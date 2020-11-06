@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=false; // whether or not debugging this module
+static bool DEBUGGING=true; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8512,6 +8512,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 	}
 	return result;
 }
+
 static long long lmergesort(Mlist* _list){
 	long long result=M_LL_INVALID;
 	if(_list){
@@ -8520,7 +8521,11 @@ static long long lmergesort(Mlist* _list){
 	return result;
 }
 
-// timsort implementation (based on geeksforgeeks.org/timsort)
+// Mindexrange and linsertingmerge() used in both harmonicasort and timsort
+typedef struct Mindexrange{
+	unsigned long long first,last;
+	struct Mindexrange* _next;
+}Mindexrange;
 // helper functions
 // MDH@04NOV2020: due to the problem with the index values (which we need to keep in ascending order)
 //                it's easier to simply merge in all second sequence values into the first sequence values
@@ -8572,6 +8577,130 @@ static Mlistelement* linsertingmerge(Mlist * const _list,Mlistelement * const be
 	if(!nextlastanother)_list->_last=mergedlistelement;
 	return mergedlistelement;
 }
+// harmonica sort helper function
+// reversing the order of list elements is expected to be much faster than having to insert into a large list, where merging would be possible!!!
+// CHANGING first -> ... -> last -> afterlast TO last -> ... -> first -> afterlast
+//          essentially all the successors change but beforefirst should now point to last I suppose
+static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement * const last){
+	Mlistelement *afterlast=last->_next,*first=(beforefirst?beforefirst->_next:_list->_first); // salvage the current successor of last
+	if(beforefirst)beforefirst->_next=last; // we've salvaged the original first, so we can now change it to last which will be the new first element
+	// ASSERT beforefirst and afterlast should be connected meaning that if you next up from beforefirst upwards, you'd end up at afterlast
+	Mlistelement *nextnextlistelement,*listelement=first,*nextlistelement=first->_next;
+	while(listelement){
+		// ASSERT originalnextlistelement should be the original next of listelement
+		// i.e. we want to make originalnextlistelement->_next equal to listelement
+		// NOTE that listelement itself is no longer pointing to originalnextlistelement, so the situation is <-listelement | nextlistelement->
+		// step 1: remember the current successor of the originalnextlistelement
+		nextnextlistelement=nextlistelement->_next;
+		// step 2: CHANGING <- listelement | nextlistelement -> INTO <- listelement | <- nextlistelement
+		nextlistelement->_next=listelement;
+		if(nextlistelement==last)break;
+		// step 3: make list element equal to its original successor (which is nextlistelement) and nextlistelement to it's original successor which is nextnextlistelement
+		listelement=nextlistelement;
+		nextlistelement=nextnextlistelement;
+	}
+	// make first->_next point to the original successor of last
+	first->_next=afterlast;
+}
+static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long result=(_list?M_TRUE:M_LL_INVALID);
+	if(result==M_TRUE){
+		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
+		if(previous){ // at least two elements in the list
+			Mlistelement* current=previous->_next; // the first element to compare
+			if(current){ // at least 2 elements in the list
+				// determine the index ranges
+				Mindexrange indexrange={_list->_first->index,_list->_first->index};
+				Mindexrange* nextindexrange=&indexrange;
+				if(_list->_last->index>_list->numberOfElements){ // possibly multiple range
+					Mlistelement* listelement=_list->_first;
+					while(1){
+						listelement=listelement->_next;
+						if(!listelement)break;
+						if(listelement->index!=nextindexrange->last+1){ // there's a gap
+							nextindexrange->_next=CALLOC_1(sizeof(Mindexrange),'~',owner);
+							nextindexrange=nextindexrange->_next;
+							if(!nextindexrange)break; // TODO serious problem
+							nextindexrange->first=listelement->index;
+						}
+						// update last
+						nextindexrange->last=listelement->index;
+					}
+				}else
+					nextindexrange->last=_list->_last->index;
+				// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
+				// original code from Mrunpoints() below
+				int direction,rundirection=0;
+				Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*smallest=NULL,*largest=NULL,*runsmallest,*runlargest; // keep track of the global smallest and largest, and the run smallest and largest
+				Mvalue *currentValue,*previousValue=previous->_value;
+				do{
+					currentValue=current->_value; // the value to compare
+					// if value equals nextvalue, we simply continue, because an equal value can never end a run
+					if(smallerthan(currentValue,previousValue)==M_TRUE){
+						if(rundirection>0){ // direction switched from up to down
+							// we have to merge the down and the up run to an single up run i.e. \/ to / where the first \ is from largest to smallest
+							// ASSERT all the elements in \ (largest to smallest) are larger than smallest so we know the following loop always ends
+							runlargest=previous;
+							if(report)outputValue("Up run maximum: '",previousValue,"'.\n");
+							// both the main run is up, as well as the run we just finished
+							// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
+							if(largest)linsertingmerge(_list,NULL,largest,previous);
+							if(previous->_next==current)largest=previous;
+							if(report)outputValue("Maximum so far: '",largest->_value,"'.\n");
+						}
+						rundirection=-1;
+					}else
+					if(largerthan(currentValue,previousValue)==M_TRUE){
+						if(rundirection<0){ // direction switched from down to up
+							runsmallest=previous;
+							if(report)outputValue("Down run minimum: '",previousValue,"'.\n");
+							// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
+							// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
+							lreverse(_list,largest,runsmallest); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+							// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
+							if(smallest)linsertingmerge(_list,NULL,largest,previous); // NOTE previous still contains the smallest element in the run
+							smallest=_list->_first; // TODO we might not need to do this actually
+							// ASSERT we've successfully merged the down run into the up run that we're going to end up with
+							if(report)outputValue("Minimum so far: '",smallest->_value,"'.\n");
+						}
+						rundirection=1; // going up!!!!
+					}
+					previous=current;previousValue=currentValue; // update previous
+					current=current->_next;
+				}while(current);
+
+				_list->_last=largest; // TODO this seems to be a valid assumption
+
+				// reapply the collected indices from the index ranges
+				nextindexrange=&indexrange;
+				unsigned long long index=nextindexrange->first; // the fist index to assign
+				Mlistelement* listelement=_list->_first;
+				while(1){
+					listelement->index=index;
+					listelement=listelement->_next;
+					if(!listelement)break;
+					// update the index to assign
+					if(index==nextindexrange->last){
+						nextindexrange=nextindexrange->_next;
+						index=nextindexrange->first;
+					}else
+						index++;
+				}
+				// free all dynamically allocated index ranges
+				Mindexrange* indexrangetofree=indexrange._next;
+				while(indexrangetofree){
+					nextindexrange=indexrangetofree->_next;
+					FREE_DISOWNED_1(indexrangetofree,'~',owner);
+					indexrangetofree=nextindexrange;
+				}
+			}
+		}
+	}
+	return result;
+}
+
+// timsort implementation (based on geeksforgeeks.org/timsort)
 /* replacing:
 static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mlistelement* lastanother){
 	bool report=amVerboseDebugging()||DEBUGGING;
@@ -8768,6 +8897,7 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 	if(!afterlast)_list->_last=largest; // if there is no afterlast we should update the last element of the list
 	return largest;
 }
+/*
 // NOTE linsertionSort moves the values NOT the list elements, therefore there's no need to change the index
 static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	// ASSERT last should NOT be NULL
@@ -8810,12 +8940,9 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 		listelement=listelement->_next; // the list element to insert next, is the one we remembered at the beginning of the loop
 	}
 }
+*/
 const unsigned long long M_RUN_LENGTH=32;
 // MDH@05NOV2020: changing timsort by registering the index ranges first, and writing the indices at the end
-typedef struct Mindexrange{
-	unsigned long long first,last;
-	struct Mindexrange* _next;
-}Mindexrange;
 static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
@@ -8963,6 +9090,8 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 		}else
 		if(_tosortValue->type==VT_LIST){
 			switch(sortMethod){
+				case 'b': // "biden" sort
+				case 'h':result=lharmonicasort(_tosortValue->value._list);break;
 				case 'm':result=lmergesort(_tosortValue->value._list);break;
 				case 't':result=ltimsort(_tosortValue->value._list);break;
 				default:result=lquicksort(_tosortValue->value._list);break;
@@ -9002,6 +9131,8 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 				char sortMethod=(_sortMethodValue&&_sortMethodValue->type==VT_TEXT?_sortMethodValue->value._text->_c[0]:'\0');
 				long long sortResult=M_LL_INVALID;
 				switch(sortMethod){
+					case 'b': // "biden" sort
+					case 'h':sortResult=lharmonicasort(_tosortValue->value._list);break;
 					case 't':sortResult=ltimsort(_tosortList);break;
 					case 'm':sortResult=lmergesort(_tosortList);break;
 					default:sortResult=lquicksort(_tosortList);break;
