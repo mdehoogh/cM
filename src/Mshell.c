@@ -8618,7 +8618,17 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
 		if(previous){ // at least two elements in the list
 			Mlistelement* current=previous->_next; // the first element to compare
-			if(current){ // at least 2 elements in the list
+			// skip all equal values so we can set the rundirection to either -1 or 1
+			// obviously all elements could be equal
+			while(current&&equalto(previous->_value,current->_value)){
+				previous=current;
+				current=current->_next;
+			}
+			if(current){ // at least 2 unequal elements in the list
+				// we're either going up or down
+				int rundirection=(largerthan(current->_value,previous->_value)==M_TRUE?1:-1);
+				// advance current (NOTE if the list has only two elements, current would then be NULL)
+				previous=current;current=current->_next; 
 				// determine the index ranges
 				Mindexrange indexrange={_list->_first->index,_list->_first->index};
 				Mindexrange* nextindexrange=&indexrange;
@@ -8640,15 +8650,14 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 					nextindexrange->last=_list->_last->index;
 				// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
 				// original code from Mrunpoints() below
-				int direction,rundirection=0;
-				Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*smallest=NULL,*largest=NULL,*runsmallest,*runlargest; // keep track of the global smallest and largest, and the run smallest and largest
+				Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*runsmallest,*runlargest;
+				Mlistelement *smallest=NULL,*largest=NULL;
 				Mvalue *currentValue=NULL,*previousValue=previous->_value;
-				do{
+				while(current){
 					currentValue=current->_value; // the value to compare
 					if(report){outputValue("Comparing '",currentValue,"'");outputValue(" with '",previousValue,"'.\n");}
-					// if value equals nextvalue, we simply continue, because an equal value can never end a run
-					if(smallerthan(currentValue,previousValue)==M_TRUE){
-						if(rundirection>0){ // direction switched from up to down
+					if(rundirection>0){ // in an up run
+						if(smallerthan(currentValue,previousValue)==M_TRUE){
 							// we have to merge the down and the up run to an single up run i.e. \/ to / where the first \ is from largest to smallest
 							// ASSERT all the elements in \ (largest to smallest) are larger than smallest so we know the following loop always ends
 							runlargest=previous;
@@ -8663,11 +8672,10 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 								if(report)outputList("List so far: '",_list,"'.\n");
 							}else
 							if(report)output("The up run is empty!\n");
+							rundirection=-1;
 						}
-						rundirection=-1;
-					}else
-					if(largerthan(currentValue,previousValue)==M_TRUE){
-						if(rundirection<0){ // direction switched from down to up
+					}else{ // in a down run
+						if(largerthan(currentValue,previousValue)==M_TRUE){ // switching to an up run
 							runsmallest=previous;
 							if(report)outputValue("Down run minimum: '",previousValue,"'.\n");
 							// if there's nothing in between the down run is empty
@@ -8694,13 +8702,13 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 							}else
 							if(report)
 								output("The down run is empty!\n");
+							rundirection=1;
 						}
-						rundirection=1; // going up!!!!
 					}
-					if(report)output("Direction: %i.\n",rundirection);
+					// and the next one!!
 					previous=current;previousValue=currentValue; // update previous
 					current=current->_next;
-				}while(current);
+				}
 				// take care of the last run
 				if(rundirection>0){ // end of an up run
 					// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
