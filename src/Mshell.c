@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=true; // whether or not debugging this module
+static bool DEBUGGING=false; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8398,16 +8398,6 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 }
 
 // MDH@02NOV2020: we can speed up sorting if we can somehow reverse parts of a list
-static void reverse(Mlist* _list){
-	// because a list of forward linked we simply have to make every successor point to its predecessor list element
-	/*
-	Mlistelement *predecessor=(_list?_list->_first:NULL);
-	while(predecessor){
-		successor=predecessor->_next;
-		successor->next=
-	}
-	*/
-}
 static void swap(Mlistelement* const listelement1,Mlistelement* const listelement2){
 	// normally we would not be allowed to do it this way, but the reference count
 	// of both values remains the same when we exchange their position in the list
@@ -8581,22 +8571,27 @@ static Mlistelement* linsertingmerge(Mlist * const _list,Mlistelement * const be
 // reversing the order of list elements is expected to be much faster than having to insert into a large list, where merging would be possible!!!
 // CHANGING first -> ... -> last -> afterlast TO last -> ... -> first -> afterlast
 //          essentially all the successors change but beforefirst should now point to last I suppose
-static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement * const last){
+static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement * const last,bool report){
 	// ASSERT beforelist can be NULL, but last should NOT
-	Mlistelement* first;
+	Mlistelement* first=(beforefirst?beforefirst->_next:_list->_first);
+	if(report){outputValue("Reversing: '",first->_value,"'");outputValue(" through '",last->_value,"'.\n");}
 	if(beforefirst){ // not at the start of the list
-		first=beforefirst->_next;
 		beforefirst->_next=last;
+		if(report){outputValue("Successor of '",beforefirst->_value,"'");outputValue(" set to '",beforefirst->_next->_value,"'.\n");}
 	}else{ // at the start of the list
-		first=_list->_first;
 		_list->_first=last;
+		if(report)outputValue("First list element changed to '",_list->_first->_value,"'.\n");
 	}
 	Mlistelement* afterlast=last->_next; // salvage the current successor of last
-	if(!afterlast)_list->_last=first; // if last is the last element in the list, first will be the new last element of the list
+	if(!afterlast){
+		_list->_last=first; // if last is the last element in the list, first will be the new last element of the list
+		if(report)outputValue("Last list element changed to '",_list->_last->_value,"'.\n");
+	}
 
 	// ASSERT beforefirst and afterlast should be connected meaning that if you next up from beforefirst upwards, you'd end up at afterlast
 	Mlistelement *nextnextlistelement,*listelement=first,*nextlistelement=first->_next;
 	while(listelement){
+		if(report){outputValue("Next list element '",nextlistelement->_value,"'");outputValue(" to point to '",listelement->_value,"'.\n");}
 		// ASSERT originalnextlistelement should be the original next of listelement
 		// i.e. we want to make originalnextlistelement->_next equal to listelement
 		// NOTE that listelement itself is no longer pointing to originalnextlistelement, so the situation is <-listelement | nextlistelement->
@@ -8611,6 +8606,10 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 	}
 	// make first->_next point to the original successor of last
 	first->_next=afterlast;
+	if(report){
+		outputValue("'",first->_value,"' now pointing to");
+		if(afterlast)outputValue("': '",afterlast->_value,"'.\n");else output(" nothing!");
+	}
 }
 static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
@@ -8646,6 +8645,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				Mvalue *currentValue=NULL,*previousValue=previous->_value;
 				do{
 					currentValue=current->_value; // the value to compare
+					if(report){outputValue("Comparing '",currentValue,"'");outputValue(" with '",previousValue,"'.\n");}
 					// if value equals nextvalue, we simply continue, because an equal value can never end a run
 					if(smallerthan(currentValue,previousValue)==M_TRUE){
 						if(rundirection>0){ // direction switched from up to down
@@ -8674,12 +8674,20 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 							if(!largest||largest->_next!=previous){
 								// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
 								// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
-								if(largest)previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
-								lreverse(_list,largest,runsmallest); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-								// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
-								// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
-								if(largest)linsertingmerge(_list,NULL,largest,previous); // NOTE previous still contains the smallest element in the run
-								// smallest=_list->_first; // TODO we might not need to do this actually
+								if(largest){
+									previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
+									lreverse(_list,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+									// if(report)output("Down run reversed!\n");
+									if(report)outputList("List after reversing the down list: '",_list,"'.\n");
+									// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
+									// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
+									linsertingmerge(_list,NULL,largest,previous);
+								}else{ // there's no main up run, so we only need to reverse this down run at the beginning of the list
+									largest=_list->_first; // obviously
+									lreverse(_list,NULL,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+									// if(report)output("Initial down run reversed!\n");
+								}						
+								smallest=_list->_first; // TODO we might not need to do this actually
 								// ASSERT we've successfully merged the down run into the up run that we're going to end up with
 								if(report)outputValue("Minimum so far: '",smallest->_value,"'.\n");
 								if(report)outputList("List so far: '",_list,"'.\n");
@@ -8689,6 +8697,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 						}
 						rundirection=1; // going up!!!!
 					}
+					if(report)output("Direction: %i.\n",rundirection);
 					previous=current;previousValue=currentValue; // update previous
 					current=current->_next;
 				}while(current);
@@ -8698,7 +8707,6 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 					if(largest){
 						if(report)output("Processing the final up run!\n");
 						linsertingmerge(_list,NULL,largest,previous);
-						largest=_list->_last;
 					}else
 					if(report)
 						output("The list was already in ascending order.\n");
@@ -8706,15 +8714,18 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				if(rundirection<0){ // end of the down run
 					if(report)output("Processing the final down run!\n");
 					runsmallest=previous;
-					if(largest)previous=largest->_next;else previous=_list->_last;
-					lreverse(_list,largest,runsmallest);
-					if(largest)linsertingmerge(_list,NULL,largest,previous);else largest=_list->_last;
+					if(largest){ // something in front that we need to merge the down run into
+						// nothing to reverse if there's only a single element in the down run
+						if(largest->_next!=previous){previous=largest->_next;lreverse(_list,largest,runsmallest,report);}
+						linsertingmerge(_list,NULL,largest,previous);
+					}else
+						lreverse(_list,NULL,runsmallest,report);
 					// because it's a down run the maximum will be the last element in the list after reversal
 				}
 				
-				_list->_last=largest; // TODO this seems to be a valid assumption
+				// _list->_last=largest; // TODO this seems to be a valid assumption
 
-				if(report)outputList("The sorted list: '",_list,"'.\n");
+				if(report){outputList("The sorted list: '",_list,"'.\n");outputValue("First: '",_list->_first->_value,"'");outputValue(" - last: '",_list->_last->_value,"'.\n");}
 
 				// reapply the collected indices from the index ranges
 				nextindexrange=&indexrange;
