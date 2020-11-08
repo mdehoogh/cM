@@ -8521,6 +8521,10 @@ typedef struct Mindexrange{
 //                it's easier to simply merge in all second sequence values into the first sequence values
 // MDH@05NOV2020: linsertingmerge does not need to keep the index values ascending so it can safely
 //                exchange the position of list elements in the list
+static struct{
+	unsigned long long comparisons;
+	unsigned long long exchanges;
+}sortstatistics;
 static Mlistelement* linsertingmerge(Mlist * const _list,Mlistelement * const beforefirstone,Mlistelement * const lastone,Mlistelement * const lastanother){
 	bool report=amVerboseDebugging()||DEBUGGING;
 
@@ -8545,6 +8549,7 @@ static Mlistelement* linsertingmerge(Mlist * const _list,Mlistelement * const be
 	while(one&&another){
 		// determine the first one that is larger than another
 		if(smallerthanorequalto(oneValue,anotherValue)==M_TRUE){ // one<=another
+			sortstatistics.comparisons++;
 			if(mergedlistelement)mergedlistelement->_next=one;else _list->_first=one;
 			mergedlistelement=one;
 			if(one!=lastone){one=one->_next;oneValue=one->_value;}else one=NULL;
@@ -8591,6 +8596,7 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 	// ASSERT beforefirst and afterlast should be connected meaning that if you next up from beforefirst upwards, you'd end up at afterlast
 	Mlistelement *nextnextlistelement,*listelement=first,*nextlistelement=first->_next;
 	while(listelement){
+		sortstatistics.exchanges++;
 		if(report){outputValue("Next list element '",nextlistelement->_value,"'");outputValue(" to point to '",listelement->_value,"'.\n");}
 		// ASSERT originalnextlistelement should be the original next of listelement
 		// i.e. we want to make originalnextlistelement->_next equal to listelement
@@ -8621,6 +8627,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 			// skip all equal values so we can set the rundirection to either -1 or 1
 			// obviously all elements could be equal
 			while(current&&equalto(previous->_value,current->_value)){
+				sortstatistics.comparisons++;
 				previous=current;
 				current=current->_next;
 			}
@@ -8658,6 +8665,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 					if(report){outputValue("Comparing '",currentValue,"'");outputValue(" with '",previousValue,"'.\n");}
 					if(rundirection>0){ // in an up run
 						if(smallerthan(currentValue,previousValue)==M_TRUE){
+							sortstatistics.comparisons++;
 							// we have to merge the down and the up run to an single up run i.e. \/ to / where the first \ is from largest to smallest
 							// ASSERT all the elements in \ (largest to smallest) are larger than smallest so we know the following loop always ends
 							runlargest=previous;
@@ -8665,7 +8673,9 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 							if(!smallest||smallest->_next!=previous){
 								// both the main run is up, as well as the run we just finished
 								// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
-								if(largest)linsertingmerge(_list,NULL,largest,previous);
+								// MDH@08NOV2020: if I'm right you can use runsmallest as initial insertion point
+								//                apparently NOT as it loops indefinitely somewhere
+								if(largest)linsertingmerge(_list,runsmallest,largest,previous);
 								smallest=_list->_first;
 								if(previous->_next==current)largest=previous;
 								if(report)outputValue("Maximum so far: '",largest->_value,"'.\n");
@@ -8676,6 +8686,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 						}
 					}else{ // in a down run
 						if(largerthan(currentValue,previousValue)==M_TRUE){ // switching to an up run
+							sortstatistics.comparisons++;
 							runsmallest=previous;
 							if(report)outputValue("Down run minimum: '",previousValue,"'.\n");
 							// if there's nothing in between the down run is empty
@@ -8928,11 +8939,13 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 		// MDH@04NOV2020: we can speed things up a little bit by comparing with the largest value so far
 		//                if toinsertValue is smaller than lastinsertedValue, we have to insert it
 		if(smallerthan(toinsertValue,largest->_value)==M_TRUE){ // toinsertValue<largest value
+			sortstatistics.comparisons++;
 			// we compare toinsertValue with all values ordered so far to find the first value that is larger
 			notlarger=NULL;
 			larger=smallest;
 			// determine the first element with value larger than the value to insert
 			while(smallerthanorequalto(larger->_value,toinsertValue)==M_TRUE){
+				sortstatistics.comparisons++;
 				if(larger==largest){outputBug("");outputValue("'",toinsertValue,"' seems to be larger than the largest so far: ");outputValue("'",largest->_value,"'.\n");break;}
 				if(report){outputValue("'",larger->_value,"'<");outputValue("='",toinsertValue,"'.\n");}
 				notlarger=larger;
@@ -9152,6 +9165,7 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 			}
 		}else
 		if(_tosortValue->type==VT_LIST){
+			sortstatistics.comparisons=0;sortstatistics.exchanges=0;
 			switch(sortMethod){
 				case 'b': // "biden" sort
 				case 'h':result=lharmonicasort(_tosortValue->value._list);break;
@@ -9159,6 +9173,7 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 				case 't':result=ltimsort(_tosortValue->value._list);break;
 				default:result=lquicksort(_tosortValue->value._list);break;
 			}
+			output("Sort result: comparisons=%llu, exchanges=%llu.\n",sortstatistics.comparisons,sortstatistics.exchanges);
 		}
 	}
 	return _getIntegerValue(result);
@@ -9192,6 +9207,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 			Mlist* _tosortList=owned_list(_getListCopy(_tosortValue->value._list),owner);
 			if(_tosortList){
 				char sortMethod=(_sortMethodValue&&_sortMethodValue->type==VT_TEXT?_sortMethodValue->value._text->_c[0]:'\0');
+				sortstatistics.comparisons=0;sortstatistics.exchanges=0;
 				long long sortResult=M_LL_INVALID;
 				switch(sortMethod){
 					case 'b': // "biden" sort
@@ -9200,9 +9216,10 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 					case 'm':sortResult=lmergesort(_tosortList);break;
 					default:sortResult=lquicksort(_tosortList);break;
 				}
-				if(sortResult>0) // _tosortList was successfully sorted
+				if(sortResult>0){ // _tosortList was successfully sorted
 					sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
-				else
+					output("Sort result: comparisons=%llu, exchanges=%llu.\n",sortstatistics.comparisons,sortstatistics.exchanges);
+				}else
 					FREE_LIST(_tosortList,owner);
 			}else
 				outputError("Failed to create a copy of the list to sort");
