@@ -8955,6 +8955,8 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 }
 const unsigned long long M_RUN_LENGTH=32;
 // calling the improved version harmonica binary sort which keeps waypoints on the part already sorted, to speed up merging
+// the general idea is to keep every M_RUN_LENGTH list element of the already sorted list, so we can use binary sort to find the lower boundary of what we're inserting
+// if we run out of memory we simply double the space between the remembered list elements
 static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=(_list?M_TRUE:M_LL_INVALID);
@@ -9008,16 +9010,18 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 				// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
 				// original code from Mrunpoints() below
 
-				/* let's keep a number of list element pointers that we can use to speed up inserting
-				Mlistelement** stack=CALLOC_1(sizeof(Mlistelement*),-'l',owner);
-				long long processbeforestacking=M_RUN_LENGTH; // keeping track of the current list element index so that we can push elements onto the stack at regular intervals
-				*/
-				Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*runsmallest,*runlargest,*smaller,*beforefirstone,*firstone;
+				// let's keep an array of list element pointers that we can use to speed up inserting
+				Mlistelement** stack=MALLOC_1(sizeof(Mlistelement*),-'l',owner);
+				size_t laststackindex=0; // the last stack index pointing to the last stacked element
+				unsigned long long stackelementdistance=0;
+				// if(stack)stackelementdistance=M_RUN_LENGTH; // start out with stacking every M_RUN_LENGTH element of the already sorted list
+				unsigned long long runindex,stackelementindex,lowerstackindex,upperstackindex,middlestackindex; // start out with stacking every M_RUN_LENGTH element of the already sorted list
+				
+				Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*runsmallest,*runlargest,*smaller,*beforefirstone,*firstone,*stacklistelement;
 				Mlistelement *smallest=NULL,*largest=NULL;
 				Mvalue *currentValue=NULL,*previousValue=previous->_value;
-				sortstatistics.pointerassignments+=13;sortstatistics.fieldreferences++; // NOTE counting the declarations as well but if that will really make a difference
+				sortstatistics.pointerassignments+=14;sortstatistics.fieldreferences++; // NOTE counting the declarations as well but if that will really make a difference
 				bool emptyrun;
-				long long runindex;
 				while(1){
 					sortstatistics.pointertests++;
 					if(!current)break;
@@ -9046,32 +9050,64 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 								sortstatistics.pointertests++;
 								if(largest){
 									smaller=NULL; // this is going to be the 'offset' to the main list that we're going to speed determine
-									runsmallest=largest->_next; // the successor of the largest is essentially the first list element to merge from `another`
-									sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests++;
-									if(runsmallest){ // TODO should always be there I suppose!!!
-										// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
-										// iterate over the part already sorted
-										beforefirstone=NULL;
-										firstone=_list->_first;
-										sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
-										while(1){
-											runindex=M_RUN_LENGTH*4;
-											while(--runindex>=0){
-												beforefirstone=firstone;
-												firstone=beforefirstone->_next;
-												sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2;
-												if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
+									if(stackelementdistance>0){
+										lowerstackindex=0;upperstackindex=laststackindex;
+										while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
+											middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
+											if(largerthan(previousValue,stack[middlestackindex]->_value)==M_TRUE)
+												lowerstackindex=middlestackindex;
+											else
+												upperstackindex=middlestackindex;
+										}
+										smaller=stack[lowerstackindex];
+									}else{
+										runsmallest=largest->_next; // the successor of the largest is essentially the first list element to merge from `another`
+										sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests++;
+										if(runsmallest){ // TODO should always be there I suppose!!!
+											// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
+											// iterate over the part already sorted
+											beforefirstone=NULL;
+											firstone=_list->_first;
+											sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
+											while(1){
+												runindex=M_RUN_LENGTH*4;
+												while(--runindex>=0){
+													beforefirstone=firstone;
+													firstone=beforefirstone->_next;
+													sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2;
+													if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
+												}
+												sortstatistics.pointertests++;
+												if(!beforefirstone)break;
+												sortstatistics.comparisons++;
+												if(largerthan(firstone->_value,runsmallest->_value))break; // found one that is larger, which means we're done
+												// ASSERT firstone is smaller than or equal to runsmallest
+												smaller=beforefirstone;
+												sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 											}
-											sortstatistics.pointertests++;
-											if(!beforefirstone)break;
-											sortstatistics.comparisons++;
-											if(largerthan(firstone->_value,runsmallest->_value))break; // found one that is larger, which means we're done
-											// ASSERT firstone is smaller than or equal to runsmallest
-											smaller=beforefirstone;
-											sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 										}
 									}
 									linsertingmerge(_list,smaller,largest,previous);
+									// do we need to remember an additional list element on the stack?????
+									if(stackelementdistance>0){
+										stacklistelement=stack[laststackindex];
+										stackelementindex=M_RUN_LENGTH;
+										while(stackelementindex>0){
+											stacklistelement=stacklistelement->_next;
+											if(stacklistelement==largest){stacklistelement=NULL;break;}
+											stackelementindex--;
+										}
+										if(stacklistelement){
+											// try to push stacklistelement it on the stack
+											Mlistelement** newstack=REALLOC(stack,laststackindex+1,laststackindex+2,sizeof(Mlistelement*),-'l');
+											if(newstack){
+												stack=newstack;
+												stack[++laststackindex]=stacklistelement;
+											}else{ // failure
+												// double the distance between the stack elements which means removing half of the elements on the stack
+											}
+										}
+									}
 								}
 								smallest=_list->_first;
 								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;sortstatistics.pointertests++;
