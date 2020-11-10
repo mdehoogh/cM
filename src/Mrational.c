@@ -180,7 +180,7 @@ mp_err _qdiv_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
  * \brief computes the difference of \p a and \p b and puts the result in \p c
  */
 mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
-    bool report=amVerboseDebugging()||DEBUGGING;
+    bool report=amVerboseDebugging(); //||DEBUGGING;
     mp_err status=((c&&!c->num&&!c->den)&&(a||b)?MP_OKAY:MP_ERR); // MDH@24MAY2020: demanding that c->num and c->den are currently undefined!!!
     if(status==MP_OKAY){ // c and at least a or b provided
         // should we NULL the numerator and denominator of c?????
