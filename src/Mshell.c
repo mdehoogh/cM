@@ -8957,6 +8957,35 @@ const unsigned long long M_RUN_LENGTH=32;
 // calling the improved version harmonica binary sort which keeps waypoints on the part already sorted, to speed up merging
 // the general idea is to keep every M_RUN_LENGTH list element of the already sorted list, so we can use binary sort to find the lower boundary of what we're inserting
 // if we run out of memory we simply double the space between the remembered list elements
+static unsigned long long llsqrt(unsigned long long n){
+	unsigned long long q=1;
+    while(q<=n)q<<=2;
+    long long t,r=0;
+    while(q>1){
+        q>>=2;
+        t=-r;
+		t+=n;
+		t-=q;
+        r>>=1;
+        if(t>=0){n=t;r+=q;}
+    }
+    return r;
+}
+static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long numberoflistelements,Mvalue* value){
+	if(smallerthan(value,(*listelements)->_value)==M_TRUE)return NULL;
+	unsigned long long lastindex=--numberoflistelements;
+	Mlistelement* last=listelements[lastindex];
+	if(smallerthan(last->_value,value)==M_TRUE)return last;
+	unsigned long long middleindex,firstindex=0;
+	while(lastindex>firstindex+1){
+		middleindex=(firstindex+lastindex)>>1;
+		if(largerthan(listelements[middleindex]->_value,value)==M_TRUE)
+			lastindex=middleindex;
+		else
+			firstindex=middleindex;
+	}
+	return listelements[firstindex];
+}
 static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=(_list?M_TRUE:M_LL_INVALID);
@@ -8987,6 +9016,15 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 				previous=current;current=current->_next; 
 				sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;
 				
+				Mlist* _sublist=owned_list(__list("harmonicabinarysort"),owner);
+				unsigned long long stacksize,leftbeforesublist;
+				if(_sublist){
+					stacksize=llsqrt(_list->numberOfElements);
+					output("Stack size of list with %llu elements: %llu.\n",_list->numberOfElements,stacksize);
+					// don't bother if less than 17 elements in the list
+					if(stacksize<4){FREE_LIST(_sublist,owner);_sublist=NULL;}else leftbeforesublist=stacksize;
+				}
+
 				// determine the index ranges
 				Mindexrange indexrange={_list->_first->index,_list->_first->index};
 				Mindexrange* nextindexrange=&indexrange;
@@ -8995,6 +9033,16 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 					while(1){
 						listelement=listelement->_next;
 						if(!listelement)break;
+						// fill the sublist with the value associated with listelement 
+						if(_sublist){
+							leftbeforesublist--;
+							if(leftbeforesublist==0){
+								if(appendedToList(_sublist,owner,listelement->_value,M_LL_INVALID)<=0){
+									FREE_LIST(_sublist,owner);_sublist=NULL;
+								}else
+									leftbeforesublist=stacksize;
+							}
+						}
 						if(listelement->index!=nextindexrange->last+1){ // there's a gap
 							nextindexrange->_next=CALLOC_1(sizeof(Mindexrange),'~',owner);
 							nextindexrange=nextindexrange->_next;
@@ -9007,6 +9055,10 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 				}else
 					nextindexrange->last=_list->_last->index;
 
+				Mlistelement** stack=NULL;
+				if(_sublist){
+					stack=CALLOC(sizeof(Mlistelement*))
+				}
 				// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
 				// original code from Mrunpoints() below
 
