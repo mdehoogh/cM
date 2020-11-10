@@ -8993,12 +8993,14 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
 		if(previous){ // at least two elements in the list
+			unsigned long long equalcount=0; // keep track of the total number of elements left to sort
 			Mlistelement* current=previous->_next; // the first element to compare
 			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
 			if(current){
 				while(1){
 					sortstatistics.comparisons++;
 					if(!equalto(previous->_value,current->_value))break;
+					equalcount++;
 					previous=current;
 					current=current->_next;
 					sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
@@ -9016,32 +9018,40 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 				previous=current;current=current->_next; 
 				sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;
 				
-				Mlist* _sublist=owned_list(__list("harmonicabinarysort"),owner);
-				unsigned long long stacksize,leftbeforesublist;
-				if(_sublist){
-					stacksize=llsqrt(_list->numberOfElements);
-					output("Stack size of list with %llu elements: %llu.\n",_list->numberOfElements,stacksize);
-					// don't bother if less than 17 elements in the list
-					if(stacksize<4){FREE_LIST(_sublist,owner);_sublist=NULL;}else leftbeforesublist=stacksize;
+				// for use in binary search we'll be using a stack of list elements
+				Mlistelement** stack=NULL;
+				Mlistelement* stacktop;
+				unsigned long long stacksize=llsqrt(_list->numberOfElements-equalcount),leftbeforestack=0,stacked=0;
+				if(stacksize>=4)stack=CALLOC(sizeof(Mlistelement*),stacksize,'~',owner);
+				if(stack){
+					leftbeforestack=(stacksize>>1)+equalcount; // just take the middle element of the successive parts starting from equalcount
+					stacktop=previous; // remember where to link the next stack element to
+					// NOTE we're not yet disconnecting the stacktop but we will of course
 				}
 
 				// determine the index ranges
 				Mindexrange indexrange={_list->_first->index,_list->_first->index};
 				Mindexrange* nextindexrange=&indexrange;
-				if(_list->_last->index>_list->numberOfElements){ // possibly multiple range
-					Mlistelement* listelement=_list->_first;
-					while(1){
-						listelement=listelement->_next;
-						if(!listelement)break;
+				// MDH@10NOV2020: if we are supposed to create and use a stack the elements to stack will be placed between previous and current
+				//                then we sort that sublist with quick sort (which doesn't pay attention to the indices which of course will now be incorrect)
+				if(stack||_list->_last->index>_list->numberOfElements){ // possibly multiple range
+					Mlistelement *prevlistelement=_list->_first;
+					Mlistelement *listelement=prevlistelement->_next; // initialized to the second element
+					while(listelement){
 						// fill the sublist with the value associated with listelement 
-						if(_sublist){
-							leftbeforesublist--;
-							if(leftbeforesublist==0){
-								if(appendedToList(_sublist,owner,listelement->_value,M_LL_INVALID)<=0){
-									FREE_LIST(_sublist,owner);_sublist=NULL;
-								}else
-									leftbeforesublist=stacksize;
-							}
+						if(stack){
+							leftbeforestack--;
+							if(leftbeforestack==0){
+								leftbeforestack=stacksize;
+								stacked++;
+								// unlink listelement i.e. link it's predecessor to the successor of listelement
+								prevlistelement->_next=listelement->_next;
+								stacktop->_next=listelement;
+								stacktop=listelement; // the new stack top
+								stacktop->_next=NULL; // as long as stacktop is the top of the stack it's successor will be NULL
+							}else
+							if(leftbeforestack==1)
+								prevlistelement=listelement;
 						}
 						if(listelement->index!=nextindexrange->last+1){ // there's a gap
 							nextindexrange->_next=CALLOC_1(sizeof(Mindexrange),'~',owner);
@@ -9051,21 +9061,37 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 						}
 						// update last
 						nextindexrange->last=listelement->index;
+						// if there is no next element, we're done
+						listelement=listelement->_next;
 					}
 				}else
 					nextindexrange->last=_list->_last->index;
 
-				Mlistelement** stack=NULL;
-				if(_sublist){
-					stack=CALLOC(sizeof(Mlistelement*))
-				}
 				// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
 				// original code from Mrunpoints() below
 
-				// let's keep an array of list element pointers that we can use to speed up inserting
-				Mlistelement** stack=MALLOC_1(sizeof(Mlistelement*),-'l',owner);
-				size_t laststackindex=0; // the last stack index pointing to the last stacked element
-				unsigned long long stackelementdistance=0;
+				// sorting the stacked list elements is going to be fun
+				if(stack){
+					Mlistelement *first=_list->_first,*last=_list->_last;
+					unsigned long long listNumberOfElements=_list->numberOfElements;
+					stacktop->_next=NULL;
+					_list->_last=stacktop;
+					_list->_first=previous->_next;
+					_list->numberOfElements=stacked;
+					lquicksort(_list); // quicksort the 'stack'
+					outputList("Sub sample quick sorted list: '",_list,"'.\n");
+					// put the elements of list in the stack
+					Mlistelement* listelement=_list->_first;unsigned long long stackindex=0;
+					while(listelement){stack[stackindex++]=listelement;listelement=listelement->_next;}
+					// restore the list
+					previous=_list->_last; // the last element in the list
+					previous->_next=current; // restore the link to current (the first element to process)
+					// restore the list
+					_list->numberOfElements=listNumberOfElements;
+					_list->_first=first;
+					_list->_last=last;
+				}
+
 				// if(stack)stackelementdistance=M_RUN_LENGTH; // start out with stacking every M_RUN_LENGTH element of the already sorted list
 				unsigned long long runindex,stackelementindex,lowerstackindex,upperstackindex,middlestackindex; // start out with stacking every M_RUN_LENGTH element of the already sorted list
 				
@@ -9102,8 +9128,8 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 								sortstatistics.pointertests++;
 								if(largest){
 									smaller=NULL; // this is going to be the 'offset' to the main list that we're going to speed determine
-									if(stackelementdistance>0){
-										lowerstackindex=0;upperstackindex=laststackindex;
+									if(stack){
+										lowerstackindex=0;upperstackindex=stacked-1;
 										while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
 											middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
 											if(largerthan(previousValue,stack[middlestackindex]->_value)==M_TRUE)
@@ -9140,26 +9166,6 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 										}
 									}
 									linsertingmerge(_list,smaller,largest,previous);
-									// do we need to remember an additional list element on the stack?????
-									if(stackelementdistance>0){
-										stacklistelement=stack[laststackindex];
-										stackelementindex=M_RUN_LENGTH;
-										while(stackelementindex>0){
-											stacklistelement=stacklistelement->_next;
-											if(stacklistelement==largest){stacklistelement=NULL;break;}
-											stackelementindex--;
-										}
-										if(stacklistelement){
-											// try to push stacklistelement it on the stack
-											Mlistelement** newstack=REALLOC(stack,laststackindex+1,laststackindex+2,sizeof(Mlistelement*),-'l');
-											if(newstack){
-												stack=newstack;
-												stack[++laststackindex]=stacklistelement;
-											}else{ // failure
-												// double the distance between the stack elements which means removing half of the elements on the stack
-											}
-										}
-									}
 								}
 								smallest=_list->_first;
 								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;sortstatistics.pointertests++;
@@ -9199,25 +9205,37 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 									// already set (see above): runsmallest=largest->_next; // the successor of the largest is essentially the first list element to merge from `another`
 									sortstatistics.pointerassignments++;
 									// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
-									// iterate over the part already sorted
-									beforefirstone=NULL;
-									firstone=_list->_first;
-									sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
-									while(1){
-										runindex=M_RUN_LENGTH;
-										while(--runindex>=0){
-											beforefirstone=firstone;
-											firstone=beforefirstone->_next;
-											sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2;
-											if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
+									if(stack){
+										lowerstackindex=0;upperstackindex=stacked-1;
+										while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
+											middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
+											if(largerthan(previousValue,stack[middlestackindex]->_value)==M_TRUE)
+												lowerstackindex=middlestackindex;
+											else
+												upperstackindex=middlestackindex;
 										}
-										sortstatistics.pointertests++;
-										if(!beforefirstone)break;
-										sortstatistics.comparisons++;
-										if(largerthan(firstone->_value,runsmallest->_value))break; // found one that is larger, which means we're done
-										// ASSERT firstone is smaller than or equal to runsmallest
-										smaller=beforefirstone;
-										sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+										smaller=stack[lowerstackindex];
+									}else{
+										// iterate over the part already sorted
+										beforefirstone=NULL;
+										firstone=_list->_first;
+										sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
+										while(1){
+											runindex=M_RUN_LENGTH;
+											while(--runindex>=0){
+												beforefirstone=firstone;
+												firstone=beforefirstone->_next;
+												sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2;
+												if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
+											}
+											sortstatistics.pointertests++;
+											if(!beforefirstone)break;
+											sortstatistics.comparisons++;
+											if(largerthan(firstone->_value,runsmallest->_value))break; // found one that is larger, which means we're done
+											// ASSERT firstone is smaller than or equal to runsmallest
+											smaller=beforefirstone;
+											sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+										}
 									}
 									linsertingmerge(_list,smaller,largest,previous);
 								}else{ // there's no main up run, so we only need to reverse this down run at the beginning of the list
@@ -9271,6 +9289,8 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 					// because it's a down run the maximum will be the last element in the list after reversal
 				}
 				
+				if(stack)FREE_DISOWNED(stack,stacked,'~',owner);
+
 				// _list->_last=largest; // TODO this seems to be a valid assumption
 
 				if(report){outputList("The sorted list: '",_list,"'.\n");outputValue("First: '",_list->_first->_value,"'");outputValue(" - last: '",_list->_last->_value,"'.\n");}
