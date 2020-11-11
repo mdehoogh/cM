@@ -1412,7 +1412,7 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
             }
             ///////outputChar('$');
             // increment listindex until it is equal to _listelement->index
-            if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
+            // MDH@11NOV2020 we use index 0 in sorting: if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
             if(listelementindex<=showAtStart||listelementindex>=firstAtEnd){ // a displayable value
                 if(_listelement==_list->_first
                     ||_listelement==_list->_last

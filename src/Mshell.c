@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=false; // whether or not debugging this module
+static bool DEBUGGING=true; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8924,7 +8924,12 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				
 				// _list->_last=largest; // TODO this seems to be a valid assumption
 
-				if(report){outputList("The sorted list: '",_list,"'.\n");outputValue("First: '",_list->_first->_value,"'");outputValue(" - last: '",_list->_last->_value,"'.\n");}
+				if(report)
+				{
+					outputList("The sorted list: '",_list,"'.\n");
+					if(_list->_first)outputValue("First: '",_list->_first->_value,"'.\n");else outputBug("No first!");
+					if(_list->_last)outputValue("Last: '",_list->_last->_value,"'.\n");else outputBug("No last!");
+				}
 
 				// reapply the collected indices from the index ranges
 				nextindexrange=&indexrange;
@@ -8986,38 +8991,26 @@ static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long
 	}
 	return listelements[firstindex];
 }
-static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
+// MDH@11NOV2020: the stack multiplier tells us how many times the stack size is to be multiplied with
+static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=(_list?M_TRUE:M_LL_INVALID);
 	if(result==M_TRUE){
 		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
-		outputValue("Previous: '",previous->_value,"'.\n");
+		if(report)
+			outputValue("First value: '",previous->_value,"'.\n");
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
 		if(previous){ // at least two elements in the list
 			Mlistelement* current=previous->_next; // the first element to compare
-			outputValue("Current: '",current->_value,"'.\n");
+			if(report)
+				outputValue("Second value: '",current->_value,"'.\n");
 			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-			/*			
-			unsigned long long equalcount=0; // keep track of the total number of elements left to sort
-			if(current){
-				while(1){
-					sortstatistics.comparisons++;
-					if(!equalto(previous->_value,current->_value))break;
-					equalcount++;
-					previous=current;
-					current=current->_next;
-					sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-					if(!current)break;
-				}
-			}
-			*/
+			
 			// skip all equal values so we can set the rundirection to either -1 or 1
 			// obviously all elements could be equal
 			sortstatistics.pointertests++; // the test below
 			if(current){ // at least 2 unequal elements in the list
-				// we're either going up or down
-				sortstatistics.comparisons++; // the comparison below
-				int newrundirection,rundirection=0; // replacing: (largerthan(current->_value,previous->_value)==M_TRUE?1:-1);
+
 				// advance current (NOTE if the list has only two elements, current would then be NULL)
 				/* NO
 				previous=current;current=current->_next; 
@@ -9028,6 +9021,8 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 				Mlistelement** stack=NULL;
 				Mlistelement* stacktop;
 				unsigned long long leftbeforestack,betweenstackelements=llsqrt(_list->numberOfElements);
+				if(stackmultiplier>1)betweenstackelements/=stackmultiplier; // MDH@11NOV2020: divide by the stack multiplier if need be
+				if(betweenstackelements<2)betweenstackelements=2; // MDH@11NOV2020: the minimum should be two elements
 				unsigned long long stacksize=_list->numberOfElements/betweenstackelements; // the maximum number of stack elements we're going to need
 				if(stacksize>=4){
 					stack=MALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
@@ -9037,7 +9032,8 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 						stacktop=previous;
 					}
 				}
-				output("Stack size: %llu.\n",stacksize);
+				if(report)
+					output("Stack size: %llu.\n",stacksize);
 				// determine the index ranges
 				Mindexrange indexrange={_list->_first->index,_list->_first->index};
 				Mindexrange* nextindexrange=&indexrange;
@@ -9054,7 +9050,8 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 								leftbeforestack=betweenstackelements;
 								// unlink listelement i.e. link it's predecessor to the successor of listelement
 								prevlistelement->_next=listelement->_next;
-								outputValue("Stacking '",listelement->_value,"'.\n");
+								if(report)
+									outputValue("Stacking '",listelement->_value,"'.\n");
 								// add listelement to the 'stack' without changing it's _next because if we didn't we couldn't keep iterating over all list elements and collect the index values
 								stacktop->_next=listelement;
 								stacktop=listelement; // the new stack top
@@ -9082,11 +9079,10 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 
 				// sorting the stacked list elements is going to be fun
 				if(stack){
-					outputValue("Previous: '",previous->_value,"' - ");
-					outputValue("Current: '",current->_value,"'.\n");
 					stacktop->_next=current; // the stack starts with element previous and the successor of previous used to be current
 					current=previous->_next; // previous remained the same BUT current would've changed
-					outputList("List after stacking: ",_list,"'.\n");
+					if(report)
+						outputList("List after stacking: ",_list,"'.\n");
 					/* replacing:
 					Mlistelement *first=_list->_first,*last=_list->_last;
 					unsigned long long listNumberOfElements=_list->numberOfElements;
@@ -9108,75 +9104,235 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 					_list->_last=last;
 					*/
 				}
+				if(report)
+				{outputValue("After stacking: first: '",previous->_value,"' - ");outputValue("second: '",current->_value,"'.\n");}
+				// if elements were stacked it is quite unlikely that there are equal elements at the start	
+				// nevertheless we use the same approach as originally: ascertaining that previous and current are different, so that we know the initial run direction to be either 1 or -1	
+				do{
+					sortstatistics.comparisons++;
+					if(!equalto(previous->_value,current->_value))break;
+					previous=current;
+					current=current->_next;
+					sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
+				}while(current);
+				if(report)
+				{
+					outputValue("After skipping equal values: first: '",previous->_value,"' - ");
+					outputValue("second: '",(current?current->_value:NULL),"'.\n");
+				}
 
-				// if(stack)stackelementdistance=M_RUN_LENGTH; // start out with stacking every M_RUN_LENGTH element of the already sorted list
-				unsigned long long runindex,stackelementindex,lowerstackindex,upperstackindex,middlestackindex; // start out with stacking every M_RUN_LENGTH element of the already sorted list
-				
-				unsigned long long processedsofar=0; // keep track of the amount of list elements at the beginning of the list that is in ascending order
+				// when all values are the same rundirection current will be NULL and rundirection will end up zero!!! 
+				int rundirection=(current?(largerthan(current->_value,previous->_value)==M_TRUE?1:-1):0);
 
-				Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*runsmallest,*runlargest,*smaller,*beforefirstone,*firstone,*stacklistelement;
-				Mlistelement *smallest=NULL,*largest=NULL;
-				Mvalue *currentValue=NULL,*previousValue=previous->_value;
-				sortstatistics.pointerassignments+=14;sortstatistics.fieldreferences++; // NOTE counting the declarations as well but if that will really make a difference
-				bool emptyrun;
-				while(1){
-					sortstatistics.pointertests++;
-					if(!current)break;
-					processedsofar++;
-					currentValue=current->_value; // the value to compare
-					sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-					//if(report)
-					{outputValue("Comparing '",currentValue,"'");outputValue(" with '",previousValue,"'.\n");}
-					sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;sortstatistics.comparisons++; // this we know will always happen
-					newrundirection=rundirection;
-					if(rundirection>=0){ // in an up run
-						if(smallerthan(currentValue,previousValue)==M_TRUE){
-							// we have to merge the down and the up run to an single up run i.e. \/ to / where the first \ is from largest to smallest
-							// ASSERT all the elements in \ (largest to smallest) are larger than smallest so we know the following loop always ends
-							runlargest=previous;
-							if(report)outputValue("Up run maximum: '",previousValue,"'.\n");
-							sortstatistics.pointertests++;
-							if(smallest){
-								emptyrun=(smallest->_next==previous);
-								sortstatistics.fieldtests++;sortstatistics.pointertests++;
-							}else
-								emptyrun=false;
-							if(!emptyrun){
-								// both the main run is up, as well as the run we just finished
-								// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
-								// MDH@08NOV2020: if I'm right you can use runsmallest as initial insertion point
-								//                apparently NOT as it loops indefinitely somewhere
-								// MDH@09NOV2020: OOPS we're supposed to pass in the beforefirst NOT the first, so how do we find the predecessor of runsmallest?????
+				if(rundirection!=0){
+
+					previous=current;current=current->_next; // move on to compare the third and second element next
+
+					// if(stack)stackelementdistance=M_RUN_LENGTH; // start out with stacking every M_RUN_LENGTH element of the already sorted list
+					unsigned long long runindex,stackelementindex,lowerstackindex,upperstackindex,middlestackindex; // start out with stacking every M_RUN_LENGTH element of the already sorted list
+					
+					unsigned long long processedsofar=0; // keep track of the amount of list elements at the beginning of the list that is in ascending order
+
+					Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*runsmallest,*runlargest,*smaller,*beforefirstone,*firstone,*stacklistelement;
+					Mlistelement *smallest=NULL,*largest=NULL;
+					Mvalue *runsmallestValue,*currentValue=NULL,*previousValue=previous->_value;
+					sortstatistics.pointerassignments+=15;sortstatistics.fieldreferences++; // NOTE counting the declarations as well but if that will really make a difference
+					bool emptyrun;
+					while(1){
+						sortstatistics.pointertests++;
+						if(!current)break;
+						processedsofar++;
+						currentValue=current->_value; // the value to compare
+						sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+						if(report)
+						{output("Run direction: %s",(rundirection>0?"up":"down"));outputValue(" - comparing '",previousValue,"'");outputValue(" with successor '",currentValue,"'.\n");}
+						sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;sortstatistics.comparisons++; // this we know will always happen
+						if(rundirection>0){ // in an up run
+							if(smallerthan(currentValue,previousValue)==M_TRUE){
+								// we have to merge the down and the up run to an single up run i.e. \/ to / where the first \ is from largest to smallest
+								// ASSERT all the elements in \ (largest to smallest) are larger than smallest so we know the following loop always ends
+								runlargest=previous;
+								if(report)
+									outputValue("Up run maximum: '",previousValue,"'.\n");
 								sortstatistics.pointertests++;
-								if(largest){
-									smaller=NULL; // this is going to be the 'offset' to the main list that we're going to speed determine
-									if(*stack){ // if the first element in the stack is set
-										if(smallerthan(previousValue,stack[0]->_value)!=M_TRUE){
-											upperstackindex=stacksize-1;
-											if(smallerthan(stack[upperstackindex]->_value,previousValue)!=M_TRUE){
-												lowerstackindex=0;
-												while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
-													middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
-													if(largerthan(previousValue,stack[middlestackindex]->_value)==M_TRUE)
-														lowerstackindex=middlestackindex;
-													else
-														upperstackindex=middlestackindex;
-												}
-												smaller=stack[lowerstackindex];
-											}else
-												smaller=stack[upperstackindex];
-										}
-									}else{
+								if(smallest){
+									emptyrun=(smallest->_next==previous);
+									sortstatistics.fieldtests++;sortstatistics.pointertests++;
+								}else
+									emptyrun=false;
+								if(!emptyrun){
+									// both the main run is up, as well as the run we just finished
+									// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
+									// MDH@08NOV2020: if I'm right you can use runsmallest as initial insertion point
+									//                apparently NOT as it loops indefinitely somewhere
+									// MDH@09NOV2020: OOPS we're supposed to pass in the beforefirst NOT the first, so how do we find the predecessor of runsmallest?????
+									sortstatistics.pointertests++;
+									if(largest){
 										runsmallest=largest->_next; // the successor of the largest is essentially the first list element to merge from `another`
+										smaller=NULL; // this is going to be the 'offset' to the main list that we're going to speed determine
 										sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests++;
 										if(runsmallest){ // TODO should always be there I suppose!!!
-											// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
+											runsmallestValue=runsmallest->_value;
+											sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2; // test below
+											if(*stack){ // if the first element in the stack is set
+												sortstatistics.comparisons++;
+												if(smallerthan(runsmallestValue,stack[0]->_value)!=M_TRUE){
+													upperstackindex=stacksize-1;
+													sortstatistics.comparisons++;
+													if(smallerthan(stack[upperstackindex]->_value,runsmallestValue)!=M_TRUE){
+														lowerstackindex=0;
+														while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
+															middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
+															sortstatistics.comparisons++;
+															if(largerthan(runsmallestValue,stack[middlestackindex]->_value)==M_TRUE)
+																lowerstackindex=middlestackindex;
+															else
+																upperstackindex=middlestackindex;
+														}
+														smaller=stack[lowerstackindex];
+													}else{
+														smaller=stack[upperstackindex];
+														if(report)
+															outputValue("New stack maximum: '",runsmallestValue,"'.\n");
+													}
+												}else{
+													*stack=runsmallest;
+													if(report)
+														outputValue("New stack minimum: '",runsmallestValue,"'.\n");
+												}
+											}else{
+												// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
+												// iterate over the part already sorted
+												beforefirstone=NULL;
+												firstone=_list->_first;
+												sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
+												while(1){
+													runindex=M_RUN_LENGTH*4;
+													while(--runindex>=0){
+														beforefirstone=firstone;
+														firstone=beforefirstone->_next;
+														sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2;
+														if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
+													}
+													sortstatistics.pointertests++;
+													if(!beforefirstone)break;
+													sortstatistics.comparisons++;
+													if(largerthan(firstone->_value,runsmallestValue))break; // found one that is larger, which means we're done
+													// ASSERT firstone is smaller than or equal to runsmallest
+													smaller=beforefirstone;
+													sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+												}
+											}
+										}
+										if(report)
+										{
+											if(smaller)outputValue("'",smaller->_value,"' is smaller");else output("Nothing is smaller");
+											if(runsmallest)outputValue(" then '",runsmallestValue,"'");output(".\n");
+										}
+										largest=linsertingmerge(_list,smaller,largest,previous);
+										largest->index=0; // mark the largest with index 0 (so we can see where it currently is)
+										if(report)
+											outputList("List after merging up run: ",_list,"'.\n");
+										if(!*stack){
+											if(processedsofar>=stacksize){
+												*stack=_list->_first;
+												Mlistelement** stackelement=stack;
+												if(report)output("Stack elements:");
+												stackelementindex=0;
+												while(++stackelementindex<=stacksize){
+													if(report)
+													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
+													*(stackelement+1)=(*stackelement)->_next;
+													stackelement++;
+												}
+												if(report)output(".\n");
+											}
+										}
+									}
+									smallest=_list->_first;
+									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;sortstatistics.pointertests++;
+									if(previous->_next==current){largest=previous;sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;}
+
+									if(report)
+										outputValue("Maximum so far: '",largest->_value,"'.\n");
+									if(report)
+										outputList("List so far: '",_list,"'.\n");
+								}else
+								if(report)output("The up run is empty!\n");
+								rundirection=-1;
+							}
+						}else{ // in a down run
+							if(largerthan(currentValue,previousValue)==M_TRUE){ // switching to an up run
+								runsmallest=previous;
+								if(report)
+									outputValue("Down run minimum: '",previousValue,"'.\n");
+								// if there's nothing in between the down run is empty
+								sortstatistics.pointertests++;
+								if(largest){
+									emptyrun=(largest->_next==previous);
+									sortstatistics.fieldtests++;sortstatistics.pointertests++;
+								}else
+									emptyrun=false;
+								if(!emptyrun){
+									// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
+									// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
+									sortstatistics.pointertests++;
+									if(largest){
+										previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
+										sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
+										lreverse(_list,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+										// if(report)output("Down run reversed!\n");
+										if(report)
+											outputList("List after reversing the down list: '",_list,"'.\n");
+										
+										// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
+										// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
+										smaller=NULL; // this is going to be the 'offset' to the main list that we're going to speed determine
+										// already set (see above): runsmallest=largest->_next; // the successor of the largest is essentially the first list element to merge from `another`
+										sortstatistics.pointerassignments++;
+										// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
+										runsmallestValue=runsmallest->_value;
+										if(*stack){
+											// when merging a down run we can have a new minimum
+											sortstatistics.comparisons++;
+											if(smallerthan(runsmallestValue,stack[0]->_value)!=M_TRUE){
+												upperstackindex=stacksize-1;
+												sortstatistics.comparisons++;
+												if(smallerthan(stack[upperstackindex]->_value,runsmallestValue)!=M_TRUE){
+													lowerstackindex=0;
+													while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
+														middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
+														sortstatistics.comparisons++;
+														if(largerthan(runsmallestValue,stack[middlestackindex]->_value)==M_TRUE)
+															lowerstackindex=middlestackindex;
+														else
+															upperstackindex=middlestackindex;
+													}
+													if(report)
+													{
+													outputValue("'",runsmallestValue,"'");
+													outputValue(" lies between '",stack[lowerstackindex]->_value,"'");
+													outputValue("' and '",stack[upperstackindex]->_value,"'.\n");
+													}
+													smaller=stack[lowerstackindex];
+												}else{
+													smaller=stack[upperstackindex];
+													stack[upperstackindex]=runsmallest;
+													if(report)
+														outputValue("New stack maximum: '",runsmallestValue,"'.\n");
+												}
+											}else{
+												*stack=runsmallest;
+												if(report)
+													outputValue("New stack minimum: '",runsmallestValue,"'.\n");
+											}
+										}else{
 											// iterate over the part already sorted
 											beforefirstone=NULL;
 											firstone=_list->_first;
 											sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
 											while(1){
-												runindex=M_RUN_LENGTH*4;
+												runindex=M_RUN_LENGTH;
 												while(--runindex>=0){
 													beforefirstone=firstone;
 													firstone=beforefirstone->_next;
@@ -9185,184 +9341,100 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 												}
 												sortstatistics.pointertests++;
 												if(!beforefirstone)break;
-												sortstatistics.comparisons++;
-												if(largerthan(firstone->_value,runsmallest->_value))break; // found one that is larger, which means we're done
+												sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.comparisons++; // the test below
+												if(largerthan(firstone->_value,runsmallestValue))break; // found one that is larger, which means we're done
 												// ASSERT firstone is smaller than or equal to runsmallest
 												smaller=beforefirstone;
 												sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 											}
 										}
-									}
-									linsertingmerge(_list,smaller,largest,previous);
-									if(!*stack){
-										if(processedsofar>=stacksize){
-											*stack=_list->_first;
-											Mlistelement** stackelement=stack;
-											output("Stack elements:");
-											stackelementindex=0;
-											while(++stackelementindex<=stacksize){
-												output(" %llu",stackelementindex);
-												outputValue("=",(*stackelement)->_value,NULL);
-												*(stackelement+1)=(*stackelement)->_next;
-												stackelement++;
-											}
-											output(".\n");
+										if(report)
+										{
+											if(smaller)outputValue("'",smaller->_value,"' is smaller");else output("Nothing is smaller");
+											if(runsmallest)outputValue(" then '",runsmallestValue,"'");output(".\n");
 										}
-									}
-								}
-								smallest=_list->_first;
-								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;sortstatistics.pointertests++;
-								if(previous->_next==current){largest=previous;sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;}
-
-								if(report)outputValue("Maximum so far: '",largest->_value,"'.\n");
-								if(report)outputList("List so far: '",_list,"'.\n");
-							}else
-							if(report)output("The up run is empty!\n");
-							newrundirection=-1;
-						}
-					}
-					if(rundirection<=0){ // in a down run
-						if(largerthan(currentValue,previousValue)==M_TRUE){ // switching to an up run
-							runsmallest=previous;
-							if(report)outputValue("Down run minimum: '",previousValue,"'.\n");
-							// if there's nothing in between the down run is empty
-							sortstatistics.pointertests++;
-							if(largest){
-								emptyrun=(largest->_next==previous);
-								sortstatistics.fieldtests++;sortstatistics.pointertests++;
-							}else
-								emptyrun=false;
-							if(!emptyrun){
-								// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
-								// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
-								sortstatistics.pointertests++;
-								if(largest){
-									previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
-									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
-									lreverse(_list,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-									// if(report)output("Down run reversed!\n");
-									if(report)outputList("List after reversing the down list: '",_list,"'.\n");
-									
-									// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
-									// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
-									smaller=NULL; // this is going to be the 'offset' to the main list that we're going to speed determine
-									// already set (see above): runsmallest=largest->_next; // the successor of the largest is essentially the first list element to merge from `another`
-									sortstatistics.pointerassignments++;
-									// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
-									if(*stack){
-										if(smallerthan(previousValue,stack[0]->_value)!=M_TRUE){
-											upperstackindex=stacksize-1;
-											if(smallerthan(stack[upperstackindex]->_value,previousValue)!=M_TRUE){
-												lowerstackindex=0;
-												while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
-													middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
-													if(largerthan(previousValue,stack[middlestackindex]->_value)==M_TRUE)
-														lowerstackindex=middlestackindex;
-													else
-														upperstackindex=middlestackindex;
+										largest=linsertingmerge(_list,smaller,largest,previous);
+										largest->index=0;
+										if(report)
+											outputList("List after merging down run: ",_list,"'.\n");
+										if(!*stack){
+											if(processedsofar>=stacksize){
+												*stack=_list->_first;
+												Mlistelement** stackelement=stack;
+												if(report)
+													output("Stack elements:");
+												stackelementindex=0;
+												while(++stackelementindex<=stacksize){
+													if(report)
+													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
+													*(stackelement+1)=(*stackelement)->_next;
+													stackelement++;
 												}
-												outputValue("'",previousValue,"'");
-												outputValue(" lies between '",stack[lowerstackindex]->_value,"'");
-												outputValue("' and '",stack[upperstackindex]->_value,"'.\n");
-												smaller=stack[lowerstackindex];
-											}else
-												smaller=stack[upperstackindex];
-										}
-									}else{
-										// iterate over the part already sorted
-										beforefirstone=NULL;
-										firstone=_list->_first;
-										sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
-										while(1){
-											runindex=M_RUN_LENGTH;
-											while(--runindex>=0){
-												beforefirstone=firstone;
-												firstone=beforefirstone->_next;
-												sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2;
-												if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
+												if(report)
+													output(".\n");
 											}
-											sortstatistics.pointertests++;
-											if(!beforefirstone)break;
-											sortstatistics.comparisons++;
-											if(largerthan(firstone->_value,runsmallest->_value))break; // found one that is larger, which means we're done
-											// ASSERT firstone is smaller than or equal to runsmallest
-											smaller=beforefirstone;
-											sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 										}
-									}
-									linsertingmerge(_list,smaller,largest,previous);
-									if(!*stack){
-										if(processedsofar>=stacksize){
-											*stack=_list->_first;
-											Mlistelement** stackelement=stack;
-											output("Stack elements:");
-											stackelementindex=0;
-											while(++stackelementindex<=stacksize){
-												output(" %llu",stackelementindex);
-												outputValue("=",(*stackelement)->_value,NULL);
-												*(stackelement+1)=(*stackelement)->_next;
-												stackelement++;
-											}
-											output(".\n");
-										}
-									}
-								}else{ // there's no main up run, so we only need to reverse this down run at the beginning of the list
-									largest=_list->_first; // obviously
+									}else{ // there's no main up run, so we only need to reverse this down run at the beginning of the list
+										largest=_list->_first; // obviously
+										sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+										lreverse(_list,NULL,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+										// if(report)output("Initial down run reversed!\n");
+									}						
+									smallest=_list->_first; // TODO we might not need to do this actually
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-									lreverse(_list,NULL,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-									// if(report)output("Initial down run reversed!\n");
-								}						
-								smallest=_list->_first; // TODO we might not need to do this actually
-								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-								// ASSERT we've successfully merged the down run into the up run that we're going to end up with
-								if(report)outputValue("Minimum so far: '",smallest->_value,"'.\n");
-								if(report)outputList("List so far: '",_list,"'.\n");
-							}else
-							if(report)
-								output("The down run is empty!\n");
-							newrundirection=1;
+									// ASSERT we've successfully merged the down run into the up run that we're going to end up with
+									if(report)
+										outputValue("Minimum so far: '",smallest->_value,"'.\n");
+									if(report)
+										outputList("List so far: '",_list,"'.\n");
+								}else
+								if(report)
+									output("The down run is empty!\n");
+								rundirection=1;
+							}
 						}
+						// and the next one!!
+						previous=current;previousValue=currentValue; // update previous
+						current=current->_next;
+						sortstatistics.pointerassignments+=3;sortstatistics.pointerreferences+=2;sortstatistics.fieldreferences++;
+						sortstatistics.pointertests++; // the test below
 					}
-					// and the next one!!
-					previous=current;previousValue=currentValue; // update previous
-					current=current->_next;
-					sortstatistics.pointerassignments+=3;sortstatistics.pointerreferences+=2;sortstatistics.fieldreferences++;
-					rundirection=newrundirection;
-				}
-				// take care of the last run
-				sortstatistics.pointertests++; // test on largest below
-				if(rundirection>0){ // end of an up run
-					// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
-					if(largest){
-						if(report)output("Processing the final up run!\n");
-						linsertingmerge(_list,NULL,largest,previous);
+					// take care of the last run
+					sortstatistics.pointertests++; // test on largest below
+					if(rundirection>0){ // end of an up run
+						// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
+						if(largest){
+							if(report)
+								output("Processing the final up run!\n");
+							linsertingmerge(_list,NULL,largest,previous);
+						}else
+						if(report)
+							output("The list was already in ascending order.\n");
 					}else
-					if(report)
-						output("The list was already in ascending order.\n");
-				}else
-				if(rundirection<0){ // end of the down run
-					if(report)output("Processing the final down run!\n");
-					runsmallest=previous;
-					sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
-					if(largest){ // something in front that we need to merge the down run into
-						// nothing to reverse if there's only a single element in the down run
-						sortstatistics.fieldtests++;sortstatistics.pointertests++;
-						if(largest->_next!=previous){
-							previous=largest->_next;
-							sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-							lreverse(_list,largest,runsmallest,report);
-						}
-						linsertingmerge(_list,NULL,largest,previous);
-					}else
-						lreverse(_list,NULL,runsmallest,report);
-					// because it's a down run the maximum will be the last element in the list after reversal
-				}
-				
+					if(rundirection<0){ // end of the down run
+						if(report)output("Processing the final down run!\n");
+						runsmallest=previous;
+						sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+						if(largest){ // something in front that we need to merge the down run into
+							// nothing to reverse if there's only a single element in the down run
+							sortstatistics.fieldtests++;sortstatistics.pointertests++;
+							if(largest->_next!=previous){
+								previous=largest->_next;
+								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+								lreverse(_list,largest,runsmallest,report);
+							}
+							linsertingmerge(_list,NULL,largest,previous);
+						}else
+							lreverse(_list,NULL,runsmallest,report);
+						// because it's a down run the maximum will be the last element in the list after reversal
+					}
+
 				if(stack)FREE_DISOWNED(stack,stacksize,-'l',owner);
 
 				// _list->_last=largest; // TODO this seems to be a valid assumption
 
-				if(report){outputList("The sorted list: '",_list,"'.\n");outputValue("First: '",_list->_first->_value,"'");outputValue(" - last: '",_list->_last->_value,"'.\n");}
+				if(report)
+				{outputList("The sorted list: '",_list,"'.\n");outputValue("First: '",_list->_first->_value,"'");outputValue(" - last: '",_list->_last->_value,"'.\n");}
 
 				// reapply the collected indices from the index ranges
 				nextindexrange=&indexrange;
@@ -9379,6 +9451,7 @@ static long long lharmonicabinarysort(Mlist* _list){Mallocationowner owner=getOw
 					}else
 						index++;
 				}
+				} // rundirection!=0
 				// free all dynamically allocated index ranges
 				Mindexrange* indexrangetofree=indexrange._next;
 				while(indexrangetofree){
@@ -9825,7 +9898,7 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 			sortstatistics=(struct Msortstatistics){}; // this should work
 			switch(sortMethod){
 				case 'b': // "biden" sort
-				case 'h':result=(_sortMethodValue->value._text->_c[1]?lharmonicabinarysort(_tosortValue->value._list):lharmonicasort(_tosortValue->value._list));break;
+				case 'h':result=(_sortMethodValue->value._text->_c[1]?lharmonicabinarysort(_tosortValue->value._list,atoll(_sortMethodValue->value._text->_c+1)):lharmonicasort(_tosortValue->value._list));break;
 				case 'm':result=lmergesort(_tosortValue->value._list);break;
 				case 't':result=ltimsort(_tosortValue->value._list);break;
 				default:result=lquicksort(_tosortValue->value._list);break;
@@ -9870,7 +9943,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 				long long sortResult=M_LL_INVALID;
 				switch(sortMethod){
 					case 'b': // "biden" sort
-					case 'h':sortResult=(_sortMethodValue->value._text->_c[1]?lharmonicabinarysort(_tosortList):lharmonicasort(_tosortList));break;
+					case 'h':sortResult=(_sortMethodValue->value._text->_c[1]?lharmonicabinarysort(_tosortList,atoll(_sortMethodValue->value._text->_c+1)):lharmonicasort(_tosortList));break;
 					case 't':sortResult=ltimsort(_tosortList);break;
 					case 'm':sortResult=lmergesort(_tosortList);break;
 					default:sortResult=lquicksort(_tosortList);break;
