@@ -1003,12 +1003,14 @@ void Mvfree(){
 */
 // MDH@20APR2020: unfortunately we need to know the size of what was allocated which is easy for fixed size allocation but problematic for variable size records
 //                unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
-void Mfree(void const * const ptr,long long count,signed char allocationType/*,Mallocationowner owner*/){
+void Mfree(void const * const ptr,long long count,signed char allocationType,bool report/*,Mallocationowner owner*/){
     if(!ptr||allocationType==0||count<=0)return;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
     int32_t allocationIndex=_alloc->allocationIndex; // MDH@13NOV2020: best to get the allocation index asap
-    info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
-    info("%p: of type '%c' owned by %s:%u(%s%u%s%s) being freed.\n",_alloc,abs(allocationType) // replacing: by %s:%u(%s%u%s%s).\n",_alloc
+    if(report)
+        tell("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
+    if(report)
+        tell("%p: of type '%c' owned by %s:%u(%s%u%s%s) being freed.\n",_alloc,abs(allocationType) // replacing: by %s:%u(%s%u%s%s).\n",_alloc
         ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
         // ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
         );
@@ -1101,15 +1103,19 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
         pos--;
     }
 #endif
-    // output("Freeing '%p'...",_alloc);
+    if(report)
+    {printf("Freeing '%p'...",_alloc);fflush(stdout);}
     free(_alloc);
-    // output("Freed!\n");
+    if(report)
+    {printf(" done!\n");fflush(stdout);}
 #ifndef __PRODUCTION__
     // MDH@07JUN2020: if we get here we know free was sucessful and we should definitely mark the thing as freed
     // we may safely assume that _alloc was freed but its good that to set the freed flag so we know that the pointer was freed actually but still know the type
     // technically it might also be a good idea to have an additional flag that we can use to 
     if(allocationIndex>=0&&allocationIndex<allocations.l)
         allocations._owners[allocationIndex].owner.freed=1; // MDH@13APR2020: can't use ' ' as that's used for a command
+    if(report)
+        printf("Allocation marked as free!\n");
 #endif
     //////info("!");
     // undo the allocation of the given type

@@ -9019,7 +9019,7 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				// for use in binary search we'll be using a stack of list elements
 				// but instead of presorting (as we intended originally) we simply place them at the start, and populate the stack if stacked elements were actually sorted
 				Mlistelement** stack=NULL;
-				Mlistelement* stacktop;
+				Mlistelement* stacktop=NULL;
 				unsigned long long leftbeforestack,betweenstackelements=llsqrt(_list->numberOfElements);
 				if(stackmultiplier>1)betweenstackelements/=stackmultiplier; // MDH@11NOV2020: divide by the stack multiplier if need be
 				if(betweenstackelements<2)betweenstackelements=2; // MDH@11NOV2020: the minimum should be two elements
@@ -9027,9 +9027,9 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				// if(report)
 					output("Stack size: %llu.\n",stacksize);
 				if(stacksize>=4){
-					stack=MALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
+					stack=CALLOC(sizeof(Mlistelement*),stacksize,'l',owner);
 					if(stack){
-						output("Stack '%p'.",stack);
+						output("Stack address: '%p'.\n",stack);
 						*stack=NULL; // essential because I'm using that to indicate that the stack is not initialized yet
 						leftbeforestack=betweenstackelements;
 						stacktop=previous;
@@ -9462,8 +9462,12 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 					output("Captured index ranges freed!\n");
 				} // rundirection!=0
 
-				if(stack){output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);FREE_DISOWNED(stack,stacksize,-'l',owner);output("Stack freed!\n");stack=NULL;}
-
+				if(stack){
+					output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);
+					_FREE_DISOWNED(stack,stacksize,'l',owner);
+					output("Stack freed!\n");
+					stack=NULL;
+				}
 			}
 		}
 	}

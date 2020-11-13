@@ -1109,27 +1109,32 @@ int numberOfLineCharacters=0;
 void initializeNumberOfLineCharacters(){
 	int minimumNumberOfLineCharacters=MIN(20,promptLength+10);
 	numberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
-	// let's only accept values above 20 but at least 10 over the prompt length (which is at least 7)
-	if(numberOfLineCharacters<minimumNumberOfLineCharacters){
-		oneLineDown();toStartOfLine();
-		if(numberOfLineCharacters<=0)outputWarning("Failed to obtain the number of columns of the input window");
-		while(1){	
-			numberOfLineCharacters=0;
-			output("How many characters would fit on a single user input line? (minimally %i)? ",minimumNumberOfLineCharacters);
-			char c;
-			while(inputCharRead(&c)){ // should be Ok to use inputCharRead() here
-        		if(c==13||c==10)break;
-				if(c<48||c>57){beep();continue;}
-				outputChar(c);
-				numberOfLineCharacters*=10;
-				if(c!=48)numberOfLineCharacters+=(c-48);
+	if(numberOfLineCharacters>0){
+		// let's only accept values above 20 but at least 10 over the prompt length (which is at least 7)
+		if(numberOfLineCharacters<minimumNumberOfLineCharacters){
+			oneLineDown();toStartOfLine();
+			if(numberOfLineCharacters<=0)outputWarning("Failed to obtain the number of columns of the input window");
+			while(1){	
+				numberOfLineCharacters=0;
+				output("How many characters would fit on a single user input line? (minimally %i)? ",minimumNumberOfLineCharacters);
+				char c;
+				while(inputCharRead(&c)){ // should be Ok to use inputCharRead() here
+					if(c==13||c==10)break;
+					if(c<48||c>57){beep();continue;}
+					outputChar(c);
+					numberOfLineCharacters*=10;
+					if(c!=48)numberOfLineCharacters+=(c-48);
+				}
+				outputChar('\n');
+				if(numberOfLineCharacters>=minimumNumberOfLineCharacters)break;
+				output("The number of line characters %i does not exceed %i. Please try again...\n",numberOfLineCharacters,minimumNumberOfLineCharacters);
 			}
-			outputChar('\n');
-			if(numberOfLineCharacters>=minimumNumberOfLineCharacters)break;
-			output("The number of line characters %i does not exceed %i. Please try again...\n",numberOfLineCharacters,minimumNumberOfLineCharacters);
+			// we should prompt again for the command
+			showPrompt();
 		}
-		// we should prompt again for the command
-		showPrompt();
+	}else{
+		output("Undefined number of line characters; 80 will be assumed!\n");
+		// numberOfLineCharacters=80;
 	}
 }
 
