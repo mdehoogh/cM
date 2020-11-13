@@ -9429,36 +9429,37 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 						// because it's a down run the maximum will be the last element in the list after reversal
 					}
 
+					// _list->_last=largest; // TODO this seems to be a valid assumption
+
+					if(report)
+					{outputList("The sorted list: '",_list,"'.\n");outputValue("First: '",_list->_first->_value,"'");outputValue(" - last: '",_list->_last->_value,"'.\n");}
+
+					// reapply the collected indices from the index ranges
+					nextindexrange=&indexrange;
+					unsigned long long index=nextindexrange->first; // the fist index to assign
+					Mlistelement* listelement=_list->_first;
+					while(1){
+						listelement->index=index;
+						listelement=listelement->_next;
+						if(!listelement)break;
+						// update the index to assign
+						if(index==nextindexrange->last){
+							nextindexrange=nextindexrange->_next;
+							index=nextindexrange->first;
+						}else
+							index++;
+					}
+					// free all dynamically allocated index ranges
+					Mindexrange* indexrangetofree=indexrange._next;
+					while(indexrangetofree){
+						nextindexrange=indexrangetofree->_next;
+						FREE_DISOWNED_1(indexrangetofree,'~',owner);
+						indexrangetofree=nextindexrange;
+					}
+				} // rundirection!=0
+
 				if(stack)FREE_DISOWNED(stack,stacksize,-'l',owner);
 
-				// _list->_last=largest; // TODO this seems to be a valid assumption
-
-				if(report)
-				{outputList("The sorted list: '",_list,"'.\n");outputValue("First: '",_list->_first->_value,"'");outputValue(" - last: '",_list->_last->_value,"'.\n");}
-
-				// reapply the collected indices from the index ranges
-				nextindexrange=&indexrange;
-				unsigned long long index=nextindexrange->first; // the fist index to assign
-				Mlistelement* listelement=_list->_first;
-				while(1){
-					listelement->index=index;
-					listelement=listelement->_next;
-					if(!listelement)break;
-					// update the index to assign
-					if(index==nextindexrange->last){
-						nextindexrange=nextindexrange->_next;
-						index=nextindexrange->first;
-					}else
-						index++;
-				}
-				} // rundirection!=0
-				// free all dynamically allocated index ranges
-				Mindexrange* indexrangetofree=indexrange._next;
-				while(indexrangetofree){
-					nextindexrange=indexrangetofree->_next;
-					FREE_DISOWNED_1(indexrangetofree,'~',owner);
-					indexrangetofree=nextindexrange;
-				}
 			}
 		}
 	}
