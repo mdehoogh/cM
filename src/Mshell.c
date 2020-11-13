@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=true; // whether or not debugging this module
+static bool DEBUGGING=false; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -9024,9 +9024,12 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				if(stackmultiplier>1)betweenstackelements/=stackmultiplier; // MDH@11NOV2020: divide by the stack multiplier if need be
 				if(betweenstackelements<2)betweenstackelements=2; // MDH@11NOV2020: the minimum should be two elements
 				unsigned long long stacksize=_list->numberOfElements/betweenstackelements; // the maximum number of stack elements we're going to need
+				// if(report)
+					output("Stack size: %llu.\n",stacksize);
 				if(stacksize>=4){
 					stack=MALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
 					if(stack){
+						output("Stack '%p'.",stack);
 						*stack=NULL; // essential because I'm using that to indicate that the stack is not initialized yet
 						leftbeforestack=betweenstackelements;
 						stacktop=previous;
@@ -9456,9 +9459,10 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 						FREE_DISOWNED_1(indexrangetofree,'~',owner);
 						indexrangetofree=nextindexrange;
 					}
+					output("Captured index ranges freed!\n");
 				} // rundirection!=0
 
-				if(stack)FREE_DISOWNED(stack,stacksize,-'l',owner);
+				if(stack){output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);FREE_DISOWNED(stack,stacksize,-'l',owner);output("Stack freed!\n");stack=NULL;}
 
 			}
 		}

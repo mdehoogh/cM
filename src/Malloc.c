@@ -941,14 +941,15 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 void* Msubowned(void* ptr,uint8_t level){
     if(!ptr)return NULL;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
+    int32_t allocationIndex=_alloc->allocationIndex; // MDH@13NOV2020
     info("%p: Incrementing level of owner %s:%u(%s%u%s%s) by %i.\n",_alloc
         ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
         ,level);
     //replacing: info("Incrementing subownership of %p by %i.\n",_alloc,level);
     // info("Subowning %p:\n",ptr);
-    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
-        Mallocationowner* _owner=&(allocations._owners[_alloc->allocationIndex].owner);
-        info("\tAllocation #%i=%s:%u(%s%u%s%s).\n",_alloc->allocationIndex
+    if(allocationIndex>=0&&allocationIndex<allocations.l){
+        Mallocationowner* _owner=&(allocations._owners[allocationIndex].owner);
+        info("\tAllocation #%i=%s:%u(%s%u%s%s).\n",allocationIndex
             ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]);
         if(_owner->id>0&&_owner->disowned==0){
             if(_owner->level==256-level)return NULL; // MDH@22MAY2020: shouldn't happen though!!!
@@ -962,7 +963,7 @@ void* Msubowned(void* ptr,uint8_t level){
     }else
         bug("\tFailed to subown memory allocation %s:%u(%s%u%s%s): it is not registered (index: %llu)."
                 ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
-                ,_alloc->allocationIndex);
+                ,allocationIndex);
     return ptr;
 }
 // MDH@25MAY2020 careful here Msubowner result is supposed to be a local variable (on the program stack) so it will be disposed off 'automagically'
@@ -1005,6 +1006,7 @@ void Mvfree(){
 void Mfree(void const * const ptr,long long count,signed char allocationType/*,Mallocationowner owner*/){
     if(!ptr||allocationType==0||count<=0)return;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
+    int32_t allocationIndex=_alloc->allocationIndex; // MDH@13NOV2020: best to get the allocation index asap
     info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
     info("%p: of type '%c' owned by %s:%u(%s%u%s%s) being freed.\n",_alloc,abs(allocationType) // replacing: by %s:%u(%s%u%s%s).\n",_alloc
         ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
@@ -1015,11 +1017,11 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
         bug("\tAbout to free the still owned memory allocation %s:%u(%s%u%s%s)!"
         ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
         );
-    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
-        if(allocations._owners[_alloc->allocationIndex].owner.freed!=0)
+    if(allocationIndex>=0&&allocationIndex<allocations.l){
+        if(allocations._owners[allocationIndex].owner.freed!=0)
             bug("\tFreed before!");
     }else
-        bug("\tInvalid allocation index %i.",_alloc->allocationIndex);
+        bug("\tInvalid allocation index %i.",allocationIndex);
     /////info("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     // MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
@@ -1061,13 +1063,13 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
     if(allocations.l==0)warning("Nothing allocated to free.\n");
 #ifndef __PRODUCTION__
     // MDH@04JUN2020: we can check ownership here BUT when a subowned allocation is freed by the superowner, which might have changed ownership the subowned allocation can still be freed as long as the levels match
-    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
-        if(allocations._owners[_alloc->allocationIndex].owner.freed){
-            allocations._owners[_alloc->allocationIndex].owner.freed=0;
+    if(allocationIndex>=0&&allocationIndex<allocations.l){
+        if(allocations._owners[allocationIndex].owner.freed){
+            allocations._owners[allocationIndex].owner.freed=0;
             bug("\tAllocation of dynamic memory '%c' (=%i) of size %zd was already marked as free.");
         }
-        if(allocations._owners[_alloc->allocationIndex].type!=allocationType){
-            bug("\tAllocation type of dynamic memory '%c' (=%i) (at index %i) does not match provided allocation type '%c' (=%i).",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType,allocationType);
+        if(allocations._owners[allocationIndex].type!=allocationType){
+            bug("\tAllocation type of dynamic memory '%c' (=%i) (at index %i) does not match provided allocation type '%c' (=%i).",allocations._owners[allocationIndex].type,allocations._owners[allocationIndex].type,allocationIndex,allocationType,allocationType);
             dump(ptr,size*count,size);
         /*}else
         if(allocations._owners[_alloc->allocationIndex].owner.level!=owner.level+1&&(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id||allocations._owners[_alloc->allocationIndex].owner.module!=owner.module)){
@@ -1089,7 +1091,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
             */
         }
     }else{
-        bug("\tRetrieved allocation position %llu out of range [0,%llu).",_alloc->allocationIndex,allocations.l);
+        bug("\tRetrieved allocation position %llu out of range [0,%llu).",allocationIndex,allocations.l);
         dump(ptr,size*count,size);
     }
 #else
@@ -1099,13 +1101,15 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
         pos--;
     }
 #endif
+    // output("Freeing '%p'...",_alloc);
     free(_alloc);
+    // output("Freed!\n");
 #ifndef __PRODUCTION__
     // MDH@07JUN2020: if we get here we know free was sucessful and we should definitely mark the thing as freed
     // we may safely assume that _alloc was freed but its good that to set the freed flag so we know that the pointer was freed actually but still know the type
     // technically it might also be a good idea to have an additional flag that we can use to 
-    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l)
-        allocations._owners[_alloc->allocationIndex].owner.freed=1; // MDH@13APR2020: can't use ' ' as that's used for a command
+    if(allocationIndex>=0&&allocationIndex<allocations.l)
+        allocations._owners[allocationIndex].owner.freed=1; // MDH@13APR2020: can't use ' ' as that's used for a command
 #endif
     //////info("!");
     // undo the allocation of the given type
