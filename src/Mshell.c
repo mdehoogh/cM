@@ -9025,12 +9025,13 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				if(stackmultiplier>1)betweenstackelements/=stackmultiplier; // MDH@11NOV2020: divide by the stack multiplier if need be
 				if(betweenstackelements<2)betweenstackelements=2; // MDH@11NOV2020: the minimum should be two elements
 				unsigned long long processedsofar=0,stacksize=_list->numberOfElements/betweenstackelements; // the maximum number of stack elements we're going to need
-				// if(report)
+				if(report)
 					output("Stack size: %llu.\n",stacksize);
 				if(stacksize>=4){
 					stack=CALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
 					if(stack){
-						output("Stack address: '%p'.\n",stack);
+						if(report)
+							output("Stack address: '%p'.\n",stack);
 						*stack=NULL; // essential because I'm using that to indicate that the stack is not initialized yet
 						leftbeforestack=betweenstackelements;
 						stacktop=previous;
@@ -9238,20 +9239,20 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 										if(!*stack){
 											if(processedsofar>=stacksize){
 												*stack=_list->_first;
-												// if(report)
+												if(report)
 													output("Registering %lld of %lld sorted list elements in the stack.\n",stacksize,processedsofar);
 												Mlistelement** stackelement=stack;
-												// if(report)
+												if(report)
 													output("Stack elements:");
 												stackelementindex=1; // MDH@16NOV2020: replacing 0 by 1 because we already have one stack element set
 												// MDH@16NOV2020: it might be writing one value too many here?????
 												while(++stackelementindex<=stacksize){
-													// if(report)
+													if(report)
 													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
 													*(stackelement+1)=(*stackelement)->_next;
 													stackelement++;
 												}
-												// if(report)
+												if(report)
 													output(".\n");
 											}
 										}
@@ -9368,16 +9369,16 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 											if(processedsofar>=stacksize){
 												*stack=_list->_first;
 												Mlistelement** stackelement=stack;
-												// if(report)
+												if(report)
 													output("Stack elements:");
 												stackelementindex=1; // MDH@16NOV2020 OOPS: need to do that here as well!!!!! replacing 0 by 1
 												while(++stackelementindex<=stacksize){
-													// if(report)
+													if(report)
 													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
 													*(stackelement+1)=(*stackelement)->_next;
 													stackelement++;
 												}
-												// if(report)
+												if(report)
 													output(".\n");
 											}
 										}
@@ -9469,14 +9470,11 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				} // rundirection!=0
 
 				if(stack){
-					// if(report)
-					// if(report)
-					{
-						if(!*stack)output("%sNo stack elements used (processed: %lld)!",M_WARNING_PREFIX,processedsofar);
+					if(!*stack)output("%sNo stack elements used (processed: %lld)!",M_WARNING_PREFIX,processedsofar);
+					if(report)
 						output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);
-					}
 					_FREE_DISOWNED(stack,stacksize,-'l',owner);
-					// if(report)
+					if(report)
 						output("Stack freed!\n");
 					stack=NULL;
 				}
