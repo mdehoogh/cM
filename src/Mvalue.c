@@ -1085,12 +1085,12 @@ Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocat
         output("Wrapping a %s list.\n",(disowned_list?"disowned":"owned"));
     Mvalue* _value=__value(_list->weak?"weak list":"strong list");
     if(!_value){
-        if(Misdisowned(_list))free_list(_list);
+        if(disowned_list)free_list(_list);
         return NULL;
     }
     _value->value._list=(disowned_list?owned_list(_list,owner_value_data):_list); // MDH@09JUN2020: _value is to take over ownership of _list
     _value->type=VT_LIST;
-    if(amVerbose())
+    if(amVerboseDebugging())
         output("%s list wrapped.\n",(disowned_list?"disowned":"owned"));
     return _value;
 }/* VALIDATED */

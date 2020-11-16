@@ -48,7 +48,7 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="16";char const * const M_DATE="6 November 2020"; // MDH@06NOV2020: finally able to implement my harmonica sort (which yes is quite similar to what I think is timsort)
+char const * const M_BUILD="17";char const * const M_DATE="16 November 2020"; // MDH@16NOV2020: addressing a serious memory bug in sorting using lharmonicabinarysort
 //char const * const M_BUILD="15";char const * const M_DATE="5 November 2020"; // MDH@05NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
 //char const * const M_BUILD="14";char const * const M_DATE="3 November 2020"; // MDH@03NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
 //char const * const M_BUILD="13";char const * const M_DATE="2 November 2020"; // MDH@02NOV2020: wasn't really there though
@@ -1108,8 +1108,9 @@ int numberOfLineCharacters=0;
 // call initializeNumberOfLineCharacters every time the prompt is shown
 void initializeNumberOfLineCharacters(){
 	int minimumNumberOfLineCharacters=MIN(20,promptLength+10);
-	numberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
-	if(numberOfLineCharacters>0){
+	int newNumberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
+	if(newNumberOfLineCharacters>0){
+		numberOfLineCharacters=newNumberOfLineCharacters;
 		// let's only accept values above 20 but at least 10 over the prompt length (which is at least 7)
 		if(numberOfLineCharacters<minimumNumberOfLineCharacters){
 			oneLineDown();toStartOfLine();
@@ -1132,9 +1133,12 @@ void initializeNumberOfLineCharacters(){
 			// we should prompt again for the command
 			showPrompt();
 		}
-	}else{
-		output("Undefined number of line characters; 80 will be assumed!\n");
-		// numberOfLineCharacters=80;
+	}else
+	if(newNumberOfLineCharacters!=numberOfLineCharacters){ // a change
+		if(numberOfLineCharacters>0)
+			output("Undefined number of line characters: will assume %i characters.\n",numberOfLineCharacters);
+		else
+			output("Number of line characters still unknown.\n");
 	}
 }
 
@@ -1512,7 +1516,11 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!comma
 	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
-			Mregisteredcommand* newRegisteredCommands=(commandBlocks==0?MALLOC(sizeof(Mregisteredcommand),COMMAND_BLOCKSIZE,'C',owner_registeredcommands):REALLOC(_registeredcommands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mregisteredcommand),'C'));
+			Mregisteredcommand* newRegisteredCommands=
+				(commandBlocks==0
+					?MALLOC(sizeof(Mregisteredcommand),COMMAND_BLOCKSIZE,-'C',owner_registeredcommands)
+					:REALLOC(_registeredcommands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mregisteredcommand),-'C')
+				);
 			if(newRegisteredCommands==NULL)return false;
 			commandBlocks++;
 			_registeredcommands=newRegisteredCommands;
@@ -2048,10 +2056,15 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	Mstring* _commandText=owned_string(_getCommandText(true),owner); // MDH@13MAR2020 TODO determine later???????
+	
 	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
 	clock_t before_evaluating=clock();
+	
 	getExecutionEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
 	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
+	
+	outputValue("Result value: '",*resultValue,"'.\n");
+
 	long long elapsed_evaluating=(clock()-before_evaluating)/1000;
 
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
@@ -3869,7 +3882,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 		exit(3);
 	}
 	outputInfo("Shell initialized.");
-	if(_settingsCharacterText)FREE_STRING(_settingsCharacterText,owner);
+	if(_settingsCharacterText){FREE_STRING(_settingsCharacterText,owner);_settingsCharacterText=NULL;}
 
 	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
 
@@ -3897,6 +3910,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 	if(predefinedVariableNames){
 		output("Predefined variables: %s.\n",string(predefinedVariableNames));
 		FREE_STRING(predefinedVariableNames,owner); // no get rid of it!!!
+		predefinedVariableNames=NULL;
 	}else
 		outputInfo("No predefined variables!");
 	//////////output("Number of predefined variables: %d.",getNumberOfVariables(mEnvironment));
@@ -3942,6 +3956,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 		}else
 			outputError("No session log will be written, due to failing to compose the output filename.");
 		FREE_STRING(_outputFilename,owner);
+		_outputFilename=NULL; // MDH@16NOV2020: precaution
 	}
 
 	if(getNumberOfAllocationMarks()==0){
@@ -4804,6 +4819,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
 							outputInfo("Please complete, correct or cancel the command.");
 						FREE_STRING(_userInputCommandText,owner); // freed!
+						_userInputCommandText=NULL;
 						continue;
 					}
 					resetOutputColor();
@@ -4834,7 +4850,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							}
 						}
 					}
-					if(_userInputCommandText)FREE_STRING(_userInputCommandText,owner); // MDH@14NOV2019: freed
+					// MDH@16NOV2020 NOTE: think we already freed the user input command text (see above)
+					if(_userInputCommandText){FREE_STRING(_userInputCommandText,owner);_userInputCommandText=NULL;} // MDH@14NOV2019: freed
 
 					// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
 					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command

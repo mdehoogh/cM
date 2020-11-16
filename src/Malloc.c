@@ -1104,10 +1104,10 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
     }
 #endif
     if(report)
-    {printf("Freeing '%p'...",_alloc);fflush(stdout);}
+        output("Freeing '%p'...",_alloc);
     free(_alloc);
     if(report)
-    {printf(" done!\n");fflush(stdout);}
+        output(" done!\n");
 #ifndef __PRODUCTION__
     // MDH@07JUN2020: if we get here we know free was sucessful and we should definitely mark the thing as freed
     // we may safely assume that _alloc was freed but its good that to set the freed flag so we know that the pointer was freed actually but still know the type

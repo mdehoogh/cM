@@ -8398,7 +8398,7 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 }
 
 // SORTING STUFF
-static struct Msortstatistics{
+struct Msortstatistics{
 	unsigned long long comparisons;
 	unsigned long long pointerassignments;
 	unsigned long long fieldassignments; // any reference to a field pointed to by a pointer whether in a comparison or assigment (left or right-hand side)
@@ -8406,7 +8406,8 @@ static struct Msortstatistics{
 	unsigned long long fieldreferences; // any reference to a field pointed to by a pointer whether in a comparison or assigment (left or right-hand side)
 	unsigned long long pointertests;
 	unsigned long long fieldtests;
-}sortstatistics;
+};
+static struct Msortstatistics sortstatistics;
 // MDH@02NOV2020: we can speed up sorting if we can somehow reverse parts of a list
 static void swap(Mlistelement* const listelement1,Mlistelement* const listelement2){
 	// normally we would not be allowed to do it this way, but the reference count
@@ -9023,11 +9024,11 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				unsigned long long leftbeforestack,betweenstackelements=llsqrt(_list->numberOfElements);
 				if(stackmultiplier>1)betweenstackelements/=stackmultiplier; // MDH@11NOV2020: divide by the stack multiplier if need be
 				if(betweenstackelements<2)betweenstackelements=2; // MDH@11NOV2020: the minimum should be two elements
-				unsigned long long stacksize=_list->numberOfElements/betweenstackelements; // the maximum number of stack elements we're going to need
+				unsigned long long processedsofar=0,stacksize=_list->numberOfElements/betweenstackelements; // the maximum number of stack elements we're going to need
 				// if(report)
 					output("Stack size: %llu.\n",stacksize);
 				if(stacksize>=4){
-					stack=CALLOC(sizeof(Mlistelement*),stacksize,'l',owner);
+					stack=CALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
 					if(stack){
 						output("Stack address: '%p'.\n",stack);
 						*stack=NULL; // essential because I'm using that to indicate that the stack is not initialized yet
@@ -9134,8 +9135,6 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 					// if(stack)stackelementdistance=M_RUN_LENGTH; // start out with stacking every M_RUN_LENGTH element of the already sorted list
 					unsigned long long runindex,stackelementindex,lowerstackindex,upperstackindex,middlestackindex; // start out with stacking every M_RUN_LENGTH element of the already sorted list
 					
-					unsigned long long processedsofar=0; // keep track of the amount of list elements at the beginning of the list that is in ascending order
-
 					Mlistelement *toinsert,*nexttoinsert,*compare,*lastcompare,*runsmallest,*runlargest,*smaller,*beforefirstone,*firstone,*stacklistelement;
 					Mlistelement *smallest=NULL,*largest=NULL;
 					Mvalue *runsmallestValue,*currentValue=NULL,*previousValue=previous->_value;
@@ -9239,16 +9238,21 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 										if(!*stack){
 											if(processedsofar>=stacksize){
 												*stack=_list->_first;
+												// if(report)
+													output("Registering %lld of %lld sorted list elements in the stack.\n",stacksize,processedsofar);
 												Mlistelement** stackelement=stack;
-												if(report)output("Stack elements:");
-												stackelementindex=0;
+												// if(report)
+													output("Stack elements:");
+												stackelementindex=1; // MDH@16NOV2020: replacing 0 by 1 because we already have one stack element set
+												// MDH@16NOV2020: it might be writing one value too many here?????
 												while(++stackelementindex<=stacksize){
-													if(report)
+													// if(report)
 													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
 													*(stackelement+1)=(*stackelement)->_next;
 													stackelement++;
 												}
-												if(report)output(".\n");
+												// if(report)
+													output(".\n");
 											}
 										}
 									}
@@ -9364,16 +9368,16 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 											if(processedsofar>=stacksize){
 												*stack=_list->_first;
 												Mlistelement** stackelement=stack;
-												if(report)
+												// if(report)
 													output("Stack elements:");
-												stackelementindex=0;
+												stackelementindex=1; // MDH@16NOV2020 OOPS: need to do that here as well!!!!! replacing 0 by 1
 												while(++stackelementindex<=stacksize){
-													if(report)
+													// if(report)
 													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
 													*(stackelement+1)=(*stackelement)->_next;
 													stackelement++;
 												}
-												if(report)
+												// if(report)
 													output(".\n");
 											}
 										}
@@ -9452,20 +9456,28 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 						}else
 							index++;
 					}
+					unsigned long long indexrangesfreed=0;
 					// free all dynamically allocated index ranges
 					Mindexrange* indexrangetofree=indexrange._next;
 					while(indexrangetofree){
+						indexrangesfreed++;
 						nextindexrange=indexrangetofree->_next;
 						FREE_DISOWNED_1(indexrangetofree,'~',owner);
 						indexrangetofree=nextindexrange;
 					}
-					output("Captured index ranges freed!\n");
+					output("%lld captured index ranges freed!\n",indexrangesfreed);
 				} // rundirection!=0
 
 				if(stack){
-					output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);
-					_FREE_DISOWNED(stack,stacksize,'l',owner);
-					output("Stack freed!\n");
+					// if(report)
+					// if(report)
+					{
+						if(!*stack)output("%sNo stack elements used (processed: %lld)!",M_WARNING_PREFIX,processedsofar);
+						output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);
+					}
+					_FREE_DISOWNED(stack,stacksize,-'l',owner);
+					// if(report)
+						output("Stack freed!\n");
 					stack=NULL;
 				}
 			}
@@ -9916,7 +9928,9 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 					,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
 					,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
 		}
+		output("Done sorting!\n");
 	}
+	output("Sort result: %lld.\n",result);
 	return _getIntegerValue(result);
 }
 // similar to Msort but does not change the input in any way, returns NULL on failure
@@ -9958,16 +9972,18 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 					default:sortResult=lquicksort(_tosortList);break;
 				}
 				if(sortResult>0){ // _tosortList was successfully sorted
-					sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
 					output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
 							,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
 							,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+					sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
 				}else
 					FREE_LIST(_tosortList,owner);
+				output("List sort result: %lld.\n",sortResult);
 			}else
 				outputError("Failed to create a copy of the list to sort");
 		}
 	}
+	if(sortedValue)output("Sort done with value '%p' wrapping list '%p'!\n",sortedValue,sortedValue->value._list);
 	return sortedValue;
 }
 

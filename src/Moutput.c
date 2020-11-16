@@ -23,6 +23,7 @@ size_t output(const char *fmt,...){
     va_list args;
     va_start(args,fmt);
     int result=vprintf(fmt,args);
+    fflush(stdout); // MDH@16NOV2020: let's ascertain to see it on any crash
     va_end(args);
     if(echo_to_output_file){
         va_list args;
