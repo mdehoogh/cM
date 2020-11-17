@@ -8867,8 +8867,8 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 									previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
 									lreverse(_list,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-									// if(report)output("Down run reversed!\n");
-									if(report)outputList("List after reversing the down list: '",_list,"'.\n");
+									if(report)
+										outputList("List after reversing the down list: '",_list,"'.\n");
 									// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
 									// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
 									linsertingmerge(_list,NULL,largest,previous);
@@ -8876,13 +8876,14 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 									largest=_list->_first; // obviously
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 									lreverse(_list,NULL,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-									// if(report)output("Initial down run reversed!\n");
+									if(report)
+										output("Initial down run reversed!\n");
 								}						
 								smallest=_list->_first; // TODO we might not need to do this actually
 								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 								// ASSERT we've successfully merged the down run into the up run that we're going to end up with
-								if(report)outputValue("Minimum so far: '",smallest->_value,"'.\n");
-								if(report)outputList("List so far: '",_list,"'.\n");
+								if(report)
+								{outputValue("Minimum so far: '",smallest->_value,"'.\n");outputList("List so far: '",_list,"'.\n");}
 							}else
 							if(report)
 								output("The down run is empty!\n");
@@ -9020,21 +9021,34 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				// for use in binary search we'll be using a stack of list elements
 				// but instead of presorting (as we intended originally) we simply place them at the start, and populate the stack if stacked elements were actually sorted
 				Mlistelement** stack=NULL;
-				Mlistelement* stacktop=NULL;
-				unsigned long long leftbeforestack,betweenstackelements=llsqrt(_list->numberOfElements);
-				if(stackmultiplier>1)betweenstackelements/=stackmultiplier; // MDH@11NOV2020: divide by the stack multiplier if need be
+				unsigned long long betweenstackelements=llsqrt(_list->numberOfElements);
+				/*
+				if(stackmultiplier!=0)betweenstackelements/=stackmultiplier; // MDH@11NOV2020: divide by the stack multiplier if need be
 				if(betweenstackelements<2)betweenstackelements=2; // MDH@11NOV2020: the minimum should be two elements
-				unsigned long long processedsofar=0,stacksize=_list->numberOfElements/betweenstackelements; // the maximum number of stack elements we're going to need
+				*/
+				/*
+				unsigned long long leftbeforestack;
+				Mlistelement* stacktop=NULL;
+				*/
+				// MDH@17NOV2020: the number of elements in the stack should be at most half the number of elements
+				unsigned long long processedsofar=0,stacksize=(stackmultiplier!=0?_list->numberOfElements/MAX(2,betweenstackelements/llabs(stackmultiplier)):0); // the maximum number of stack elements we're going to need
+				long long stackminimumindex=0,stackmaximumindex=-1;
 				if(report)
 					output("Stack size: %llu.\n",stacksize);
-				if(stacksize>=4){
+				if(stacksize>=3){
 					stack=CALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
 					if(stack){
 						if(report)
 							output("Stack address: '%p'.\n",stack);
-						*stack=NULL; // essential because I'm using that to indicate that the stack is not initialized yet
+						if(stackmultiplier<0){ // the stack is to be filled gradually
+							*stack=_list->_first;
+							stackmaximumindex=0; // we have a single value on the stack so it's both the minimum and the maximum
+						}else
+							*stack=NULL; // essential because I'm using that to indicate that the stack is not initialized yet
+						/*
 						leftbeforestack=betweenstackelements;
 						stacktop=previous;
+						*/
 					}
 				}
 				if(report)
@@ -9044,11 +9058,11 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				Mindexrange* nextindexrange=&indexrange;
 				// MDH@10NOV2020: if we are supposed to create and use a stack the elements to stack will be placed between previous and current
 				//                then we sort that sublist with quick sort (which doesn't pay attention to the indices which of course will now be incorrect)
-				if(stack||_list->_last->index>_list->numberOfElements){ // possibly multiple range
+				if(/*stack||*/_list->_last->index>_list->numberOfElements){ // possibly multiple range
 					Mlistelement *prevlistelement=_list->_first;
 					Mlistelement *listelement=prevlistelement->_next; // initialized to the second element
 					while(listelement){
-						// fill the sublist with the value associated with listelement 
+						/* fill the sublist with the value associated with listelement 
 						if(stack){
 							leftbeforestack--;
 							if(leftbeforestack==0){
@@ -9065,6 +9079,7 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 							if(leftbeforestack==1)
 								prevlistelement=listelement;
 						}
+						*/
 						if(listelement->index!=nextindexrange->last+1){ // there's a gap
 							nextindexrange->_next=CALLOC_1(sizeof(Mindexrange),'~',owner);
 							nextindexrange=nextindexrange->_next;
@@ -9082,33 +9097,14 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 				// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
 				// original code from Mrunpoints() below
 
-				// sorting the stacked list elements is going to be fun
+				/* sorting the stacked list elements is going to be fun
 				if(stack){
 					stacktop->_next=current; // the stack starts with element previous and the successor of previous used to be current
 					current=previous->_next; // previous remained the same BUT current would've changed
 					if(report)
 						outputList("List after stacking: ",_list,"'.\n");
-					/* replacing:
-					Mlistelement *first=_list->_first,*last=_list->_last;
-					unsigned long long listNumberOfElements=_list->numberOfElements;
-					stacktop->_next=NULL;
-					_list->_last=stacktop;
-					_list->_first=previous->_next;
-					_list->numberOfElements=stacked;
-					lquicksort(_list); // quicksort the 'stack'
-					outputList("Sub sample quick sorted list: '",_list,"'.\n");
-					// put the elements of list in the stack
-					Mlistelement* listelement=_list->_first;unsigned long long stackindex=0;
-					while(listelement){stack[stackindex++]=listelement;listelement=listelement->_next;}
-					// restore the list
-					previous=_list->_last; // the last element in the list
-					previous->_next=current; // restore the link to current (the first element to process)
-					// restore the list
-					_list->numberOfElements=listNumberOfElements;
-					_list->_first=first;
-					_list->_last=last;
-					*/
 				}
+				*/
 				if(report)
 				{outputValue("After stacking: first: '",previous->_value,"' - ");outputValue("second: '",current->_value,"'.\n");}
 				// if elements were stacked it is quite unlikely that there are equal elements at the start	
@@ -9177,13 +9173,13 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 										if(runsmallest){ // TODO should always be there I suppose!!!
 											runsmallestValue=runsmallest->_value;
 											sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2; // test below
-											if(*stack){ // if the first element in the stack is set
+											if(stack&&*stack){ // if the first element in the stack is set
 												sortstatistics.comparisons++;
-												if(smallerthan(runsmallestValue,stack[0]->_value)!=M_TRUE){
-													upperstackindex=stacksize-1;
+												if(smallerthan(runsmallestValue,stack[stackminimumindex]->_value)!=M_TRUE){
+													upperstackindex=stackmaximumindex; // replacing: stacksize-1
 													sortstatistics.comparisons++;
 													if(smallerthan(stack[upperstackindex]->_value,runsmallestValue)!=M_TRUE){
-														lowerstackindex=0;
+														lowerstackindex=stackminimumindex;
 														while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
 															middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
 															sortstatistics.comparisons++;
@@ -9194,14 +9190,22 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 														}
 														smaller=stack[lowerstackindex];
 													}else{
+														// if(report)
+														{outputValue("New stack maximum in up run: '",runsmallestValue,"'");outputValue(" replacing: '",stack[upperstackindex]->_value,"'");output(" at index %llu.\n",upperstackindex);}
 														smaller=stack[upperstackindex];
-														if(report)
-															outputValue("New stack maximum: '",runsmallestValue,"'.\n");
+														if(upperstackindex!=stacksize-1){upperstackindex++;stackmaximumindex=upperstackindex;} // if the stack is not full yet, we get an additional element
+														stack[upperstackindex]=runsmallest; // MDH@17NOV2020: need this obviously
 													}
-												}else{
-													*stack=runsmallest;
-													if(report)
-														outputValue("New stack minimum: '",runsmallestValue,"'.\n");
+												}else{ // we have a new minimum
+													// if(report)
+													{outputValue("New stack minimum from up run: '",runsmallestValue,"'");outputValue(" replacing: '",stack[stackminimumindex]->_value,"'.\n");}
+													// if we're filling the stack dynamically (instead of in one go)
+													if(stackmaximumindex!=stacksize-1){ // the stack is not full yet (which is only possible with stackmultiplier<0)
+														stackelementindex=(++stackmaximumindex);
+														do{stack[stackelementindex]=stack[stackelementindex-1];}while(--stackelementindex!=stackminimumindex);
+														// output("\n");
+													}
+													stack[stackminimumindex]=runsmallest;
 												}
 											}else{
 												// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
@@ -9236,37 +9240,38 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 										largest->index=0; // mark the largest with index 0 (so we can see where it currently is)
 										if(report)
 											outputList("List after merging up run: ",_list,"'.\n");
-										if(!*stack){
-											if(processedsofar>=stacksize){
-												*stack=_list->_first;
-												if(report)
-													output("Registering %lld of %lld sorted list elements in the stack.\n",stacksize,processedsofar);
-												Mlistelement** stackelement=stack;
-												if(report)
-													output("Stack elements:");
-												stackelementindex=1; // MDH@16NOV2020: replacing 0 by 1 because we already have one stack element set
-												// MDH@16NOV2020: it might be writing one value too many here?????
-												while(++stackelementindex<=stacksize){
+										if(stack&&!*stack){
+											if(betweenstackelements>0){
+												if(processedsofar>=stacksize){
+													stackminimumindex=0;stackmaximumindex=stacksize-1;
+													*stack=_list->_first;
 													if(report)
-													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
-													*(stackelement+1)=(*stackelement)->_next;
-													stackelement++;
+														output("Registering %llu of %llu sorted list elements in the stack.\n",stacksize,processedsofar);
+													Mlistelement** stackelement=stack;
+													if(report)
+														output("Stack elements after processing %llu elements:",processedsofar);
+													stackelementindex=1; // MDH@16NOV2020: replacing 0 by 1 because we already have one stack element set
+													// MDH@16NOV2020: it might be writing one value too many here?????
+													while(++stackelementindex<=stacksize){
+														if(report)
+														{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
+														*(stackelement+1)=(*stackelement)->_next;
+														stackelement++;
+													}
+													if(report)
+														output(".\n");
 												}
-												if(report)
-													output(".\n");
 											}
 										}
 									}
 									smallest=_list->_first;
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;sortstatistics.pointertests++;
 									if(previous->_next==current){largest=previous;sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;}
-
 									if(report)
-										outputValue("Maximum so far: '",largest->_value,"'.\n");
-									if(report)
-										outputList("List so far: '",_list,"'.\n");
+									{outputValue("Maximum so far: '",largest->_value,"'.\n");outputList("List so far: '",_list,"'.\n");}
 								}else
-								if(report)output("The up run is empty!\n");
+								if(report)
+									output("The up run is empty!\n");
 								rundirection=-1;
 							}
 						}else{ // in a down run
@@ -9289,7 +9294,6 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 										previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
 										sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
 										lreverse(_list,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-										// if(report)output("Down run reversed!\n");
 										if(report)
 											outputList("List after reversing the down list: '",_list,"'.\n");
 										
@@ -9300,14 +9304,14 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 										sortstatistics.pointerassignments++;
 										// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
 										runsmallestValue=runsmallest->_value;
-										if(*stack){
+										if(stack&&*stack){
 											// when merging a down run we can have a new minimum
 											sortstatistics.comparisons++;
-											if(smallerthan(runsmallestValue,stack[0]->_value)!=M_TRUE){
-												upperstackindex=stacksize-1;
+											if(smallerthan(runsmallestValue,stack[stackminimumindex]->_value)!=M_TRUE){
+												upperstackindex=stackmaximumindex; // replacing:stacksize-1;
 												sortstatistics.comparisons++;
 												if(smallerthan(stack[upperstackindex]->_value,runsmallestValue)!=M_TRUE){
-													lowerstackindex=0;
+													lowerstackindex=stackminimumindex;
 													while(upperstackindex!=lowerstackindex+1){ // not adjacent yet
 														middlestackindex=(lowerstackindex+upperstackindex)>>1; // half
 														sortstatistics.comparisons++;
@@ -9324,15 +9328,24 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 													}
 													smaller=stack[lowerstackindex];
 												}else{
+													// if(report)
+													{outputValue("New stack maximum from down run: '",runsmallestValue,"'");outputValue(" replacing: '",stack[upperstackindex]->_value,"'");output(" at index %llu.\n",upperstackindex);}
 													smaller=stack[upperstackindex];
+													if(upperstackindex!=stacksize-1){ // if the stack isn't full yet, we can append the new maximum instead of replacing it
+														upperstackindex++;stackmaximumindex=upperstackindex;
+													}
 													stack[upperstackindex]=runsmallest;
-													if(report)
-														outputValue("New stack maximum: '",runsmallestValue,"'.\n");
 												}
-											}else{
-												*stack=runsmallest;
-												if(report)
-													outputValue("New stack minimum: '",runsmallestValue,"'.\n");
+											}else{ // a new minimum
+												// if(report)
+												{outputValue("New stack minimum from down run: '",runsmallestValue,"'");outputValue(" replacing: '",stack[stackminimumindex]->_value,"'.\n");}
+												// if the stack is not full yet, we can prepend the new minimum
+												if(stackmaximumindex!=stacksize-1){ // the stack is not full yet (which is only possible with stackmultiplier<0)
+													stackelementindex=(++stackmaximumindex);
+													do{stack[stackelementindex]=stack[stackelementindex-1];}while(--stackelementindex!=stackminimumindex);
+													// outputChar('\n');
+												}
+												*(stack+stackminimumindex)=runsmallest; // as long as stackminimumindex equals zero, this would be the same as *stack=runsmallest
 											}
 										}else{
 											// iterate over the part already sorted
@@ -9365,28 +9378,33 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 										largest->index=0;
 										if(report)
 											outputList("List after merging down run: ",_list,"'.\n");
-										if(!*stack){
-											if(processedsofar>=stacksize){
-												*stack=_list->_first;
-												Mlistelement** stackelement=stack;
-												if(report)
-													output("Stack elements:");
-												stackelementindex=1; // MDH@16NOV2020 OOPS: need to do that here as well!!!!! replacing 0 by 1
-												while(++stackelementindex<=stacksize){
+										if(stack&&!*stack){
+											if(betweenstackelements>0){
+												// filling the stack once if we have enough elements to fill it in one go
+												if(processedsofar>=stacksize){
+													stackminimumindex=0;stackmaximumindex=stacksize-1;
+													*stack=_list->_first;
+													Mlistelement** stackelement=stack;
 													if(report)
-													{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
-													*(stackelement+1)=(*stackelement)->_next;
-													stackelement++;
+														output("Stack elements after processing %llu elements:",processedsofar);
+													stackelementindex=1; // MDH@16NOV2020 OOPS: need to do that here as well!!!!! replacing 0 by 1
+													while(++stackelementindex<=stacksize){
+														if(report)
+														{output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
+														*(stackelement+1)=(*stackelement)->_next;
+														stackelement++;
+													}
+													if(report)
+														output(".\n");
 												}
-												if(report)
-													output(".\n");
 											}
 										}
 									}else{ // there's no main up run, so we only need to reverse this down run at the beginning of the list
 										largest=_list->_first; // obviously
 										sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 										lreverse(_list,NULL,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-										// if(report)output("Initial down run reversed!\n");
+										if(report)
+											output("Initial down run reversed!\n");
 									}						
 									smallest=_list->_first; // TODO we might not need to do this actually
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
@@ -9466,14 +9484,15 @@ static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Ma
 						FREE_DISOWNED_1(indexrangetofree,'~',owner);
 						indexrangetofree=nextindexrange;
 					}
-					output("%lld captured index ranges freed!\n",indexrangesfreed);
+					if(report)
+						output("%lld captured index ranges freed!\n",indexrangesfreed);
 				} // rundirection!=0
 
 				if(stack){
 					if(!*stack)output("%sNo stack elements used (processed: %lld)!",M_WARNING_PREFIX,processedsofar);
 					if(report)
 						output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);
-					_FREE_DISOWNED(stack,stacksize,-'l',owner);
+					FREE_DISOWNED(stack,stacksize,-'l',owner); // replacing debug version: _FREE_DISOWNED(stack,stacksize,-'l',owner);
 					if(report)
 						output("Stack freed!\n");
 					stack=NULL;
@@ -9789,7 +9808,8 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 					sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 				}
 				runbeforefirst=linsertinginsertionSort(_list,runbeforefirst,runlast); // execute the run insertion sort that returns the new last element (which will exist)
-				// if(report)output("Last value: '",_list->_last->_value,"'.\n");
+				if(report)
+					output("Last value: '",_list->_last->_value,"'.\n");
 				runlast=runbeforefirst->_next; // now equal to the first element of the next run to insertion sort
 				sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
 			}
@@ -9976,12 +9996,12 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 					sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
 				}else
 					FREE_LIST(_tosortList,owner);
-				output("List sort result: %lld.\n",sortResult);
+				// output("List sort result: %lld.\n",sortResult); // DEBUG
 			}else
 				outputError("Failed to create a copy of the list to sort");
 		}
 	}
-	if(sortedValue)output("Sort done with value '%p' wrapping list '%p'!\n",sortedValue,sortedValue->value._list);
+	// if(sortedValue)output("Sort done with value '%p' wrapping list '%p'!\n",sortedValue,sortedValue->value._list); // DEBUG
 	return sortedValue;
 }
 
