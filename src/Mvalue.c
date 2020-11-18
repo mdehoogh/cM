@@ -3108,6 +3108,35 @@ Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=g
 }
 
 Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
+    // let's allow either a text or a file, in any case we need a foldername
+    if(file_value){
+        char* directoryname=NULL;
+        if(file_value->type==VT_FILE){
+            if(file_value->value._file)
+                if(file_value->value._file->_name)
+                    directoryname=string(file_value->value._file->_name);
+        }else
+        if(file_value->type==VT_TEXT)directoryname=file_value->value._text->_c;
+        if(directoryname&&strlen(directoryname)){
+            DIR* dr=opendir(directoryname);
+            if(dr){
+                Mlist* files_list=owned_list(_getListOfType(VT_TEXT),owner);
+                struct dirent *en;
+                while((en=readdir(dr))!=NULL){
+                    Mstring* _filename=owned_string(_getString("'"),owner);
+                    if(_filename){
+                        // let's NOT prepend the directory name!!!! string_append(_filename,directoryname);
+                        string_append(_filename,en->d_name);
+                        appendedToList(files_list,owner,_getTextValue(string(_filename)),M_LL_INVALID);
+                        FREE_STRING(_filename,owner);
+                    }
+                }
+                closedir(dr); //close all directory
+                return _getValueOfList(disowned_list(files_list,owner));
+            }
+        }
+    }
+    /* replacing:
     Mfile* _file=(file_value?file_value->value._file:NULL);
     if(_file&&_file->_name&&_file->_stat&&S_ISDIR(_file->_stat->st_mode)){ // the file is a directory
         char* directoryname=string(_file->_name);
@@ -3127,6 +3156,6 @@ Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
             closedir(dr); //close all directory
             return _getValueOfList(disowned_list(files_list,owner));
         }
-   }
+   }*/
    return NULL;
 }
