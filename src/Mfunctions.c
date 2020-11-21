@@ -534,12 +534,14 @@ Mvalue* Misalist(Mvalue* _value){
 // TODO the length of a text is the number of characters in a text????
 // MDH@17OCT2019: the length of a list should now return the index of the last element (instead of the number of non-null values)
 //                because doing so means appending a value with l[len(l)+1] will do so, instead of overwriting some value!!!!
+// MDH@20NOV2020: for lists, also return the number of elements
 Mvalue* Mlen(Mvalue* _value){
     long long result=M_LL_INVALID;
     if(_value){
         switch(_value->type){
-            case VT_LIST:result=(_value->value._list->_last?_value->value._list->_last->index:0);break;
+            case VT_LIST:result=_value->value._list->numberOfElements;break; //(_value->value._list->_last?_value->value._list->_last->index:0);break;
             case VT_MAP:result=_value->value._map->numberOfElements;break;
+            case VT_TEXT:result=strlen(_value->value._text->_c);break;
             default:break;
         }
     }
