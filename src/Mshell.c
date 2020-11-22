@@ -51,6 +51,8 @@ const char* const M_UNDEFINED_VALUE_TEXT="UNDEFINED"; // the text to represent v
 const char* const M_UNDEFINED_VARIABLE_NAME="UNDEFINED";
 
 // MDH@02NOV2020: because lists can be very long, we only show a limited amount of elements at the start and end
+const long long M_ARRAY_ELEMENTS_AT_START=50;
+const long long M_ARRAY_ELEMENTS_AT_END=50;
 const long long M_LIST_ELEMENTS_AT_START=50;
 const long long M_LIST_ELEMENTS_AT_END=50;
 const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
@@ -10474,6 +10476,14 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				outputError("Failed to register the statistics, first and last list functions");
 				return NULL;
 			}
+
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"array"),"array",marray)
+					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fill"),"fill",mfill)
+			){
+				outputError("Failed to register the array and fill array functions");
+				return NULL;
+			}
+
 			if(!completedListValueFunction(_getFunction(_Menvironment,owner,"removed"),"removed",Mremoved)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)

@@ -539,6 +539,7 @@ Mvalue* Mlen(Mvalue* _value){
     long long result=M_LL_INVALID;
     if(_value){
         switch(_value->type){
+            case VT_ARRAY:result=_value->value._array->numberOfElements;break;
             case VT_LIST:result=_value->value._list->numberOfElements;break; //(_value->value._list->_last?_value->value._list->_last->index:0);break;
             case VT_MAP:result=_value->value._map->numberOfElements;break;
             case VT_TEXT:result=strlen(_value->value._text->_c);break;

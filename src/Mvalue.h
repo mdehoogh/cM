@@ -141,6 +141,7 @@ typedef struct Marray{
 long long isArrayUndefined(Marray* array);
 
 Marray* __array(char* source/*,Mallocationowner owner_list*/);
+Marray* _getArray(char* source,unsigned long long numberOfValues);
 void free_array(Marray* _array/*,Mallocationowner owner*/);
 #ifndef __PRODUCTION__
 Marray* owned_array(Marray * const _array,Mallocationowner owner_array);
@@ -357,6 +358,7 @@ typedef Mvalue* (*ThreeArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argume
 typedef Mvalue* (*FourArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value);
 typedef Mvalue* (*FiveArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value,Mvalue* _argument5Value);
 
+Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction); // MDH@22NOV2020
 Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
 Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
 

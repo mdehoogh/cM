@@ -11,7 +11,7 @@ static bool DEBUGGING=true;
 static uint16_t const MODULE_ID=13;
 static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MODULE_ID,id};}
 
-extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END;
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO,M_ARRAY_ELEMENTS_AT_START,M_ARRAY_ELEMENTS_AT_END,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
@@ -157,6 +157,16 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
 // MDH@04NOV2020: soon in this theater
 Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
     Marray* _array=CALLOC_1(sizeof(Marray),'A',owner);
+    return disowned_array(_array,owner);
+}
+Marray* _getArray(char* source,unsigned long long numberOfValues){Mallocationowner owner=getOwner(__LINE__);
+    Marray* _array=owned_array(__array(source),owner);
+    if(_array){
+        if(numberOfValues>0){
+            _array->values=OWNED(CALLOC(sizeof(Mvalue*),numberOfValues,-'a',owner),Msubowner(owner,1));
+            if(!_array->values){FREE_1(_array,'A');_array=NULL;}
+        }
+    }
     return disowned_array(_array,owner);
 }
 void free_values(Mvalue** values,unsigned long long numberOfValues){
@@ -1417,6 +1427,62 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
     return _rationalValue;
 }/* VALIDATED */
 
+Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
+    // as this is more like a tuple than a list (Python equivalent data structures)
+    bool report=amVerboseDebugging()||DEBUGGING;
+	Mstring* result=owned_string(__string(),owner);
+    if(result){
+        Mstring* p=result;
+        if(report){
+            p=string_append_char(p,'a');
+            p=string_append_char(p,'(');
+            p=appendll(p,_array->numberOfElements);
+            p=string_append_char(p,')');
+        }
+		p=string_append_char(p,'('); // switch to using p in appends
+        long long arrayelementindex=-1,expectedarrayindex=0; // this would be the expected array index
+		Mvalue* arrayelementValue=(_array?*(_array->values):NULL);
+        long long firstAtEnd=_array->numberOfElements+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
+        long long elementsNotIncluded=firstAtEnd-showAtStart-1;
+        // output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
+		while(p){
+            arrayelementindex++;
+            if(elementsNotIncluded>0&&arrayelementindex>=firstAtEnd){ // the first to show at the end coming up next
+                p=string_append(p,"(");
+                p=appendll(p,elementsNotIncluded);
+                p=string_append(p," element");
+                if(elementsNotIncluded>1)p=string_append_char(p,'s');
+                p=string_append(p," not displayed),");
+                elementsNotIncluded=0; // for safety
+            }
+            ///////outputChar('$');
+            // increment listindex until it is equal to _listelement->index
+            // MDH@11NOV2020 we use index 0 in sorting: if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
+            if(arrayelementindex<=showAtStart-1||arrayelementindex>=firstAtEnd-1){ // a displayable value
+                if(expectedarrayindex!=arrayelementindex){
+                    p=appendll(p,arrayelementindex);
+                    p=string_append_char(p,':');
+                }
+                // replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
+                Mstring* _arrayelementValueText=owned_string(_getValueText(arrayelementValue,false),owner); // to be freed asap
+                if(_arrayelementValueText){
+                    p=string_append(p,string(_arrayelementValueText));
+                    FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
+                }
+                // if there's more coming write a comma
+                if(_array->values[arrayelementindex+1])p=string_append_char(p,',');
+            }
+            expectedarrayindex=arrayelementindex+1; // expected next
+            arrayelementindex++;
+            // output("(%llu)",listindex); // DEBUG
+		}
+		p=string_append_char(p,')');
+		/////output("List=%s",string(p));
+		// if appending failed somewhere free s
+		if(!p){FREE_STRING(result,owner);result=NULL;}
+	}
+	return disowned_string(result,owner);    
+}
 // MDH@02NOV2020: because lists can be very large, we adapt _getListText with a value telling it the maximum
 //                number of elements to display from the start and at the end
 // MDH@03NOV2020: showing all elements but prefixing the index when it differs from the expected list index (which is one above the last one shown)
@@ -1581,6 +1647,7 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
 			case VT_TEXT:valueText=owned_string(_getStringText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
+            case VT_ARRAY:valueText=owned_string(_getArrayText(_value->value._array,M_ARRAY_ELEMENTS_AT_START,M_ARRAY_ELEMENTS_AT_END),owner);break;
 			case VT_LIST:valueText=owned_string(_getListText(_value->value._list,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END),owner);break;
             case VT_TOKEN:
                 { // can't just show the single token because we could have following ones
@@ -2368,6 +2435,22 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowne
 }/* VALIDATED */
 
 // functions
+Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    Marray* _result=NULL;
+    if(_array){
+        unsigned long long l=_array->numberOfElements;
+        if(l>0){
+            _result=owned_array(_getArray("appliedToArray",_array->numberOfElements),owner);
+            if(_result){
+                do{
+                    l--;
+                    assignValue(&_result->values[l],oneArgumentFunction(_array->values[l]));
+                }while(l>0);
+            }
+        }
+    }
+    return disowned_array(_result,owner);    
+}
 // helpers
 Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _result=NULL;
