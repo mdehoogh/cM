@@ -1440,12 +1440,12 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
             p=string_append_char(p,')');
         }
 		p=string_append_char(p,'('); // switch to using p in appends
-        long long arrayelementindex=-1,expectedarrayindex=0; // this would be the expected array index
+        unsigned long long arrayelementindex=0;
 		Mvalue* arrayelementValue=(_array?*(_array->values):NULL);
         long long firstAtEnd=_array->numberOfElements+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
         long long elementsNotIncluded=firstAtEnd-showAtStart-1;
         // output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
-		while(p){
+		while(p&&arrayelementindex<_array->numberOfElements){
             arrayelementindex++;
             if(elementsNotIncluded>0&&arrayelementindex>=firstAtEnd){ // the first to show at the end coming up next
                 p=string_append(p,"(");
@@ -1458,8 +1458,8 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
             ///////outputChar('$');
             // increment listindex until it is equal to _listelement->index
             // MDH@11NOV2020 we use index 0 in sorting: if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
-            if(arrayelementindex<=showAtStart-1||arrayelementindex>=firstAtEnd-1){ // a displayable value
-                if(expectedarrayindex!=arrayelementindex){
+            if(arrayelementindex<=showAtStart||arrayelementindex>=firstAtEnd){ // a displayable value
+                if(arrayelementindex==showAtStart||arrayelementindex==firstAtEnd){
                     p=appendll(p,arrayelementindex);
                     p=string_append_char(p,':');
                 }
@@ -1470,10 +1470,8 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
                     FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
                 }
                 // if there's more coming write a comma
-                if(_array->values[arrayelementindex+1])p=string_append_char(p,',');
+                if(arrayelementindex!=_array->numberOfElements)p=string_append_char(p,',');
             }
-            expectedarrayindex=arrayelementindex+1; // expected next
-            arrayelementindex++;
             // output("(%llu)",listindex); // DEBUG
 		}
 		p=string_append_char(p,')');
