@@ -155,16 +155,31 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
 }
 
 // MDH@04NOV2020: soon in this theater
-Marray* __array(char* source/*,Mallocationowner owner_list*/){
-    return NULL;
+Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
+    Marray* _array=CALLOC_1(sizeof(Marray),'A',owner);
+    return disowned_array(_array,owner);
 }
-void free_array(Mlist* _array/*,Mallocationowner owner*/){
+void free_values(Mvalue** values,unsigned long long numberOfValues){
+    if(!values)return;
+    // disconnect every stored value
+    unsigned long long l=0;while(l<numberOfValues)assignValue(&values[l++],NULL);
+    FREE(values,numberOfValues,-'a');
+}
+void free_array(Marray* _array/*,Mallocationowner owner*/){
+    if(!_array)return;
+    // if we have values, we should disconnect them from their values (see free_values)
+    if(_array->values)free_values(_array->values,_array->numberOfElements);
+    FREE_1(_array,'A');
 }
 #ifndef __PRODUCTION__
 Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
-    return _array;
+    if(!_array)return NULL;
+    if(_array->values)OWNED(_array->values,Msubowner(owner_array,1));
+    return OWNED(_array,owner_array);
 }
 Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
+    if(!_array)return NULL;
+    if(_array->values)DISOWNED(_array->values,owner_array);
     return _array;
 }
 #endif
@@ -321,6 +336,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
             case VT_RATIONAL:if(_value->value._rational){FREE_RATIONAL(_value->value._rational,owner_value_data);_value->value._rational=NULL;}break;
             case VT_FLOAT:if(_value->value._float){FREE_FLOAT(_value->value._float,owner_value_data);_value->value._float=NULL;}break;
             case VT_TEXT:if(_value->value._text){FREE_TEXT(_value->value._text,owner_value_data);_value->value._text=NULL;}break;
+            case VT_ARRAY:if(_value->value._array){FREE_ARRAY(_value->value._array,owner_value_data);_value->value._array=NULL;}break;
             case VT_LIST:if(_value->value._list){FREE_LIST(_value->value._list,owner_value_data);_value->value._list=NULL;}break;
             case VT_MAP:if(_value->value._map){FREE_MAP(_value->value._map,owner_value_data);_value->value._map=NULL;}break;
             case VT_REFERENCE:if(_value->value._reference){FREE_REFERENCE(_value->value._reference,owner_value_data);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
@@ -1076,6 +1092,26 @@ Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *
 }
 Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5){return _getFiveArgumentMap(name1,name2,name3,name4,name5,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 // end helper functions 
+
+// ARRAY STUFF
+Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
+    if(!_array)return NULL;
+    bool disowned_array=Misdisowned(_array);
+    if(amVerbose())
+        output("Wrapping a %s array.\n",(disowned_array?"disowned":"owned"));
+    Mvalue* _value=__value(_array->weak?"weak array":"strong array");
+    if(!_value){
+        if(disowned_array)free_array(_array);
+        return NULL;
+    }
+    _value->value._array=(disowned_array?owned_array(_array,owner_value_data):_array); // MDH@22NOV2020: _value is to take over ownership of _list
+    // if the array is disowned (so should any values in it be, so we should take over ownership)
+    if(disowned_array)if(_array->values)OWNED(_array->values,Msubowner(owner_value_data,1)); // TODO check this
+    _value->type=VT_ARRAY;
+    if(amVerboseDebugging())
+        output("%s array wrapped.\n",(disowned_array?"disowned":"owned"));
+    return _value;
+}/* TODO VALIDATED */
 
 // LIST STUFF
 Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
@@ -2174,6 +2210,7 @@ long long isValueNull(Mvalue* value){
         case VT_RATIONAL:result=(value->value._rational?M_FALSE:M_TRUE);break;
         case VT_FLOAT:result=(value->value._float?M_FALSE:M_TRUE);break;
         case VT_TEXT:result=(value->value._text?M_FALSE:M_TRUE);break;
+        case VT_ARRAY:result=(value->value._array?M_FALSE:M_TRUE);break;
         case VT_LIST:result=(value->value._list?M_FALSE:M_TRUE);break;
         case VT_MAP:result=(value->value._map?M_FALSE:M_TRUE);break;
         case VT_TOKEN:result=(value->value._token?M_FALSE:M_TRUE);break;
@@ -2185,6 +2222,10 @@ long long isValueNull(Mvalue* value){
     }
     return result;
 }/* VALIDATED */
+
+long long isArrayUndefined(Marray* array){return(array?M_FALSE:M_TRUE);}
+long long isListUndefined(Mlist* list){return(list?M_FALSE:M_TRUE);}
+long long isMapUndefined(Mmap* map){return(map?M_FALSE:M_TRUE);}
 // MDH@18JUL2019: we consider certain non-null values as undefined, this is to fill the gap between non-null values that represent missings
 //                TODO is a map or list undefined when empty???????
 long long isValueUndefined(Mvalue* value){
@@ -2198,6 +2239,7 @@ long long isValueUndefined(Mvalue* value){
         case VT_DECIMAL:result=isDecimalUndefined(value->value._decimal);break; // replacing: mpd_isnan((mpd_t*)value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
         case VT_RATIONAL:result=isRationalUndefined(value->value._rational);break;
         case VT_TEXT:result=isTextUndefined(value->value._text);break; ////strlen(_value->value._text->_c)==0;
+        case VT_ARRAY:result=isArrayUndefined(value->value._array);break; ////Mlen(_value)==0;
         case VT_LIST:result=isListUndefined(value->value._list);break; ////Mlen(_value)==0;
         case VT_MAP:result=isMapUndefined(value->value._map);break; ////Mlen(_value)==0;
         case VT_TOKEN:result=isTokenUndefined(value->value._token);break; /////string_length(_value->value._token->text)==0;
@@ -2507,9 +2549,6 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){Mallocationowner owner=getOwner
     return NULL;
 }
 
-long long isListUndefined(Mlist* list){return(list?M_FALSE:M_TRUE);}
-long long isMapUndefined(Mmap* map){return(map?M_FALSE:M_TRUE);}
-
 // MDH@24OCT2019: when representing variable values the value might match the value of a constant in which case we use the name of that constant variable instead (which is like a symbol)
 //                obviously the type of the value should match as well
 bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
@@ -2524,7 +2563,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
         case VT_BIGINTEGER:return(mp_cmp(MP_INT_POINTER(value1->value._biginteger),MP_INT_POINTER(value2->value._biginteger))==MP_EQ);
         case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
         case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
-        case VT_LIST:case VT_MAP:break;
+        case VT_ARRAY:case VT_LIST:case VT_MAP:break;
         case VT_DECIMAL:case VT_RATIONAL:break;
         case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
         case VT_REFERENCE: // TODO this might be hard

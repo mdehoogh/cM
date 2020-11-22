@@ -138,14 +138,15 @@ typedef struct Marray{
     bool weak:1;
     bool immutable:1;
 }Marray;
+long long isArrayUndefined(Marray* array);
 
 Marray* __array(char* source/*,Mallocationowner owner_list*/);
-void free_array(Mlist* _array/*,Mallocationowner owner*/);
+void free_array(Marray* _array/*,Mallocationowner owner*/);
 #ifndef __PRODUCTION__
 Marray* owned_array(Marray * const _array,Mallocationowner owner_array);
 Marray* disowned_array(Marray * const _array,Mallocationowner owner_array);
 #define OWNED_ARRAY(_array,owner_array) owned_array(_array,owner_array)
-#define __ARRAY(source,owner_array) owned_list(__array(source),owner_array)
+#define __ARRAY(source,owner_array) owned_array(__array(source),owner_array)
 #define DISOWNED_ARRAY(_array,owner_array) disowned_array(_array,owner_array)
 #define FREE_ARRAY(_array,owner_array) free_array(disowned_array(_array,owner_array))
 #else
@@ -230,6 +231,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty m
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
+Mvalue* _getValueOfArray(Marray* _array);
 Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/);
 Mvalue* _getValueOfInteger(Minteger* _integer/*,Mallocationowner owner_integer*/);
 Mvalue* _getValueOfReal(Mfloat* _real/*,Mallocationowner owner_real*/);

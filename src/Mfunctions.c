@@ -3,7 +3,7 @@
 
 #include "Mfunctions.h"
 
-static uint16_t const MODULE_ID=15;
+static uint16_t const MODULE_ID=16;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
 
 extern char const * const VALUETYPENAMES[];
