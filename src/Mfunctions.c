@@ -548,6 +548,109 @@ Mvalue* Mlen(Mvalue* _value){
     }
     return _getIntegerValue(result);
 }/* VALIDATED */
+// MDH@30NOV2020: convenient if we can change the length of an array of string
+Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=getOwner(__LINE__);
+    // a length should always be a nonnegative integer
+    long long result=M_LL_INVALID;
+    if(_value){
+        long long newlength=getValueInteger(newlength_value);
+        if(newlength>=0){
+            switch(_value->type){
+                case VT_ARRAY:
+                    {
+                        Marray* array=_value->value._array;
+                        unsigned long long length=array->numberOfElements;
+                        if(length!=newlength){
+                            unsigned long long l=MAX(length,newlength); // guaranteed to be positive, will equal length if newlength equals 0!!!
+                            // we can't cut off values until we managed to get new memory
+                            result=newlength;
+                            if(newlength>0){
+                                Mvalue** newvalues=CALLOC(sizeof(Mvalue*),newlength,-'a',owner);
+                                if(newvalues){
+                                    do{
+                                        l--;
+                                        // all values ABOVE newlength will not be used anymore
+                                        // all values below length will still be used
+                                        if(l>=newlength)assignValue(&array->values[l],NULL);else if(l<length)newvalues[l]=array->values[l];
+                                    }while(l>0);
+                                    // NULL any value reference in the current array's values NOT included in the new values
+                                    FREE_DISOWNED(array->values,length,-'a',Msubowner(getValueOwner(),1)); // get rid of the current values
+                                    array->values=newvalues; // make values point to the new values
+                                    array->numberOfElements=newlength; // remember the new length
+                                    result-=length; // the change in number of elements is the result of the function
+                                }
+                            }else{ // deleting all values, so no need to try to allocate sufficient memory
+                                result-=length;
+                                while(l>0)assignValue(&array->values[--l],NULL); // getting rid of all value pointers (in effect decrementing the counts of all the values!!!!)
+                                FREE(array->values,length,-'a'); // get rid of the current values                            
+                                array->numberOfElements=0;
+                                array->values=NULL;
+                            }
+                        }else // no need to change
+                            result=0;
+                    };break;
+                case VT_LIST:
+                    {
+                        Mlist* list=_value->value._list;
+                        unsigned long long length=list->numberOfElements;
+                        result=newlength;
+                        result-=length;
+                        if(result>0){ // expanding a list, which essentially is not possible unless we append NULL value references
+                            while(length<newlength&&appendedToList(list,Msubowner(getValueOwner(),1),NULL,M_LL_INVALID)>0)length++;
+                            result-=(newlength-length); // decrement result with what we couldn't append!!!
+                        }else
+                        if(result<0){ // shortening a list means removing this number of elements
+                            // find the first list element to free
+                            if(newlength>0){
+                                list->numberOfElements=newlength;
+                                // determine the last element to keep
+                                Mlistelement *listelement=list->_first;
+                                while(--newlength>0)listelement=listelement->_next;
+                                list->_last=listelement;
+                                free_listelement(listelement->_next,list->weak);
+                                listelement->_next=NULL;
+                            }else{ // completely empty the list
+                                free_listelement(list->_first,list->weak);
+                                list->numberOfElements=0;
+                                list->_first=NULL;
+                                list->_last=NULL;
+                            }
+                        }
+                    };break;
+                case VT_TEXT:
+                    {
+                        unsigned long long length=strlen(_value->value._text->_c);
+                        if(length!=newlength){
+                            // we're going to copy the text out of it, change it and reset it
+                            Mstring* _text=owned_string(__string(),owner);
+                            if(_text){
+                                Mstring* p=_text;
+                                result=newlength;
+                                result-=length;
+                                p=string_append_char(p,_value->value._text->presuffix);
+                                p=string_append(_text,_value->value._text->_c);
+                                if(length<newlength){
+                                    while(length<newlength){p=string_append_char(p,' ');if(!p)break;length++;}
+                                }else
+                                    p=string_setlength(p,newlength);
+                                if(p){ // text successfully lengthened or shortened
+                                    // now that we've copied the current text content over, we can free it BEFORE replacing it!!!
+                                    free_text(_value->value._text);
+                                    _value->value._text=owned_text(_getText(string(_text)),Msubowner(getValueOwner(),1));
+                                    result-=(newlength-length);
+                                }else // failure
+                                    result=M_LL_INVALID;
+                                FREE_STRING(_text,owner);
+                            }
+                        }
+                    };break;
+                default:break;
+            }
+        }
+    }
+    return _getIntegerValue(result);
+}
+
 // 25OCT2019: get the length of a text with M's tl function
 Mvalue* Mtl(Mvalue* _value){
     long long result=M_LL_INVALID;

@@ -1776,6 +1776,34 @@ bool completedValueValueFunction(Mfunction* const _function,const char* const fu
     }
     return false;
 }/* VALIDATED */
+bool completedIntegerValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=owned_map(_getTokenTokenMap("number of elements","fill value"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register integer value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedValueIntegerFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=owned_map(_getTokenTokenMap("list, array or text","new length"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register value integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 bool completedListValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);

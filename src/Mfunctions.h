@@ -17,7 +17,10 @@ Mvalue* Misnumeric(Mvalue* _value);
 Mvalue* Misalist(Mvalue* _value);
 
 Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
+
 Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
+Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value);
+
 Mvalue* Mfacd(Mvalue* _value); // faculty (for an integer)
 Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)
 

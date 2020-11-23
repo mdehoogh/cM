@@ -48,7 +48,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="18";char const * const M_DATE="17 November 2020"; // MDH@17NOV2020: yes the bug (setting one list element to many in the stack and so writing outside the reserved dynamic memory) was fixed, by harmonica binary sort still way too slow
+char const * const M_BUILD="19";char const * const M_DATE="23 November 2020"; // MDH@17NOV2020: array data type added
+//char const * const M_BUILD="18";char const * const M_DATE="17 November 2020"; // MDH@17NOV2020: yes the bug (setting one list element to many in the stack and so writing outside the reserved dynamic memory) was fixed, by harmonica binary sort still way too slow
 //char const * const M_BUILD="17";char const * const M_DATE="16 November 2020"; // MDH@16NOV2020: addressing a serious memory bug in sorting using lharmonicabinarysort
 //char const * const M_BUILD="15";char const * const M_DATE="5 November 2020"; // MDH@05NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
 //char const * const M_BUILD="14";char const * const M_DATE="3 November 2020"; // MDH@03NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow

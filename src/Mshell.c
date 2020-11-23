@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=false; // whether or not debugging this module
+static bool DEBUGGING=true; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=18;
@@ -2435,6 +2435,7 @@ Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mal
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
 // TODO we should delegate to (_)getValueDecimal
 Mvalue* Md(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(value&&value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Md));
 	if(value&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Md));
 	Mvalue* dValue=value;
 	if(value&&value->type!=VT_DECIMAL){
@@ -2456,6 +2457,7 @@ Mvalue* Md(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 Mvalue* Mo(Mvalue* value){ // little-endian representation list to return
 	if(value){
 		switch(value->type){
+			case VT_ARRAY:return _getValueOfArray(appliedToArray(value->value._array,Mo));
 			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,Mo));
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,true);
@@ -2469,6 +2471,7 @@ Mvalue* Mo(Mvalue* value){ // little-endian representation list to return
 Mvalue* MO(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endian decimal representation list to return
 	if(value){
 		switch(value->type){
+			case VT_ARRAY:return _getValueOfArray(appliedToArray(value->value._array,MO));
 			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,MO));
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,false);
@@ -2481,6 +2484,7 @@ Mvalue* MO(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endi
 // TODO to add h/H and b/B functions
 
 Mvalue* Mi(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
+	if(value&&value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mi));
 	if(value&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mi));
 	if(amVerboseDebugging())outputValue("Converting '",value,"' to an integer.\n");
 	long long ll=getValueInteger(value);
@@ -2489,6 +2493,7 @@ Mvalue* Mi(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
 
 // convert to a big integer
 Mvalue* Mb(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
+	if(value&&value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mb));
 	if(value&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mb));
 	if(amVerboseDebugging())outputValue("Converting '",value,"' to a big integer.\n");
 	Mvalue* bValue=value;
@@ -2664,6 +2669,7 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 // TODO how many iterations would we accept at most?????
 Mvalue* MQ(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
+	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,MQ));
 	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,MQ));
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
 	Mvalue* _rationalValue=NULL;
@@ -2679,6 +2685,7 @@ Mvalue* MQ(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 // MDH@09OCT2019: TODO=DONE how about turning a unpure rational into a pure rational???? yes, that's a good idea
 Mvalue* Mq(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
+	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mq));
 	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mq));
 	if(_value->type==VT_RATIONAL){
 		Mrational* rational=_value->value._rational;
@@ -2709,6 +2716,7 @@ Mvalue* Mq(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 // TODO complete with conversion from big integer and rational
 Mvalue* Mf(Mvalue* _value){
 	if(!_value||_value->type==VT_FLOAT)return _value;
+	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mf));
 	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mf));
 	bool report=amVerboseDebugging(); //||DEBUGGING;
 	long double ld=M_LD_NAN;
@@ -2766,10 +2774,20 @@ Mvalue* Msum(Mvalue* _value){
 				if(listelement){
 					// how about adding as decimals????
 					assignValue(&_sumValue,listelement->_value); // TODO I suppose we can do this????
-					while(listelement->_next){listelement=listelement->_next;_sumValue=add(_sumValue,listelement->_value);}
+					while(listelement->_next){listelement=listelement->_next;assignValue(&_sumValue,add(_sumValue,listelement->_value));}
 				}
 			}
 			return _sumValue;
+		}
+		if(_value->type==VT_ARRAY){
+			Mvalue* _sumValue=NULL;
+			Marray* array=_value->value._array;
+			if(array&&array->numberOfElements>0){
+				unsigned long long arrayindex=1;
+				assignValue(&_sumValue,array->values[0]);
+				while(arrayindex<array->numberOfElements)assignValue(&_sumValue,add(_sumValue,array->values[arrayindex++]));
+			}
+			return _sumValue;	
 		}
     }
     return _value; // the default
@@ -3517,9 +3535,10 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 // MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
 // MDH@19OCT2020: I thought I had it in here somewhere that if the item id list contains a single element that the result would also be a single value instead of a list
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner owner=getOwner(__LINE__);
+	bool report=(amVerboseDebugging()||DEBUGGING);
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
-	if(amVerboseDebugging())
+	if(report)
 	{
 			output("Getting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
@@ -3549,9 +3568,9 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name->chars); // the value at the top level
 			}
 		}
-		// only composite values can be indexed...
-		if(referencedValue&&(referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
-			if(amVerboseDebugging())
+		// only composite values can be indexed... // MDH@23NOV2020: now including VT_ARRAY things as well
+		if(referencedValue&&(referencedValue->type==VT_ARRAY||referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
+			if(report)
 				outputValue("Top level value reference: '",referencedValue,"'.\n");
 			// MDH@14NOV2019: ANY value that evaluates to a list or map can be further indexed
 			// if we have index/attribute names we have to get the final subvalue
@@ -3561,11 +3580,11 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 			// empty lists should also return the full element, so only something to do when we actually have list elements!!!
 			// MDH@07APR2020: should be similar to what setReferencedValue does except for the part of setting the value!!!
 			if(itemidList){
-				if(amVerboseDebugging())
+				if(report)
 					outputList("Item id list: ",itemidList,"'.\n"); // DEBUG
 				Mvalue* *valueholder=&referencedValue; // MDH@07APR2020 replacing what we used in setReferencedValue(): getValueHolder(getExecutionEnvironment(),_valuereference->_name);
 				// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
-				if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
+				if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
 					// if(amVerboseDebugging())outputInfo("************ Element(s) to set.");
 					// let's get the first index/attribute name
 					Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@19JUN2020 not anymore: MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
@@ -3586,7 +3605,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								indexorattributenameListelementValue=indexorattributenameListelement->_value;
 								// if no value is defined, it is ignored TODO should we????
 								if(indexorattributenameListelementValue){
-									if(amVerboseDebugging())
+									if(report)
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 									// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 									// NOTE we need to check ALL valueholders
@@ -3602,7 +3621,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
-										if(amVerboseDebugging())
+										if(report)
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
 										Mvalue*** _newValueholders=_valueholders;
@@ -3648,7 +3667,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 												numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 												indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
 												if(indexorattributenameListelementValue){
-													if(amVerboseDebugging())
+													if(report)
 														outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
 													int valueholderIndex=numberOfValueholders;
 													while(--valueholderIndex>=0){
@@ -3665,13 +3684,15 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																	//                we could flatten the value here????? so if it is a list we get the list of indices here
 																	Mmap* valueholderMap=(*valueholder)->value._map;
 																	Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
-																	if(amVerboseDebugging())outputList("Value index list: ",_valueIndexList,".\n");
+																	if(report)
+																		outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																	if(valueIndexListelement){
 																		Mvalue** newValueholder;
 																		while(valueholderMap){
-																			if(amVerboseDebugging())outputMap("Value holder map: ",valueholderMap,".");
+																			if(report)
+																				outputMap("Value holder map: ",valueholderMap,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																			if(indexorattributenameListelementValue){
 																				Mstring* _attributenameText=_getValueText(indexorattributenameListelementValue,true);
@@ -3703,16 +3724,17 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
 																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 															}else
-															if((*valueholder)->type==VT_LIST){
+															if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
-																	Mlist* valueholderList=(*valueholder)->value._list;
+																	Mlist* valueholderList=((*valueholder)->type==VT_LIST?(*valueholder)->value._list:NULL);
+																	Marray* valueholderArray=((*valueholder)->type==VT_ARRAY?(*valueholder)->value._array:NULL);
 																	Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
 																	// outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																	if(valueIndexListelement){
 																		Mvalue** newValueholder;
-																		while(valueholderList){
+																		while(valueholderList||valueholderArray){
 																			// outputList("Value holder list: ",valueholderList,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																			if(indexorattributenameListelementValue){
@@ -3720,24 +3742,33 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																				if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
 																				if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
 																				// MDH@19JUN2020: I suppose we should also allow appending to the list if listIndex equals M_LL_INVALID
-																				if(listIndex!=M_LL_INVALID){
-																					newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
-																					if(!newValueholder){
-																						listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
-																						if(listIndex>0){
-																							newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
-																							if(amDebugging())
-																								output("List element at index #%zd retrieved.\n",listIndex);	
-																						}else
-																							output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
-																					}
-																				}else
-																					newValueholder=NULL;
+																				if(valueholderList){ // indexing a list
+																					if(listIndex!=M_LL_INVALID){
+																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
+																						if(!newValueholder){
+																							listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
+																							if(listIndex>0){
+																								newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
+																								if(amDebugging())
+																									output("List element at index #%zd retrieved.\n",listIndex);	
+																							}else
+																								output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
+																						}
+																					}else
+																						newValueholder=NULL;
+																				}else{ // indexing an array
+																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
+																					if(report)
+																						if(newValueholder)
+																							output("New value holder reference value #%llu in array.\n",listIndex);
+																				}
 																			}
 																			valueIndexListelement=valueIndexListelement->_next;
 																			if(!valueIndexListelement)break;
+																			if(!newValueholder||!*newValueholder)break;
 																			// we have another property 'index', so we should have a value holder map
-																			valueholderList=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
+																			valueholderList=((*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
+																			valueholderArray=((*newValueholder)->type==VT_ARRAY?(*newValueholder)->value._array:NULL);
 																		}
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																	}
@@ -3747,7 +3778,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+															if(!_valueholders[valueholderIndex+numberOfNewValueholders])
+																output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														}
 													}
 												}
@@ -3769,7 +3801,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						}
 						// MDH@31MAR2020: supposedly we have ALL value holders to which _newValue needs to be assigned!!!
 						if(result){
-							if(amVerboseDebugging())
+							if(report)
 								output("Storing the values of %d elements.\n",numberOfValueholders);
 							// MDH@19OCT2020: if the result contains a single element we return the first element (which is an Mvalue* and therefore does not need to be owned here)
 							if(numberOfValueholders>1){
@@ -3777,7 +3809,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								Mlist* _resultList=owned_list(_getListOfType(VT_UNDEFINED),owner);
 								int valueholderIndex=numberOfValueholders;
 								while(--valueholderIndex>=0){
-									if(amVerboseDebugging())
+									if(report)
 										{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
 									if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){
 										FREE_LIST(_resultList,owner);
@@ -3872,16 +3904,17 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 			}
 		}
 		///////if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
-		if(amVerboseDebugging())
+		if(report)
 			outputValue("Returning referenced value: '",referencedValue,"'.\n");
 	}
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
 bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner owner_valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
-		if(amVerboseDebugging())
+		if(report)
 		{
 			output("Setting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
@@ -3900,11 +3933,13 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 			// MDH@28MAR2020: if we allow item index elements to be lists we need an array of value holders
 			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name->chars);
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
-			if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
+			if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
 				// MDH@19JUN2020: if itemidList is empty, we use the default index or attribute name
-				if(!itemidList->_first)if(appendedToList(itemidList,owner_valuereference,(*valueholder)->type==VT_LIST?_getIntegerValue(M_LL_INVALID):_getTextValue("'"),M_LL_INVALID)<0)return false;
+				if(!itemidList->_first)
+					if(appendedToList(itemidList,owner_valuereference,(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY?_getIntegerValue(M_LL_INVALID):_getTextValue("'"),M_LL_INVALID)<0)
+						return false;
 				result=true;
-				if(amVerboseDebugging())
+				if(report)
 					outputInfo("************ Element(s) to set.");
 				// let's get the first index/attribute name
 				Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
@@ -3924,7 +3959,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 							indexorattributenameListelementValue=indexorattributenameListelement->_value;
 							// if no value is defined, it is ignored TODO should we????
 							if(indexorattributenameListelementValue){
-								if(amVerboseDebugging())
+								if(report)
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 								// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 								// NOTE we need to check ALL valueholders
@@ -3973,11 +4008,11 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 												// if the index is a list we will be duplicating
 												if(_flattenedIndexList->valuetype==VT_INTEGER){ // all integers in the index list
 													assignValue(valueholder,_getListValue(VT_UNDEFINED,false,"value holder list creator"));
-													if(amVerboseDebugging())
+													if(report)
 														output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 												}else{ // not all integers in the index list
 													assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
-													if(amVerboseDebugging())
+													if(report)
 														output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 												}
 												if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
@@ -3985,7 +4020,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 											// as soon as the list or map valueholder is created we can use it to get the new value reference IFF the value is of the right type, we have to ascertain that all copies are zero
 										}
 										// now we can create the elements
-										if(amVerboseDebugging())
+										if(report)
 											outputList("****** Flattened index list: '",_flattenedIndexList,"'.\n");
 										flattenedIndexListelement=_flattenedIndexList->_first;
 										while(flattenedIndexListelement){
@@ -4027,7 +4062,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																//                we could flatten the value here????? so if it is a list we get the list of indices here
 																Mmap* valueholderMap=(*valueholder)->value._map;
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
-																if(amVerboseDebugging())
+																if(report)
 																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
 																// 'iterating' over all list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
@@ -4076,19 +4111,22 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
 															/*}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
-															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+															if(!_valueholders[valueholderIndex+numberOfNewValueholders])
+																output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														}else
-														if((*valueholder)->type==VT_LIST){
+														if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){ // MDH@23NOV2020: either a list or an array being indexed
 															if(_flattenedIndexList->valuetype==VT_INTEGER){
-																Mlist* valueholderList=(*valueholder)->value._list;
+																// we either have a list or an array (bit of a nuisance to have to do it this way?????)
+																Mlist* valueholderList=((*valueholder)->type==VT_LIST?(*valueholder)->value._list:NULL);
+																Marray* valueholderArray=((*valueholder)->type==VT_ARRAY?(*valueholder)->value._array:NULL);
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
-																if(amVerboseDebugging())
+																if(report)
 																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
 																// 'iterating' over all index list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																if(valueIndexListelement){
 																	Mvalue** newValueholder;
-																	while(valueholderList){
+																	while(valueholderList||valueholderArray){
 																		// output("%c\n",'D'); // DEBUG
 																		// outputList("Value holder list: ",valueholderList,".");
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
@@ -4097,6 +4135,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																			if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
 																			if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
 																			// MDH@19JUN2020 M_LL_INVALID allowed as index indicating appending: if(listIndex!=M_LL_INVALID){
+																			if(valueholderList){ // MDH@23NOV2020: a list
 																				newValueholder=(listIndex!=M_LL_INVALID?getValueHolderAtIndex(valueholderList,listIndex):NULL);
 																				if(!newValueholder){
 																					listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
@@ -4111,12 +4150,20 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																					}else
 																						output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
 																				}
+																			}else{ // MDH@23NOV2020: an array (and we're NOT going to create an element that's not there like we do with a list!!!!)
+																				newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
+																				if(report)
+																					if(newValueholder)
+																						output("New value holder reference value #%llu in array.\n",listIndex);
+																			}
 																			//}else	newValueholder=NULL;
 																		}
 																		valueIndexListelement=valueIndexListelement->_next;
 																		if(!valueIndexListelement)break;
 																		// we have another property 'index', so we should have a value holder map
-																		valueholderList=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
+																		if(!newValueholder||!*newValueholder)break;
+																		valueholderList=((*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
+																		valueholderArray=((*newValueholder)->type==VT_ARRAY?(*newValueholder)->value._array:NULL);
 																		// output("%c\n",'E'); // DEBUG
 																	}
 																	// output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
@@ -4135,7 +4182,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 											// if we managed to collect all assigned indices we use these to replace the current value in the flattened index list element
 											if(_assignedIndexList){
 												if(_assignedIndexList->_first){
-													if(amVerboseDebugging())
+													if(report)
 														outputList("Assigned index list: '",_assignedIndexList,"'.\n"); // DEBUG
 													if(_assignedIndexList->_first==_assignedIndexList->_last){
 														assignValue(&flattenedIndexListelement->_value,_assignedIndexList->_first->_value);
@@ -4159,7 +4206,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 								// MDH@19JUN2020 TODO not too happy about using _flattenedIndexList and assignedIndexList to collect the actual ids of the properties or array elements
 								if(_flattenedIndexList){
 									if(_flattenedIndexList->_first){ // at least one element
-										if(amVerboseDebugging())
+										if(report)
 											outputList("Flattened index list: '",_flattenedIndexList,"'.\n");
 										if(_flattenedIndexList->_first!=_flattenedIndexList->_last){ // more than one element: replace the value by the reversed list (which is disowned to start with!!!!)
 											Mlist* _rereversedIndexList=owned_list(_getReversedList(_flattenedIndexList),owner);
@@ -4180,7 +4227,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					// MDH@31MAR2020: supposedly we have ALL value holders to which _newValue needs to be assigned!!!
 					if(result){
 						long long valueholderIndex=numberOfValueholders;
-						if(amVerboseDebugging())
+						if(report)
 						{output("Setting %llu values",valueholderIndex);outputValue(" to '",_newValue,"'.\n");}
 						while(--valueholderIndex>=0)if(_valueholders[valueholderIndex])assignValue(_valueholders[valueholderIndex],_newValue);
 						// output("Values set!\n"); // DEBUG
@@ -4309,7 +4356,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 						}
 					}
 				}
-				if(amVerboseDebugging())
+				if(report)
 					outputInfo("Value set!");
 			}
 		}
@@ -4991,7 +5038,7 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 		}
 		// if(resultsOfSameType)_result->valuetype=_list->valuetype;
 	}else
-		_result=_appliedToLists(_list,_value->value._list,binaryoperator,maintainsValuetype);
+		_result=owned_list(_appliedToLists(_list,_value->value._list,binaryoperator,maintainsValuetype),owner);
 	return _getValueOfList(disowned_list(_result,owner));
 }
 Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
@@ -5010,8 +5057,67 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 		}
 		// if(resultsOfSameType)_result->valuetype=_list->valuetype;
 	}else
-		_result=_appliedToLists(_value->value._list,_list,binaryoperator,maintainsValuetype);
+		_result=owned_list(_appliedToLists(_value->value._list,_list,binaryoperator,maintainsValuetype),owner);
 	return _getValueOfList(disowned_list(_result,owner));
+}
+
+// we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
+static Mvaluetype getMatchingArrayValuetype(Mvaluetype arrayValuetype,Mvaluetype valueValuetype){
+	// essentially the matching list value type is listValuetype unless valueValuetype is different
+	// TODO we might improve on this if we select the 'highest' of the two value types as the result type
+	return(arrayValuetype!=valueValuetype?VT_UNDEFINED:arrayValuetype);
+}
+Marray* _appliedToArrays(Marray* _array1,Marray* _array2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	if(!_array1)return _array2;if(!_array2)return _array1;
+	Marray* _result=owned_array(_getArray("_appliedToArrays",MAX(_array1->numberOfElements,_array2->numberOfElements)),owner); // TODO if the types are the same use that?
+	if(_result){
+		if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array1->valuetype,_array2->valuetype);
+		unsigned long long arrayindex=0;
+		while(arrayindex<_result->numberOfElements){
+			// leaving it up to the binary operator what will be the result of applying it with one of the arguments equal to NULL
+			assignValue(&_result->values[arrayindex],binaryoperator((arrayindex<_array1->numberOfElements?_array1->values[arrayindex]:NULL),(arrayindex<_array2->numberOfElements?_array2->values[arrayindex]:NULL)));
+			arrayindex++;
+		}
+	}
+	return disowned_array(_result,owner);
+}
+Mvalue* _appliedToArray(Marray* _array,Mvalue* _value,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	// scalars are to be added to each element of the original list
+	// lists are to be added to the elements at the same position, so listwise
+	Marray* _result=NULL;
+	if(_value->type!=VT_ARRAY){
+		// should create an array of the same length
+		_result=owned_array(_getArray("_appliedToArray",_array->numberOfElements),owner);
+		if(_result){
+			if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
+			unsigned long long arrayindex=0;
+			while(arrayindex<_array->numberOfElements){
+				assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
+				arrayindex++;
+			}
+		}
+	}else
+		_result=owned_array(_appliedToArrays(_array,_value->value._array,binaryoperator,maintainsValuetype),owner);
+	return _getValueOfArray(disowned_array(_result,owner));
+}
+Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	// scalars are to be added to each element of the original list
+	// lists are to be added to the elements at the same position, so listwise
+	Marray* _result=NULL;
+	if(_value->type!=VT_ARRAY){
+		// should create an array of the same length
+		_result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements),owner);
+		if(_result){
+			if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
+			unsigned long long arrayindex=0;
+			while(arrayindex<_array->numberOfElements){
+				assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
+				arrayindex++;
+			}
+		}
+	}else
+		_result=owned_array(_appliedToArrays(_value->value._array,_array,binaryoperator,maintainsValuetype),owner);
+	return _getValueOfArray(disowned_array(_result,owner));
 }
 
 // two-argument arithmetic
@@ -5027,6 +5133,8 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 ///// MDH@18NOV2019 is now defined elsewhere!!: Mdecimal* getValueDecimal(Mvalue* _value);
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL; // MDH@24OCT2019: propagate NULL
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,add,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,add,true);
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add,true);
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add,true);
@@ -5169,7 +5277,9 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(amVerboseDebugging())
-		{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
+	{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,subtract,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,subtract,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract,true);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract,true);
 	// if either is zero, result is easy to determine
@@ -5267,6 +5377,8 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,multiply,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,multiply,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply,true);
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply,true);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
@@ -6053,6 +6165,8 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 }
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,power,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,power,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power,false); // MDH@02NOV2020 TODO: the input type is not always maintained for certain type combinations but sometimes it is
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power,false);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
@@ -6321,6 +6435,8 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 // MDH@07JUN2019: when two integers are presented to divide instead of actually computing the division we can store the division as a rational (so we kind of have a slow evaluation of the division, and we maintain accuracy as long as possible)
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,divide,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divide,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide,false);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
@@ -6382,6 +6498,8 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 }
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,integerdivide,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,integerdivide,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide,false);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
@@ -6500,6 +6618,8 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 }
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,divideremainder,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divideremainder,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder,false);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
@@ -6619,6 +6739,8 @@ static long long not(long long boolean){return(boolean==M_LL_INVALID?M_LL_INVALI
 // bitwise operators (and, or, xor)
 Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwisexor,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwisexor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwisexor,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwisexor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
@@ -6644,6 +6766,8 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 }
 Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwiseand,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseand,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseand,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseand,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
@@ -6668,6 +6792,8 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 }
 Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwiseor,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseor,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
@@ -6695,6 +6821,8 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 // logical binary operators
 Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,logicaland,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicaland,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicaland,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
@@ -6716,6 +6844,8 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 }
 Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,logicalor,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicalor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicalor,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicalor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
@@ -6745,6 +6875,8 @@ long long integerShift(long long integer,long long shift){
 }
 Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftleft,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftleft,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@25OCT2019: if either value is zero the result is the first value
@@ -6820,6 +6952,8 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 }
 Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftright,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftright,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@26OCT2019: if either value is zero return _value1
@@ -10460,7 +10594,8 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sum"),"sum",Msum)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"len"),"len",Mlen)){
+					||!completedValueIntegerFunction(_getFunction(_Menvironment,owner,"setlength"),"setlength",Msetlen)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"length"),"length",Mlen)){
 				outputError("Failed to register the sum and len list functions");
 				return NULL;
 			}
@@ -10477,7 +10612,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				return NULL;
 			}
 
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"array"),"array",marray)
+			if(!completedIntegerValueFunction(_getFunction(_Menvironment,owner,"array"),"array",marray)
 					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fill"),"fill",mfill)
 			){
 				outputError("Failed to register the array and fill array functions");

@@ -154,20 +154,32 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
     return DISOWNED_LIST(_list,owner);
 }
 
-// MDH@04NOV2020: soon in this theater
+// MDH@04NOV2020: coming soon in this theater
+#ifndef __PRODUCTION__
+Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
+    if(!_array)return NULL;
+    if(_array->values)OWNED(_array->values,Msubowner(owner_array,1));
+    return OWNED(_array,owner_array);
+}
+Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
+    if(!_array)return NULL;
+    if(_array->values)DISOWNED(_array->values,owner_array);
+    return DISOWNED(_array,owner_array);
+}
+#endif
 Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
     Marray* _array=CALLOC_1(sizeof(Marray),'A',owner);
-    return disowned_array(_array,owner);
+    return DISOWNED_ARRAY(_array,owner);
 }
 Marray* _getArray(char* source,unsigned long long numberOfValues){Mallocationowner owner=getOwner(__LINE__);
     Marray* _array=owned_array(__array(source),owner);
-    if(_array){
-        if(numberOfValues>0){
-            _array->values=OWNED(CALLOC(sizeof(Mvalue*),numberOfValues,-'a',owner),Msubowner(owner,1));
-            if(!_array->values){FREE_1(_array,'A');_array=NULL;}
-        }
+    if(!_array)return NULL;
+    if(numberOfValues>0){ // _array->values should be initialized to accomodate the given number of values
+        _array->values=CALLOC(sizeof(Mvalue*),numberOfValues,-'a',Msubowner(owner,1));
+        if(!_array->values){FREE_DISOWNED_1(_array,'A',owner);return NULL;}
+        _array->numberOfElements=numberOfValues; // OOPS almost forgot this!!!!
     }
-    return disowned_array(_array,owner);
+    return DISOWNED_ARRAY(_array,owner);
 }
 void free_values(Mvalue** values,unsigned long long numberOfValues){
     if(!values)return;
@@ -181,18 +193,6 @@ void free_array(Marray* _array/*,Mallocationowner owner*/){
     if(_array->values)free_values(_array->values,_array->numberOfElements);
     FREE_1(_array,'A');
 }
-#ifndef __PRODUCTION__
-Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
-    if(!_array)return NULL;
-    if(_array->values)OWNED(_array->values,Msubowner(owner_array,1));
-    return OWNED(_array,owner_array);
-}
-Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
-    if(!_array)return NULL;
-    if(_array->values)DISOWNED(_array->values,owner_array);
-    return _array;
-}
-#endif
 
 #ifndef __PRODUCTION__
 Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
@@ -1107,7 +1107,7 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
 Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
     if(!_array)return NULL;
     bool disowned_array=Misdisowned(_array);
-    if(amVerbose())
+    if(amVerboseDebugging())
         output("Wrapping a %s array.\n",(disowned_array?"disowned":"owned"));
     Mvalue* _value=__value(_array->weak?"weak array":"strong array");
     if(!_value){
@@ -1518,51 +1518,52 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
 
 Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
     // as this is more like a tuple than a list (Python equivalent data structures)
-    bool report=amVerboseDebugging()||DEBUGGING;
+    bool report=(amVerboseDebugging()||DEBUGGING);
 	Mstring* result=owned_string(__string(),owner);
     if(result){
         Mstring* p=result;
+        unsigned long long l=(_array?_array->numberOfElements:0);
         if(report){
             p=string_append_char(p,'a');
             p=string_append_char(p,'(');
-            p=appendll(p,_array->numberOfElements);
+            p=appendll(p,l);
             p=string_append_char(p,')');
         }
 		p=string_append_char(p,'('); // switch to using p in appends
-        unsigned long long arrayelementindex=0;
-		Mvalue* arrayelementValue=(_array?*(_array->values):NULL);
-        long long firstAtEnd=_array->numberOfElements+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
-        long long elementsNotIncluded=firstAtEnd-showAtStart-1;
-        // output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
-		while(p&&arrayelementindex<_array->numberOfElements){
-            arrayelementindex++;
-            if(elementsNotIncluded>0&&arrayelementindex>=firstAtEnd){ // the first to show at the end coming up next
-                p=string_append(p,"(");
-                p=appendll(p,elementsNotIncluded);
-                p=string_append(p," element");
-                if(elementsNotIncluded>1)p=string_append_char(p,'s');
-                p=string_append(p," not displayed),");
-                elementsNotIncluded=0; // for safety
-            }
-            ///////outputChar('$');
-            // increment listindex until it is equal to _listelement->index
-            // MDH@11NOV2020 we use index 0 in sorting: if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
-            if(arrayelementindex<=showAtStart||arrayelementindex>=firstAtEnd){ // a displayable value
-                if(arrayelementindex==showAtStart||arrayelementindex==firstAtEnd){
-                    p=appendll(p,arrayelementindex);
-                    p=string_append_char(p,':');
+        if(l>0){
+            long long firstAtEnd=l+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
+            long long elementsNotIncluded=firstAtEnd-showAtStart-1;
+            // output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
+            unsigned long long arrayelementindex=0,lastarrayelementindex=(--l);
+            do{
+                if(elementsNotIncluded>0&&arrayelementindex>=firstAtEnd){ // the first to show at the end coming up next
+                    p=string_append(p,"(");
+                    p=appendll(p,elementsNotIncluded);
+                    p=string_append(p," element");
+                    if(elementsNotIncluded>1)p=string_append_char(p,'s');
+                    p=string_append(p," not displayed),");
+                    elementsNotIncluded=0; // for safety
                 }
-                // replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
-                Mstring* _arrayelementValueText=owned_string(_getValueText(arrayelementValue,false),owner); // to be freed asap
-                if(_arrayelementValueText){
-                    p=string_append(p,string(_arrayelementValueText));
-                    FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
+                ///////outputChar('$');
+                // increment listindex until it is equal to _listelement->index
+                // MDH@11NOV2020 we use index 0 in sorting: if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
+                if(arrayelementindex<=showAtStart||arrayelementindex>=firstAtEnd){ // a displayable value
+                    if(arrayelementindex==showAtStart||arrayelementindex==firstAtEnd){
+                        p=appendll(p,arrayelementindex);
+                        p=string_append_char(p,':');
+                    }
+                    // replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
+                    Mstring* _arrayelementValueText=owned_string(_getValueText(_array->values[arrayelementindex],false),owner); // to be freed asap
+                    if(_arrayelementValueText){
+                        p=string_append(p,string(_arrayelementValueText));
+                        FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
+                    }
+                    // if there's more coming write a comma
+                    if(arrayelementindex!=lastarrayelementindex)p=string_append_char(p,',');
                 }
-                // if there's more coming write a comma
-                if(arrayelementindex!=_array->numberOfElements)p=string_append_char(p,',');
-            }
-            // output("(%llu)",listindex); // DEBUG
-		}
+                // output("(%llu)",listindex); // DEBUG
+            }while(p&&(++arrayelementindex)<=lastarrayelementindex);
+        }
 		p=string_append_char(p,')');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
