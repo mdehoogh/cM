@@ -10486,8 +10486,10 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 
 			if(!completedListValueFunction(_getFunction(_Menvironment,owner,"removed"),"removed",Mremoved)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
-					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)
+					||!completedListValueFunction(_getFunction(_Menvironment,owner,"append"),"append",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
+					||!completedListValueFunction(_getFunction(_Menvironment,owner,"prepend"),"prepend",Mshove)
+					||!completedListValueIndexFunction(_getFunction(_Menvironment,owner,"insert"),"insert",Minsert)
 					||!completedListTextFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Msort)
 					||!completedListTextFunction(_getFunction(_Menvironment,owner,"sorted"),"sorted",Msorted)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"runpoints"),"runpoints",Mrunpoints)

@@ -127,6 +127,7 @@ bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char
 bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction);
 
 bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedListValueIndexFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 
 // MDH@28OCT2020 moved over to Mshell.h/c: Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
 

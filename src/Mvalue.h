@@ -128,6 +128,7 @@ Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,b
 long long isListUndefined(Mlist* list);
 
 /*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // MDH@23NOV2020: helper function to insert into a list with a certain index
 
 // MDH@04NOV2020: similar definitions for Marray
 typedef struct Marray{

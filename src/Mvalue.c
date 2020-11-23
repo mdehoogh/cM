@@ -1256,6 +1256,95 @@ void checkList(Mlist* _list){
     if(amDebugging())checkList(_list);
     return _listelement->index;
 }/* VALIDATED */
+// MDH@23NOV2020: inserting is similar to appending except that it should NOT replace a value but put it in front of it
+long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
+    if(!_list){outputError("No list to insert into");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
+    if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
+    // MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
+    if(_value&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
+    if(_value->type!=_list->valuetype){
+        output(M_ERROR_PREFIX);
+        outputValue("Unable to insert '",_value,"'");
+        output(" of type '%s' into a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
+        return 0;
+    }
+    // check validity of index first
+    long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
+    // MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
+    // MDH@05NOV2019: if supposed to append the value, and the current last index is already equal to the maximum possible index, we consider the list to be full
+    if(index==M_LL_INVALID){if(lastindex==M_LL_MAX){outputError("Unable to insert into a list: it is full");return 0;};index=lastindex+1;} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
+    if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
+    // MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
+    if(index<0){output("%sIndex %lld of (new) list element too small.\n",M_ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
+    if(index==0)index=1; // MDH@23NOV2020: let's NOT allow index to be zero, the minimum possible value is 1 
+    // if(amVerboseDebugging()){outputValue("Adding '",_value,"' to a list");output(" at index %lld.\n",index);}
+    // MDH@23MAY2019: let's allow inserting or replacing as well
+    // determine _listelement as element to host the value, store the successor in _nextlistelement
+    Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index>0&&index<=lastindex?_list->_first:NULL);
+    if(_listelement){ // we are not appending and we have a first element, so this might be an insert or replace
+        // NOTE testing _listelement is just a fail-safe as that should never happen
+        while(index>_listelement->index){
+            _prevListelement=_listelement;
+            if(!_listelement->_next){output("%sIndex (%llu) ",M_BUG_PREFIX,_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
+            _listelement=_listelement->_next;
+        }
+        // if we're going to insert there will be a successor
+        // MDH@23NOV2020: insertedIntoList() is ALWAYS inserting even if the index values are the same, 
+        // therefore removing the test: if(_listelement->index!=index)
+        {_nextListelement=(_prevListelement?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
+    }else // we'll be insertingappending/prepending, so the current last is the predecessor (and no successor)
+    //  MDH@23NOV2020 no need to test the following as we know it will always be true: if(index>0) // MdH@17OCT2019: when not prepending...
+        _prevListelement=_list->_last;
+    // if we do not have a list element ascertain to have one
+    // MDH@23NOV2020: _listelement will always be NULL, so no need to actually test that
+    // removing: if(!_listelement){ // not yet present in list, so we have to create a new element
+        _listelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
+        if(!_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
+    // removing:}
+    // MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
+    if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
+    // outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count); // DEBUG
+    // if replacing i.e. the index of _listelement matches index, we're done
+    // if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
+    // MDH@23NOV2020: with inserting we always insert (or append), so no need to test _listelement->index!=index
+    // removing: if(_listelement->index!=index){ // insert or append
+        SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
+        _listelement->index=index;
+        // linking
+        if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
+        if(!_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
+        (_list->numberOfElements)++; // an additional element
+    /* removing
+    }else
+    if(index==0){ // prepending
+        SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
+        // linking into the list
+        _listelement->_next=_list->_first;
+        _list->_first=_listelement;
+        if(!_list->_last)_list->_last=_list->_first;
+        (_list->numberOfElements)++;
+        // if(amVerboseDebugging())outputValue("\tPrepending '",_listelement->_value,"'.\n");
+        // we should increment the index of all elements (consuming _listelement on the go which is OK)
+        _nextListelement=_listelement;
+        while(_nextListelement){
+            // if(amVerboseDebugging())
+            // {outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
+            (_nextListelement->index)++;
+            // if(amVerboseDebugging()){outputValue("\tIndex of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);} // DEBUG
+            _nextListelement=_nextListelement->_next;
+            // if(amVerboseDebugging()){if(_nextListelement)outputInfo("\tA next element to consider!");else outputInfo("\tNo next element to consider!");}
+        }
+        //if(amVerboseDebugging()){outputValue("\t'",_listelement->_value,"' prepended to a list");output(" (now) with %llu elements.\n",_list->numberOfElements);}
+    }
+    */
+    // MDH@23NOV2020: if we have a nextlistelement we should increment the index until it's no longer the same, i.e. all elements are shifted one position up
+    while(_nextListelement&&_nextListelement->index==index){
+        _nextListelement->index=(++index);
+        _nextListelement=_nextListelement->_next;
+    }
+    if(amDebugging())checkList(_list);
+    return _listelement->index;
+}/* VALIDATED */
 
 Mvalue* getValueAtIndex(Mlist* _list,long long index){
     // NOTE if index is equal to zero definitely no value there!!!

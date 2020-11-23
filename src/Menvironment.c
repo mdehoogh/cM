@@ -1804,6 +1804,20 @@ bool completedListValueIntegerFunction(Mfunction* const _function,const char* co
     }
     return false;
 }/* VALIDATED */
+bool completedListValueIndexFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=owned_map(_getListValueIntegerMap("list to insert into","value to insert","index of list element"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register list value index function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);

@@ -80,7 +80,12 @@ Mvalue* Mshove(Mvalue* listValue,Mvalue* value){ // prepend a value to the list
     if(listValue&&listValue->type==VT_LIST)result=appendedToList(listValue->value._list,Msubowner(getValueOwner(),1),value,0);
     return _getIntegerValue(result);
 }
-
+// MDH@23NOV2020: inserting means adding a value with a given index but not replacing it, which means we need to increment all successive indices
+Mvalue* Minsert(Mvalue* listValue,Mvalue* value,Mvalue* indexValue){
+    long long result=getValueInteger(indexValue);
+    if(result!=M_LL_INVALID)result=(listValue&&listValue->type==VT_LIST?insertedIntoList(listValue->value._list,Msubowner(getValueOwner(),1),value,result):M_LL_INVALID);
+    return _getIntegerValue(result);
+}
 Mvalue* Mpop(Mvalue* listValue){ // remove and return the last value i.e. opposite of push/drop
     if(listValue&&listValue->type==VT_LIST){
         Mlist* list=listValue->value._list;
