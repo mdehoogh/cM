@@ -57,9 +57,8 @@ rm -f M
 rm -f *.o
 # and static libraries
 rm -f *.a
-# and dynamic (shared) libraries
-rm -f *.so
-rm -f *.dylib
+# and libM libraries
+rm -f libM.*
 
 # move the static libraries in here
 cp ../lib/* .
@@ -78,38 +77,38 @@ cc -Wno-incompatible-pointer-types-discards-qualifiers -shared -fPIC Moutput.c M
 cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Mcolors.c Msession.c M.c
 
 # then link the lot together to create the interactive M program!!
-cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -lM Mcolors.o Msession.o M.o -o M
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -lM Mcolors.o Msession.o M.o -o Mi
 ## replacing the single step of creating the M executable (linking the static libraries in the process): 
-##cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM Mcolors.o Msession.o M.o -o M 
+##cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM Mcolors.o Msession.o M.o -o M
 
 # check whether it is there!!!
-if [ -f M ]; then
+if [ -f Mi ]; then
     # ascertain to be able to run it (when being sudo run)
     if [[ "$EUID" = 0 ]]; then
-        chmod 755 M
-        echo "M has been created!"
+        chmod 755 Mi
+        echo "Mi has been created!"
     else
-        echo "M has been created but you may not be able to run it with ./M if the next command (chmod) fails."
-        chmod 755 M
+        echo "Mi has been created but you may not be able to run it with ./Mi if the next command (chmod) fails."
+        chmod 755 Mi
     fi
     # copy M one directory up
-    if [ -f ../M ]; then
-        rm ../M
-        echo "Previous M removed..."
+    if [ -f ../Mi ]; then
+        rm ../Mi
+        echo "Previous Mi removed..."
     fi
-    cp M ..
+    cp Mi ..
     # MDH@24NOV2020: we need to do the following as well
     cp libM.dylib ..
     cd ..
-    if [ -f M ]; then
-        echo "Execute ./M to run M now."
+    if [ -f Mi ]; then
+        echo "Execute ./Mi to run M now."
     else
-        echo "M vanished. You will have to copy it from the scr subdirectory yourself manually."
+        echo "Mi vanished. You will have to copy it from the scr subdirectory yourself manually."
     fi
 else
-    echo "ERROR: Failed to create the M executable!"
+    echo "ERROR: Failed to create the Mi executable!"
     cd ..
-    if [ -f M ]; then
+    if [ -f Mi ]; then
         echo "You have to keep using the previously created one."
     else
         echo "Too bad. Please try again!"

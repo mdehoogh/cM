@@ -55,8 +55,9 @@ echo "Compiling M..."
 rm -f M
 # remove all object files
 rm -f *.o
-# and static libraries
-rm -f *.a
+# and any libM library
+rm -f libM.*
+
 # move the static libraries in here
 cp ../lib/* .
 # make all files readable
@@ -67,7 +68,7 @@ cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Moutput.c Mmessage.
 ar cvq libM.a *.o
 # compile the M interactive session source files separately
 cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Mcolors.c Msession.c M.c
-# then link the lot together to create the interactive M program!!
+# then link the lot together to create the interactive M program (force use the static library)
 cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM Mcolors.o Msession.o M.o -o M 
 
 # check whether it is there!!!
