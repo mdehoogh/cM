@@ -883,6 +883,22 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
     }
     return NULL;
 }
+Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
+    if(array){
+        register unsigned long long arrayindex=array->numberOfElements; // MDH@24NOV2020: HOORAY my first time use of 'register'
+        Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex),owner);
+        if(_array){
+            if(arrayindex>0){
+                Mvalue **newvalueholder=_array->values+arrayindex,**valueholder=array->values+arrayindex;
+                do assignValue(--newvalueholder,*(--valueholder));while(--arrayindex>0);
+            }
+            return disowned_array(_array,owner);
+        }else
+            outputError("Failed to create an array");
+    }
+    return NULL;
+}
+
 // MDH@24MAY2020: more convenient to be able to make any map with a certain number of arguments with names and types
 static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
     // NOTE wait with filling the single integer value map until we have all the ingredients
@@ -2515,6 +2531,9 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowne
                 // if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
                 _value=_getValueOfList(_getListCopy(_value->value._list));
                 // if(!_value)free_list(_listCopy,owner);
+            }else
+            if(_value->type==VT_ARRAY){
+                _value=_getValueOfArray(_getArrayCopy(_value->value._array));
             }
         }
     }

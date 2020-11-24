@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=true; // whether or not debugging this module
+static bool DEBUGGING=false; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=18;
@@ -2763,10 +2763,10 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)re
 }
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
+	Mvalue* _sumValue=NULL;
     if(_value){
 		if(amVerbose())outputValue("Computing the sum of '",_value,"'.\n");
         if(_value->type==VT_LIST){
-			Mvalue* _sumValue=NULL;
 			// all the values in the list could be integer
 			Mlist* list=_value->value._list;
 			if(list){
@@ -2774,36 +2774,66 @@ Mvalue* Msum(Mvalue* _value){
 				if(listelement){
 					// how about adding as decimals????
 					assignValue(&_sumValue,listelement->_value); // TODO I suppose we can do this????
-					while(listelement->_next){listelement=listelement->_next;assignValue(&_sumValue,add(_sumValue,listelement->_value));}
+					while(listelement->_next){
+						listelement=listelement->_next;
+						assignValue(&_sumValue,add(_sumValue,listelement->_value));
+					}
 				}
 			}
-			return _sumValue;
-		}
+		}else
 		if(_value->type==VT_ARRAY){
-			Mvalue* _sumValue=NULL;
+			_sumValue=NULL;
 			Marray* array=_value->value._array;
 			if(array&&array->numberOfElements>0){
-				unsigned long long arrayindex=1;
+				register unsigned long long arrayindex=1;
+				// TODO how about skipping all NULL values??????
 				assignValue(&_sumValue,array->values[0]);
-				while(arrayindex<array->numberOfElements)assignValue(&_sumValue,add(_sumValue,array->values[arrayindex++]));
-			}
-			return _sumValue;	
-		}
+				while(arrayindex<array->numberOfElements){
+					// outputValue("Sum so far: ",_sumValue,".\n");
+					assignValue(&_sumValue,add(_sumValue,array->values[arrayindex++]));
+				}
+				// outputValue("Sum: ",_sumValue,".\n");
+			}	
+		}else // if not something that can be summed, returning the original value
+			_sumValue=_value;
     }
-    return _value; // the default
+    return _sumValue;
 }
 
 // MDH@10OCT2019: applying unary operator (=function) to all elements in a list
-Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(function&&_list){ // we need both a function and a list
-		_result=owned_list(_getListOfType(_list->valuetype),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
+		_result=owned_list(_getListOfType(maintainsValuetype?_list->valuetype:VT_UNDEFINED),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement&&appendedToList(_result,owner,function(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
 	}
-	return (_result?_getValueOfList(disowned_list(_result,owner)):NULL);
+	return(_result?_getValueOfList(disowned_list(_result,owner)):NULL);
+}
+Mvalue* _functionAppliedToArray(Marray* _array,OneArgumentFunction function,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	// scalars are to be added to each element of the original list
+	// lists are to be added to the elements at the same position, so listwise
+	Marray* _result=NULL;
+	if(function&&_array){ // we need both a function and a list
+		_result=owned_array(_getArray("_functionAppliedToArray",_array->numberOfElements),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
+		if(_result){
+			if(maintainsValuetype)_result->valuetype=_array->valuetype;
+			// using pointer arithmetic is the way to go
+			long long arrayindex=_array->numberOfElements;
+			if(arrayindex>0){
+				Mvalue** _resultelementValueholder=_result->values+arrayindex;
+				Mvalue** _arrayelementValueholder=_array->values+arrayindex; // the value to which the function is to be applied
+				do{
+					_resultelementValueholder--;
+					_arrayelementValueholder--;
+					assignValue(_resultelementValueholder,function(*_arrayelementValueholder));
+				}while(--arrayindex>0);
+			}
+		}
+	}
+	return(_result?_getValueOfArray(disowned_array(_result,owner)):NULL);
 }
 
 // MDH@10OCT2019: a special function to compute a reciprocal value
@@ -2812,7 +2842,8 @@ Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value)
 	switch(value->type){
 		// composite types
-		case VT_LIST:_reciprocalValue=_functionAppliedToList(value->value._list,Mreciprocal);break;
+		case VT_ARRAY:_reciprocalValue=_functionAppliedToArray(value->value._array,Mreciprocal,false);break;
+		case VT_LIST:_reciprocalValue=_functionAppliedToList(value->value._list,Mreciprocal,false);break;
 		case VT_MAP:/*_reciprocalValue=_functionAppliedToMap(value->value._map,Mreciprocal); TODO where is it?*/break;
 		// scalar types
 		case VT_FLOAT:_reciprocalValue=_getFloatValue(1/value->value._float->ld);break; // TODO check what happens when the real equals 0
@@ -2881,7 +2912,8 @@ Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(_
 Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	// are we allowing big integers?
 	if(!value||value->type==VT_MAP)return NULL;
-	if(value->type==VT_LIST)return _functionAppliedToList(value->value._list,Mfibonacci);
+	if(value->type==VT_ARRAY)return _functionAppliedToArray(value->value._array,Mfibonacci,false);
+	if(value->type==VT_LIST)return _functionAppliedToList(value->value._list,Mfibonacci,false);
 	Mvalue* _fibonnacciValue=NULL;
 	// ASSERT assuming scalars
 	Mbiginteger* _biginteger=owned_biginteger(_getValueBiginteger(value),owner);
@@ -4988,47 +5020,111 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 	// ASSERT neither are NULL
 	// MDH@03NOV2020: the return type of the list really depends on the binary operator applied, whether or not it maintains type integrity, so it makes sense to actually pass in the list result type as a separate argument
 	Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list1->valuetype,_list2->valuetype):VT_UNDEFINED),owner); // TODO if the types are the same use that?
-	// elements with the same index are to be added and stored under that index
-	Mlistelement* _listelement1=_list1->_first;
-	Mlistelement* _listelement2=_list2->_first;
-	bool consumed1,consumed2;
-	while(_listelement1||_listelement2){
-		consumed1=false;
-		consumed2=false;
-		if(_listelement1&&_listelement2){
-			if(_listelement1->index==_listelement2->index){
-				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index)>0)
-					consumed1=consumed2=true;
+	if(_result){
+		// elements with the same index are to be added and stored under that index
+		Mlistelement* _listelement1=_list1->_first;
+		Mlistelement* _listelement2=_list2->_first;
+		while(_listelement1||_listelement2){
+			if(_listelement1&&_listelement2){
+				if(_listelement1->index==_listelement2->index){
+					if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index)<=0)break;
+					_listelement1=_listelement1->_next;_listelement2=_listelement2->_next;
+				}else
+				if(_listelement1->index<_listelement2->index){
+					if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index)<=0)break;
+					_listelement1=_listelement1->_next;
+				}else{
+					if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index)<=0)break;
+					_listelement2=_listelement2->_next;
+				}
 			}else
-			if(_listelement1->index<_listelement2->index){
-				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index)>0)
-					consumed1=true;
+			if(_listelement1){
+				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index)<=0)break;
+				_listelement1=_listelement1->_next;
 			}else{
-				if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index)>0)
-					consumed2=true;
+				if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index)<=0)break;
+				_listelement2=_listelement2->_next;
 			}
-		}else
-		if(_listelement1){
-			if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index)>0)
-				consumed1=true;
-		}else
-			if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index)>0)
-				consumed2=true;
-		// done?????
-		if(!consumed1&&!consumed2)break; // if neither consumed done
-		if(consumed1)_listelement1=_listelement1->_next;
-		if(consumed2)_listelement2=_listelement2->_next;
+		}
 	}
 	return disowned_list(_result,owner);
 }
+Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	if(!_array||_array->numberOfElements==0)return _list;
+	Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_array->valuetype):VT_UNDEFINED),owner); // TODO if the types are the same use that?
+	if(_result){
+		// elements with the same index are to be added and stored under that index
+		Mlistelement* _listelement=_list->_first;
+		unsigned long long arrayindex=0;
+		while(_listelement||arrayindex<_array->numberOfElements){
+			if(_listelement&&arrayindex<_array->numberOfElements){
+				if(_listelement->index==arrayindex+1){
+					if(appendedToList(_result,owner,binaryoperator(_listelement->_value,_array->values[arrayindex]),arrayindex+1)<=0)break;
+					_listelement=_listelement->_next;arrayindex++;
+				}else
+				if(_listelement->index<=arrayindex){
+					if(appendedToList(_result,owner,binaryoperator(_listelement->_value,NULL),_listelement->index)<=0)break;
+					_listelement=_listelement->_next;
+				}else{
+					if(appendedToList(_result,owner,binaryoperator(NULL,_array->values[arrayindex]),arrayindex+1)<=0)break;
+					arrayindex++;
+				}
+			}else
+			if(_listelement){
+				if(appendedToList(_result,owner,binaryoperator(_listelement->_value,NULL),_listelement->index)<=0)break;
+				_listelement=_listelement->_next;
+			}else{
+				if(appendedToList(_result,owner,binaryoperator(NULL,_array->values[arrayindex]),arrayindex+1)<=0)break;
+				arrayindex++;
+			}
+		}
+	}
+	return disowned_list(_result,owner);
+}
+Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	if(!_list||_list->numberOfElements==0)return _array;
+	// ASSERT the list is not empty
+	unsigned long long arraylength=(_array?_array->numberOfElements:0);
+	// the number of elements in the array is the maximum of the number of elements in the array or the index of the list
+	Marray* _result=owned_array(_getArray("appliedToArrayAndList",MAX(arraylength,_list->_last->index)),owner);
+	if(_result){
+		// elements with the same index are to be added and stored under that index
+		Mlistelement* _listelement=_list->_first;
+		unsigned long long arrayindex=0;
+		while(_listelement||arrayindex<arraylength){
+			if(_listelement&&arrayindex<arraylength){
+				if(_listelement->index==arrayindex+1){
+					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_listelement->_value));
+					_listelement=_listelement->_next;arrayindex++;
+				}else
+				if(_listelement->index<=arrayindex){
+					assignValue(&_result->values[_listelement->index-1],binaryoperator(NULL,_listelement->_value));
+					_listelement=_listelement->_next;
+				}else{
+					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],NULL));
+					arrayindex++;
+				}
+			}else
+			if(_listelement){
+				assignValue(&_result->values[_listelement->index-1],binaryoperator(NULL,_listelement->_value));
+				_listelement=_listelement->_next;
+			}else{
+				assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],NULL));
+				arrayindex++;
+			}
+		}
+	}
+	return disowned_array(_result,owner);
+}
+
 // we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
 Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
-	Mlist* _result=NULL;
-	if(_value->type!=VT_LIST){
+	Mvalue* resultValue=NULL;
+	if(_value->type!=VT_LIST&&_value->type!=VT_ARRAY){
 		// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
-		_result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
+		Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement){
 			Mvalue* resultValue=binaryoperator(_listelement->_value,_value);
@@ -5036,18 +5132,21 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 			// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
 			_listelement=_listelement->_next;
 		}
-		// if(resultsOfSameType)_result->valuetype=_list->valuetype;
+		resultValue=_getValueOfList(disowned_list(_result,owner));
 	}else
-		_result=owned_list(_appliedToLists(_list,_value->value._list,binaryoperator,maintainsValuetype),owner);
-	return _getValueOfList(disowned_list(_result,owner));
+	if(_value->type==VT_LIST)
+		resultValue=_getValueOfList(_appliedToLists(_list,_value->value._list,binaryoperator,maintainsValuetype));
+	else
+		resultValue=_getValueOfList(_appliedToListAndArray(_list,_value->value._array,binaryoperator,maintainsValuetype));
+	return resultValue;
 }
 Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
-	Mlist* _result=NULL;
-	if(_value->type!=VT_LIST){
+	Mvalue* resultValue=NULL;
+	if(_value->type!=VT_LIST&&_value->type!=VT_ARRAY){
 		// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
-		_result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
+		Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement){
 			Mvalue* resultValue=binaryoperator(_value,_listelement->_value);
@@ -5055,10 +5154,13 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 			// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
 			_listelement=_listelement->_next;
 		}
-		// if(resultsOfSameType)_result->valuetype=_list->valuetype;
+		resultValue=_getValueOfList(_result);
 	}else
-		_result=owned_list(_appliedToLists(_value->value._list,_list,binaryoperator,maintainsValuetype),owner);
-	return _getValueOfList(disowned_list(_result,owner));
+	if(_value->type==VT_LIST)
+		resultValue=_getValueOfList(_appliedToLists(_value->value._list,_list,binaryoperator,maintainsValuetype));
+	else
+		resultValue=_getValueOfArray(_appliedToArrayAndList(_value->value._array,_list,binaryoperator,maintainsValuetype));
+	return resultValue;
 }
 
 // we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
@@ -5084,8 +5186,9 @@ Marray* _appliedToArrays(Marray* _array1,Marray* _array2,TwoArgumentFunction bin
 Mvalue* _appliedToArray(Marray* _array,Mvalue* _value,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
-	Marray* _result=NULL;
-	if(_value->type!=VT_ARRAY){
+	Mvalue* resultValue=NULL;
+	if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
+		Marray* _result=NULL;
 		// should create an array of the same length
 		_result=owned_array(_getArray("_appliedToArray",_array->numberOfElements),owner);
 		if(_result){
@@ -5095,18 +5198,22 @@ Mvalue* _appliedToArray(Marray* _array,Mvalue* _value,TwoArgumentFunction binary
 				assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
 				arrayindex++;
 			}
+			resultValue=_getValueOfArray(disowned_array(_result,owner));
 		}
 	}else
-		_result=owned_array(_appliedToArrays(_array,_value->value._array,binaryoperator,maintainsValuetype),owner);
-	return _getValueOfArray(disowned_array(_result,owner));
+	if(_value->type==VT_ARRAY)
+		resultValue=_getValueOfArray(_appliedToArrays(_array,_value->value._array,binaryoperator,maintainsValuetype));
+	else
+		resultValue=_getValueOfArray(_appliedToArrayAndList(_array,_value->value._list,binaryoperator,maintainsValuetype));
+	return resultValue;
 }
 Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
-	Marray* _result=NULL;
-	if(_value->type!=VT_ARRAY){
+	Mvalue* resultValue=NULL;
+	if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
 		// should create an array of the same length
-		_result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements),owner);
+		Marray* _result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements),owner);
 		if(_result){
 			if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
 			unsigned long long arrayindex=0;
@@ -5116,8 +5223,11 @@ Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binar
 			}
 		}
 	}else
-		_result=owned_array(_appliedToArrays(_value->value._array,_array,binaryoperator,maintainsValuetype),owner);
-	return _getValueOfArray(disowned_array(_result,owner));
+	if(_value->type==VT_ARRAY)
+		resultValue=_getValueOfArray(_appliedToArrays(_value->value._array,_array,binaryoperator,maintainsValuetype));
+	else
+		resultValue=_getValueOfList(_appliedToListAndArray(_value->value._list,_array,binaryoperator,maintainsValuetype));
+	return resultValue;
 }
 
 // two-argument arithmetic

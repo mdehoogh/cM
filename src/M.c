@@ -44,11 +44,14 @@ extern const long long M_TRUE;
 extern const long long M_FALSE;
 extern const long long M_LIST_ELEMENTS_AT_START;
 extern const long long M_LIST_ELEMENTS_AT_END;
+extern const long long M_ARRAY_ELEMENTS_AT_START;
+extern const long long M_ARRAY_ELEMENTS_AT_END;
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="19";char const * const M_DATE="23 November 2020"; // MDH@17NOV2020: array data type added
+char const * const M_BUILD="20";char const * const M_DATE="24 November 2020"; // MDH@24NOV2020: copy of array on assign (assignValue), binary operator on array/list combinations
+//char const * const M_BUILD="19";char const * const M_DATE="23 November 2020"; // MDH@17NOV2020: array data type added
 //char const * const M_BUILD="18";char const * const M_DATE="17 November 2020"; // MDH@17NOV2020: yes the bug (setting one list element to many in the stack and so writing outside the reserved dynamic memory) was fixed, by harmonica binary sort still way too slow
 //char const * const M_BUILD="17";char const * const M_DATE="16 November 2020"; // MDH@16NOV2020: addressing a serious memory bug in sorting using lharmonicabinarysort
 //char const * const M_BUILD="15";char const * const M_DATE="5 November 2020"; // MDH@05NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
@@ -1880,6 +1883,50 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				break;
 			case VT_FLOAT:outputTokenTypeColor(TT_REAL);written+=outputValue(NULL,_value,NULL);break;
 			case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);written+=outputValue(NULL,_value,NULL);break;
+			case VT_ARRAY:
+				{
+					written+=outputChar('(');
+					Marray* _array=_value->value._array;
+					if(_array){
+						unsigned long long arraylength=_array->numberOfElements;
+						if(arraylength>0){
+							Mvalue** values=_array->values;
+							long long numberOfElementsNotWritten=arraylength;
+							numberOfElementsNotWritten-=(M_ARRAY_ELEMENTS_AT_START+M_ARRAY_ELEMENTS_AT_END);
+							unsigned long long arrayindex=0; // the expected array index
+							if(numberOfElementsNotWritten<=0){ // all elements will be written
+								arraylength--;
+								// write all except the last element
+								while(arrayindex<arraylength){
+									written+=outputValueColored(values[arrayindex++]);
+									written+=outputChar(','); // something will follow
+								}
+								// write the last element
+								written+=outputValueColored(values[arraylength]);	
+							}else{
+								// show the first M_ARRAY_ELEMENTS_AT_START elements
+								while(arrayindex<M_ARRAY_ELEMENTS_AT_START){
+									// let's write the index on the first element, the last element
+									written+=outputValueColored(values[arrayindex++]);
+									written+=outputChar(','); // something will follow
+								}
+								// show how many elements are not displayed
+								written+=output("(%lld element%s not displayed),",numberOfElementsNotWritten,(numberOfElementsNotWritten>1?"s":""));
+								arraylength--;
+								arrayindex=arraylength-M_ARRAY_ELEMENTS_AT_END;
+								output("%llu:",arrayindex+1);
+								// show all further elements
+								while(arrayindex<arraylength){
+									written+=outputValueColored(values[arrayindex++]);
+									written+=outputChar(','); // something will follow
+								}
+								written+=outputValueColored(values[arraylength]); // write the last element
+							}
+						}
+					}
+					written+=outputChar(')');
+				}
+				break;
 			case VT_LIST:
 				// TODO not using _getListText() as defined in Mexecution
 				/////////if(amVerbose())outputValue("List value '",_value,"'.");
@@ -2065,7 +2112,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	getExecutionEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
 	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	
-	outputValue("Result value: '",*resultValue,"'.\n");
+	// outputValue("Result value: '",*resultValue,"'.\n"); // DEBUG
 
 	long long elapsed_evaluating=(clock()-before_evaluating)/1000;
 
