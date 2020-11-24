@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# MDH@21OCT2019: assuming that the M source files are in subfolder src/ now and the library files to link in the current directory as we would expect after a make
+
+# the actual stuff
+# remove M so if we fail we'd know it
+
+# will copy the static libraries to the lib folder (if the lib folder does not yet exist)
+if [[ ! -d lib ]]; then
+    if [[ ! -f lib ]]; then
+        mkdir lib
+        if [[ -d lib ]]; then
+            echo "lib subdirectory created..."
+        else
+            echo "ERROR: Failed to create the lib subdirectory!"
+            exit 1
+        fi
+    else
+        echo "A file called lib already exists. Cannot create the subdirectory..."
+        exit 1
+    fi
+fi
+
+# ASSERT the lib subdirectory should now exist
+
+#echo "Copying tommath.h from the libtommath subdirectory."
+#cp libtommath/tommath.h .
+
+# copy the library files over if present in the current directory after which we remove them
+# NOTE we will copy them over instead of moving, so we do not have to recreate them every time, wait a minute if they are already present in lib leave it
+# NOTE this means that this will happen once directly after a make (technically Mcompile would replace making src/Makefile)
+if [[ -f libmpdec.a && ! -f lib/libmpdec.a ]]; then
+    echo "Moving libmpdec.a to the lib subdirectory."
+    mv libmpdec.a lib/
+fi
+if [[ -f libtommath.a && ! -f lib/libtommath.a ]]; then
+    echo "Moving libtommath.a to the lib subdirectory."
+    mv libtommath.a lib/
+fi
+
+# the static libraries should now be present in the lib folder
+if [[ ! -f lib/libmpdec.a || ! -f lib/libtommath.a ]]; then
+    echo "ERROR: Static libraries as needed by M not present in the lib folder."
+    exit 1
+fi
+
+cd src
+echo "Copying M.tommath-1.1.0.h to the src folder."
+cp ../M.tommath-1.1.0.h ./M.tommath.h
+
+echo ""
+echo "Compiling M..."
+
+# remove M
+rm -f M
+# remove all object files
+rm -f *.o
+# and static libraries
+rm -f *.a
+# and dynamic (shared) libraries
+rm -f *.so
+rm -f *.dylib
+
+# move the static libraries in here
+cp ../lib/* .
+# make all files readable
+chmod 644 *
+# MDH@28FEB2020: we can do this in pieces creating the static library on the go
+# MDH@03MAR2020: compile with the -g flag so we can debug it
+
+# MDH@24NOV2020: in order to create a shared library we need to compile with the -fPIC setting (and link with the static libraries we need in it immediately)
+cc -Wno-incompatible-pointer-types-discards-qualifiers -shared -fPIC Moutput.c Mmessage.c Malloc.c Mchars.c Mstring.c Msettings.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Marray.c Mlist.c Mfunctions.c Menvironment.c Mshell.c -L. -ltommath -lmpdec -o libM.dylib
+## replacing two steps: compiling to object files and 2. wrapping in a static library (archive):
+##cc -Wno-incompatible-pointer-types-discards-qualifiers -g Moutput.c Mmessage.c Malloc.c Mchars.c Mstring.c Msettings.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Marray.c Mlist.c Mfunctions.c Menvironment.c Mshell.c
+##ar cvq libM.a *.o
+
+# compile the M interactive session source files separately
+cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Mcolors.c Msession.c M.c
+
+# then link the lot together to create the interactive M program!!
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -lM Mcolors.o Msession.o M.o -o M
+## replacing the single step of creating the M executable (linking the static libraries in the process): 
+##cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM Mcolors.o Msession.o M.o -o M 
+
+# check whether it is there!!!
+if [ -f M ]; then
+    # ascertain to be able to run it (when being sudo run)
+    if [[ "$EUID" = 0 ]]; then
+        chmod 755 M
+        echo "M has been created!"
+    else
+        echo "M has been created but you may not be able to run it with ./M if the next command (chmod) fails."
+        chmod 755 M
+    fi
+    # copy M one directory up
+    if [ -f ../M ]; then
+        rm ../M
+        echo "Previous M removed..."
+    fi
+    cp M ..
+    # MDH@24NOV2020: we need to do the following as well
+    cp libM.dylib ..
+    cd ..
+    if [ -f M ]; then
+        echo "Execute ./M to run M now."
+    else
+        echo "M vanished. You will have to copy it from the scr subdirectory yourself manually."
+    fi
+else
+    echo "ERROR: Failed to create the M executable!"
+    cd ..
+    if [ -f M ]; then
+        echo "You have to keep using the previously created one."
+    else
+        echo "Too bad. Please try again!"
+    fi
+fi
