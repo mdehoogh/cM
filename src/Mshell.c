@@ -2773,7 +2773,7 @@ Mvalue* Msum(Mvalue* _value){
 				Mlistelement* listelement=list->_first;
 				if(listelement){
 					// how about adding as decimals????
-					assignValue(&_sumValue,listelement->_value); // TODO I suppose we can do this????
+					assignValue(&_sumValue,listelement->_value);
 					while(listelement->_next){
 						listelement=listelement->_next;
 						assignValue(&_sumValue,add(_sumValue,listelement->_value));
@@ -2788,12 +2788,10 @@ Mvalue* Msum(Mvalue* _value){
 				register unsigned long long arrayindex=1;
 				// TODO how about skipping all NULL values??????
 				assignValue(&_sumValue,array->values[0]);
-				while(arrayindex<array->numberOfElements){
-					// outputValue("Sum so far: ",_sumValue,".\n");
+				while(arrayindex<array->numberOfElements)
 					assignValue(&_sumValue,add(_sumValue,array->values[arrayindex++]));
-				}
 				// outputValue("Sum: ",_sumValue,".\n");
-			}	
+			}
 		}else // if not something that can be summed, returning the original value
 			_sumValue=_value;
     }
