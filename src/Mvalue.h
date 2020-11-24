@@ -157,6 +157,7 @@ Marray* disowned_array(Marray * const _array,Mallocationowner owner_array);
 #define DISOWNED_ARRAY(_array,owner_array) _array
 #define FREE_ARRAY(_array,owner_array) free_array(_array)
 #endif
+Marray* _getArrayCopy(Marray const * const array);
 
 typedef struct Mmapelement{
     Mvariable* _variable;

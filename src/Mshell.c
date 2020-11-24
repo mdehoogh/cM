@@ -8652,6 +8652,142 @@ struct Msortstatistics{
 	unsigned long long fieldtests;
 };
 static struct Msortstatistics sortstatistics;
+
+static void aswap(Mvalue** const values,long long index1,long long index2){
+	// normally we would not be allowed to do it this way, but the reference count
+	// of both values remains the same when we exchange their position in the list
+	// output("Swapping element #%llu and #%llu.\n",listelement1->index,listelement2->index);
+	Mvalue* value=values[index1];
+	values[index1]=values[index2];
+	values[index2]=value;
+	sortstatistics.pointerassignments++;sortstatistics.fieldreferences+=2;sortstatistics.pointerreferences++;sortstatistics.fieldassignments+=2;
+}
+static long long apartition(Mvalue** const values,long long lmin1,long long h){
+	long long l=lmin1+1;
+	// output("Partitioning elements #%llu through #%llu.\n",l->index,h->index);
+	Mvalue* x=values[h]; //* x=list[h] // x is set once, as the value at index h
+	long long i=lmin1; //* i=l-1
+	sortstatistics.pointerassignments+=3;sortstatistics.pointertests++;sortstatistics.fieldreferences+=2;sortstatistics.pointerreferences++;
+	// MDH@02NOV2020: in order to be able to call helper function smallerthanorequalto() x should not be a list, essentially list bubble up to the top I suppose
+	sortstatistics.fieldtests++;
+	if(x->type!=VT_LIST){
+		long long j=l;
+		sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+		while(1){
+			sortstatistics.fieldtests+=2;
+			if(j>=h)break;
+			long long notlarger=M_LL_INVALID;
+			sortstatistics.fieldtests+=2;
+			if(values[j]->type!=VT_LIST){
+				notlarger=smallerthanorequalto(values[j],x);
+				sortstatistics.comparisons++;
+			}
+			if(notlarger==M_TRUE){
+				i++; //* i++; // make i start at index l otherwise increment
+				sortstatistics.pointerassignments++;sortstatistics.pointertests++;sortstatistics.fieldreferences++;
+				aswap(values,i,j);
+			}
+			j++;
+			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+		}
+	}
+	aswap(values,i+1,h); //* swap(list[i+1],list[h])
+	return i; //* i+1 but actually we are returning i itself because that's the first value used
+}
+static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long result=M_LL_INVALID;
+	sortstatistics.pointertests++;
+	if(_array){
+		sortstatistics.fieldreferences++;
+		unsigned long long arraylength=_array->numberOfElements;
+		if(arraylength>1){ // things to compare
+			if(report)
+				output("Sorting an array of %zd elements with quicksort.\n",arraylength);
+				unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(arraylength)));
+				long long* stack=MALLOC(sizeof(long long),maxtop=initialmaxtop,-'u',owner);
+				if(stack){
+					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
+					result=2; // the current amount of stack elements used
+					stack[0]=-1; // i.e. the first lmin1
+					stack[1]=arraylength;
+					sortstatistics.pointerassignments++;sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;
+					// it's better to store the number of elements in the stack instead of the top index
+					// so that the smallest value of top will be 0
+					unsigned long long top=2;
+					long long lmin1,l,h,pmin1,p,pplus1; // two list elements
+					sortstatistics.pointerassignments+=6;
+					Mvalue** values=_array->values;
+					// as long as there are two elements on the stack
+					while(top>1){ // two or more elements on the stack
+						h=stack[--top];
+						lmin1=stack[--top];
+						pmin1=apartition(values,lmin1,h); // NOTE p is actually p-1
+						sortstatistics.pointerassignments+=3;sortstatistics.fieldreferences+=2;
+						//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
+						sortstatistics.pointertests++;
+						l=lmin1+1;
+						sortstatistics.fieldreferences++;sortstatistics.pointerassignments++;
+						if(pmin1){
+							sortstatistics.fieldtests+=2;
+							if(pmin1>l){
+								if(top>=maxtop){
+									if(report)
+										output("Expanding the stack.\n");
+									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
+									if(!stack){
+										output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
+										break;
+									}
+									maxtop+=initialmaxtop;
+									if(report)
+										output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+								}
+								stack[top++]=lmin1;
+								stack[top++]=pmin1;
+								sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
+								if(top>result)result=top;
+							}
+						}
+						// move p two elements up
+						p=pmin1+1;
+						pplus1=p+1;
+						sortstatistics.fieldreferences+=2;sortstatistics.pointerassignments+=2;sortstatistics.pointertests+=3; // including the one below (of pplus1)
+						if(pplus1>=0){
+							sortstatistics.fieldtests+=2;
+							if(pplus1<h){
+								if(top>=maxtop){
+									if(report)
+										output("Expanding the stack.\n");
+									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
+									if(!stack){
+										output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
+										break;
+									}
+									maxtop+=initialmaxtop;
+									if(report)
+										output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+								}
+								stack[top++]=p; // which is actually lmin1
+								stack[top++]=h;
+								sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
+								if(top>result)result=top;
+							}
+						}
+					}
+					if(report)
+						output("Freeing the quicksort stack.\n");
+					FREE_DISOWNED(stack,maxtop,-'u',owner);
+					if(report)
+						output("Quicksort stack freed.\n");
+				}else
+					outputError("Not enough memory to sort the array with quicksort");
+		}
+		result=M_TRUE;
+	}
+	return result;
+}
+
 // MDH@02NOV2020: we can speed up sorting if we can somehow reverse parts of a list
 static void swap(Mlistelement* const listelement1,Mlistelement* const listelement2){
 	// normally we would not be allowed to do it this way, but the reference count
@@ -8727,7 +8863,8 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 			sortstatistics.pointertests++;sortstatistics.fieldtests++;
 			if(listelement!=_list->_last){ // at least two items
 				// we need a stack of integers with the same size as the list length
-				if(report)output("Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
+				if(report)
+					output("Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
 				// MDH@02NOV2020: best to use CALLOC not calloc
 				// MDH@03NOV2020: if there are many many list elements allocating all at once is an issue
 				//                how about re-allocating in
@@ -8804,6 +8941,13 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 	return result;
 }
 
+static long long amergesort(Marray* _array){
+	long long result=M_LL_INVALID;
+	if(_array){
+		
+	}
+	return result;	
+}
 static long long lmergesort(Mlist* _list){
 	long long result=M_LL_INVALID;
 	if(_list){
@@ -8997,7 +9141,14 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 		if(afterlast)outputValue("': '",afterlast->_value,"'.\n");else output(" nothing!");
 	}
 }
+
 // lharmonicasort is the original harmonicasort which is quite slow
+static long long aharmonicasort(Marray* _array){
+	long long result=(_array?M_TRUE:M_LL_INVALID);
+	if(result==M_TRUE){
+	}
+	return result;
+}
 static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=(_list?M_TRUE:M_LL_INVALID);
@@ -9238,7 +9389,15 @@ static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long
 	return listelements[firstindex];
 }
 // MDH@11NOV2020: the stack multiplier tells us how many times the stack size is to be multiplied with
-static long long lharmonicabinarysort(Mlist* _list,long long stackmultiplier){Mallocationowner owner=getOwner(__LINE__);
+static long long aharmonicabinarysort(Marray* const _array,long long stackmultiplier){
+	Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long result=(_array?M_TRUE:M_LL_INVALID);
+	if(result==M_TRUE){
+	}
+	return result;
+}
+static long long lharmonicabinarysort(Mlist* const _list,long long stackmultiplier){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=(_list?M_TRUE:M_LL_INVALID);
 	if(result==M_TRUE){
@@ -10010,6 +10169,17 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 }
 */
 // MDH@05NOV2020: changing timsort by registering the index ranges first, and writing the indices at the end
+static long long atimsort(Marray* const _array){
+	Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long result=M_LL_INVALID;
+	sortstatistics.pointertests++;
+	if(_array){
+
+		result=M_TRUE;
+	}
+	return result;
+}
 static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
@@ -10189,6 +10359,19 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 			output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
 					,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
 					,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+		}else
+		if(_tosortValue->type==VT_ARRAY){
+			sortstatistics=(struct Msortstatistics){}; // this should work
+			switch(sortMethod){
+				case 'b': // "biden" sort
+				case 'h':result=(_sortMethodValue->value._text->_c[1]?aharmonicabinarysort(_tosortValue->value._array,atoll(_sortMethodValue->value._text->_c+1)):aharmonicasort(_tosortValue->value._array));break;
+				case 'm':result=amergesort(_tosortValue->value._array);break;
+				case 't':result=atimsort(_tosortValue->value._array);break;
+				default:result=aquicksort(_tosortValue->value._array);break;
+			}
+			output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
+					,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
+					,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
 		}
 		output("Done sorting!\n");
 	}
@@ -10243,6 +10426,30 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 				// output("List sort result: %lld.\n",sortResult); // DEBUG
 			}else
 				outputError("Failed to create a copy of the list to sort");
+		}else
+		if(_tosortValue->type==VT_ARRAY){
+			Marray* _tosortArray=owned_array(_getArrayCopy(_tosortValue->value._array),owner);
+			if(_tosortArray){
+				char sortMethod=(_sortMethodValue&&_sortMethodValue->type==VT_TEXT?_sortMethodValue->value._text->_c[0]:'\0');
+				sortstatistics=(struct Msortstatistics){};
+				long long sortResult=M_LL_INVALID;
+				switch(sortMethod){
+					case 'b': // "biden" sort
+					case 'h':sortResult=(_sortMethodValue->value._text->_c[1]?aharmonicabinarysort(_tosortArray,atoll(_sortMethodValue->value._text->_c+1)):aharmonicasort(_tosortArray));break;
+					case 't':sortResult=atimsort(_tosortArray);break;
+					case 'm':sortResult=amergesort(_tosortArray);break;
+					default:sortResult=aquicksort(_tosortArray);break;
+				}
+				if(sortResult>0){ // _tosortList was successfully sorted
+					output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
+							,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
+							,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+					sortedValue=_getValueOfArray(disowned_array(_tosortArray,owner)); // NOTE will automatically
+				}else
+					FREE_ARRAY(_tosortArray,owner);
+				// output("List sort result: %lld.\n",sortResult); // DEBUG
+			}else
+				outputError("Failed to create a copy of the array to sort");
 		}
 	}
 	// if(sortedValue)output("Sort done with value '%p' wrapping list '%p'!\n",sortedValue,sortedValue->value._list); // DEBUG
