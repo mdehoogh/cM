@@ -2388,7 +2388,7 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 	return _getValueOfMap(disowned_map(_dmap,owner));
 }
 char* _getIntegerCharacters(long long ll){//Mallocationowner owner=getOwner(__LINE__);
-	char str[20];sprintf(str,"%lld",ll);return _strdup(str);
+	char str[41];sprintf(str,"%lld",ll);return _strdup(str); // MDH@25NOV2020: for 128-bits 40 characters should do (39 if not signed)
 }
 Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner owner=getOwner(__LINE__);
 	if(!text)return NULL;
@@ -2400,21 +2400,21 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 	if(ascendingindex){
 		appendedToMap(_dmap,owner,"0",_getIntegerValue(text->presuffix)); // the quote character
 		while(*characters){
-			_indexCharacters=_getIntegerCharacters(++index); // TODO not owned?????
+			_indexCharacters=OWNED(_getIntegerCharacters(++index),owner);
 			if(!_indexCharacters)break; // TODO or else?
 			appendedToMap(_dmap,owner,_indexCharacters,_getIntegerValue(*characters));
-			FREE_1(_indexCharacters,'\'');
+			FREE_DISOWNED(_indexCharacters,strlen(_indexCharacters)+1,-'"',owner);
 			characters++; // OOPS pretty essential
 		}
 	}else{
 		// go to the end
 		while(*characters){index++;characters++;}
 		while(index){
-			_indexCharacters=_getIntegerCharacters(index--); // TODO not owned??
+			_indexCharacters=OWNED(_getIntegerCharacters(index--),owner); // TODO not owned??
 			if(!_indexCharacters)break; // TODO or else?
 			characters--;
 			appendedToMap(_dmap,owner,_indexCharacters,_getIntegerValue(*characters));
-			FREE_1(_indexCharacters,'\'');
+			FREE_DISOWNED(_indexCharacters,strlen(_indexCharacters)+1,-'"',owner);
 		}
 		appendedToMap(_dmap,owner,"0",_getIntegerValue(text->presuffix)); // the quote character
 	}
@@ -2432,6 +2432,187 @@ Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mal
 	return _getValueOfList(disowned_list(_dlist,owner));
 }
 
+// MDH25NOV2020: converting to list and array might be useful
+Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(value){
+		if(value->type==VT_LIST)return value;
+		// we'll be needing a return list
+		Mlist* _list=owned_list(__list("Ml"),owner);
+		if(_list){
+			if(value->type==VT_ARRAY){
+				Marray* array=value->value._array;
+				if(array){
+					_list->valuetype=array->valuetype;
+						unsigned long long arraylength=array->numberOfElements;
+						if(arraylength>0){
+							Mvalue** valueholder=array->values;
+							do{
+								if(appendedToList(_list,owner,*valueholder,M_LL_INVALID)<=0)
+								{output(M_ERROR_PREFIX);outputValue("Failed to append '",*valueholder,"' to the list.\n");}
+								valueholder++;
+							}while(--arraylength);
+						}
+				}
+			}else
+			if(value->type==VT_MAP){
+				Mmap* map=value->value._map;
+				if(map){
+					unsigned long long maplength=map->numberOfElements;
+					if(maplength>0){ // something to copy over
+						Mmapelement* mapelement=map->_first;
+						Mvariable* mapvariable;
+						while(mapelement){
+							mapvariable=mapelement->_variable;
+							if(mapvariable){
+								Mstring* _mapvariablename=owned_string(_getString("'"),owner);
+								if(_mapvariablename){
+									if(string_append(_mapvariablename,mapvariable->_name->chars)){
+										if(appendedToList(_list,owner,_getTextValue(string(_mapvariablename)),M_LL_INVALID)<=0
+											||appendedToList(_list,owner,mapvariable->_value,M_LL_INVALID)<=0)
+											outputError("Failed to either store a map key or value in the list");
+									}else
+										outputError("Failed to create the text to store the key in");
+									FREE_STRING(_mapvariablename,owner);
+								}
+							}
+							if(--maplength==0)break; // precaution to prevent writing beyond the end of the array (when the number of elements registered with the map would be incorrect)
+							mapelement=mapelement->_next;
+						}
+					}
+				}else
+					outputBug("Value map missing!");
+			}else{ // a single value, to be wrapped in a list
+				if(appendedToList(_list,owner,value,M_LL_INVALID)<=0)
+				{output(M_ERROR_PREFIX);outputValue("Failed to wrap '",value,"' in a list.\n");}
+			}
+			return _getValueOfList(disowned_list(_list,owner));
+		}else
+			outputError("Failed to create the list");
+	}
+	return NULL;
+}
+Mvalue* Mm(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(value){
+		if(value->type==VT_MAP)return value;
+		Mmap* _map=owned_map(__map("Mm"),owner);
+		if(_map){
+			if(value->type==VT_LIST){
+				Mlist* list=value->value._list;
+				if(list){
+					Mlistelement* listelement=list->_first;
+					while(listelement){
+						char* _key=OWNED(_getIntegerCharacters(listelement->index),owner);
+						if(_key){
+							if(appendedToMap(_map,owner,_key,listelement->_value)!=M_TRUE)
+							{output(M_ERROR_PREFIX);output("Failed to append list element #%llu to the map.\n",listelement->index);}
+							FREE_DISOWNED(_key,strlen(_key)+1,-'"',owner);
+						}else
+							outputError("Failed to create the list index element map key");
+						listelement=listelement->_next;
+					}
+				}else
+					outputBug("Value list missing!");
+			}else
+			if(value->type==VT_ARRAY){
+				Marray* array=value->value._array;
+				if(array){
+					unsigned long long arraylength=array->numberOfElements;
+					if(arraylength>0){
+						Mvalue** valueholder=array->values;
+						unsigned long long arrayindex=0;
+						while(arrayindex<arraylength){
+							char* _key=OWNED(_getIntegerCharacters(++arrayindex),owner);
+							if(_key){
+								if(appendedToMap(_map,owner,_key,*valueholder)!=M_TRUE)
+								{output(M_ERROR_PREFIX);output("Failed to append array element #%llu to the map.\n",arrayindex);}
+								FREE_DISOWNED(_key,strlen(_key)+1,-'"',owner);
+							}else
+								outputError("Failed to create the array index map key");
+							valueholder++;
+						}
+					}
+				}else
+					outputBug("Value array missing!");
+			}else{
+				if(appendedToMap(_map,owner,"",value)!=M_TRUE)
+					outputError("Failed to wrap the value in a map");
+			}
+			return _getValueOfMap(disowned_map(_map,owner));
+		}
+		outputError("Failed to create the map");
+	}
+	return NULL;
+}
+Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(value){
+		if(value->type==VT_ARRAY)return value;
+		if(value->type==VT_LIST){
+			Mlist* list=value->value._list;
+			if(list){
+				unsigned long long listlength=list->numberOfElements;
+				Marray* _array=owned_array(_getArray("Ma",listlength),owner);
+				if(_array){
+					if(listlength>0){
+						Mvalue** valueholder=_array->values;
+						Mlistelement* listelement=value->value._list->_first;
+						unsigned long long arrayindex=0;
+						while(listelement){
+							assignValue(valueholder,listelement->_value);
+							if(++arrayindex==listlength)break; // done if we reached the end of the array
+							listelement=listelement->_next;
+							valueholder++;
+						}
+					}
+					return _getValueOfArray(disowned_array(_array,owner));
+				}
+				outputError("Failed to create the array to store the list elements in");			
+			}else
+				outputBug("No (value) list to convert to an array");
+		}else
+		if(value->type==VT_MAP){
+			Mmap* map=value->value._map;
+			if(map){
+				unsigned long long maplength=map->numberOfElements;
+				Marray* _array=owned_array(_getArray("Ma",maplength<<1),owner);
+				if(_array){
+					if(maplength>0){ // something to copy over
+						Mmapelement* mapelement=map->_first;
+						Mvariable* mapvariable;
+						Mvalue** valueholder=_array->values;
+						while(mapelement){
+							mapvariable=mapelement->_variable;
+							if(mapvariable){
+								Mstring* _mapvariablename=owned_string(_getString("'"),owner);
+								if(_mapvariablename){
+									if(string_append(_mapvariablename,mapvariable->_name->chars)){
+										assignValue(valueholder,_getTextValue(string(_mapvariablename)));
+										valueholder++;
+										assignValue(valueholder,mapvariable->_value);
+										valueholder++;
+									}
+									FREE_STRING(_mapvariablename,owner);
+								}
+							}
+							if(--maplength==0)break; // precaution to prevent writing beyond the end of the array (when the number of elements registered with the map would be incorrect)
+							mapelement=mapelement->_next;
+						}
+					}
+					return _getValueOfArray(disowned_array(_array,owner));
+				}
+				output("%sFailed to create the array to store %llu map elements in.",M_ERROR_PREFIX,maplength);
+			}else
+				outputBug("No (value) map to convert to an array!");
+		}else{ // a single value, to be wrapped in an array
+			Marray* _array=owned_array(_getArray("Ma",1),owner);
+			if(_array){
+				assignValue(_array->values,value); // pretty simple!
+				return _getValueOfArray(disowned_array(_array,owner));
+			}
+			outputError("Failed to create the array to wrap the value in");
+		}
+	}
+	return NULL;
+}
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
 // TODO we should delegate to (_)getValueDecimal
 Mvalue* Md(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
@@ -8660,40 +8841,34 @@ static void aswap(Mvalue** const values,long long index1,long long index2){
 	Mvalue* value=values[index1];
 	values[index1]=values[index2];
 	values[index2]=value;
-	sortstatistics.pointerassignments++;sortstatistics.fieldreferences+=2;sortstatistics.pointerreferences++;sortstatistics.fieldassignments+=2;
+	sortstatistics.pointerassignments++;sortstatistics.fieldreferences+=4;
+	sortstatistics.pointerreferences+=2;sortstatistics.fieldassignments+=2;
 }
-static long long apartition(Mvalue** const values,long long lmin1,long long h){
-	long long l=lmin1+1;
+static unsigned long long apartition(Mvalue** const values,unsigned long long l,unsigned long long h){
 	// output("Partitioning elements #%llu through #%llu.\n",l->index,h->index);
+	sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.pointerassignments++;
 	Mvalue* x=values[h]; //* x=list[h] // x is set once, as the value at index h
-	long long i=lmin1; //* i=l-1
-	sortstatistics.pointerassignments+=3;sortstatistics.pointertests++;sortstatistics.fieldreferences+=2;sortstatistics.pointerreferences++;
+	unsigned long long i=l; // MDH@25NOV2020: actually one above the first value to use (which means we increment i AFTER swapping, instead of before as was done in the original algorithm)
 	// MDH@02NOV2020: in order to be able to call helper function smallerthanorequalto() x should not be a list, essentially list bubble up to the top I suppose
 	sortstatistics.fieldtests++;
 	if(x->type!=VT_LIST){
-		long long j=l;
-		sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
-		while(1){
-			sortstatistics.fieldtests+=2;
-			if(j>=h)break;
+		for(register unsigned long long j=l;j<h;j++){
 			long long notlarger=M_LL_INVALID;
-			sortstatistics.fieldtests+=2;
+			sortstatistics.pointerreferences++;sortstatistics.fieldtests++;
 			if(values[j]->type!=VT_LIST){
 				notlarger=smallerthanorequalto(values[j],x);
 				sortstatistics.comparisons++;
 			}
 			if(notlarger==M_TRUE){
-				i++; //* i++; // make i start at index l otherwise increment
-				sortstatistics.pointerassignments++;sortstatistics.pointertests++;sortstatistics.fieldreferences++;
-				aswap(values,i,j);
+				sortstatistics.pointerreferences++;
+				aswap(values,i++,j); // incrementing i AFTER using it in the call
 			}
-			j++;
-			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 		}
 	}
-	aswap(values,i+1,h); //* swap(list[i+1],list[h])
+	aswap(values,i,h); //* swap(list[i+1],list[h])
 	return i; //* i+1 but actually we are returning i itself because that's the first value used
 }
+// MDH@25NOV2020: because we want to work with unsigned long long values, adapting apartition accordingly
 static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
@@ -8709,70 +8884,57 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 				if(stack){
 					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
-					stack[0]=-1; // i.e. the first lmin1
-					stack[1]=arraylength;
-					sortstatistics.pointerassignments++;sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;
+					stack[0]=0; // i.e. the first index, which is 0 (l=lmin1+1)
+					stack[1]=arraylength-1; // i.e. the last index, which is arraylength-1
 					// it's better to store the number of elements in the stack instead of the top index
 					// so that the smallest value of top will be 0
 					unsigned long long top=2;
-					long long lmin1,l,h,pmin1,p,pplus1; // two list elements
-					sortstatistics.pointerassignments+=6;
+					long long lmin1,l,h,pmin1,p,pplus1;
 					Mvalue** values=_array->values;
+					sortstatistics.fieldreferences++;
 					// as long as there are two elements on the stack
 					while(top>1){ // two or more elements on the stack
 						h=stack[--top];
-						lmin1=stack[--top];
-						pmin1=apartition(values,lmin1,h); // NOTE p is actually p-1
+						l=stack[--top];
+						p=apartition(values,l,h);
 						sortstatistics.pointerassignments+=3;sortstatistics.fieldreferences+=2;
 						//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
 						sortstatistics.pointertests++;
-						l=lmin1+1;
-						sortstatistics.fieldreferences++;sortstatistics.pointerassignments++;
-						if(pmin1){
-							sortstatistics.fieldtests+=2;
-							if(pmin1>l){
-								if(top>=maxtop){
-									if(report)
-										output("Expanding the stack.\n");
-									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
-									if(!stack){
-										output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
-										break;
-									}
-									maxtop+=initialmaxtop;
-									if(report)
-										output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+						if(p>l+1){
+							if(top>=maxtop){
+								if(report)
+									output("Expanding the stack.\n");
+								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
+								if(!stack){
+									output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
+									break;
 								}
-								stack[top++]=lmin1;
-								stack[top++]=pmin1;
-								sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
-								if(top>result)result=top;
+								maxtop+=initialmaxtop;
+								if(report)
+									output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 							}
+							stack[top++]=l;
+							stack[top++]=p-1;
+							sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
+							if(top>result)result=top;
 						}
-						// move p two elements up
-						p=pmin1+1;
-						pplus1=p+1;
-						sortstatistics.fieldreferences+=2;sortstatistics.pointerassignments+=2;sortstatistics.pointertests+=3; // including the one below (of pplus1)
-						if(pplus1>=0){
-							sortstatistics.fieldtests+=2;
-							if(pplus1<h){
-								if(top>=maxtop){
-									if(report)
-										output("Expanding the stack.\n");
-									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
-									if(!stack){
-										output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
-										break;
-									}
-									maxtop+=initialmaxtop;
-									if(report)
-										output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+						if(p+1<h){
+							if(top>=maxtop){
+								if(report)
+									output("Expanding the stack.\n");
+								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
+								if(!stack){
+									output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
+									break;
 								}
-								stack[top++]=p; // which is actually lmin1
-								stack[top++]=h;
-								sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
-								if(top>result)result=top;
+								maxtop+=initialmaxtop;
+								if(report)
+									output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 							}
+							stack[top++]=p+1;
+							stack[top++]=h;
+							sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
+							if(top>result)result=top;
 						}
 					}
 					if(report)
@@ -10048,6 +10210,111 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 	return mergedlistelement; // returning the last merged element (therefore the maximum)
 }
 */
+static void ainsertionsort(Mvalue** const values,unsigned long long first,unsigned long long last){
+	// ASSERT first and last are assumed to be array positions (one-based) not zero-based
+	//        which means that we need to insert [first,last-1] instead of (originally)
+	bool report=amVerboseDebugging()||DEBUGGING;
+	Mvalue* toinsertValue=NULL;
+	if(report)
+		output("Insertion sorting array elements [%llu,%llu].\n",first,last);
+	Mvalue** toinsertValueholder=(values+first); // the address of values[first] which is the first element to insert
+	if(report)
+		outputValue("\tFirst value: '",*toinsertValueholder,"'.\n");
+	long long insertionarrayindex;
+	// by using 1-based indices, we get rid of the test for zero
+	for(register unsigned long long arrayindex=first+1;arrayindex<=last;arrayindex++){
+		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;
+		toinsertValue=*toinsertValueholder; // the first time values[first+1]
+		toinsertValueholder++;
+		if(report)
+			outputValue("\tInserting '",toinsertValue,"'.\n");
+		// NOTE source (insertionSort) from 'https://geeksforgeeks.org/timsort/' adapted a bit
+		//      the first element to compare with is the element in front of position arrayindex, and the element at position first would be the last
+		insertionarrayindex=arrayindex-1; // the minimum value would be first (which is 1)
+		do{
+			// insertionarrayindex--; // converting from 1-based to 0-based (as we need in the comparison)
+			sortstatistics.fieldreferences++;sortstatistics.pointerreferences+=2;
+			sortstatistics.comparisons++;
+			if(largerthan(values[--insertionarrayindex],toinsertValue)!=M_TRUE)
+			{insertionarrayindex++;break;} // as soon as 
+			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;
+			if(report)
+			{outputValue("\t\tMoving value '",values[insertionarrayindex],"'");output(" at index %llu one position up",insertionarrayindex);outputValue(" replacing '",values[insertionarrayindex+1],"'.\n");}
+			values[insertionarrayindex+1]=values[insertionarrayindex];
+		}while(insertionarrayindex>=first);
+		// ASSERT values[anotherarrayindex]<=temp
+		sortstatistics.fieldassignments++;sortstatistics.pointerreferences++;
+		if(insertionarrayindex!=arrayindex){
+			if(report)
+			{outputValue("\t\tInserting value '",toinsertValue,"'");output(" at index %llu",insertionarrayindex);outputValue(" replacing '",values[insertionarrayindex],"'.\n");}
+			values[insertionarrayindex]=toinsertValue;
+		}
+	}
+}
+static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	bool result=true;
+	unsigned long long len1=(m>=l?m-l+1:0),len2=(r>m?r-m:0);
+	Mvalue **left=(len1?MALLOC(sizeof(Mvalue*),len1,-'v',owner):NULL),
+			**right=(len2?MALLOC(sizeof(Mvalue*),len2,-'v',owner):NULL);
+	if((len1==0||left!=NULL)&&(len2==0||right!=NULL)){
+		if(report)
+			output("Merging ordered arrays [%llu,%llu] with [%llu,%llu].\n",l,m,m+1,r);
+		// copy the pointers over
+		if(len1)memcpy(left,values+l,sizeof(Mvalue*)*len1);
+		if(len2)memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
+		unsigned long long i=0,j=0;
+		Mvalue** valueholder=(values+l);
+		if(report)
+			outputValue("First value: '",*valueholder,"'.\n");
+		while(i<len1&&j<len2){
+			sortstatistics.comparisons++;
+			if(smallerthanorequalto(left[i],right[j]))
+				*valueholder=left[i++];
+			else
+				*valueholder=right[j++];
+			valueholder++;
+		}
+		while(i<len1){*valueholder=left[i++];valueholder++;}
+		while(j<len2){*valueholder=right[j++];valueholder++;}
+	}else{
+		result=false;
+		outputError("Not enough memory to merge two ordered arrays");
+	}
+	if(left)FREE_DISOWNED(left,len1,-'v',owner);
+	if(right)FREE_DISOWNED(right,len2,-'v',owner);
+	return result;
+}
+static long long atimsort(Marray* const _array){
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long result=M_LL_INVALID;
+	sortstatistics.pointertests++;
+	if(_array){
+		result=M_TRUE;
+		sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;
+		unsigned long long arraylength=_array->numberOfElements;
+		if(arraylength>1){
+			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+			Mvalue** values=_array->values;
+			// sort the (fixed-size) runs with insertion sort
+			// NOTE ainsertionsort expects indices one up the actual index
+			for(unsigned long long runfirst=0;runfirst<arraylength;runfirst+=M_RUN_LENGTH)
+				ainsertionsort(values,runfirst+1,MIN(runfirst+M_RUN_LENGTH,arraylength));
+			// merge all pairs of successive runs
+			unsigned long long left,size=M_RUN_LENGTH;
+			while(result==M_TRUE&&size<arraylength){
+				left=0;
+				while(result==M_TRUE&&left<arraylength)
+					if(amerge(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1))
+						left+=(size<<1);
+					else
+						result=M_FALSE;
+				size<<=1; // double the size
+			}
+		}
+	}
+	return result;
+}
 // linsertinginsertionSort works the same way linsertionSort does, except that it rearranges the list elements instead of moving the values
 // and it returns the new last (if any)
 static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * const beforefirst,Mlistelement * const last){
@@ -10169,17 +10436,6 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 }
 */
 // MDH@05NOV2020: changing timsort by registering the index ranges first, and writing the indices at the end
-static long long atimsort(Marray* const _array){
-	Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
-	long long result=M_LL_INVALID;
-	sortstatistics.pointertests++;
-	if(_array){
-
-		result=M_TRUE;
-	}
-	return result;
-}
 static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
@@ -10571,47 +10827,92 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 // MDH@03NOV2020: runs tells you how many runs there are in a given list and what length they are
 //                it's more convenient to return the points where the direction changes
 Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__);
-	if(_listValue&&_listValue->type==VT_LIST){
-		Mlist* list=_listValue->value._list;
-		Mlistelement* listelement=(list?list->_first:NULL);
-		if(listelement){ // at least one element in the list
-			Mlist* _runsList=owned_list(__list("Mrunpoints"),owner);
-			if(_runsList){
-				// the first and last list element will always be in the list
-				if(appendedToList(_runsList,owner,listelement->_value,listelement->index)>0){
-					// if all elements are equal direction will remain 0, in which case the returned list will remain empty
-					int direction,rundirection=0;
-					unsigned long long valueindex;
-					Mvalue *value,*nextvalue=listelement->_value;
-					while(listelement->_next){
-						value=nextvalue;
-						valueindex=listelement->index;
-						// update direction to indicate whether the next element is down or up or equal
-						listelement=listelement->_next;
-						nextvalue=listelement->_value;
-						// if value equals nextvalue, we simply continue, because an equal value can never end a run
-						if(smallerthan(nextvalue,value)==M_TRUE)direction=-1;
-						else
-						if(largerthan(nextvalue,value)==M_TRUE)direction=1;
-						else // never change the rundirection to 0, although it starts with 0!!
-							continue;
-						// NOTE an equal value (direction) 0 can never end a run!!!
-						if(direction!=rundirection){ // change of direction sign
-							if(rundirection!=0&&appendedToList(_runsList,owner,value,valueindex)<=0){
-								outputError("Failed to update the runs list");
-								break;
+	if(_listValue){
+		if(_listValue->type==VT_LIST){
+			Mlist* list=_listValue->value._list;
+			Mlistelement* listelement=(list?list->_first:NULL);
+			if(listelement){ // at least one element in the list
+				Mlist* _runsList=owned_list(__list("Mrunpoints"),owner);
+				if(_runsList){
+					// the first and last list element will always be in the list
+					if(appendedToList(_runsList,owner,listelement->_value,listelement->index)>0){
+						// if all elements are equal direction will remain 0, in which case the returned list will remain empty
+						int direction,rundirection=0;
+						unsigned long long valueindex;
+						Mvalue *value,*nextvalue=listelement->_value;
+						while(listelement->_next){
+							value=nextvalue;
+							valueindex=listelement->index;
+							// update direction to indicate whether the next element is down or up or equal
+							listelement=listelement->_next;
+							nextvalue=listelement->_value;
+							// if value equals nextvalue, we simply continue, because an equal value can never end a run
+							if(smallerthan(nextvalue,value)==M_TRUE)direction=-1;
+							else
+							if(largerthan(nextvalue,value)==M_TRUE)direction=1;
+							else // never change the rundirection to 0, although it starts with 0!!
+								continue;
+							// NOTE an equal value (direction) 0 can never end a run!!!
+							if(direction!=rundirection){ // change of direction sign
+								if(rundirection!=0&&appendedToList(_runsList,owner,value,valueindex)<=0){
+									outputError("Failed to update the runs list");
+									break;
+								}
+								rundirection=direction;
 							}
-							rundirection=direction;
 						}
+						// add the last one (because it's can never be a direction change point)
+						if(appendedToList(_runsList,owner,list->_last->_value,list->_last->index)>0)
+							return _getValueOfList(disowned_list(_runsList,owner));
+						outputError("Failed to add the last list element to the list of run points");
 					}
-					// add the last one (because it's can never be a direction change point)
-					if(appendedToList(_runsList,owner,list->_last->_value,list->_last->index)>0)
-						return _getValueOfList(disowned_list(_runsList,owner));
-					outputError("Failed to add the last list element to the list of run points");
+					FREE_LIST(_runsList,owner);
 				}
-				FREE_LIST(_runsList,owner);
+				outputError("Failed to create the runs list");
 			}
-			outputError("Failed to create the runs list");
+		}else
+		if(_listValue->type==VT_ARRAY){
+			Marray* array=_listValue->value._array;
+			unsigned long long arraylength=array->numberOfElements;
+			if(arraylength>0){
+				Mlist* _runsList=owned_list(__list("Mrunpoints"),owner);
+				if(_runsList){
+					Mvalue** valueholder=array->values; // the pointer to the first Mvalue*
+					Mvalue* value=*valueholder; // the first value pointed to
+					// the first and last list element will always be in the list
+					if(appendedToList(_runsList,owner,value,1)>0){ // the first value 
+						// if all elements are equal direction will remain 0, in which case the returned list will have only a single value
+						int direction,rundirection=0;
+						Mvalue *nextvalue;
+						// we're going to make valueindex run from 2 up until the last value, this is essentially the index of the element we're comparing with
+						for(unsigned long long valueindex=2;valueindex<=arraylength;valueindex++){
+							nextvalue=*(++valueholder); // valueindex should be the index (one-based) that is being used as list index
+							// compare value with nextvalue
+							// as we're only interested in changes of direction, we use rundirection to determine when that will be the case
+							// if direction ends up nonzero we know the direction changed although it could started as zero
+							direction=0;
+							if(rundirection>=0&&smallerthan(nextvalue,value)==M_TRUE)direction=-1; // change from 0 or 1 to -1
+							else
+							if(rundirection<=0&&largerthan(nextvalue,value)==M_TRUE)direction=1; // change from 0 or -1 to 1
+							// NOTE an equal value (direction) 0 can never end a run!!!
+							if(direction!=0){ // the direction has changed, so we have to register the run point IFF rundirection is nonzero
+								if(rundirection!=0&&appendedToList(_runsList,owner,value,valueindex)<=0){
+									outputError("Failed to update the list of run points");
+									break;
+								}
+								rundirection=direction;
+							}
+							value=nextvalue;
+						}
+						// add the last one (if not already in the list either when all values are equal)
+						if(rundirection==0||appendedToList(_runsList,owner,value,arraylength)>0)
+							return _getValueOfList(disowned_list(_runsList,owner));
+						outputError("Failed to add the last array element to the list of run points");
+					}
+					FREE_LIST(_runsList,owner);
+				}
+				outputError("Failed to create the runs list");
+			}
 		}
 	}
 	return NULL;
@@ -10862,6 +11163,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"i"),"i",Mi)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"l"),"l",Ml) // MDH@25NOV2020: conversion to a list
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"a"),"a",Ma) // MDH@25NOV2020: conversion to an array
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"m"),"m",Mm) // MDH@25NOV2020: conversion to a map
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"b"),"b",Mb)
 					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"t"),"t",Mt)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"f"),"f",Mf)
