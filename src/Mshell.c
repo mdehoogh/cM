@@ -7752,7 +7752,7 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 			*up=(direction==M_TRUE);
 			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
 			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
-			Mvalue* firstIntegerRangeValue=(up?Mceil(firstRangeValue):Mfloor(firstRangeValue));
+			Mvalue* firstIntegerRangeValue=(*up?Mceil(firstRangeValue):Mfloor(firstRangeValue)); // OOPS *up NOT up
 			if(firstIntegerRangeValue){
 				long long rangeInteger=getValueInteger(firstIntegerRangeValue);
 				if(rangeInteger!=M_LL_INVALID){
@@ -7791,6 +7791,66 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 		outputError("Failed to create a list to store the integer range");
 	return disowned_list(_scalarRangeList,owner);
 }
+// MDH@25NOV2020: preferable to store the range elements in an array
+static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	Marray* _scalarRangeArray=NULL; // can't create the array until we know how many values will be in it
+	if(firstRangeValue&&lastRangeValue){
+		long long direction=smallerthanorequalto(firstRangeValue,lastRangeValue);
+		if(direction!=M_LL_INVALID){
+			*up=(direction==M_TRUE);
+			if(report)
+			{outputValue("'",firstRangeValue,"' is ");output("%s",(*up?"smaller than or equal to":"larger than"));outputValue(" '",lastRangeValue,"'.\n");}
+			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
+			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
+			Mvalue* firstIntegerRangeValue=(*up?Mceil(firstRangeValue):Mfloor(firstRangeValue));
+			if(firstIntegerRangeValue){
+				long long rangeInteger=getValueInteger(firstIntegerRangeValue);
+				if(rangeInteger!=M_LL_INVALID){
+					Mvalue* integerrangeValue=_getIntegerValue(rangeInteger);
+					if(integerrangeValue){
+						Mvalue* lastIntegerRangeValue=(*up?Mfloor(lastRangeValue):Mceil(lastRangeValue));
+						if(report){
+							outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerRangeValue,"].\n");
+							if(inputCharReadFunction){
+								char c;output("%s...","Press Ctrl-C to stop or any other key to continue");(*inputCharReadFunction)(&c);if(c==3)return NULL;
+							}
+						}
+						long long lastRangeInteger=getValueInteger(lastIntegerRangeValue);
+						if(lastRangeInteger==M_LL_INVALID)return NULL;
+						if(report)
+							output("Determining all %s integers in [%lld,%lld].\n",(*up?"decreasing":"increasing"),rangeInteger,lastRangeInteger);
+						unsigned long long arraylength=(*up
+							?(lastRangeInteger>=rangeInteger?1+(lastRangeInteger-rangeInteger):0)
+							:(rangeInteger>=lastRangeInteger?1+(rangeInteger-lastRangeInteger):0));
+						_scalarRangeArray=owned_array(_getArray("_getScalarRangeArray",arraylength),owner);
+						if(_scalarRangeArray){
+							if(arraylength>0){
+								Mvalue** valueholder=_scalarRangeArray->values;
+								while(integerrangeValue){
+									assignValue(valueholder,integerrangeValue);
+									if(--arraylength==0)break; // fail-safe to ascertain NOT to right beyond the end of the array
+									valueholder++;
+									// determine the next value to insert into the integer range
+									if(*up)rangeInteger++;else rangeInteger--;
+									integerrangeValue=_getIntegerValue(rangeInteger);
+								}
+							}
+						}else 
+							outputError("Failed to create the range array");
+					}else
+						outputError("Failed to initialize the first candidate range integer");
+				}else
+					outputError("Failed to extract the lower bound of the integer range");
+			}else
+				outputError("Failed to determine the first integer range value");
+		}else
+			outputError("Unable to determine whether to go up or down in the integer range");
+	}else
+		outputError("Failed to create a list to store the integer range");
+	return(_scalarRangeArray?disowned_array(_scalarRangeArray,owner):NULL);
+}
+
 // MDH@18OCT2019: we can get the range of integers between two values
 Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
@@ -7911,7 +7971,8 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	}
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange,false);
 	// now we're dealing with scalars
-	return _getValueOfList(_getScalarRangeList(_value1,_value2,&up));
+	return _getValueOfArray(_getScalarRangeArray(_value1,_value2,&up));
+	// replacing: return _getValueOfList(_getScalarRangeList(_value1,_value2,&up));
 	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
 }
 
