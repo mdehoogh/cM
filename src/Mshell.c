@@ -10213,33 +10213,39 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 static void ainsertionsort(Mvalue** const values,unsigned long long first,unsigned long long last){
 	// ASSERT first and last are assumed to be array positions (one-based) not zero-based
 	//        which means that we need to insert [first,last-1] instead of (originally)
+	//        this is done because we're using unsigneds so we cannot go below 0
 	bool report=amVerboseDebugging()||DEBUGGING;
 	Mvalue* toinsertValue=NULL;
 	if(report)
 		output("Insertion sorting array elements [%llu,%llu].\n",first,last);
+	sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 	Mvalue** toinsertValueholder=(values+first); // the address of values[first] which is the first element to insert
 	if(report)
 		outputValue("\tFirst value: '",*toinsertValueholder,"'.\n");
 	long long insertionarrayindex;
 	// by using 1-based indices, we get rid of the test for zero
 	for(register unsigned long long arrayindex=first+1;arrayindex<=last;arrayindex++){
-		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;
+		sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences+=2;
 		toinsertValue=*toinsertValueholder; // the first time values[first+1]
 		toinsertValueholder++;
 		if(report)
 			outputValue("\tInserting '",toinsertValue,"'.\n");
-		// NOTE source (insertionSort) from 'https://geeksforgeeks.org/timsort/' adapted a bit
+		// NOTE source (insertionSort) from 'https://geeksforgeeks.org/timsort/' adapted a bit (copied to timsort_geeksforgeeks.c)
 		//      the first element to compare with is the element in front of position arrayindex, and the element at position first would be the last
-		insertionarrayindex=arrayindex-1; // the minimum value would be first (which is 1)
+		insertionarrayindex=arrayindex-1; // still 1-based
+		// NOTE the first time the condition insertionarrayindex>=first is always met
 		do{
 			// insertionarrayindex--; // converting from 1-based to 0-based (as we need in the comparison)
 			sortstatistics.fieldreferences++;sortstatistics.pointerreferences+=2;
 			sortstatistics.comparisons++;
+			// switch to using a 0-based index into values
 			if(largerthan(values[--insertionarrayindex],toinsertValue)!=M_TRUE)
-			{insertionarrayindex++;break;} // as soon as 
+			{insertionarrayindex++;break;} // increment again because we need to insert toinsertValue above the not larger value
 			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;
 			if(report)
 			{outputValue("\t\tMoving value '",values[insertionarrayindex],"'");output(" at index %llu one position up",insertionarrayindex);outputValue(" replacing '",values[insertionarrayindex+1],"'.\n");}
+			// because we decremented insertionarrayindex BEFORE instead of AFTER the following assignment
+			// we're using the proper (i.e. zero-based) indices
 			values[insertionarrayindex+1]=values[insertionarrayindex];
 		}while(insertionarrayindex>=first);
 		// ASSERT values[anotherarrayindex]<=temp
@@ -10251,69 +10257,73 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 		}
 	}
 }
+// NOTE in amerge() l, m and r are zero-based
 static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	bool result=true;
 	unsigned long long len1=(m>=l?m-l+1:0),len2=(r>m?r-m:0);
+	// allocate memory to store all value pointers so we can overwrite the originals
+	// TODO can we do this without actually having to do this??????
+	sortstatistics.pointerassignments+=2;
 	Mvalue **left=(len1?MALLOC(sizeof(Mvalue*),len1,-'v',owner):NULL),
 			**right=(len2?MALLOC(sizeof(Mvalue*),len2,-'v',owner):NULL);
 	if((len1==0||left!=NULL)&&(len2==0||right!=NULL)){
 		if(report)
 			output("Merging ordered arrays [%llu,%llu] with [%llu,%llu].\n",l,m,m+1,r);
 		// copy the pointers over
-		if(len1)memcpy(left,values+l,sizeof(Mvalue*)*len1);
-		if(len2)memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
+		if(len1){sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(left,values+l,sizeof(Mvalue*)*len1);}
+		if(len2){sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);}
 		unsigned long long i=0,j=0;
+		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 		Mvalue** valueholder=(values+l);
 		if(report)
 			outputValue("First value: '",*valueholder,"'.\n");
 		while(i<len1&&j<len2){
-			sortstatistics.comparisons++;
+			sortstatistics.comparisons++;sortstatistics.fieldassignments++;sortstatistics.fieldreferences+=3;
 			if(smallerthanorequalto(left[i],right[j]))
 				*valueholder=left[i++];
 			else
 				*valueholder=right[j++];
+			sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 			valueholder++;
 		}
-		while(i<len1){*valueholder=left[i++];valueholder++;}
-		while(j<len2){*valueholder=right[j++];valueholder++;}
+		while(i<len1){
+			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
+			*valueholder=left[i++];valueholder++;
+		}
+		while(j<len2){
+			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
+			*valueholder=right[j++];valueholder++;
+		}
 	}else{
 		result=false;
 		outputError("Not enough memory to merge two ordered arrays");
 	}
-	if(left)FREE_DISOWNED(left,len1,-'v',owner);
-	if(right)FREE_DISOWNED(right,len2,-'v',owner);
+	sortstatistics.pointertests+=2;
+	if(left){sortstatistics.pointerreferences++;FREE_DISOWNED(left,len1,-'v',owner);}
+	if(right){sortstatistics.pointerreferences++;FREE_DISOWNED(right,len2,-'v',owner);}
 	return result;
 }
 static long long atimsort(Marray* const _array){
-	bool report=amVerboseDebugging()||DEBUGGING;
-	long long result=M_LL_INVALID;
+	// bool report=amVerboseDebugging()||DEBUGGING;
 	sortstatistics.pointertests++;
-	if(_array){
-		result=M_TRUE;
-		sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;
-		unsigned long long arraylength=_array->numberOfElements;
-		if(arraylength>1){
-			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-			Mvalue** values=_array->values;
-			// sort the (fixed-size) runs with insertion sort
-			// NOTE ainsertionsort expects indices one up the actual index
-			for(unsigned long long runfirst=0;runfirst<arraylength;runfirst+=M_RUN_LENGTH)
-				ainsertionsort(values,runfirst+1,MIN(runfirst+M_RUN_LENGTH,arraylength));
-			// merge all pairs of successive runs
-			unsigned long long left,size=M_RUN_LENGTH;
-			while(result==M_TRUE&&size<arraylength){
-				left=0;
-				while(result==M_TRUE&&left<arraylength)
-					if(amerge(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1))
-						left+=(size<<1);
-					else
-						result=M_FALSE;
-				size<<=1; // double the size
-			}
-		}
+	if(!_array)return M_LL_INVALID;
+	sortstatistics.fieldreferences++;
+	unsigned long long arraylength=_array->numberOfElements;
+	if(arraylength>1){
+		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+		Mvalue** values=_array->values;
+		// sort the (fixed-size) runs with insertion sort
+		// NOTE ainsertionsort expects indices one up the actual index
+		for(unsigned long long runfirst=0;runfirst<arraylength;runfirst+=M_RUN_LENGTH)
+			ainsertionsort(values,runfirst+1,MIN(runfirst+M_RUN_LENGTH,arraylength));
+		// merge all pairs of successive runs
+		for(unsigned long long size=M_RUN_LENGTH;size<arraylength;size<<=1)
+			for(unsigned long long left=0;left<arraylength;left+=(size<<1))
+				if(!amerge(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1))
+					return M_FALSE;
 	}
-	return result;
+	return M_TRUE;
 }
 // linsertinginsertionSort works the same way linsertionSort does, except that it rearranges the list elements instead of moving the values
 // and it returns the new last (if any)

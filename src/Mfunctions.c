@@ -768,12 +768,22 @@ Mvalue* Mrand(){ // to return a random value between 0 and 1
     return _getValueOfRational(_getRational(_getBiginteger(rand()),_getBiginteger(RAND_MAX),M_LD_NAN,false));
 }
 // if you want a list of random values call Mrands()
+// switched to returning an array instead of a list
 Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
     long long count=getValueInteger(_countValue);
     if(count>0){
+        Marray* _randarray=owned_array(_getArray("Mrands",count),owner);
+        if(_randarray){
+            Mvalue** valueholder=_randarray->values;
+            while(--count>=0){assignValue(valueholder,Mrand());valueholder++;}
+            return _getValueOfArray(disowned_array(_randarray,owner));
+        }
+        output("%sFailed to create an array to hold %lld random rational numbers in [0,1).\n",M_ERROR_PREFIX,count);
+        /* replacing:
         Mlist* _randList=owned_list(__list("Mrands"),owner);
         while(--count>=0&&appendedToList(_randList,owner,Mrand(),M_LL_INVALID)>0);
         return _getValueOfList(disowned_list(_randList,owner));
+        */
     }
     return NULL;
 }
