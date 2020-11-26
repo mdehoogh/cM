@@ -7744,9 +7744,6 @@ Mvalue* Msmallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 
 // MDH@01APR2020: we can make a list with intermediate values for multi-dimensional ranging by passing in the start list, the delta list and the end list each of which should have equal length
 //                I guess we can pass in a count that tells us how many multidimensional points to return instead of the end 
-static Mlist* _getRangeList(Mlist* start,Mlist* delta,long long count){
-	return NULL;
-}
 static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?owned_list(_getListOfType(VT_INTEGER),owner):NULL);
 	if(_scalarRangeList){
@@ -7821,9 +7818,8 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		Mlist* _integerRangeList=owned_list(_getScalarRangeList(startIntegerRangeValue,endIntegerRangeValue,&up),owner);
 		if(!_integerRangeList||!_integerRangeList->_first)return NULL; // if undefined or empty apparently no integers between the start and end of the first dimensions
 
-		if(amDebugging())
-			if(amVerbose())
-				outputList("First scalar range: ",_integerRangeList,".\n");
+		if(amVerboseDebugging())
+			outputList("First scalar range: ",_integerRangeList,".\n");
 
 		Mvalue* rangeValue=subtract(endIntegerRangeValue,startIntegerRangeValue); // the total range in the first dimension
 		// the first integer range list tells us how many elements we need to create for successive elements
@@ -7858,9 +7854,8 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 			}
 		}
 
-		if(amDebugging())
-			if(amVerbose())
-				outputList("Multiplicators: ",_multFactorList,".\n");
+		if(amVerboseDebugging())
+			outputList("Multiplicators: ",_multFactorList,".\n");
 
 		Mlist* _resultList=NULL;
 		if(_multFactorList){
