@@ -7847,7 +7847,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 		}else
 			outputError("Unable to determine whether to go up or down in the integer range");
 	}else
-		outputError("Failed to create a list to store the integer range");
+		outputError("Start or end of range not defined");
 	return(_scalarRangeArray?disowned_array(_scalarRangeArray,owner):NULL);
 }
 
@@ -9180,6 +9180,54 @@ typedef struct Mindexrange{
 	struct Mindexrange* _next;
 }Mindexrange;
 // helper functions
+// NOTE in amerge() l, m and r are zero-based
+// NOTE amerge is used both in atimsort as in aharmonicasort
+static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	bool result=true;
+	unsigned long long len1=(m>=l?m-l+1:0),len2=(r>m?r-m:0);
+	// allocate memory to store all value pointers so we can overwrite the originals
+	// TODO can we do this without actually having to do this??????
+	sortstatistics.pointerassignments+=2;
+	Mvalue **left=(len1?MALLOC(sizeof(Mvalue*),len1,-'v',owner):NULL),
+			**right=(len2?MALLOC(sizeof(Mvalue*),len2,-'v',owner):NULL);
+	if((len1==0||left!=NULL)&&(len2==0||right!=NULL)){
+		if(report)
+			output("Merging ordered arrays [%llu,%llu] with [%llu,%llu].\n",l,m,m+1,r);
+		// copy the pointers over
+		if(len1){sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(left,values+l,sizeof(Mvalue*)*len1);}
+		if(len2){sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);}
+		unsigned long long i=0,j=0;
+		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+		Mvalue** valueholder=(values+l);
+		if(report)
+			outputValue("First value: '",*valueholder,"'.\n");
+		while(i<len1&&j<len2){
+			sortstatistics.comparisons++;sortstatistics.fieldassignments++;sortstatistics.fieldreferences+=3;
+			if(smallerthanorequalto(left[i],right[j]))
+				*valueholder=left[i++];
+			else
+				*valueholder=right[j++];
+			sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+			valueholder++;
+		}
+		while(i<len1){
+			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
+			*valueholder=left[i++];valueholder++;
+		}
+		while(j<len2){
+			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
+			*valueholder=right[j++];valueholder++;
+		}
+	}else{
+		result=false;
+		outputError("Not enough memory to merge two ordered arrays");
+	}
+	sortstatistics.pointertests+=2;
+	if(left){sortstatistics.pointerreferences++;FREE_DISOWNED(left,len1,-'v',owner);}
+	if(right){sortstatistics.pointerreferences++;FREE_DISOWNED(right,len2,-'v',owner);}
+	return result;
+}
 // MDH@04NOV2020: due to the problem with the index values (which we need to keep in ascending order)
 //                it's easier to simply merge in all second sequence values into the first sequence values
 // MDH@05NOV2020: linsertingmerge does not need to keep the index values ascending so it can safely
@@ -9307,6 +9355,18 @@ static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirst
 }
 */
 // harmonica sort helper function
+static void areverse(Mvalue** values,unsigned long long firstindex,unsigned long long lastindex,bool report){
+	// if(report)
+	{outputValue("Reversing: '",*(values+firstindex),"'");outputValue(" through '",*(values+lastindex),"'.\n");}
+	// the indices will become the same if there's an odd number of values to reverse
+	Mvalue* value;
+	while(lastindex>firstindex){
+		// outputValue("'",*(values+firstindex),"' and ");outputValue("'",*(values+lastindex),"' exchanged to ");
+		value=*(values+firstindex);*(values+firstindex)=*(values+lastindex);*(values+lastindex)=value; // exchange the values
+		// outputValue("'",*(values+firstindex),"' and ");outputValue("'",*(values+lastindex),"'.\n");
+		firstindex++;lastindex--; // go to the next indices
+	}
+}
 // reversing the order of list elements is expected to be much faster than having to insert into a large list, where merging would be possible!!!
 // CHANGING first -> ... -> last -> afterlast TO last -> ... -> first -> afterlast
 //          essentially all the successors change but beforefirst should now point to last I suppose
@@ -9361,11 +9421,169 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 }
 
 // lharmonicasort is the original harmonicasort which is quite slow
-static long long aharmonicasort(Marray* _array){
-	long long result=(_array?M_TRUE:M_LL_INVALID);
-	if(result==M_TRUE){
+static long long aharmonicasort(Marray* _array){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	if(!_array)return M_LL_INVALID;
+	unsigned long long arraylength=_array->numberOfElements;
+	if(arraylength>1){ // at least two elements
+		Mvalue** values=_array->values; // address of the first Mvalue pointer
+		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
+		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
+		Mvalue** current=values; // initialize current to the address of first Mvalue pointer
+		// skip all equal values so we can set the rundirection to either -1 or 1
+		// obviously all elements could be equal
+		unsigned long long arrayindex=0; // effectively counting the number of equal elements
+		do{
+			sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+			arrayindex++;
+			current++; // increment current
+			sortstatistics.comparisons++;sortstatistics.pointerreferences+=2;
+			if(!equalto(*values,*current))break;
+		}while(arrayindex<arraylength);
+		// ASSERT current is the first unequal element (which is values+arrayindex)
+		
+		if(arrayindex<arraylength){ // not all array elements are equal!!!
+			
+			// we're either going up or down
+			sortstatistics.pointerreferences+=2;sortstatistics.comparisons++; // the comparison below
+			int rundirection=(largerthan(*current,*values)==M_TRUE?1:-1);
+			
+			// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
+			// original code from Mrunpoints() below
+			long long smallest=-1,largest=-1,runsmallest=-1,runlargest=-1;
+			Mvalue** previous;
+			sortstatistics.pointerassignments+=2;
+			bool emptyrun;
+			while(++arrayindex<arraylength){
+				previous=current++; // we can update previous and current in one go
+				sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;
+				if(report)
+				{outputValue("Comparing '",*current,"'");outputValue(" with '",*previous,"'.\n");}
+
+				if(rundirection>0){ // in an up run
+					sortstatistics.pointerreferences+=2;sortstatistics.comparisons++;
+					if(smallerthan(*current,*previous)==M_TRUE){
+						// we have to merge the down and the up run to an single up run i.e. \/ to / where the first \ is from largest to smallest
+						// ASSERT all the elements in \ (largest to smallest) are larger than smallest so we know the following loop always ends
+						runlargest=arrayindex-1;
+						if(report)outputValue("Up run maximum: '",*previous,"'.\n");
+						sortstatistics.pointertests++;
+						if(smallest>=0){
+							emptyrun=(values+smallest+1==previous);
+							sortstatistics.fieldtests++;sortstatistics.pointertests++;
+						}else
+							emptyrun=false;
+						if(!emptyrun){
+							// both the main run is up, as well as the run we just finished
+							// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
+							// MDH@08NOV2020: if I'm right you can use runsmallest as initial insertion point
+							//                apparently NOT as it loops indefinitely somewhere
+							// MDH@09NOV2020: OOPS we're supposed to pass in the beforefirst NOT the first, so how do we find the predecessor of runsmallest?????
+							sortstatistics.pointertests++;
+							if(largest>=0)amerge(values,0,largest,arrayindex-1);
+							smallest=0;
+							sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;sortstatistics.pointertests++;
+							if(previous+1==current){largest=arrayindex-1;sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;}
+
+							if(report)
+								outputValue("Maximum so far: '",*(values+largest),"'.\n");
+							if(report)
+							{_array->numberOfElements=arrayindex;outputArray("The part of the array after merging an up run: '",_array,"'.\n");}
+						}else
+						if(report)
+							output("The up run is empty!\n");
+						rundirection=-1;
+					}
+				}else{ // in a down run
+					if(largerthan(*current,*previous)==M_TRUE){ // switching to an up run
+						runsmallest=arrayindex-1; // the index of previous
+						if(report)
+							outputValue("Down run minimum: '",*previous,"'.\n");
+						// if there's nothing in between the down run is empty
+						sortstatistics.pointertests++;
+						if(largest>=0){
+							emptyrun=(values+largest+1==previous);
+							sortstatistics.fieldtests++;sortstatistics.pointertests++;
+						}else
+							emptyrun=false;
+						if(!emptyrun){
+							// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
+							// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
+							sortstatistics.pointertests++;
+							if(largest>=0){
+								// NOT USED ANYMORE: previous=values+largest+1; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
+								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
+								areverse(values,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+								if(report)
+									outputArray("Array after reversing the down run: '",_array,"'.\n");
+								// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
+								// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
+								amerge(values,0,largest,arrayindex-1);
+								// if(report)
+								{_array->numberOfElements=arrayindex;outputArray("The part of the array after merging a (reversed) down run: '",_array,"'.\n");}
+							}else{ // there's no main up run, so we only need to reverse this down run at the beginning of the list
+								largest=0; // obviously
+								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+								areverse(values,0,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+								if(report)
+									output("Initial down run reversed!\n");
+								// if(report)
+								{_array->numberOfElements=arrayindex;outputArray("The part of the array after reversing the initial down run: '",_array,"'.\n");}
+							}						
+							smallest=0; // TODO we might not need to do this actually
+							sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+							// ASSERT we've successfully merged the down run into the up run that we're going to end up with
+							if(report)
+							{outputValue("Minimum so far: '",*(values+smallest),"'.\n");outputArray("Array so far: '",_array,"'.\n");}
+						}else
+						if(report)
+							output("The down run is empty!\n");
+						rundirection=1;
+					}
+				}
+			}
+			// take care of the last run
+			if(rundirection>0){ // end of an up run
+				// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
+				if(largest>=0){
+					if(report)
+						output("Processing the final up run!\n");
+					amerge(values,0,largest,arrayindex-1);
+					// if(report)
+					{_array->numberOfElements=arrayindex;outputArray("The array after merging the final up run: '",_array,"'.\n");}
+				}else
+				if(report)
+					output("The list was already in ascending order.\n");
+			}else
+			if(rundirection<0){ // end of the down run
+				if(report)output("Processing the final down run!\n");
+				runsmallest=arrayindex-1;
+				if(largest>=0){ // something in front that we need to merge the down run into
+					// nothing to reverse if there's only a single element in the down run
+					if(largest+1!=arrayindex-1){
+						sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+						areverse(values,largest,runsmallest,report);
+					}
+					amerge(values,0,largest,arraylength-1);
+					// if(report)
+					{_array->numberOfElements=arrayindex;outputArray("The array after merging the final down run: '",_array,"'.\n");}
+				}else{
+					areverse(values,0,runsmallest,report);
+					// if(report)
+					{_array->numberOfElements=arrayindex;outputArray("The array after reversing the initial down run: '",_array,"'.\n");}
+				}
+				// because it's a down run the maximum will be the last element in the list after reversal
+			}
+			_array->numberOfElements=arraylength; // in case we changed it (for display purposes)
+			// if(report)
+			{
+				outputArray("The sorted array: '",_array,"'.\n");
+				outputValue("First: '",*_array->values,"'.\n");
+				outputValue("Last: '",*(_array->values+_array->numberOfElements-1),"'.\n");
+			}
+		}
 	}
-	return result;
+	return M_TRUE;
 }
 static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
@@ -9608,7 +9826,7 @@ static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long
 }
 // MDH@11NOV2020: the stack multiplier tells us how many times the stack size is to be multiplied with
 static long long aharmonicabinarysort(Marray* const _array,long long stackmultiplier){
-	Mallocationowner owner=getOwner(__LINE__);
+Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=(_array?M_TRUE:M_LL_INVALID);
 	if(result==M_TRUE){
@@ -10312,53 +10530,6 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 			values[insertionarrayindex]=toinsertValue;
 		}
 	}
-}
-// NOTE in amerge() l, m and r are zero-based
-static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
-	bool result=true;
-	unsigned long long len1=(m>=l?m-l+1:0),len2=(r>m?r-m:0);
-	// allocate memory to store all value pointers so we can overwrite the originals
-	// TODO can we do this without actually having to do this??????
-	sortstatistics.pointerassignments+=2;
-	Mvalue **left=(len1?MALLOC(sizeof(Mvalue*),len1,-'v',owner):NULL),
-			**right=(len2?MALLOC(sizeof(Mvalue*),len2,-'v',owner):NULL);
-	if((len1==0||left!=NULL)&&(len2==0||right!=NULL)){
-		if(report)
-			output("Merging ordered arrays [%llu,%llu] with [%llu,%llu].\n",l,m,m+1,r);
-		// copy the pointers over
-		if(len1){sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(left,values+l,sizeof(Mvalue*)*len1);}
-		if(len2){sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);}
-		unsigned long long i=0,j=0;
-		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-		Mvalue** valueholder=(values+l);
-		if(report)
-			outputValue("First value: '",*valueholder,"'.\n");
-		while(i<len1&&j<len2){
-			sortstatistics.comparisons++;sortstatistics.fieldassignments++;sortstatistics.fieldreferences+=3;
-			if(smallerthanorequalto(left[i],right[j]))
-				*valueholder=left[i++];
-			else
-				*valueholder=right[j++];
-			sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
-			valueholder++;
-		}
-		while(i<len1){
-			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
-			*valueholder=left[i++];valueholder++;
-		}
-		while(j<len2){
-			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
-			*valueholder=right[j++];valueholder++;
-		}
-	}else{
-		result=false;
-		outputError("Not enough memory to merge two ordered arrays");
-	}
-	sortstatistics.pointertests+=2;
-	if(left){sortstatistics.pointerreferences++;FREE_DISOWNED(left,len1,-'v',owner);}
-	if(right){sortstatistics.pointerreferences++;FREE_DISOWNED(right,len2,-'v',owner);}
-	return result;
 }
 static long long atimsort(Marray* const _array){
 	// bool report=amVerboseDebugging()||DEBUGGING;

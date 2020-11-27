@@ -1667,12 +1667,18 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 	}
 	return disowned_string(result,owner);
 }/* VALIDATED */
+
 // MDH@02MAR2020: utility function to output a list
 // MDH@02NOV2020: outputList() is typically used in debugging and we want it to show all elements
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _listText=owned_string(_getListText(list,LLONG_MAX,LLONG_MAX),owner);
     output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
     FREE_STRING(_listText,owner);
+}/* VALIDATED */
+void outputArray(char const * const prefix,Marray const * const array,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _arrayText=owned_string(_getArrayText(array,LLONG_MAX,LLONG_MAX),owner);
+    output("%s%s%s",(prefix?prefix:""),string(_arrayText),(suffix?suffix:""));
+    FREE_STRING(_arrayText,owner);
 }/* VALIDATED */
 
 Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquotes,bool showmissings){Mallocationowner owner=getOwner(__LINE__);
