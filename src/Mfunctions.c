@@ -764,8 +764,71 @@ Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
 }
 
 // random functions
-Mvalue* Mrand(){ // to return a random value between 0 and 1
-    return _getValueOfRational(_getRational(_getBiginteger(rand()),_getBiginteger(RAND_MAX),M_LD_NAN,false));
+static Mbiginteger *birandmax_1=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MODULE_ID,__LINE__,1};
+// NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
+const Mbiginteger* getBigintegerRandMaxPlusOne(){
+    if(!birandmax_1){
+        birandmax_1=owned_biginteger(_getBiginteger(RAND_MAX),owner_biginteger);
+        if(birandmax_1)if(mp_incr(MP_INT_POINTER(birandmax_1))!=MP_OKAY)
+        {FREE_BIGINTEGER(birandmax_1,owner_biginteger);birandmax_1=NULL;}
+    }
+    return birandmax_1;
+}/* VALIDATED */
+Mvalue* Mrand(){Mallocationowner owner=getOwner(__LINE__); // to return a random value between 0 and 1
+    Mbiginteger* _randmaxplusone=getBigintegerRandMaxPlusOne();
+    if(_randmaxplusone){
+        Mbiginteger* _num=owned_biginteger(_getBiginteger(rand()),owner);
+        if(_num){
+            Mrational* _rational=owned_rational(_getRational(_num,_randmaxplusone,M_LD_NAN,false),owner);
+            if(_rational)return _getValueOfRational(disowned_rational(_rational,owner));
+            FREE_BIGINTEGER(_num,owner); // not bound to the returned rational
+        }else
+            outputError("Failed to create the numerator of the rational random number");
+    }else
+        outputError("Failed to create the numerator of the rational random number");
+    return NULL;
+}
+static long long randominteger(long long upper){Mallocationowner owner=getOwner(__LINE__);
+    // ASSERT upper should be in (0,RAND_MAX]
+    long long r=M_LL_INVALID;
+    Mbiginteger* _randmaxplusone=getBigintegerRandMaxPlusOne(); // will remain owned so the rational will not free it
+    if(_randmaxplusone){
+        // the same as what we did in Mrand() but now multiplying the numerator with upper
+        Mbiginteger *_mult=owned_biginteger(_getBiginteger(upper),owner),*_rand=owned_biginteger(_getBiginteger(rand()),owner);
+        if(_mult&&_rand){
+            Mbiginteger* _num=owned_biginteger(__biginteger(),owner);
+            if(_num){
+                Mrational* _rational=NULL;
+                if(mp_mul(MP_INT_POINTER(_mult),MP_INT_POINTER(_rand),MP_INT_POINTER(_num))==MP_OKAY){
+                    _rational=owned_rational(_getRational(_num,_randmaxplusone,M_LD_NAN,false),owner);
+                    if(_rational){
+                        Mbiginteger* _biginteger=owned_biginteger(_rational2biginteger(_rational),owner);
+                        if(_biginteger){
+                            r=biginteger2long(_biginteger);
+                            FREE_BIGINTEGER(_biginteger,owner);
+                        }else
+                            outputError("Failed to determine the integer part of the rational random number");
+                    }
+                }
+                if(_rational)FREE_RATIONAL(_rational,owner);else FREE_BIGINTEGER(_num,owner);
+            }else
+                outputError("Failed to create the random rational numerator");
+        }
+        if(_mult)FREE_BIGINTEGER(_mult,owner);if(_rand)FREE_BIGINTEGER(_rand,owner);
+    }
+    return r;
+}
+Mvalue* Mirand(Mvalue* _upperValue){Mallocationowner owner=getOwner(__LINE__);
+    if(_upperValue){
+        if(_upperValue->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_upperValue->value._array,Mirand));
+        if(_upperValue->type==VT_LIST)return _getValueOfList(appliedToList(_upperValue->value._list,Mirand));
+        long long upper=getValueInteger(_upperValue);
+        if(upper>0&&upper<=RAND_MAX){
+            long long r=randominteger(upper);
+            if(r!=M_LL_INVALID)return _getIntegerValue(r);
+        }
+    }
+    return NULL;
 }
 // if you want a list of random values call Mrands()
 // switched to returning an array instead of a list
@@ -784,6 +847,30 @@ Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
         while(--count>=0&&appendedToList(_randList,owner,Mrand(),M_LL_INVALID)>0);
         return _getValueOfList(disowned_list(_randList,owner));
         */
+    }
+    return NULL;
+}
+Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue){Mallocationowner owner=getOwner(__LINE__);
+    long long count=getValueInteger(_countValue);
+    if(count>0){
+        long long upper=getValueInteger(_upperValue);
+        if(upper>0&&upper<=RAND_MAX){
+            Marray* _randarray=owned_array(_getArray("Mrands",count),owner);
+            if(_randarray){
+                Mvalue** valueholder=_randarray->values;
+                while(--count>=0){
+                    long long r=randominteger(upper);
+                    assignValue(valueholder,(r>=0?_getIntegerValue(r):NULL));
+                    valueholder++;
+                }
+                return _getValueOfArray(disowned_array(_randarray,owner));
+            }
+            output("%sFailed to create an array to hold %lld random integer numbers in [0,%lld).\n",M_ERROR_PREFIX,count,upper);
+        }else
+        if(upper<=0)
+            output("%s%llu should be positive",M_ERROR_PREFIX,upper);
+        else
+            output("%s%lld should not exceed %lu.",M_ERROR_PREFIX,upper,RAND_MAX);
     }
     return NULL;
 }

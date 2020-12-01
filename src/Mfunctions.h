@@ -62,5 +62,8 @@ Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue);
 
 // MDH@02MAY2020
 Mvalue* Mrand(); // to return a random value between 0 and 1
+Mvalue* Mirand(Mvalue* _upperValue); // returns a random integer in [0,_upperValue)
 Mvalue* Mrands(Mvalue* _countValue); // returns a list of _countValue random numbers
+Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue);
+
 Mvalue* Msrand(Mvalue* _seedValue);

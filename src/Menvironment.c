@@ -1998,6 +1998,9 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
     if(!completedFunction(_getFunction(_environment,owner_environment,"rand"),"rand",Mrand))return false;
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"rands"),"rands",Mrands))return false;
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"srand"),"srand",Msrand))return false;
+    // TODO can we have an completedInteger and completedIntegerInteger function here????
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"irand"),"irand",Mirand))return false;
+    if(!completedValueValueFunction(_getFunction(_environment,owner_environment,"irands"),"irands",Mirands))return false;
 
     // math functions
     if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cos"),"cos",Mcos))return false;
