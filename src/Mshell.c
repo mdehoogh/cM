@@ -9189,16 +9189,17 @@ static bool abinarymerge(Mvalue** const values,unsigned long long l,unsigned lon
 // NOTE in amerge() l, m and r are zero-based
 // NOTE amerge is used both in atimsort as in aharmonicasort
 static void outputValues(char const * const prefix,char const * const info,Mvalue const * const * const values,unsigned long long length,unsigned long long bugindex){
-	output("%s%s\n",prefix,info);
-	output("Sequence of length %llu:",length);
+	// if(prefix||info)output("%s%s",prefix,info);
+	output("Sequence of length %llu: ",length);
 	outputValue("'",*values,"'");
 	for(unsigned long long index=1;index<length;index++){
-		outputChar(',');
-		if(index>bugindex)outputChar('*');
+		output("%c",',');
+		if(index>bugindex)output("%c",'*');
 		outputValue("'",*(values+index),"'");
 	}
-	outputChar(M_NEWLINE_CHARACTER);
+	output(".\n");
 }
+// the default amerge copies the presumable original values, then uses the copy to overwrite the original with the new values
 static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
 	// bool report=amVerboseDebugging()||DEBUGGING;
 	if(report)
@@ -9230,8 +9231,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 		if(report)
 			outputValues("","Checking second sequence: ",right,len2,len2);
 		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
-		if(report)
-		{if(result)output("Sequences OK!\n");else output("Sequences not Ok!");}
+		if(!result)outputBug("Sequences are not ordered!");else if(report)output("Sequences are in correct ascending order!\n");
 		
 		i=j=0;
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
@@ -9283,6 +9283,192 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 	if(right){sortstatistics.pointerreferences++;FREE_DISOWNED(right,len2,-'v',owner);}
 	return result;
 }
+// an possible improvement on amerge() is to only create a copy of the second sequence, so that these positions become available in the merging process
+// by go backwards through the second sequence elements we can accomplish to move every value in the first sequence at most once (as intended)
+static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
+	// bool report=amVerboseDebugging()||DEBUGGING;
+	if(report)
+		output("Insert merging ordered arrays of indices [%llu,%llu] and [%llu,%llu].\n",l,m,m+1,r);
+	if(l>m||m>=r)return true; // if either list is empty return true
+	bool result=false;
+	unsigned long long len1=m-l+1,len2=r-m; // OOPS adding +1; (as I did previously) would definitely be wrong!!!!
+	// allocate memory to store all value pointers so we can overwrite the originals
+	// TODO can we do this without actually having to do this??????
+	sortstatistics.pointerassignments++;
+	Mvalue **right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
+	if(right){
+		result=true;
+		// copy the pointers over
+		sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
+		if(report)
+		{
+			output("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
+			outputValue("\ti.e. [",*(values+l),",");outputValue(NULL,*(values+m),"] and ");
+			outputValue("[",*(values+m+1),",");outputValue(NULL,*(values+r),"].\n");
+		}
+		// check
+		if(report)
+			outputValues("","Checking first sequence: ",values+l,len1,len1);
+		// the first sequence starts at values+l
+		unsigned long long i=0,j=0;
+		while(++i<len1)if(smallerthan(values[l+i],values[l+i-1])==M_TRUE){outputValues(M_BUG_PREFIX,"First sequence is not ordered: ",values+l,len1,i-1);result=false;break;}
+		if(report)
+			outputValues("","Checking second sequence: ",right,len2,len2);
+		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
+		if(!result)outputBug("Sequences are not ordered!");else if(report)output("Sequences are in correct ascending order!\n");
+		
+		// NOTE programmatically a much more elegant merge than amerge()
+		long long smaller; // the last position (index) where the previous element was inserted
+		unsigned long long tomergeinto=len1,toinsert=len2; // keep track of amount to insert
+		Mvalue **smallerValueholder,**toinsertValueholder=right+toinsert;
+		// what we need to do is insert len2 elements from the second sequence from end to beginning into the first sequence
+		do{
+			toinsertValueholder--; // go to the next value to insert
+			if(report)
+			{output("Value #%llu to insert: ",toinsert);outputValue("'",*toinsertValueholder,"'");}
+			// the smallest value of the insert position will be zero!!!
+			smaller=tomergeinto;
+			smallerValueholder=values+l+smaller; // one above the first element to compare against
+			// keep going back until we find a smaller predecessor or we've investigated the first value
+			// NOTE smaller may become -1 when all remaining (len1) elements in the first sequence are larger
+			while(--smaller>=0){
+				sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+				smallerValueholder--;
+				sortstatistics.comparisons++;sortstatistics.fieldreferences+=2;
+				if(smallerthanorequalto(*smallerValueholder,*toinsertValueholder)==M_TRUE)break; // equal to to maintain the original order if possible
+			}
+			if(report)
+			{
+				if(smaller>=0){output("Smaller value #%llu:",smaller+1);outputValue("'",*smallerValueholder,"'.\n");}else output("No smaller value found!\n");
+			}
+			// move all elements one larger than smallerValueholder
+			sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
+			if(smaller>=0){smallerValueholder++;smaller++;}else smaller=0; // now pointing to the first element to move
+			// NOTE the first time toinsert will equal len2 and that is exactly the number of positions we will need to move up the elements
+			sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;
+			memmove(smallerValueholder+toinsert,smallerValueholder,sizeof(Mvalue*)*(tomergeinto-smaller));
+			toinsert--; // one less to insert
+			// prepend the toinsert value to what we've just moved up
+			sortstatistics.fieldassignments++;sortstatistics.fieldreferences+=3; // TODO is this correct???
+			*(smallerValueholder+toinsert)=*toinsertValueholder;
+			tomergeinto=smaller; // what we have left in the first sequence, yes could be zero!
+			if(report)
+			{
+				outputValues("Left to insert",": ",right,toinsert,toinsert);
+				outputValues("into",": ",values,tomergeinto,tomergeinto);
+			}
+			if(report)
+				outputValues("Merge result so far",": ",values,len1+len2,len1);
+			// the last len2 to process would be zero, so when len2 is zero we stop
+		}while(toinsert>0);
+		// and we can get rid of right
+		sortstatistics.pointerreferences++;
+		FREE_DISOWNED(right,len2,-'v',owner);
+	}
+	return result;
+}
+// MDH@02DEC2020: we may further limit the number of comparisons by using a binary search when looking for the first smaller value
+static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
+	// bool report=amVerboseDebugging()||DEBUGGING;
+	// report=true;
+	if(report)
+		output("Binary insert merging ordered arrays of indices [%llu,%llu] and [%llu,%llu].\n",l,m,m+1,r);
+	if(l>m||m>=r)return true; // if either list is empty return true
+	bool result=false;
+	unsigned long long len1=m-l+1,len2=r-m; // OOPS adding +1; (as I did previously) would definitely be wrong!!!!
+	// allocate memory to store all value pointers so we can overwrite the originals
+	// TODO can we do this without actually having to do this??????
+	sortstatistics.pointerassignments++;
+	Mvalue **right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
+	if(right){
+		result=true;
+		// copy the pointers over
+		sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
+		if(report)
+		{
+			output("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
+			outputValue("\ti.e. [",*(values+l),",");outputValue(NULL,*(values+m),"] and ");
+			outputValue("[",*(values+m+1),",");outputValue(NULL,*(values+r),"].\n");
+		}
+		// check
+		if(report)
+			outputValues("","Checking first sequence: ",values+l,len1,len1);
+		// the first sequence starts at values+l
+		unsigned long long i=0,j=0;
+		while(++i<len1)if(smallerthan(values[l+i],values[l+i-1])==M_TRUE){outputValues(M_BUG_PREFIX,"First sequence is not ordered: ",values+l,len1,i-1);result=false;break;}
+		if(report)
+			outputValues("","Checking second sequence: ",right,len2,len2);
+		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
+		if(!result)outputBug("Sequences are not ordered!");else if(report)output("Sequences are in correct ascending order!\n");
+		
+		// NOTE programmatically a much more elegant merge than amerge()
+		long long smaller; // the last position (index) where the previous element was inserted
+		unsigned long long tomergeinto=len1,toinsert=len2; // keep track of amount to insert
+		unsigned long long middle,upper;
+		Mvalue **smallerValueholder,**toinsertValueholder=right+toinsert;
+		// what we need to do is insert len2 elements from the second sequence from end to beginning into the first sequence
+		do{
+			toinsertValueholder--; // go to the next value to insert
+			if(report)
+			{output("Value #%llu to insert: ",toinsert);outputValue("'",*toinsertValueholder,"'");}
+			
+			// here's the part where we use a binary search instead of a linear search (backwards) in a quest to determine `smaller` which can range from -1 through tomergeinto-1
+			// NOTE immediately determining the value of smaller+1 so it will range from [0,tomergeinto] afterwards
+			if(tomergeinto>0){ // values to compare to
+				// is the last value smaller than or equal to? if so it is the smaller value
+				sortstatistics.comparisons++;
+				if(largerthanorequalto(*toinsertValueholder,*(values+l+tomergeinto-1))!=M_TRUE){ // the value to insert is NOT larger than or equal to the last sequence value
+					sortstatistics.comparisons++;
+					if(smallerthan(*toinsertValueholder,*(values+l))!=M_TRUE){ // the value to insert is NOT smaller than the first sequence value
+						smaller=0;
+						upper=tomergeinto-1;
+						while(smaller+1!=upper){ // there's still something in between (i.e. at least two values)
+							middle=(smaller+upper)>>1;
+							sortstatistics.comparisons++;
+							if(smallerthan(*toinsertValueholder,*(values+l+middle))==M_TRUE)
+								upper=middle;
+							else
+								smaller=middle;
+						}
+						smaller++;
+					}else
+						smaller=0;
+				}else
+					smaller=tomergeinto;
+			}else
+				smaller=0;
+			smallerValueholder=values+l+smaller;
+
+			if(report)
+			{
+				output("First value not smaller #%llu:",smaller+1);outputValue("'",*smallerValueholder,"'.\n");
+			}
+
+			// move all elements one larger than smallerValueholder
+			// NOTE the first time toinsert will equal len2 and that is exactly the number of positions we will need to move up the elements
+			sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;
+			memmove(smallerValueholder+toinsert,smallerValueholder,sizeof(Mvalue*)*(tomergeinto-smaller));
+			toinsert--; // one less to insert
+			// prepend the toinsert value to what we've just moved up
+			sortstatistics.fieldassignments++;sortstatistics.fieldreferences+=3; // TODO is this correct???
+			*(smallerValueholder+toinsert)=*toinsertValueholder;
+			tomergeinto=smaller; // what we have left in the first sequence, yes could be zero!
+			if(report)
+			{
+				outputValues("Left to insert",": ",right,toinsert,toinsert);
+				outputValues("into",": ",values,tomergeinto,tomergeinto);
+			}
+			if(report)
+				outputValues("Merge result so far",": ",values,len1+len2,len1);
+			// the last len2 to process would be zero, so when len2 is zero we stop
+		}while(toinsert>0);
+		// and we can get rid of right
+		sortstatistics.pointerreferences++;
+		FREE_DISOWNED(right,len2,-'v',owner);
+	}
+	return result;
+}
+
 // MDH@04NOV2020: due to the problem with the index values (which we need to keep in ascending order)
 //                it's easier to simply merge in all second sequence values into the first sequence values
 // MDH@05NOV2020: lmerge does not need to keep the index values ascending so it can safely
@@ -9479,9 +9665,11 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 		if(afterlast)outputValue("': '",afterlast->_value,"'.\n");else output(" nothing!");
 	}
 }
+// we'd like to pass the merge function to use depending
+typedef bool (*ArrayMergeFunction)(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report);
 
 // lharmonicasort is the original harmonicasort which is quite slow
-static long long aharmonicasort(Marray* _array){Mallocationowner owner=getOwner(__LINE__);
+static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunction){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	if(!_array)return M_LL_INVALID;
 	unsigned long long arraylength=_array->numberOfElements;
@@ -9529,7 +9717,7 @@ static long long aharmonicasort(Marray* _array){Mallocationowner owner=getOwner(
 						if(report)
 							outputValue("Up run maximum: '",*previous,"'.\n");
 						sortstatistics.pointertests++;
-						if(largest>=0&&!amerge(values,0,largest,arrayindex,report)){outputError("Failed to merge an up run!");return M_FALSE;}
+						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge an up run!");return M_FALSE;}
 						largest=arrayindex;
 						rundirection=-1;
 						if(report)
@@ -9549,7 +9737,7 @@ static long long aharmonicasort(Marray* _array){Mallocationowner owner=getOwner(
 						if(report)
 							output("Down run reversed!\n");
 						// we only need to merge if largest>=0
-						if(largest>=0&&!amerge(values,0,largest,arrayindex,report)){outputError("Failed to merge an up run!");return M_FALSE;}
+						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge an up run!");return M_FALSE;}
 						largest=arrayindex;
 						rundirection=1;
 						if(report)
@@ -9566,7 +9754,7 @@ static long long aharmonicasort(Marray* _array){Mallocationowner owner=getOwner(
 			// take care of the last run
 			if(rundirection>0){ // end of an up run
 				// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
-				if(largest>=0&&!amerge(values,0,largest,arrayindex,report)){outputError("Failed to merge the final up run!");return M_FALSE;}
+				if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge the final up run!");return M_FALSE;}
 				/*
 				if(report)
 				{_array->numberOfElements=arrayindex+1;outputArray("The array after merging the final up run: '",_array,"'.\n");}
@@ -9578,7 +9766,7 @@ static long long aharmonicasort(Marray* _array){Mallocationowner owner=getOwner(
 				areverse(values,largest+1,arrayindex,report);
 				if(report)
 					output("Final down run reversed!\n");
-				if(largest>=0&&!amerge(values,0,largest,arrayindex,report)){outputError("Failed to merge the final down run!");return M_FALSE;}
+				if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge the final down run!");return M_FALSE;}
 				/*
 				if(report)
 				{_array->numberOfElements=arrayindex+1;outputArray("The array after merging the final down run: '",_array,"'.\n");}
@@ -10541,7 +10729,7 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 		}
 	}
 }
-static long long atimsort(Marray* const _array){
+static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunction){
 	bool report=amVerboseDebugging()||DEBUGGING;
 	sortstatistics.pointertests++;
 	if(!_array)return M_LL_INVALID;
@@ -10557,7 +10745,7 @@ static long long atimsort(Marray* const _array){
 		// merge all pairs of successive runs
 		for(unsigned long long size=M_RUN_LENGTH;size<arraylength;size<<=1)
 			for(unsigned long long left=0;left<arraylength;left+=(size<<1))
-				if(!amerge(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1,report))
+				if(!arrayMergeFunction(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1,report))
 					return M_FALSE;
 	}
 	return M_TRUE;
@@ -10833,7 +11021,8 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 	long long result=M_LL_INVALID;
 	// we've got merge, tim and quick sort, below you can see what the default is
-	char sortMethod='\0';if(_sortMethodValue&&_sortMethodValue->type==VT_TEXT)sortMethod=_sortMethodValue->value._text->_c[0];
+	char sortMethodVariant='\0',sortMethod='\0';
+	if(_sortMethodValue&&_sortMethodValue->type==VT_TEXT){sortMethod=_sortMethodValue->value._text->_c[0];if(sortMethod)sortMethodVariant=_sortMethodValue->value._text->_c[1];}
 	// can either sort a list or the list elements in a map
 	if(_tosortValue){
 		if(_tosortValue->type==VT_MAP){
@@ -10854,9 +11043,9 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 			sortstatistics=(struct Msortstatistics){}; // this should work
 			switch(sortMethod){
 				case 'b': // "biden" sort
-				case 'h':result=(_sortMethodValue->value._text->_c[1]?lharmonicabinarysort(_tosortValue->value._list,atoll(_sortMethodValue->value._text->_c+1)):lharmonicasort(_tosortValue->value._list));break;
-				case 'm':result=lmergesort(_tosortValue->value._list);break;
+				case 'h':result=(sortMethodVariant?lharmonicabinarysort(_tosortValue->value._list,atoll(_sortMethodValue->value._text->_c+1)):lharmonicasort(_tosortValue->value._list));break;
 				case 't':result=ltimsort(_tosortValue->value._list);break;
+				// case 'm':result=lmergesort(_tosortValue->value._list);break;
 				default:result=lquicksort(_tosortValue->value._list);break;
 			}
 			output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
@@ -10867,9 +11056,9 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 			sortstatistics=(struct Msortstatistics){}; // this should work
 			switch(sortMethod){
 				case 'b': // "biden" sort
-				case 'h':result=(_sortMethodValue->value._text->_c[1]?aharmonicabinarysort(_tosortValue->value._array,atoll(_sortMethodValue->value._text->_c+1)):aharmonicasort(_tosortValue->value._array));break;
-				case 'm':result=amergesort(_tosortValue->value._array);break;
-				case 't':result=atimsort(_tosortValue->value._array);break;
+				case 'h':result=aharmonicasort(_tosortValue->value._array,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
+				case 't':result=atimsort(_tosortValue->value._array,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
+				// case 'm':result=amergesort(_tosortValue->value._array);break;
 				default:result=aquicksort(_tosortValue->value._array);break;
 			}
 			output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
@@ -10905,54 +11094,55 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 				outputError("");outputValue("Failed to sort '",mapelement->_variable->_value,"'.\n");
 			}else
 				sortedValue=_getValueOfMap(disowned_map(_tosortMap,owner));
-		}else
-		if(_tosortValue->type==VT_LIST){
-			Mlist* _tosortList=owned_list(_getListCopy(_tosortValue->value._list),owner);
-			if(_tosortList){
-				char sortMethod=(_sortMethodValue&&_sortMethodValue->type==VT_TEXT?_sortMethodValue->value._text->_c[0]:'\0');
-				sortstatistics=(struct Msortstatistics){};
-				long long sortResult=M_LL_INVALID;
-				switch(sortMethod){
-					case 'b': // "biden" sort
-					case 'h':sortResult=(_sortMethodValue->value._text->_c[1]?lharmonicabinarysort(_tosortList,atoll(_sortMethodValue->value._text->_c+1)):lharmonicasort(_tosortList));break;
-					case 't':sortResult=ltimsort(_tosortList);break;
-					case 'm':sortResult=lmergesort(_tosortList);break;
-					default:sortResult=lquicksort(_tosortList);break;
-				}
-				if(sortResult>0){ // _tosortList was successfully sorted
-					output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
-							,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
-							,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
-					sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
+		}else{
+			char sortMethodVariant='\0',sortMethod='\0';
+			if(_sortMethodValue&&_sortMethodValue->type==VT_TEXT){sortMethod=_sortMethodValue->value._text->_c[0];if(sortMethod)sortMethodVariant=_sortMethodValue->value._text->_c[1];}
+			if(_tosortValue->type==VT_LIST){
+				Mlist* _tosortList=owned_list(_getListCopy(_tosortValue->value._list),owner);
+				if(_tosortList){
+					sortstatistics=(struct Msortstatistics){};
+					long long sortResult=M_LL_INVALID;
+					switch(sortMethod){
+						case 'b': // "biden" sort
+						case 'h':sortResult=(sortMethodVariant?lharmonicabinarysort(_tosortList,atoll(_sortMethodValue->value._text->_c+1)):lharmonicasort(_tosortList));break;
+						case 't':sortResult=ltimsort(_tosortList);break;
+						// case 'm':sortResult=lmergesort(_tosortList);break;
+						default:sortResult=lquicksort(_tosortList);break;
+					}
+					if(sortResult>0){ // _tosortList was successfully sorted
+						output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
+								,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
+								,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+						sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
+					}else
+						FREE_LIST(_tosortList,owner);
+					// output("List sort result: %lld.\n",sortResult); // DEBUG
 				}else
-					FREE_LIST(_tosortList,owner);
-				// output("List sort result: %lld.\n",sortResult); // DEBUG
+					outputError("Failed to create a copy of the list to sort");
 			}else
-				outputError("Failed to create a copy of the list to sort");
-		}else
-		if(_tosortValue->type==VT_ARRAY){
-			Marray* _tosortArray=owned_array(_getArrayCopy(_tosortValue->value._array),owner);
-			if(_tosortArray){
-				char sortMethod=(_sortMethodValue&&_sortMethodValue->type==VT_TEXT?_sortMethodValue->value._text->_c[0]:'\0');
-				sortstatistics=(struct Msortstatistics){};
-				long long sortResult=M_LL_INVALID;
-				switch(sortMethod){
-					case 'b': // "biden" sort
-					case 'h':sortResult=(_sortMethodValue->value._text->_c[1]?aharmonicabinarysort(_tosortArray,atoll(_sortMethodValue->value._text->_c+1)):aharmonicasort(_tosortArray));break;
-					case 't':sortResult=atimsort(_tosortArray);break;
-					case 'm':sortResult=amergesort(_tosortArray);break;
-					default:sortResult=aquicksort(_tosortArray);break;
-				}
-				if(sortResult>0){ // _tosortList was successfully sorted
-					output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
-							,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
-							,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
-					sortedValue=_getValueOfArray(disowned_array(_tosortArray,owner)); // NOTE will automatically
+			if(_tosortValue->type==VT_ARRAY){
+				Marray* _tosortArray=owned_array(_getArrayCopy(_tosortValue->value._array),owner);
+				if(_tosortArray){
+					sortstatistics=(struct Msortstatistics){};
+					long long sortResult=M_LL_INVALID;
+					switch(sortMethod){
+						case 'b': // "biden" sort
+						case 'h':sortResult=aharmonicasort(_tosortArray,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
+						case 't':sortResult=atimsort(_tosortArray,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
+						// case 'm':sortResult=amergesort(_tosortArray);break;
+						default:sortResult=aquicksort(_tosortArray);break;
+					}
+					if(sortResult>0){ // _tosortList was successfully sorted
+						output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
+								,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
+								,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+						sortedValue=_getValueOfArray(disowned_array(_tosortArray,owner)); // NOTE will automatically
+					}else
+						FREE_ARRAY(_tosortArray,owner);
+					// output("List sort result: %lld.\n",sortResult); // DEBUG
 				}else
-					FREE_ARRAY(_tosortArray,owner);
-				// output("List sort result: %lld.\n",sortResult); // DEBUG
-			}else
-				outputError("Failed to create a copy of the array to sort");
+					outputError("Failed to create a copy of the array to sort");
+			}
 		}
 	}
 	// if(sortedValue)output("Sort done with value '%p' wrapping list '%p'!\n",sortedValue,sortedValue->value._list); // DEBUG
