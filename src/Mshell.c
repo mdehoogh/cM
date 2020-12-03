@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "Mshell.h"
 
@@ -8880,6 +8881,7 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 
 // SORTING STUFF
 struct Msortstatistics{
+	unsigned long long memoryallocation;
 	unsigned long long comparisons;
 	unsigned long long pointerassignments;
 	unsigned long long fieldassignments; // any reference to a field pointed to by a pointer whether in a comparison or assigment (left or right-hand side)
@@ -8889,7 +8891,12 @@ struct Msortstatistics{
 	unsigned long long fieldtests;
 };
 static struct Msortstatistics sortstatistics;
-
+static void outputSortStatistics(){
+	output("Sort statistics: value comparisons=%llu | memory allocation=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu - references=%llu - tests=%llu.\n"
+			,sortstatistics.comparisons,sortstatistics.memoryallocation
+			,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
+			,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+}
 static void aswap(Mvalue** const values,long long index1,long long index2){
 	// normally we would not be allowed to do it this way, but the reference count
 	// of both values remains the same when we exchange their position in the list
@@ -8930,6 +8937,8 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
 	if(_array){
+		result=M_TRUE;
+		clock_t sortstart=clock();
 		sortstatistics.fieldreferences++;
 		unsigned long long arraylength=_array->numberOfElements;
 		if(arraylength>1){ // things to compare
@@ -8938,6 +8947,7 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 				unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(arraylength)));
 				long long* stack=MALLOC(sizeof(long long),maxtop=initialmaxtop,-'u',owner);
 				if(stack){
+					sortstatistics.memoryallocation+=(sizeof(long long)*maxtop);
 					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
 					stack[0]=0; // i.e. the first index, which is 0 (l=lmin1+1)
@@ -8962,9 +8972,11 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 									output("Expanding the stack.\n");
 								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
 								if(!stack){
+									result=M_FALSE;
 									output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
 									break;
 								}
+								sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
 								maxtop+=initialmaxtop;
 								if(report)
 									output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
@@ -8980,9 +8992,11 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 									output("Expanding the stack.\n");
 								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
 								if(!stack){
+									result=M_FALSE;
 									output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
 									break;
 								}
+								sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
 								maxtop+=initialmaxtop;
 								if(report)
 									output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
@@ -8998,10 +9012,13 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 					FREE_DISOWNED(stack,maxtop,-'u',owner);
 					if(report)
 						output("Quicksort stack freed.\n");
-				}else
-					outputError("Not enough memory to sort the array with quicksort");
+				}else{
+					result=M_FALSE;
+					outputError("Not enough memory for the stack to sort the array with quicksort");
+				}
 		}
-		result=M_TRUE;
+		if(result>0)
+			output("Duration of array sorting by quicksort: %.3f ms.\n",(clock()-sortstart)/1000.0);
 	}
 	return result;
 }
@@ -9089,6 +9106,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 				unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(_list->numberOfElements)));
 				Mlistelement** stack=MALLOC(sizeof(Mlistelement*),maxtop=initialmaxtop,-'l',owner);
 				if(stack){
+					sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*maxtop);
 					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
 					stack[0]=NULL; // i.e. the first lmin1
@@ -9116,6 +9134,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 									if(report)output("Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
 									if(!stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
+									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);
 									maxtop+=initialmaxtop;
 									if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 								}
@@ -9136,6 +9155,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 									if(report)output("Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
 									if(!stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
+									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);									
 									maxtop+=initialmaxtop;
 									if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 								}
@@ -9158,7 +9178,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 	}
 	return result;
 }
-
+/*
 static long long amergesort(Marray* _array){
 	long long result=M_LL_INVALID;
 	if(_array){
@@ -9173,7 +9193,7 @@ static long long lmergesort(Mlist* _list){
 	}
 	return result;
 }
-
+*/
 // Mindexrange and lmerge() used in both harmonicasort and timsort
 typedef struct Mindexrange{
 	unsigned long long first,last;
@@ -9211,6 +9231,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 	// TODO can we do this without actually having to do this??????
 	sortstatistics.pointerassignments+=2;
 	Mvalue **left=MALLOC(sizeof(Mvalue*),len1,-'v',owner),**right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
+	if(left)sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len1);if(right)sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len2);
 	if(left&&right){
 		// ASSERT both left and right (if needed) defined
 		result=true;
@@ -9297,6 +9318,7 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 	sortstatistics.pointerassignments++;
 	Mvalue **right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
 	if(right){
+		sortstatistics.memoryallocation+=sizeof(Mvalue*)*len2;
 		result=true;
 		// copy the pointers over
 		sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
@@ -9381,6 +9403,7 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 	sortstatistics.pointerassignments++;
 	Mvalue **right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
 	if(right){
+		sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len2);
 		result=true;
 		// copy the pointers over
 		sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
@@ -9671,117 +9694,141 @@ typedef bool (*ArrayMergeFunction)(Mvalue** const values,unsigned long long l,un
 // lharmonicasort is the original harmonicasort which is quite slow
 static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunction){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
-	if(!_array)return M_LL_INVALID;
-	unsigned long long arraylength=_array->numberOfElements;
-	if(arraylength>1){ // at least two elements
-		Mvalue** values=_array->values; // address of the first Mvalue pointer
-		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-		Mvalue** current=values; // initialize current to the address of first Mvalue pointer
-		// skip all equal values so we can set the rundirection to either -1 or 1
-		// obviously all elements could be equal
-		unsigned long long arrayindex=0; // effectively counting the number of equal elements
-		do{
-			sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
-			arrayindex++;
-			current++; // increment current
-			sortstatistics.comparisons++;sortstatistics.pointerreferences+=2;
-			if(equalto(*values,*current)!=M_TRUE)break; // if not equal break
-		}while(arrayindex<arraylength);
-		// ASSERT current is the first unequal element (which is values+arrayindex)
-		
-		if(arrayindex<arraylength){ // not all array elements are equal!!!
+	bool result=M_LL_INVALID;
+	if(_array){
+		result=M_TRUE;
+		clock_t sortstart=clock();
+		unsigned long long arraylength=_array->numberOfElements;
+		if(arraylength>1){ // at least two elements
+			Mvalue** values=_array->values; // address of the first Mvalue pointer
+			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
+			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
+			Mvalue** current=values; // initialize current to the address of first Mvalue pointer
+			// skip all equal values so we can set the rundirection to either -1 or 1
+			// obviously all elements could be equal
+			unsigned long long arrayindex=0; // effectively counting the number of equal elements
+			do{
+				sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
+				arrayindex++;
+				current++; // increment current
+				sortstatistics.comparisons++;sortstatistics.pointerreferences+=2;
+				if(equalto(*values,*current)!=M_TRUE)break; // if not equal break
+			}while(arrayindex<arraylength);
+			// ASSERT current is the first unequal element (which is values+arrayindex)
 			
-			// we're either going up or down
-			sortstatistics.pointerreferences+=2;sortstatistics.comparisons++; // the comparison below
-			int rundirection=(largerthan(*current,*values)==M_TRUE?1:-1);
-			
-			// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
-			// original code from Mrunpoints() below
-			long long largest=-1;
-			Mvalue** previous;
-			sortstatistics.pointerassignments+=2;
-			// MDH@01DEC2020: deciding to always also merge the end of the down/up run, therefore there's never an empty run!!! removing: bool emptyrun;
-			// if we lower arraylength by 1, we do not need to increment arrayindex at the start
-			arraylength--;
-			while(arrayindex<arraylength){
-				previous=current++; // we can update previous and current in one go, after which arrayindex points at previous!!!!
-				sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;
-				if(report)
-				{outputValue("Comparing '",*current,"'");outputValue(" with '",*previous,"'.\n");}
+			if(arrayindex<arraylength){ // not all array elements are equal!!!
+				
+				// we're either going up or down
+				sortstatistics.pointerreferences+=2;sortstatistics.comparisons++; // the comparison below
+				int rundirection=(largerthan(*current,*values)==M_TRUE?1:-1);
+				
+				// we'll be detecting the natural 'runs' and whenever the direction changes we will get the stuff behind it sorted
+				// original code from Mrunpoints() below
+				long long largest=-1;
+				Mvalue** previous;
+				sortstatistics.pointerassignments+=2;
+				// MDH@01DEC2020: deciding to always also merge the end of the down/up run, therefore there's never an empty run!!! removing: bool emptyrun;
+				// if we lower arraylength by 1, we do not need to increment arrayindex at the start
+				arraylength--;
+				while(arrayindex<arraylength){
+					previous=current++; // we can update previous and current in one go, after which arrayindex points at previous!!!!
+					sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;
+					if(report)
+					{outputValue("Comparing '",*current,"'");outputValue(" with '",*previous,"'.\n");}
 
-				if(rundirection>0){ // in an up run
-					sortstatistics.pointerreferences+=2;sortstatistics.comparisons++;
-					if(smallerthan(*current,*previous)==M_TRUE){ // end of up run reached
-						// we know that we need to merge the ended up run with the main up run (if any)
-						if(report)
-							outputValue("Up run maximum: '",*previous,"'.\n");
-						sortstatistics.pointertests++;
-						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge an up run!");return M_FALSE;}
-						largest=arrayindex;
-						rundirection=-1;
-						if(report)
-						{outputValue("Extremes after merging up run: minimum='",*values,"'");outputValue(" - maximum='",*(values+largest),"'.\n");}
+					if(rundirection>0){ // in an up run
+						sortstatistics.pointerreferences+=2;sortstatistics.comparisons++;
+						if(smallerthan(*current,*previous)==M_TRUE){ // end of up run reached
+							// we know that we need to merge the ended up run with the main up run (if any)
+							if(report)
+								outputValue("Up run maximum: '",*previous,"'.\n");
+							sortstatistics.pointertests++;
+							if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
+								result=M_FALSE;
+								outputError("Failed to merge an up run!");
+								break;
+							}
+							largest=arrayindex;
+							rundirection=-1;
+							if(report)
+							{outputValue("Extremes after merging up run: minimum='",*values,"'");outputValue(" - maximum='",*(values+largest),"'.\n");}
+							/*
+							if(report)
+							{_array->numberOfElements=arrayindex+1;outputArray("The part of the array after merging an up run: '",_array,"'.\n");}
+							*/
+						}
+					}else{ // in a down run
+						if(largerthan(*current,*previous)==M_TRUE){ // // end of down run reached
+							if(report)
+								outputValue("Down run minimum: '",*previous,"'.\n");
+							// we always need to reverse the ended down run (even if there's no main up run!!!)
+							sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+							areverse(values,largest+1,arrayindex,report);
+							if(report)
+								output("Down run reversed!\n");
+							// we only need to merge if largest>=0
+							if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
+								result=M_FALSE;
+								outputError("Failed to merge an up run!");
+								break;
+							}
+							largest=arrayindex;
+							rundirection=1;
+							if(report)
+							{outputValue("Extremes after merging down run: minimum='",*values,"'");outputValue(" - maximum='",*(values+largest),"'.\n");}
+							/*
+							if(report)
+							{_array->numberOfElements=arrayindex+1;outputArray("The part of the array after reversing the down run: '",_array,"'.\n");}
+							*/
+						}
+					}
+					arrayindex++;
+				}
+				// ASSERT arrayindex is equal to the index of the last element (currently arraylength)
+				// take care of the last run
+				if(result==M_TRUE){
+					if(rundirection>0){ // end of an up run
+						// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
+						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
+							result=M_FALSE;
+							outputError("Failed to merge the final up run!");
+						}
 						/*
 						if(report)
-						{_array->numberOfElements=arrayindex+1;outputArray("The part of the array after merging an up run: '",_array,"'.\n");}
+						{_array->numberOfElements=arrayindex+1;outputArray("The array after merging the final up run: '",_array,"'.\n");}
 						*/
-					}
-				}else{ // in a down run
-					if(largerthan(*current,*previous)==M_TRUE){ // // end of down run reached
-						if(report)
-							outputValue("Down run minimum: '",*previous,"'.\n");
-						// we always need to reverse the ended down run (even if there's no main up run!!!)
+					}else
+					if(rundirection<0){ // end of the down run
 						sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+						// if we reverse from largest+1 instead of largest we can merge [0,largest] with [largest+1,arrayindex]
 						areverse(values,largest+1,arrayindex,report);
 						if(report)
-							output("Down run reversed!\n");
-						// we only need to merge if largest>=0
-						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge an up run!");return M_FALSE;}
-						largest=arrayindex;
-						rundirection=1;
-						if(report)
-						{outputValue("Extremes after merging down run: minimum='",*values,"'");outputValue(" - maximum='",*(values+largest),"'.\n");}
+							output("Final down run reversed!\n");
+						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
+							result=M_FALSE;
+							outputError("Failed to merge the final down run!");
+						}
 						/*
 						if(report)
-						{_array->numberOfElements=arrayindex+1;outputArray("The part of the array after reversing the down run: '",_array,"'.\n");}
+						{_array->numberOfElements=arrayindex+1;outputArray("The array after merging the final down run: '",_array,"'.\n");}
 						*/
 					}
+					_array->numberOfElements=++arraylength; // in case we changed it (for display purposes)
 				}
-				arrayindex++;
 			}
-			// ASSERT arrayindex is equal to the index of the last element (currently arraylength)
-			// take care of the last run
-			if(rundirection>0){ // end of an up run
-				// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
-				if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge the final up run!");return M_FALSE;}
-				/*
-				if(report)
-				{_array->numberOfElements=arrayindex+1;outputArray("The array after merging the final up run: '",_array,"'.\n");}
-				*/
-			}else
-			if(rundirection<0){ // end of the down run
-				sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-				// if we reverse from largest+1 instead of largest we can merge [0,largest] with [largest+1,arrayindex]
-				areverse(values,largest+1,arrayindex,report);
-				if(report)
-					output("Final down run reversed!\n");
-				if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){outputError("Failed to merge the final down run!");return M_FALSE;}
-				/*
-				if(report)
-				{_array->numberOfElements=arrayindex+1;outputArray("The array after merging the final down run: '",_array,"'.\n");}
-				*/
-			}
-			_array->numberOfElements=++arraylength; // in case we changed it (for display purposes)
+		}
+		if(result==M_TRUE){
+			clock_t duration=clock()-sortstart;
 			if(report)
 			{
 				outputArray("The sorted array: '",_array,"'.\n");
 				outputValue("First: '",*_array->values,"'.\n");
 				outputValue("Last: '",*(_array->values+_array->numberOfElements-1),"'.\n");
 			}
+			output("Duration of array sorting by harmonicasort: %.3f ms.\n",duration/1000.0);
 		}
 	}
-	return M_TRUE;
+	return result;
 }
 static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
@@ -10023,14 +10070,6 @@ static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long
 	return listelements[firstindex];
 }
 // MDH@11NOV2020: the stack multiplier tells us how many times the stack size is to be multiplied with
-static long long aharmonicabinarysort(Marray* const _array,long long stackmultiplier){
-Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
-	long long result=(_array?M_TRUE:M_LL_INVALID);
-	if(result==M_TRUE){
-	}
-	return result;
-}
 static long long lharmonicabinarysort(Mlist* const _list,long long stackmultiplier){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=(_list?M_TRUE:M_LL_INVALID);
@@ -10731,24 +10770,32 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 }
 static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunction){
 	bool report=amVerboseDebugging()||DEBUGGING;
+	bool result=M_LL_INVALID;
 	sortstatistics.pointertests++;
-	if(!_array)return M_LL_INVALID;
-	sortstatistics.fieldreferences++;
-	unsigned long long arraylength=_array->numberOfElements;
-	if(arraylength>1){
-		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-		Mvalue** values=_array->values;
-		// sort the (fixed-size) runs with insertion sort
-		// NOTE ainsertionsort expects indices one up the actual index
-		for(unsigned long long runfirst=0;runfirst<arraylength;runfirst+=M_RUN_LENGTH)
-			ainsertionsort(values,runfirst+1,MIN(runfirst+M_RUN_LENGTH,arraylength));
-		// merge all pairs of successive runs
-		for(unsigned long long size=M_RUN_LENGTH;size<arraylength;size<<=1)
-			for(unsigned long long left=0;left<arraylength;left+=(size<<1))
-				if(!arrayMergeFunction(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1,report))
-					return M_FALSE;
+	if(_array){
+		result=M_TRUE;
+		clock_t sortstart=clock();
+		sortstatistics.fieldreferences++;
+		unsigned long long arraylength=_array->numberOfElements;
+		if(arraylength>1){
+			clock_t sortstart=clock();
+			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
+			Mvalue** values=_array->values;
+			// sort the (fixed-size) runs with insertion sort
+			// NOTE ainsertionsort expects indices one up the actual index
+			for(unsigned long long runfirst=0;runfirst<arraylength;runfirst+=M_RUN_LENGTH)
+				ainsertionsort(values,runfirst+1,MIN(runfirst+M_RUN_LENGTH,arraylength));
+			// merge all pairs of successive runs
+			for(unsigned long long size=M_RUN_LENGTH;size<arraylength;size<<=1)
+				for(unsigned long long left=0;left<arraylength;left+=(size<<1))
+					if(!arrayMergeFunction(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1,report)){
+						outputError("Failed to merge two array parts in timsort");
+						return M_FALSE;
+					}
+		}
+		output("Duration of array sorting by timsort: %.3f ms.\n",(clock()-sortstart)/1000.0);
 	}
-	return M_TRUE;
+	return result;
 }
 // linsertinginsertionSort works the same way linsertionSort does, except that it rearranges the list elements instead of moving the values
 // and it returns the new last (if any)
@@ -11019,6 +11066,7 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 }
 // Msort is the generic entry point for sorting lists
 Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
+	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
 	// we've got merge, tim and quick sort, below you can see what the default is
 	char sortMethodVariant='\0',sortMethod='\0';
@@ -11048,9 +11096,7 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 				// case 'm':result=lmergesort(_tosortValue->value._list);break;
 				default:result=lquicksort(_tosortValue->value._list);break;
 			}
-			output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
-					,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
-					,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+			outputSortStatistics();
 		}else
 		if(_tosortValue->type==VT_ARRAY){
 			sortstatistics=(struct Msortstatistics){}; // this should work
@@ -11061,17 +11107,18 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 				// case 'm':result=amergesort(_tosortValue->value._array);break;
 				default:result=aquicksort(_tosortValue->value._array);break;
 			}
-			output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
-					,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
-					,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+			outputSortStatistics();
 		}
-		output("Done sorting!\n");
+		if(report)
+			output("Done sorting!\n");
 	}
-	output("Sort result: %lld.\n",result);
+	if(report)
+		output("Sort result: %lld.\n",result);
 	return _getIntegerValue(result);
 }
 // similar to Msort but does not change the input in any way, returns NULL on failure
 Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
 	Mvalue* sortedValue=NULL;
 	if(_tosortValue){
 		if(_tosortValue->type==VT_MAP){
@@ -11110,9 +11157,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 						default:sortResult=lquicksort(_tosortList);break;
 					}
 					if(sortResult>0){ // _tosortList was successfully sorted
-						output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
-								,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
-								,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+						outputSortStatistics();
 						sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
 					}else
 						FREE_LIST(_tosortList,owner);
@@ -11133,9 +11178,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 						default:sortResult=aquicksort(_tosortArray);break;
 					}
 					if(sortResult>0){ // _tosortList was successfully sorted
-						output("Sort statistics: value comparisons=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu,references=%llu,tests=%llu.\n"
-								,sortstatistics.comparisons,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
-								,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
+						outputSortStatistics();
 						sortedValue=_getValueOfArray(disowned_array(_tosortArray,owner)); // NOTE will automatically
 					}else
 						FREE_ARRAY(_tosortArray,owner);

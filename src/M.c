@@ -50,7 +50,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="20";char const * const M_DATE="24 November 2020"; // MDH@24NOV2020: copy of array on assign (assignValue), binary operator on array/list combinations
+char const * const M_BUILD="21";char const * const M_DATE="3 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
+//char const * const M_BUILD="20";char const * const M_DATE="24 November 2020"; // MDH@24NOV2020: copy of array on assign (assignValue), binary operator on array/list combinations
 //char const * const M_BUILD="19";char const * const M_DATE="23 November 2020"; // MDH@17NOV2020: array data type added
 //char const * const M_BUILD="18";char const * const M_DATE="17 November 2020"; // MDH@17NOV2020: yes the bug (setting one list element to many in the stack and so writing outside the reserved dynamic memory) was fixed, by harmonica binary sort still way too slow
 //char const * const M_BUILD="17";char const * const M_DATE="16 November 2020"; // MDH@16NOV2020: addressing a serious memory bug in sorting using lharmonicabinarysort
