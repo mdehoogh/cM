@@ -84,8 +84,8 @@ Mreference* disowned_reference(Mreference* reference,Mallocationowner owner);
 
 
 typedef struct Mlistelement{
+    Mvalue* _value; // should be the first field in Mlistelement, so that we can use Mlistelement* as a value holder (Mvalue**)
     unsigned long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
-    Mvalue* _value;
     struct Mlistelement* _next;
 }Mlistelement;
 

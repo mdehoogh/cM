@@ -18,3 +18,5 @@ Mvalue* Mfirst(Mvalue* listValue); // return the first value
 Mvalue* Mlast(Mvalue* listValue); // return the last value
 
 Mvalue* Mstats(Mvalue* listValue);
+
+Miterator getListIterator(Mlist* list);

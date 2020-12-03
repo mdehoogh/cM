@@ -75,3 +75,19 @@ Mvalue* mfill(Mvalue* array_value,Mvalue* value){
     }
     return array_value;
 }
+
+static Mvalue** arrayNext(void* const iterator){
+    Mvalue** result=NULL;
+    if(iterator){
+        Miterator* it=(Miterator*)iterator;
+        if(it->left){ // there's something to return
+            result=(Mvalue**)it->valueholder;
+            // prepare for returning the next array element
+            if(--(it->left)==0)it->valueholder=NULL;else it->valueholder++;
+        }
+    }
+    return result;
+}
+Miterator getArrayIterator(Marray* array){
+    return(array?(Miterator){arrayNext,(void**)array->values,array->numberOfElements,array->valuetype}:(Miterator){});
+}

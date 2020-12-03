@@ -64,7 +64,7 @@ cp ../lib/* .
 chmod 644 *
 # MDH@28FEB2020: we can do this in pieces creating the static library on the go
 # MDH@03MAR2020: compile with the -g flag so we can debug it
-cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Moutput.c Mmessage.c Malloc.c Mchars.c Mstring.c Msettings.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Marray.c Mlist.c Mfunctions.c Menvironment.c Mshell.c 
+cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Moutput.c Mmessage.c Malloc.c Mchars.c Mstring.c Msettings.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Miterator.c Marray.c Mlist.c Mfunctions.c Menvironment.c Mshell.c 
 ar cvq libM.a *.o
 # compile the M interactive session source files separately
 cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Mcolors.c Msession.c M.c
