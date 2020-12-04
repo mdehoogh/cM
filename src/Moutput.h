@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "Mmodule.h"
+
 #include "Mconstants.h"
 
 // MDH@13MAR2020: let's allow echoing output to a file as well if so requested

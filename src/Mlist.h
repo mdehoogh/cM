@@ -1,6 +1,9 @@
 // some common list functions
 #include "Marray.h"
 
+// (sequence) iterator support
+Miterator getListiterator(Mlist* list);
+
 Mvalue* Mclear(Mvalue* value); // will also work on a map though (TODO move over to functions.h/c I guess)
 Mvalue* Mempty(Mvalue* value); // will also work on a map though (TODO move over to functions.h/c I guess)
 Mvalue* Mkeys(Mvalue* value); // will also work on a map (although perhaps those are attributes)
@@ -17,6 +20,9 @@ Mvalue* Mfind(Mvalue* listValue,Mvalue* listElementValue,Mvalue* maximumNumberOf
 Mvalue* Mfirst(Mvalue* listValue); // return the first value
 Mvalue* Mlast(Mvalue* listValue); // return the last value
 
-Mvalue* Mstats(Mvalue* listValue);
-
-Miterator getListIterator(Mlist* list);
+// value type specific sample statistics methods (TODO we could move these to the iterator module)
+Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator);
+Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator);
+Mmap* _getFloatSampleStatisticsMap(Miterator* iterator);
+Mmap* _getDecimalSampleStatisticsMap(Miterator* iterator);
+Mmap* _getRationalSampleStatisticsMap(Miterator* iterator);

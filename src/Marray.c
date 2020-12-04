@@ -4,6 +4,42 @@ static uint16_t const MODULE_ID=14;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
 extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 
+// iterator support
+static Msequenceelement arrayNext(void * const iterator){
+    Msequenceelement sequenceelement={};
+    if(iterator){
+        Miterator* it=(Miterator*)iterator;
+        if(it->valueholder){
+            sequenceelement=(Msequenceelement){it->index,*(it->valueholder)};
+            if(it->index<it->lastindex){ // not the last array element yet
+                // we need the last value holder to know when we are done!!!!
+                it->index++;
+                it->valueholder++;
+            }else // end of array reached
+                it->valueholder=NULL;
+        }
+    }
+    return sequenceelement;
+}
+static unsigned long long arrayNextIndex(void * const iterator){
+    if(iterator){
+        Miterator* it=(Miterator*)iterator;
+        if(it->valueholder)return it->index;
+    }
+    return 0;
+}
+Miterator getArrayiterator(Marray* array){
+    Miterator arrayiterator={arrayNext,arrayNextIndex,1};
+    if(array){
+        arrayiterator.valuetype=array->valuetype;
+        if(array->numberOfElements){
+            arrayiterator.lastindex=array->numberOfElements;
+            arrayiterator.valueholder=(void**)array->values; // NOTE leading in determining whether end of sequence was reached (instead of index)
+        }
+    }
+    return arrayiterator;
+}
+
 Mvalue* marray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner owner=getOwner(__LINE__);
     // how about allowing length_value to be a list or array to fill the array with 
     // returns an array that can store length_value values (if possible)
@@ -74,20 +110,4 @@ Mvalue* mfill(Mvalue* array_value,Mvalue* value){
         while(l>0)assignValue(&array->values[--l],value);
     }
     return array_value;
-}
-
-static Mvalue** arrayNext(void* const iterator){
-    Mvalue** result=NULL;
-    if(iterator){
-        Miterator* it=(Miterator*)iterator;
-        if(it->left){ // there's something to return
-            result=(Mvalue**)it->valueholder;
-            // prepare for returning the next array element
-            if(--(it->left)==0)it->valueholder=NULL;else it->valueholder++;
-        }
-    }
-    return result;
-}
-Miterator getArrayIterator(Marray* array){
-    return(array?(Miterator){arrayNext,(void**)array->values,array->numberOfElements,array->valuetype}:(Miterator){});
 }

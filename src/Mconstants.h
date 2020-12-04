@@ -13,5 +13,3 @@
 
 #define UNDEFINED_VALUETEXT "?"
 
-
-

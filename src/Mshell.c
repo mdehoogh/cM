@@ -6,11 +6,10 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=false; // whether or not debugging this module
+// we can define the module ids in an enumeration
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
-static uint16_t const MODULE_ID=18;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_SHELL,id};}
 
 Mvalue* NULL_value=NULL;
 // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
@@ -85,6 +84,11 @@ const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator b
 const char M_COMMAND_CONTINUATION_CHARACTER='`'; // MDH@28OCT2020: the only character unused left to continue a command because I couldn't use \ because that's the escape character in text
 
 const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
+
+// you can set the modules to debug here using the module masks as defined in Mmodule.h
+unsigned long long M_MODULE_DEBUGGING=(MM_RATIONAL);
+
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_SHELL)
 
 // as needed by the tokenizer (as part of evaluating a command)
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
@@ -3584,7 +3588,7 @@ void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocat
 	FREE_DISOWNED_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
-static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest=(Mallocationowner){MODULE_ID,__LINE__,1};
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest=(Mallocationowner){MI_SHELL,__LINE__,1};
 static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
 	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
 	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName->chars))functionBodyRequest=functionBodyRequest->_next;
@@ -3611,7 +3615,7 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 	return _functionBodyRequest;
 }
 
-static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL;static Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MODULE_ID,__LINE__,1}; // the stack of function bodies being constructed
+static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL;static Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MI_SHELL,__LINE__,1}; // the stack of function bodies being constructed
 FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
 Mallocationowner getCurrentFunctionBodyInputOwner(){return owner_currentFunctionBodyInput;}
 // MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
@@ -8677,6 +8681,108 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
     }
     return _getIntegerValue(0); // indicating failure...
 }/*VALIDATED */
+
+// MDH@04DEC2020: computing sample statistics on any sequence inserted here as it uses Misnumeric (see Mfunctions.c/h), multiply and add M functions
+// MDH@04DEC2020: generic sample statistics map producer, which only processes the numeric values
+//                as it uses M functions it has to be here and not in Mlist.c/h
+static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _statisticsMap=(iterator?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
+    if(_statisticsMap){
+        if(amVerbose())output("Computing float sample statistics.\n");
+        long long missings=0,errors=0,count=0,minimumindex=0,maximumindex=0;
+        // initialize sum, sumofsquares, minimum and maximum to NULL
+        Mvalue *value=NULL,*squarevalue=NULL,*sum=NULL,*sumofsquares=NULL,*minimum=NULL,*maximum=NULL;
+        unsigned long long index=0;
+        while((index=iter_nextindex(iterator))){
+			// output("Index: %llu",index); // DEBUG
+            value=iter_next(iterator);
+			// output(" - value='",value,"'\n"); // DEBUG
+            if(value){
+                if(getValueInteger(Misnumeric(value))==M_TRUE){
+                    squarevalue=multiply(value,value);
+                    if(count>0){
+                        sum=add(sum,value);
+                        sumofsquares=add(sumofsquares,squarevalue);
+                        if(smallerthan(value,minimum)==M_TRUE){minimum=value;minimumindex=index;}
+						if(largerthan(value,maximum)==M_TRUE){maximum=value;maximumindex=index;}
+                    }else{ // no sum yet
+                        sum=value;
+                        minimum=value;minimumindex=index;
+                        maximum=value;maximumindex=index;
+                        sumofsquares=squarevalue;
+                    }
+                    count++;
+                }else // not numeric, so skip and assume being an error
+                    errors++;
+            }else
+                missings++;
+        }
+        // ready to compose the map elements
+        appendedToMap(_statisticsMap,owner,"size",_getIntegerValue(count));
+        appendedToMap(_statisticsMap,owner,"sum",sum);
+        appendedToMap(_statisticsMap,owner,"sumofsquares",sumofsquares);
+        appendedToMap(_statisticsMap,owner,"minimum",minimum);
+        appendedToMap(_statisticsMap,owner,"maximum",maximum);
+        appendedToMap(_statisticsMap,owner,"minimumindex",_getIntegerValue(minimumindex));
+        appendedToMap(_statisticsMap,owner,"maximumindex",_getIntegerValue(maximumindex));
+        appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
+        appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
+        return disowned_map(_statisticsMap,owner);
+    }
+    if(iterator)outputMemoryError("Failed to create a map to store statistics in.");
+    return NULL;
+}
+static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _statsMap=NULL;
+    if(iterator){
+        if(iterator->valuetype!=VT_MAP&&iterator->valuetype!=VT_REFERENCE&&iterator->valuetype!=VT_LIST){
+            // the values in the list need to be scalars of the same type
+            if(iterator->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(iterator),owner);else
+            if(iterator->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(iterator),owner);else
+            if(iterator->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(iterator),owner);else
+            if(iterator->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(iterator),owner);else
+            if(iterator->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(iterator),owner);else
+            if(iterator->valuetype==VT_UNDEFINED)_statsMap=owned_map(_getSampleStatisticsMap(iterator),owner);
+        }else
+            output("All values in the iterator should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
+    }
+    return disowned_map(_statsMap,owner);
+}
+Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _statsMap=NULL;
+    if(sequenceValue){
+        Miterator iterator={};
+        if(sequenceValue->type==VT_LIST){
+            Mlist* list=sequenceValue->value._list;
+            if(list){
+                iterator=getListiterator(list);
+                /*
+                if(list->valuetype!=VT_MAP&&list->valuetype!=VT_REFERENCE&&list->valuetype!=VT_LIST&&list->valuetype!=VT_UNDEFINED){
+                    // the values in the list need to be scalars of the same type
+                    if(list->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(list),owner);
+                    if(list->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(list),owner);
+                    if(list->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(list),owner);
+                    if(list->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(list),owner);
+                    if(list->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(list),owner);
+                }else
+                    output("All values in the list should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
+                */
+            }else 
+                outputBug("Missing value list!");
+        }else
+        if(sequenceValue->type==VT_ARRAY){
+            Marray* array=sequenceValue->value._array;
+            if(array)
+                iterator=getArrayiterator(array);
+            else
+                outputBug("Missing value array!");
+        }
+        if(iterator.next)
+            _statsMap=owned_map(_getStatsMap(&iterator),owner);
+    }else
+        outputError("No sample list to compute statistics of");
+    return(_statsMap?_getValueOfMap(disowned_map(_statsMap,owner)):NULL);
+}
 
 // MDH@29OCT2020: the famous array functions of JS: foreach, map, reduce, filter
 Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccumulatedValue){Mallocationowner owner=getOwner(__LINE__);

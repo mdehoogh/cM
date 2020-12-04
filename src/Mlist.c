@@ -8,20 +8,41 @@ extern long double M_LD_NAN;
 extern char const * const M_ERROR_PREFIX;
 
 // iterator support
-static Mvalue** listNext(void* const iterator){
-    Mvalue** result=NULL;
+// NOTE for a list use getListIterator() to obtain a valid list iterator (which guarantees that it's actually an iterator pointer being passed in)
+static Msequenceelement listNext(void * const iterator){
+    Msequenceelement result={}; // initialize to the default i.e. {0,NULL}
     if(iterator){
         Miterator* it=(Miterator*)iterator;
-        if(it->left){
-            result=(Mvalue**)it->valueholder;
+        Mlistelement* listelement=(Mlistelement*)it->valueholder;
+        if(listelement){ // there's still a value being pointed to
+            result=(Msequenceelement){listelement->index,listelement->_value};
             // prepare for returning the next element
-            if(--(it->left)==0)it->valueholder=NULL;else it->valueholder=(void**)((Mlistelement*)(it->valueholder))->_next;
+            // knowing that the valueholder is a listelement, we can get the next list element
+            if(listelement->index>=it->lastindex)it->valueholder=NULL;else it->valueholder=(void**)listelement->_next;
         }
     }
     return result;
 }
-Miterator getListIterator(Mlist* list){
-    return(list?(Miterator){listNext,(void**)list->_first,list->numberOfElements,list->valuetype}:(Miterator){});
+static unsigned long long listNextindex(void * const iterator){
+    Mlistelement* listelement=(iterator?(Mlistelement*)((Miterator*)iterator)->valueholder:NULL);
+    return(listelement?listelement->index:0);
+}
+Miterator getListiterator(Mlist* list){
+    // NOTE ascertain to have at least the next and nextindex fields
+    Miterator listiterator=(Miterator){listNext,listNextindex};
+    if(list){
+        listiterator.valuetype=list->valuetype;
+        // for security we check whether the list has a last, and if so there's something to iterate over
+        // if no last, no valueholder
+        if(list->_last&&!list->_last->_next){
+            listiterator.valueholder=(void**)list->_first;
+            // no need to set index because we can always get the index from the current value holder!!!
+            listiterator.lastindex=list->_last->index;
+        }else
+        if(list->_last)
+            outputBug("Assumed last list element points to another list element in constructing a list iterator!");
+    }
+    return listiterator;
 }
 
 Mvalue* Mclear(Mvalue* value){
@@ -267,14 +288,13 @@ Mvalue* Mlast(Mvalue* listValue){ // return the last value
 // count and missing are integers, sum, sumofsquares, mode, minimum and maximum are in the same unit as the input values
 // if we use sum and sumofsquares to compute the mean and variance we can store these in a rational for integer input values
 Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
-    Mlistelement* listelement=NULL;
     Mmap* _statisticsMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing integer sample statistics.\n");
-        long long missings=0,errors=0;
-        long long integer=M_LL_INVALID;
+        long long missings=0,errors=0,integer=M_LL_INVALID;
+        unsigned long long index=0;
         Mvalue* value;
-        while(iter_hasnext(iterator)){
+        while((index=iter_nextindex(iterator))){
             value=iter_next(iterator);
             if(value&&value->type==VT_INTEGER){
                 integer=getValueInteger(value);
@@ -284,18 +304,18 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
                 missings++;
         }
         if(integer!=M_LL_INVALID){ // at least one valid integer in the list
-            long long count=1,minimumindex=listelement->index,maximumindex=listelement->index; // counting the missings and the number of sample values (that are NOT missing)
+            long long count=1,minimumindex=index,maximumindex=index; // counting the missings and the number of sample values (that are NOT missing)
             long long sum=integer,squaressum=sum*sum,mode=integer,minimum=integer,maximum=integer;
-            while(listelement->_next){
-                listelement=listelement->_next;
-                if(listelement->_value&&listelement->_value->type==VT_INTEGER){
-                    integer=getValueInteger(listelement->_value);
+            while((index=iter_nextindex(iterator))){
+                value=iter_next(iterator);
+                if(value&&value->type==VT_INTEGER){
+                    integer=getValueInteger(value);
                     if(integer!=M_LL_INVALID){
                         count++;
                         sum+=integer;
                         squaressum+=(integer*integer);
-                        if(integer<minimum){minimum=integer;minimumindex=listelement->index;}
-                        if(integer>maximum){maximum=integer;maximumindex=listelement->index;}
+                        if(integer<minimum){minimum=integer;minimumindex=index;}
+                        if(integer>maximum){maximum=integer;maximumindex=index;}
                     }else errors++;
                 }else missings++;
             }
@@ -352,7 +372,9 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
                         outputError("Failed to initialize the sum of squares");
                 }else 
                     outputMemoryError("Failed to store the sample size and/or sum in a big integer");
-                FREE_BIGINTEGER(_sum,owner);FREE_BIGINTEGER(_count,owner);FREE_BIGINTEGER(_squaressum,owner);
+                FREE_BIGINTEGER(_sum,owner);
+                FREE_BIGINTEGER(_count,owner);
+                FREE_BIGINTEGER(_squaressum,owner);
             }
         }
         appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
@@ -363,15 +385,15 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
     return NULL;
 }
 Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
-    Mlistelement* listelement=NULL;
     Mmap* _statisticsMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing big integer sample statistics.\n");
         Mbiginteger* biginteger=NULL;
         long long missings=0,errors=0; // NOTE errors is the number of times converting a value to a big integer failed
+        unsigned long long index=0;
         // ok, go and try to find the first valid big integer
         Mvalue* value;
-        while(iter_hasnext(iterator)){
+        while((index=iter_nextindex(iterator))){
             value=iter_next(iterator);
             if(value&&value->type==VT_BIGINTEGER){
                 biginteger=_getValueBiginteger(value);
@@ -381,7 +403,7 @@ Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator){Mallocationowner ow
                 missings++;
         }
         if(biginteger){ // at least one valid integer in the list
-            long long count=1,minimumindex=listelement->index,maximumindex=listelement->index; // counting the missings and the number of sample values (that are NOT missing)
+            long long count=1,minimumindex=index,maximumindex=index; // counting the missings and the number of sample values (that are NOT missing)
             Mbiginteger *sumofsquares=owned_biginteger(__biginteger(),owner),*sum=owned_biginteger(_getBigintegerCopy(biginteger),owner)
                        ,*minimum=owned_biginteger(_getBigintegerCopy(biginteger),owner),*maximum=owned_biginteger(_getBigintegerCopy(biginteger),owner);
             if(sum&&minimum&&maximum&&sumofsquares&&mp_mul(MP_INT_POINTER(biginteger),MP_INT_POINTER(biginteger),MP_INT_POINTER(sumofsquares))==MP_OKAY){
@@ -393,10 +415,10 @@ Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator){Mallocationowner ow
                            ,*_square=owned_biginteger(__biginteger(),owner);
                 if(_newsum&&_newssq&&_newminimum&&_newmaximum){
                     bool someerror;
-                    while(listelement->_next){
-                        listelement=listelement->_next;
-                        if(listelement->_value&&listelement->_value->type==VT_BIGINTEGER){
-                            biginteger=_getValueBiginteger(listelement->_value);
+                    while((index=iter_nextindex(iterator))){
+                        value=iter_next(iterator);
+                        if(value&&value->type==VT_BIGINTEGER){
+                            biginteger=_getValueBiginteger(value);
                             if(biginteger){
                                 someerror=false;
                                 if(mp_mul(MP_INT_POINTER(biginteger),MP_INT_POINTER(biginteger),MP_INT_POINTER(_square))!=MP_OKAY)someerror=true;
@@ -427,9 +449,9 @@ Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator){Mallocationowner ow
                     }else{
                         Mstring* _error=owned_string(__string(),owner);
                         if(_error){
-                            if(listelement){
+                            if(value){
                                 string_append(_error,"Some error occurred while updating the sample statistics with the list element at index ");
-                                appendll(_error,listelement->index);string_append(_error,".");
+                                appendll(_error,index);string_append(_error,".");
                             }else
                                 string_append(_error,"Failed to compute the big integer sample statistics.");
                             appendedToMap(_statisticsMap,owner,"error",_getTextValue(string(_error)));
@@ -439,7 +461,11 @@ Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator){Mallocationowner ow
                     }
                 }else
                     outputError("Failed to create all big integer helpers in computing big integer sample statistics");
-                FREE_BIGINTEGER(_newsum,owner);FREE_BIGINTEGER(_newssq,owner);FREE_BIGINTEGER(_newminimum,owner);FREE_BIGINTEGER(_newmaximum,owner);FREE_BIGINTEGER(_square,owner);
+                FREE_BIGINTEGER(_newsum,owner);
+                FREE_BIGINTEGER(_newssq,owner);
+                FREE_BIGINTEGER(_newminimum,owner);
+                FREE_BIGINTEGER(_newmaximum,owner);
+                FREE_BIGINTEGER(_square,owner);
                 // ready to compose the map elements
             }else 
                 outputError("Failed to initialize the big integer sample statistics");
@@ -470,14 +496,14 @@ Mmap* _getRationalSampleStatisticsMap(Miterator* iterator){Mallocationowner owne
     return NULL;
 }
 Mmap* _getFloatSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
-    Mlistelement* listelement=NULL;
     Mmap* _statisticsMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing float sample statistics.\n");
         long long missings=0,errors=0;
         long double ld=M_LD_NAN;
+        unsigned long long index=0;
         Mvalue* value;
-        while(iter_hasnext(iterator)){
+        while((index=iter_nextindex(iterator))){
             value=iter_next(iterator);
             if(value&&value->type==VT_FLOAT){
                 ld=getValueLongDouble(value);
@@ -487,16 +513,18 @@ Mmap* _getFloatSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=g
                 missings++;
         }
         if(!isLongDoubleUndefined(ld)){ // at least one valid integer in the list
-            long long count=1,minimumindex=listelement->index,maximumindex=listelement->index;
+            long long count=1,minimumindex=index,maximumindex=index;
             long double sum=ld,sumofsquares=(ld*ld),minimum=ld,maximum=ld;
-            while(listelement->_next){
-                listelement=listelement->_next;
-                ld=getValueLongDouble(listelement->_value);
+            unsigned long long index;
+            Mvalue* value;
+            while((index=iter_nextindex(iterator))){
+                value=iter_next(iterator);
+                ld=getValueLongDouble(value);
                 if(!isLongDoubleUndefined(ld)){
                     sum+=ld;
                     sumofsquares+=(ld*ld);
-                    if(ld<minimum){minimum=ld;minimumindex=listelement->index;}
-                    if(ld>maximum){maximum=ld;maximumindex=listelement->index;}
+                    if(ld<minimum){minimum=ld;minimumindex=index;}
+                    if(ld>maximum){maximum=ld;maximumindex=index;}
                     count++;
                 }else
                     missings++;
@@ -516,55 +544,4 @@ Mmap* _getFloatSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=g
     }
     outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
-}
-static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _statsMap=NULL;
-    if(iterator){
-        if(iterator->valuetype!=VT_MAP&&iterator->valuetype!=VT_REFERENCE&&iterator->valuetype!=VT_LIST&&iterator->valuetype!=VT_UNDEFINED){
-            // the values in the list need to be scalars of the same type
-            if(iterator->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(iterator),owner);
-        }else
-            output("All values in the iterator should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
-    }
-    return disowned_map(_statsMap,owner);
-}
-Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _statsMap=NULL;
-    if(sequenceValue){
-        Miterator iterator={};
-        if(sequenceValue->type==VT_LIST){
-            Mlist* list=sequenceValue->value._list;
-            if(list){
-                iterator=getListIterator(list);
-                /*
-                if(list->valuetype!=VT_MAP&&list->valuetype!=VT_REFERENCE&&list->valuetype!=VT_LIST&&list->valuetype!=VT_UNDEFINED){
-                    // the values in the list need to be scalars of the same type
-                    if(list->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(list),owner);
-                }else
-                    output("All values in the list should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
-                */
-            }else 
-                outputBug("Missing value list!");
-        }else
-        if(sequenceValue->type==VT_ARRAY){
-            Marray* array=sequenceValue->value._array;
-            if(array)
-                iterator=getArrayIterator(array);
-            else
-                outputBug("Missing value array!");
-        }
-        if(iterator.next)
-            _statsMap=owned_map(_getStatsMap(&iterator),owner);
-    }else
-        outputError("No sample list to compute statistics of");
-    if(!_statsMap)return NULL;
-    return _getValueOfMap(disowned_map(_statsMap,owner));
 }

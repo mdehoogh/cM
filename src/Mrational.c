@@ -1,9 +1,6 @@
 #include "Mrational.h"
 
-static bool DEBUGGING=false;
-
-static uint16_t const MODULE_ID=11;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_RATIONAL,id};}
 
 // MDH@27FEB2020 replacing: #include "Msession.h"
 
@@ -11,6 +8,10 @@ extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_PO
 extern const char * const M_ERROR_PREFIX;
 extern const long double M_LD_NAN;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
+
+extern const long long M_MODULE_DEBUGGING;
+
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_RATIONAL);
 
 mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){//Mallocationowner owner=getOwner(__LINE__);
     // assuming _c equals NULL
@@ -180,7 +181,7 @@ mp_err _qdiv_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
  * \brief computes the difference of \p a and \p b and puts the result in \p c
  */
 mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
-    bool report=amVerboseDebugging(); //||DEBUGGING;
+    bool report=amVerboseDebugging()||DEBUGGING;
     mp_err status=((c&&!c->num&&!c->den)&&(a||b)?MP_OKAY:MP_ERR); // MDH@24MAY2020: demanding that c->num and c->den are currently undefined!!!
     if(status==MP_OKAY){ // c and at least a or b provided
         // should we NULL the numerator and denominator of c?????
@@ -188,20 +189,27 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
         // TODO do we need to NULL the denominator????? if(c->den){FREE_BIGINTEGER(c->den);c->den=NULL;}
         // if b is not defined, or zero, copy a into c
         if(!b||!b->num||isBigintegerZero(b->num)==M_TRUE){ // b is undefined or zero: return a
-            if(report)outputInfo("Second rational argument undefined or zero.");
+            if(report)
+                outputInfo("Second rational argument undefined or zero.");
             if(a->num){c->num=owned_biginteger(_getBigintegerCopy(a->num),Msubowner(owner_c,1));if(!c->num)return MP_ERR;}
             if(a->den){c->den=owned_biginteger(_getBigintegerCopy(a->den),Msubowner(owner_c,1));if(!c->den){FREE_BIGINTEGER(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
         }else
         if(!a||!a->num||isBigintegerZero(a->num)==M_TRUE){ // a is undefined or zero: return b
-            if(report)outputInfo("First rational argument undefined or zero.");
+            if(report)
+                outputInfo("First rational argument undefined or zero.");
             if(b->num){c->num=owned_biginteger(_getBigintegerCopy(b->num),Msubowner(owner_c,1));if(!c->num)return MP_ERR;}
             if(b->den){c->den=owned_biginteger(_getBigintegerCopy(b->den),Msubowner(owner_c,1));if(!c->den){FREE_BIGINTEGER(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
         }else{
             // ASSERT a and b both defined
-            if(report)outputInfo("Subtracting two pure rationals.");
+            if(report)
+                outputInfo("Subtracting two pure rationals.");
             Mbiginteger *_num=NULL;
             // MDH@05NOV2020: how about speeding things up by checking whether the denominators are the same?
-            if((!a->den&&!b->den)||(mp_cmp(MP_INT_POINTER(a->den),MP_INT_POINTER(b->den))==MP_EQ)){ // denominators are the same
+            // MDH@04DEC2020: I think it doesn't like it when one is NULL so we need to prevent that situation
+            //                although when both denominators are NULL there's the same as well
+            if((!a->den&&!b->den)||(a->den&&b->den&&(mp_cmp(MP_INT_POINTER(a->den),MP_INT_POINTER(b->den))==MP_EQ))){ // denominators are the same
+                if(report)
+                    outputInfo("With equal denominators.");
                 // NOTE c is supposed to be a rational with num and den undefined i.e. NULL as __rational() creates it
                 // TODO check validity of computation/ownership
                 status=_bisub(a->num,b->num,&_num);
@@ -219,10 +227,15 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
                     if(c->num){ // success
                         if(!c->normalized&&!normalizeRational(c,owner_c))
                         {output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
-                    }else
+                    }else{
                         FREE_BIGINTEGER(_num,owner);
-                }
+                        outputError("Failed to compute the rational difference numerator");
+                    }
+                }else
+                    outputError("Failed to subtract the rational numerators");
             }else{
+                if(report)
+                    outputInfo("With different denominators.");
                 Mbiginteger *_num1=NULL,*_num2=NULL,*_den=NULL;
                 if(a->den||b->den){status=_bimul(a->den,b->den,&_den);owned_biginteger(_den,owner);} // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
                 if(status==MP_OKAY)if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
@@ -235,6 +248,7 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
                 if(status!=MP_OKAY){ // numerator and denominator not computed both
                     if(_num)FREE_BIGINTEGER(_num,owner);
                     if(_den)FREE_BIGINTEGER(_den,owner);
+                    outputError("Some error occurred!");
                 }else{ // numerator and denominator computed
                     c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
                     c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
@@ -496,10 +510,12 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
     // NOTE leaving it to _qmul to deal with NULL rational input (which should never happen though)
     Mrational* _rational=owned_rational(__rational(),owner);
     if(_rational){
-        if(amVerbose()){outputRational("Subtracting '",q2,"'");outputRational(" from '",q1,"'.\n");}
+        if(amVerbose())
+        {outputRational("Subtracting '",q2,"'");outputRational(" from '",q1,"'.\n");}
         mp_err status=_qsub(_rational,owner,q1,q2);
         if(status==MP_OKAY){
-            if(amVerbose()){outputRational("Difference '",_rational,"'.\n");}
+            if(amVerbose())
+            {outputRational("Difference '",_rational,"'.\n");}
             // compute the delta
         	_rational->delta=owned_float(_floatdifference(q1->delta,q2->delta),Msubowner(owner,1));
             // if failed to compute the delta mark error

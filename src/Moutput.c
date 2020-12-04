@@ -10,8 +10,6 @@
 
 #include "Moutput.h"
 
-static uint32_t const MODULE_ID=1;
-
 static FILE* outputFile=NULL;
 
 static bool echo_to_output_file=false;

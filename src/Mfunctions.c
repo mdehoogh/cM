@@ -524,8 +524,12 @@ Mvalue* Mscalar(Mvalue* _value){
 }/* VALIDATED */
 
 // MDH@29OCT2020: might come in handy
+static long long isnumeric(Mvalue* _value){
+    return(_value?(_value->type==VT_BIGINTEGER||_value->type==VT_DECIMAL||_value->type==VT_FLOAT||_value->type==VT_INTEGER||_value->type==VT_RATIONAL?M_TRUE:M_FALSE):M_LL_INVALID);
+}/* VALIDATED */
 Mvalue* Misnumeric(Mvalue* _value){
-    return _getIntegerValue(_value?(_value->type==VT_BIGINTEGER||_value->type==VT_DECIMAL||_value->type==VT_FLOAT||_value->type==VT_INTEGER||_value->type==VT_RATIONAL?M_TRUE:M_FALSE):M_LL_INVALID);
+    // MDH@04DEC2020: delegate to local helper function isnumeric 
+    return _getIntegerValue(isnumeric(_value));
 }/* VALIDATED */
 Mvalue* Misalist(Mvalue* _value){
     return _getIntegerValue(_value?(_value->type==VT_LIST?M_TRUE:M_FALSE):M_LL_INVALID);
