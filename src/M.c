@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <limits.h>
+#include <locale.h>
 
 // MDH@27FEB2020: on top of environment management we have the 'shell' for setting up the root M environment
 #include "Msession.h"
@@ -54,7 +55,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.5"; // MDH@05DEC2020: this is were Mexpression is renamed to Mtoken
-char const * const M_BUILD="1";char const * const M_DATE="5 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
+char const * const M_BUILD="2";char const * const M_DATE="5 December 2020"; // with Mlocale.c/h to be able to get/set the locale
+//char const * const M_BUILD="1";char const * const M_DATE="5 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
 
 //char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
 //char const * const M_BUILD="21";char const * const M_DATE="3 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
@@ -1165,7 +1167,7 @@ void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
 		long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
 		if(_allocationTypeSizes){
 			if(numberOfAllocationTypeSizes>0&&numberOfAllocationMarks>0)
-				output("Dynamically allocated memory: %llu bytes.\n",_allocationTypeSizes[1]);
+				output("Dynamically allocated memory: %s bytes.\n",LL_SEP(_allocationTypeSizes[1]));
 			free(_allocationTypeSizes);
 		}else
 			outputError("No memory allocation information available!");
@@ -3872,6 +3874,8 @@ void showSeparatorLine(){
 int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // using 0 is kind of an exception to the rule that every function has a positive function id
 
 	COMMAND_PROCESSOR_AVAILABLE=system(NULL); // check if there's a command processor available
+
+	// setlocale(LC_ALL,"C"); // TODO will this help???
 
 #ifdef __DEBUG__
 	printf("\n%s","Operator token types:");

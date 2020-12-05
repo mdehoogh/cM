@@ -139,3 +139,7 @@ Mvalue* Mreturn(Mvalue* _value);
 // MDH@23OCT2020: a get and set function might come in handy
 Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value);
 Mvalue* Mget(Mvalue* _variableNameValue);
+
+// MDH@05DEC2020: for getting and setting the locale
+Mvalue* Msetlocale(Mvalue* _localeValue);
+Mvalue* Mlocale();

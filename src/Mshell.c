@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 #include <time.h>
+#include <locale.h>
 
 #include "Mshell.h"
 
@@ -84,6 +85,8 @@ const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator b
 const char M_COMMAND_CONTINUATION_CHARACTER='`'; // MDH@28OCT2020: the only character unused left to continue a command because I couldn't use \ because that's the escape character in text
 
 const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
+
+const char * const M_LOCALE_VARIABLE_NAME="LOCALE";
 
 // you can set the modules to debug here using the module masks as defined in Mmodule.h
 unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized in shellInitialized()
@@ -11662,6 +11665,27 @@ bool shellInitialized(char const * const settingCharacters,unsigned long long mo
 			if(!setValue(_Menvironment,"E",E_value)){
 				//////free_value(E_value);
 				outputError("Failed to initialize E");
+				return NULL;
+			}
+
+			// MDH@05DEC2020: obtain the current LC_ALL locale, and save it to the LOCALE variable
+			Mvalue* LOCALE_value=NULL;
+			Mstring* _locale=owned_string(_getString("'"),owner);
+			if(_locale&&string_append(_locale,setlocale(LC_ALL,NULL)))
+				LOCALE_value=_getTextValue(string(_locale));
+			FREE_STRING(_locale,owner);
+			if(!LOCALE_value){
+				///////free_value(E_value);
+				output("%sFailed to create %s.\n",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
+				return NULL;
+			}
+			if(!addVariable(_Menvironment,owner,M_LOCALE_VARIABLE_NAME,VT_TEXT,false)){
+				output("%sFailed to register %s.\n",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
+				return NULL;
+			}
+			if(!setValue(_Menvironment,M_LOCALE_VARIABLE_NAME,LOCALE_value)){
+				//////free_value(E_value);
+				output("%sFailed to initialize %s.\n",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
 				return NULL;
 			}
 

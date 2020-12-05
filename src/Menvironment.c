@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <math.h>
+#include <locale.h>
 
 #include "Menvironment.h"
 
@@ -28,6 +29,7 @@ extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with ea
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char * const VALUETYPENAMES[];
+extern const char * const M_LOCALE_VARIABLE_NAME; // MDH@05DEC2020
 
 // moved over to the end of Mvalue.c
 
@@ -1988,11 +1990,49 @@ Mvalue* Mget(Mvalue* _variableNameValue){Mallocationowner owner=getOwner(__LINE_
     return getValue(getExecutionEnvironment(),"");
 }
 
+Mvalue* Msetlocale(Mvalue* _localeValue){Mallocationowner owner=getOwner(__LINE__);
+    Mvalue* localeValue=NULL;
+    if(_localeValue&&_localeValue->type==VT_TEXT){
+        char* locale=setlocale(LC_ALL,_localeValue->value._text->_c);
+        if(locale){
+            Mstring* _locale=owned_string(_getString("'"),owner); // free asap
+            if(_locale){
+                if(string_append(_locale,locale)){
+                    // NOTE convenient to use getlocale() instead of locale (although they should be the same)
+                    localeValue=_getTextValue(string(_locale));
+                    if(localeValue){
+                        if(!setVariable(NULL,M_LOCALE_VARIABLE_NAME,localeValue)){
+                            output("%sFailed to save the new current locale '%s'.\n",M_ERROR_PREFIX,locale);
+                            localeValue=NULL; // TODO would this be OK?
+                        }
+                    }else
+                        output("%sFailed to create the value of new current locale '%s'.",M_ERROR_PREFIX,locale);
+                }else
+                    outputError("Failed to store the locale text");
+                FREE_STRING(_locale,owner);
+            }else
+                outputError("Failed to create the locale text");
+        }else
+            outputError("Proposed new locale not accepted");
+    }else
+        outputError("Proposed locale not of type text");
+    return localeValue;
+}
+Mvalue* Mlocale(){Mallocationowner owner=getOwner(__LINE__);
+    Mvariable* localeVariable=getVariable(getExecutionEnvironment(),M_LOCALE_VARIABLE_NAME,false);
+    if(localeVariable)return localeVariable->_value;
+    output("%sVariable %s not found",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
+    return NULL;
+}
+
 // these internal functions do NOT have a body as M defined functions have...
 bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment){
 
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"get"),"get",Mget))return false;
     if(!completedValueValueFunction(_getFunction(_environment,owner_environment,"set"),"set",Mset))return false;
+
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"setlocale"),"setlocale",Msetlocale))return false;
+    if(!completedFunction(_getFunction(_environment,owner_environment,"locale"),"locale",Mlocale))return false;
 
     // variable functions
 

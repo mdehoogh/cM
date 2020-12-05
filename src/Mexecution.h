@@ -31,7 +31,7 @@
 #include "mpdecimal.h"
 
 // for heap_string_copy() to copy char* stuff
-#include "Mmemory.h"
+#include "Mlocale.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))

@@ -613,8 +613,10 @@ Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__L
 	Mstring* _s=owned_string(__string(),owner);
     if(!_s)return NULL;
     Mstring* p=_s;
-    if(amVerboseDebugging())p=string_append_char(p,'i');
-    if(p&&_integer)p=appendll(p,_integer->ll);
+    if(amVerboseDebugging())
+        p=string_append_char(p,'i');
+    if(p&&_integer)
+        p=appendll(p,_integer->ll); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
     if(!p){FREE_STRING(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return disowned_string(_s,owner);
