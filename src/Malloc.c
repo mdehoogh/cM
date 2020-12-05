@@ -7,10 +7,10 @@
 
 #include "Malloc.h"
 
-static bool DEBUGGING=false;
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_ALLOC)
 
-static uint16_t const MODULE_ID=3;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ALLOC,id};}
 
 static char const * const MODULE_NAMES[]={"M","Moutput","Mmessage","Malloc","Mchars","Mstring","Msettings","Mexpression","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue","Mlist","Mfunctions","Menvironment","Mshell"};
 static char const * const DISOWNED_FLAG_TEXTS[]={"","-"};

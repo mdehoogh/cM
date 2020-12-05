@@ -3,8 +3,10 @@
 
 #include "Mfunctions.h"
 
-static uint16_t const MODULE_ID=16;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_FUNCTIONS)
+
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_FUNCTIONS,id};}
 
 extern char const * const VALUETYPENAMES[];
 extern char const * const M_ERROR_PREFIX;
@@ -768,7 +770,7 @@ Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
 }
 
 // random functions
-static Mbiginteger *birandmax_1=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MODULE_ID,__LINE__,1};
+static Mbiginteger *birandmax_1=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MI_FUNCTIONS,__LINE__,1};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
 const Mbiginteger* getBigintegerRandMaxPlusOne(){
     if(!birandmax_1){

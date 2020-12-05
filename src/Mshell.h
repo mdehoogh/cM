@@ -110,8 +110,10 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue);
 
 // and finally obtaining a root environment
 // in general initializing the shell with the callbacks and the M setting characters
+// MDH@05DEC2020: added moduleDebugging flags
 bool shellInitialized(
 				char const * const settingCharacters,
+				unsigned long long moduleDebugging,
 				InputCharReadFunction _inputCharReadFunction,
 				InputResponseFunction _inputInfoFunction,
 				InputResponseFunction _inputErrorFunction,

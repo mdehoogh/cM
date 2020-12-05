@@ -5,8 +5,10 @@
 
 #include "Mdecimal.h"
 
-static uint16_t const MODULE_ID=12;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_DECIMAL)
+
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_DECIMAL,id};}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 extern long double const M_LD_NAN;
@@ -117,7 +119,7 @@ void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement/*
 }
 #define FREE_DECIMALCONTEXTELEMENT(_decimalcontextElement,owner_decimalcontextElement) free_decimalcontextElement(disowned_decimalcontextElement(_decimalcontextElement,owner_decimalcontextElement))
 
-static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={MODULE_ID,__LINE__,1};
+static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={MI_DECIMAL,__LINE__,1};
 // to get the unique decimal context with the requested precision
 static Mdecimalcontext* _getExistingDecimalcontext(mpd_ssize_t prec){
 	if(prec<6)return NULL; // prec needs to be at least 6

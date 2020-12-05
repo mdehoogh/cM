@@ -86,7 +86,7 @@ const char M_COMMAND_CONTINUATION_CHARACTER='`'; // MDH@28OCT2020: the only char
 const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
 
 // you can set the modules to debug here using the module masks as defined in Mmodule.h
-unsigned long long M_MODULE_DEBUGGING=(MM_RATIONAL);
+unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized in shellInitialized()
 
 #define DEBUGGING (M_MODULE_DEBUGGING&MM_SHELL)
 
@@ -11549,7 +11549,9 @@ bool settingApplied(char settingCharacter){
 }
 
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
-bool shellInitialized(char const * const settingCharacters,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
+bool shellInitialized(char const * const settingCharacters,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
+
+	M_MODULE_DEBUGGING=moduleDebugging; // MDH@05DEC2020
 
 	// initialize the random generator
 	long long randomSeedGeneratorInitializationResult=getValueInteger(Msrand(NULL));

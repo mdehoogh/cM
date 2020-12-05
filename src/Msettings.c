@@ -1,9 +1,11 @@
 #include "Msettings.h"
 
-extern char const * const M_ERROR_PREFIX;
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_SETTINGS)
 
-static uint16_t const MODULE_ID=6;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_SETTINGS,id};}
+
+extern char const * const M_ERROR_PREFIX;
 
 // Edit flags
 bool acceptinghistorycommand=true; // whether to immediately accept a history command

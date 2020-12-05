@@ -1,5 +1,8 @@
 #include "Mrational.h"
 
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_RATIONAL)
+
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_RATIONAL,id};}
 
 // MDH@27FEB2020 replacing: #include "Msession.h"
@@ -8,10 +11,6 @@ extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_PO
 extern const char * const M_ERROR_PREFIX;
 extern const long double M_LD_NAN;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
-
-extern const long long M_MODULE_DEBUGGING;
-
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_RATIONAL);
 
 mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){//Mallocationowner owner=getOwner(__LINE__);
     // assuming _c equals NULL

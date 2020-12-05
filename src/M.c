@@ -14,8 +14,12 @@
 // MDH@27FEB2020: on top of environment management we have the 'shell' for setting up the root M environment
 #include "Msession.h"
 
-static uint32_t const MODULE_ID=0; // the 'main' module always has module id 0
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_MAIN,id};}
+
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_MAIN)
+
+extern char const * const M_MODULE_DEBUG_CHARACTERS; // MDH@05DEC2020: as defined in Mmodule.h
 
 // the constants are defined in Mshell.c
 extern char const* const M_ERROR_PREFIX;
@@ -49,8 +53,11 @@ extern const long long M_ARRAY_ELEMENTS_AT_END;
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
-char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="21";char const * const M_DATE="3 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
+char const * const M_VERSION="0.1.5"; // MDH@05DEC2020: this is were Mexpression is renamed to Mtoken
+char const * const M_BUILD="1";char const * const M_DATE="5 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
+
+//char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
+//char const * const M_BUILD="21";char const * const M_DATE="3 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
 //char const * const M_BUILD="20";char const * const M_DATE="24 November 2020"; // MDH@24NOV2020: copy of array on assign (assignValue), binary operator on array/list combinations
 //char const * const M_BUILD="19";char const * const M_DATE="23 November 2020"; // MDH@17NOV2020: array data type added
 //char const * const M_BUILD="18";char const * const M_DATE="17 November 2020"; // MDH@17NOV2020: yes the bug (setting one list element to many in the stack and so writing outside the reserved dynamic memory) was fixed, by harmonica binary sort still way too slow
@@ -374,9 +381,9 @@ void outputFlags(){
 }
 
 // the user input (either the shell command or the M user input command)
-Mstring* _shellCommand=NULL;Mallocationowner owner_shellCommand=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mstring* _shellCommand=NULL;Mallocationowner owner_shellCommand=(Mallocationowner){MI_MAIN,__LINE__,1};
 
-Mcommand* _userInputCommand=NULL;Mallocationowner owner_userInputCommand=(Mallocationowner){MODULE_ID,__LINE__,1}; // the current input command
+Mcommand* _userInputCommand=NULL;Mallocationowner owner_userInputCommand=(Mallocationowner){MI_MAIN,__LINE__,1}; // the current input command
 
 // keeping track of both the cursor position and the total command length
 size_t getUserInputLength(){
@@ -393,7 +400,7 @@ typedef struct Muserinputline{
 	size_t offset,index; // the number of characters on previous lines and the line index
 	struct Muserinputline *_prev; // for accessing previous lines
 }Muserinputline;
-static Muserinputline* _userinputline=NULL;static Mallocationowner owner_userinputline=(Mallocationowner){MODULE_ID,__LINE__,1};
+static Muserinputline* _userinputline=NULL;static Mallocationowner owner_userinputline=(Mallocationowner){MI_MAIN,__LINE__,1};
 static size_t getNumberOfCommandLines(){return(_userinputline?_userinputline->index:0)+1;}
 // MDH@24SEP2020: unless we're at the end of a command getUserInputLength() would be the current offset BUT if a command is being output completely that would be an invalid assumption therefore we now pass in the offset to use
 static Muserinputline* __userinputline(size_t offset){Mallocationowner owner=getOwner(__LINE__);
@@ -480,7 +487,7 @@ static void inputError(const char* const fmt,...){
 // manual feed forward characters stuff
 // what the user consumed manually, and is supposed to remain continguous i.e. uninterrupted by other feed forward texts
 // it's possible that manual feed forward text is empty so it will block the identifier continuation text when that is the case!!
-Mstring* _manualFeedforwardText=NULL;Mallocationowner owner_manualFeedforwardText=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mstring* _manualFeedforwardText=NULL;Mallocationowner owner_manualFeedforwardText=(Mallocationowner){MI_MAIN,__LINE__,1};
 size_t numberOfIdentifierContinuationManualFeedforwardCharacters=0; // MDH@06OCT2019: determine the number of manual feed forward characterr matching the identifier continuation
 bool manualFeedforwardCharacterPrepended(char c){
 	if(!c)return false;
@@ -543,7 +550,7 @@ typedef struct Mtokenautocompletiontext{
 // MDH@30SEP2019: all token feed forward texts accepted (i.e. consumed) are pointed to by _lastConsumedAutocompletiontext
 //                consumption of feed forward texts is done by right arrow (one character at a time) or tab (all feed forward characters)
 //                right arrow reads the first feed forward character, gets it accepted and then moves the feed forward character to the consumed feed forward texts
-Mtokenautocompletiontext *_firstTokenautocompletiontext=NULL,*_lastConsumedAutocompletiontext=NULL;Mallocationowner tokenautocompletiontextowner=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mtokenautocompletiontext *_firstTokenautocompletiontext=NULL,*_lastConsumedAutocompletiontext=NULL;Mallocationowner tokenautocompletiontextowner=(Mallocationowner){MI_MAIN,__LINE__,1};
 // MDH@26SEP2019: it's prudent to store the identifier continuation text separated from the rest of the (autogenerated) feed forward text
 Mstring* _getAutoCompletionText(char sep){Mallocationowner owner=getOwner(__LINE__);
 	// constructs the total feed forward text
@@ -585,7 +592,7 @@ size_t numberOfBehindPromptCharactersWritten=0; // MDH@25SEP2019: the total numb
 
 // the globally constructed behind cursor text (without separator!!!)
 Mstring* _autoCompletionText=NULL; // MDH@27FEB2019: we keep track of the auto completion text
-Mallocationowner owner_autoCompletionText=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mallocationowner owner_autoCompletionText=(Mallocationowner){MI_MAIN,__LINE__,1};
 void deleteAutocompletionText(){
 	if(_autoCompletionText){
 		if(amVerboseDebugging())inputInfo("Deleting autocompletion text.");
@@ -679,7 +686,7 @@ Mtokenautocompletiontext* disowned_tokenautocompletiontext(Mtokenautocompletiont
 	return DISOWNED(_autocompletiontext,owner_autocompletiontext);
 }
 */
-Mallocationowner owner_tokenAutoCompletionTexts=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mallocationowner owner_tokenAutoCompletionTexts=(Mallocationowner){MI_MAIN,__LINE__,1};
 void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext/*,Mallocationowner owner_autocompletiontext*/){
 	if(!_autocompletiontext)return;
 	if(_autocompletiontext->_next)free_tokenautocompletiontext(_autocompletiontext->_next/*,owner_autocompletiontext*/);
@@ -959,7 +966,7 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 //                deleteLastTokenImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken stops being the current token or when the type of the current token changes
 //                updateImmediateFeedforwardTextOfUserInputCommand() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
 // MDH@04OCT2019: deciding to keep the immediate feed forward text separate from the other feed forward texts, that way it is easier to merge the identifier continuation and feed forward texts
-Mstring* _immediateFeedforwardText=NULL;Mallocationowner owner_immediateFeedforwardText=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mstring* _immediateFeedforwardText=NULL;Mallocationowner owner_immediateFeedforwardText=(Mallocationowner){MI_MAIN,__LINE__,1};
 bool immediateFeedforwardToBeUpdated=false;
 bool updateImmediateFeedforwardTextOfUserInputCommand(){
 	if(!_immediateFeedforwardText)return false; // should have one
@@ -1011,7 +1018,7 @@ void deleteAutocompletionTextOfToken(Mtoken* token,bool deleteIdentifierContinua
 	deleteAutocompletionTextOfToken(token);
 }
 */
-Mstring* _suggestedText=NULL;Mallocationowner owner_suggestedText=(Mallocationowner){MODULE_ID,__LINE__,1}; // MDH@04SEP2019: where we'll be storing the entire feed forward text (i.e. identifier continuation, immediate feed forward and auto completion text)
+Mstring* _suggestedText=NULL;Mallocationowner owner_suggestedText=(Mallocationowner){MI_MAIN,__LINE__,1}; // MDH@04SEP2019: where we'll be storing the entire feed forward text (i.e. identifier continuation, immediate feed forward and auto completion text)
 
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 long long commandCount=0; // the total number of command input
@@ -1504,7 +1511,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 }
 */
 
-Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MI_MAIN,__LINE__,1};
 
 // keep track of all commands so far
 #define COMMAND_BLOCKSIZE 8
@@ -1514,7 +1521,7 @@ typedef struct{
 	Mcommand* _command;
 	unsigned long long previousCommandIndex;
 }Mregisteredcommand;
-Mregisteredcommand* _registeredcommands=NULL;Mallocationowner owner_registeredcommands=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mregisteredcommand* _registeredcommands=NULL;Mallocationowner owner_registeredcommands=(Mallocationowner){MI_MAIN,__LINE__,1};
 size_t commandBlocks=0;
 // MDH@24MAY2020 NOTE: registerCommand is ONLY called once with _userInputCommand as argument but 
 // MDH@12JUN2020 TODO TODO TODO how to deal with the command being registered and whether or not the tokens are to be disowned when put in the value 
@@ -3492,7 +3499,7 @@ void removeFirstSuggestedCharacter(char firstSuggestedCharacter,bool consumed){
 
 // MDH@14NOV2019: we want to keep a list of evaluated commands inside the main M environment
 //                then the user can use variable M to get at the stored commands, and the M function to get results
-Mvalue* M_value=NULL;Mallocationowner owner_M_value=(Mallocationowner){MODULE_ID,__LINE__,1}; // where the list of evaluated commands is to be stored 
+Mvalue* M_value=NULL;Mallocationowner owner_M_value=(Mallocationowner){MI_MAIN,__LINE__,1}; // where the list of evaluated commands is to be stored 
 // the M function (full name MM or perhaps MMfunction) allows one to use a previous result in a command
 Mvalue* MM(Mvalue* indexValue){
 	Mvalue* resultValue=NULL;
@@ -3847,7 +3854,7 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 	return result;
 }
 
-static Mstring* _separator=NULL;Mallocationowner owner_separator=(Mallocationowner){MODULE_ID,__LINE__,1};
+static Mstring* _separator=NULL;Mallocationowner owner_separator=(Mallocationowner){MI_MAIN,__LINE__,1};
 void showSeparatorLine(){
 	int columns=getCurrentNumberOfWindowTextColumns();
 	if(columns<=0){outputWarning("No number of columns");return;}
@@ -3893,15 +3900,17 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
+	unsigned long long moduleDebugging=0; // MDH@05DEC2020
 	Mstring* _settingsCharacterText=owned_string(__string(),owner);
 	if(_settingsCharacterText){
 		output("Settings characters text: '%s'.\n",string(_settingsCharacterText));
 		if(argc>1){
 			printf("%s\n","Arguments");
-			char settingCharacter;
+			char moduleDebuggingCharacters[]={'\0','\0','\0','\0'}; // for each module we take two successive characters
+			char settingCharacter,moduleDebuggingCharacter;
 			for(int arg=1;arg<argc;arg++){
 				printf("%i. %s\n",arg,argv[arg]);
-				if(argv[arg][0]=='-'){ // a flag (or flags)
+				if(argv[arg][0]=='-'){ // a setting flag (or flags)
 					int i=0;
 					while((settingCharacter=argv[arg][++i])){
 						// if it's not a session setting we're going to pass it along to shellInitialized (see below) if we can
@@ -3910,6 +3919,30 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							if(!_settingsCharacterText)settingApplied(settingCharacter); // if failing to add, do it from here
 						}
 					}
+				}else
+				if(argv[arg][0]=='+'){ // a debugging flag (or flags)
+					// for most modules we can stick to using the first two character of the module
+					int i=0;char* pos;unsigned long long moduleMask;
+					while((moduleDebuggingCharacter=argv[arg][++i])){
+						if(moduleDebuggingCharacter>=97)moduleDebuggingCharacter-=32; // just in case
+						moduleDebuggingCharacters[strlen(moduleDebuggingCharacters)]=moduleDebuggingCharacter;
+						if(strlen(moduleDebuggingCharacters)==2){ // we've got two successive characters
+							moduleDebuggingCharacters[2]=' '; // when we're looking
+							pos=strstr(M_MODULE_DEBUG_CHARACTERS,moduleDebuggingCharacters);
+							moduleDebuggingCharacters[2]='\0'; // done looking
+							if(pos){ // TODO if we can find a better way to get the flag
+								moduleMask=(1<<((pos-M_MODULE_DEBUG_CHARACTERS)/3));
+								output("Module debugging mask: 0x%x.\n",moduleMask);
+								moduleDebugging|=moduleMask;
+							}else
+								output("%s'%s' does not denote a module.",M_ERROR_PREFIX,moduleDebuggingCharacters);
+							// and reinitialize
+							moduleDebuggingCharacters[0]='\0';
+							moduleDebuggingCharacters[1]='\0';
+						}
+					}
+					moduleDebuggingCharacters[0]='\0'; // just in case a user forgot the second character!!! 
+					output("Module debugging flags: 0x%x.\n",moduleDebugging);
 				}
 			}
 		}
@@ -3926,7 +3959,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
-	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),moduleDebugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
 		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);

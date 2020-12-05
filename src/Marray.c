@@ -1,7 +1,11 @@
 #include "Marray.h"
+
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_ARRAY)
+
 // MDH@22NOV2020
-static uint16_t const MODULE_ID=14;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ARRAY,id};}
+
 extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 
 // iterator support

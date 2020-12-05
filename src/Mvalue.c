@@ -8,8 +8,10 @@
 
 static bool DEBUGGING=true;
 
-static uint16_t const MODULE_ID=13;
-static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MODULE_ID,id};}
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_VALUE)
+
+static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MI_VALUE,id};}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO,M_ARRAY_ELEMENTS_AT_START,M_ARRAY_ELEMENTS_AT_END,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
@@ -295,7 +297,7 @@ void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner own
 static Mlist* _valueList=NULL;
 static unsigned long long valueCount=0; // MDH@16JUN2020: keeping track of the total number of values
 // MDH@28MAY2020: in one go we can set the owner of the value list, the owner of every element in the value list, the owner of each value in every element of the value list and finally that of any data bound to the value
-static Mallocationowner owner_valueList=(Mallocationowner){MODULE_ID,__LINE__,1},owner_valueListelement=(Mallocationowner){MODULE_ID,__LINE__,1,1},owner_value=(Mallocationowner){MODULE_ID,__LINE__,1,2},owner_value_data=(Mallocationowner){MODULE_ID,__LINE__,1,3};
+static Mallocationowner owner_valueList=(Mallocationowner){MI_VALUE,__LINE__,1},owner_valueListelement=(Mallocationowner){MI_VALUE,__LINE__,1,1},owner_value=(Mallocationowner){MI_VALUE,__LINE__,1,2},owner_value_data=(Mallocationowner){MI_VALUE,__LINE__,1,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
 Mallocationowner getValueOwner(){return owner_value;}
 Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(__LINE__);

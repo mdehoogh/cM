@@ -2,7 +2,11 @@
 
 #include <limits.h>
 
-static uint16_t const MODULE_ID=7;
+// MDH@05DEC2020: replaced by Mtoken.h/c in v0.1.5
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING false
+
+static uint16_t MODULE_ID=15;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
 
 extern char const * const M_ERROR_PREFIX;

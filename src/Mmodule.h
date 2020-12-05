@@ -6,7 +6,7 @@ typedef enum Mmoduleid {
     MI_CHARS,
     MI_STRING,
     MI_SETTINGS,
-    MI_EXPRESSION,
+    MI_TOKEN, // MDH@05DEC2020: renamed from MI_EXPRESSION to MI_TOKEN
     MI_MEMORY,
     MI_EXECUTION,
     MI_BIGINTEGER,
@@ -28,7 +28,7 @@ typedef enum Mmodulemask {
     MM_CHARS=(1<<MI_CHARS),
     MM_STRING=(1<<MI_STRING),
     MM_SETTINGS=(1<<MI_SETTINGS),
-    MM_EXPRESSION=(1<<MI_EXPRESSION),
+    MM_EXPRESSION=(1<<MI_TOKEN),
     MM_MEMORY=(1<<MI_MEMORY),
     MM_EXECUTION=(1<<MI_EXECUTION),
     MM_BIGINTEGER=(1<<MI_BIGINTEGER),
@@ -40,5 +40,5 @@ typedef enum Mmodulemask {
     MM_LIST=(1<<MI_LIST),
     MM_FUNCTIONS=(1<<MI_FUNCTIONS),
     MM_ENVIRONMENT=(1<<MI_ENVIRONMENT),
-    MM_SHELL=(1<<MI_SHELL),
+    MM_SHELL=(1<<MI_SHELL)
 }Mmodulemask;

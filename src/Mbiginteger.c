@@ -1,7 +1,9 @@
 #include "Mbiginteger.h"
 
-static uint16_t const MODULE_ID=10;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_BIGINTEGER)
+
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_BIGINTEGER,id};}
 
 extern const long long M_LL_INVALID,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 

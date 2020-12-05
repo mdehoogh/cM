@@ -7,8 +7,10 @@
 
 #include "Menvironment.h"
 
-static uint16_t const MODULE_ID=17;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_ENVIRONMENT)
+
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ENVIRONMENT,id};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE;

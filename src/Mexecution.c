@@ -15,8 +15,10 @@
 
 #include "Mexecution.h"
 
-static uint16_t const MODULE_ID=9;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_EXECUTION)
+
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_EXECUTION,id};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
@@ -159,7 +161,7 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger){if(!_bigi
 }/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
-static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MODULE_ID,__LINE__,1};
+static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MI_EXECUTION,__LINE__,1};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
 const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=owned_biginteger(_getBiginteger(0),owner_biginteger);return bi0;}/* VALIDATED */
 const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=owned_biginteger(_getBiginteger(1),owner_biginteger);return bi1;}/* VALIDATED */
@@ -719,7 +721,7 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){//Mallocationowner o
     return(_biginteger?_getMpintText(MP_INT_POINTER(_biginteger)):__string());
 }
 
-Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;Mallocationowner owner_biLLextreme=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;Mallocationowner owner_biLLextreme=(Mallocationowner){MI_EXECUTION,__LINE__,1};
 // MDH@11JUN2020: if we return something that is owned instead of something that is disowned we prevent external freeing (i.e. unwarned that is)
 Mbiginteger* getBigintegerLLMin(){//Mallocationowner owner=getOwner(__LINE__);
     if(!_biLLMin){

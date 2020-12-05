@@ -5,11 +5,12 @@
 
 #include "Mchars.h"
 
-static uint16_t const MODULE_ID=4;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+extern unsigned long long M_MODULE_DEBUGGING;
+#define DEBUGGING (M_MODULE_DEBUGGING&MM_CHARS)
+
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_CHARS,id};}
 
 extern char const * const M_WARNING_PREFIX;
-
 
 Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return DISOWNED(_chars,owner_chars);}
 Mchars* owned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return OWNED(_chars,owner_chars);}
