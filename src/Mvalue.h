@@ -241,6 +241,7 @@ Mvalue* _getValueOfInteger(Minteger* _integer/*,Mallocationowner owner_integer*/
 Mvalue* _getValueOfReal(Mfloat* _real/*,Mallocationowner owner_real*/);
 Mvalue* _getValueOfMap(Mmap* _map/*,Mallocationowner owner_map*/);
 Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/);
+Mvalue* _getValueOfText(Mtext* _text); // MDH@07DEC2020: finally!!!
 Mvalue* _getValueOfReference(Mreference* _reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
 Mvalue* _getValueOfBiginteger(Mbiginteger* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
 Mvalue* _getValueOfRational(Mrational* _rational);

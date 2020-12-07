@@ -31,7 +31,7 @@
 #include "mpdecimal.h"
 
 // for heap_string_copy() to copy char* stuff
-#include "Mlocale.h"
+#include "Mmemory.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -123,6 +123,12 @@ Mtext* owned_text(Mtext* _text,Mallocationowner owner_text);
 
 Mtext* _getText(char const * const _c);
 Mtext* _getCharText(char _char);
+
+// MDH@07DEC2020: convenience method to create a Mstring from a character string
+Mstring* _getQuotedTextString(char const * const c,char quote); // specifically used by
+Mtext* _getSingleQuotedText(char const * const text);
+Mstring* _getQuotedTextCharString(char _char,char quote); // specifically used by
+Mtext* _getSingleQuotedCharText(char _char);
 
 ////////Menvironment* getExecutionEnvironment();
 Minteger* disowned_integer(Minteger* _integer,Mallocationowner owner_integer);

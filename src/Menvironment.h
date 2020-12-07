@@ -142,4 +142,4 @@ Mvalue* Mget(Mvalue* _variableNameValue);
 
 // MDH@05DEC2020: for getting and setting the locale
 Mvalue* Msetlocale(Mvalue* _localeValue);
-Mvalue* Mlocale();
+Mvalue* Mlocalesettings();

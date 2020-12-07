@@ -761,6 +761,17 @@ Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/){
     if(Misdisowned(_token))free_token(_token);
     return _value;
 }/* VALIDATED */
+// MDH@07DEC2020: why wasn't this defined before??????
+Mvalue* _getValueOfText(Mtext* _text){
+    if(!_text)return NULL;
+    bool disowned_text=Misdisowned(_text); // if _text is currently disowned we're going to free it if we fail to wrap it in a value
+    Mvalue* _value=__value("text");
+    if(_value)
+    {_value->value._text=(disowned_text?owned_text(_text,owner_value_data):_text);_value->type=VT_TEXT;}
+    else
+    if(disowned_text)free_text(_text);
+    return _value;
+}/* VALIDATED */
 
 /* TODO move elsewhere
 Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){

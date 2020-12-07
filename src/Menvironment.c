@@ -29,7 +29,7 @@ extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with ea
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char * const VALUETYPENAMES[];
-extern const char * const M_LOCALE_VARIABLE_NAME; // MDH@05DEC2020
+extern const char * const M_LOCALE_SETTINGS_VARIABLE_NAME; // MDH@05DEC2020
 
 // moved over to the end of Mvalue.c
 
@@ -1991,17 +1991,26 @@ Mvalue* Mget(Mvalue* _variableNameValue){Mallocationowner owner=getOwner(__LINE_
 }
 
 Mvalue* Msetlocale(Mvalue* _localeValue){Mallocationowner owner=getOwner(__LINE__);
-    Mvalue* localeValue=NULL;
+    long long result=M_LL_INVALID;
     if(_localeValue&&_localeValue->type==VT_TEXT){
+        result=M_FALSE;
         char* locale=setlocale(LC_ALL,_localeValue->value._text->_c);
         if(locale){
+            // OOPS we can't NULL the immutable locale settings variable, we can only ask for updating the map
+            // by NULLing the localesettingsVariable localeValue (as kept by Mlocale.c) will have a zero count, well hopefully)
+            // NOTE if the user assigns it to another variable, the map will get copied and not referenced, so the count won't be incremented on the original!
+            if(!updateLocalesettingsMap()) // replacing: !setVariable(NULL,M_LOCALE_SETTINGS_VARIABLE_NAME,NULL)||!setVariable(NULL,M_LOCALE_SETTINGS_VARIABLE_NAME,getLocaleValue()))
+                outputError("Failed to update the locale settings");
+            else
+                result=M_TRUE; // success
+            /* replacing:
             Mstring* _locale=owned_string(_getString("'"),owner); // free asap
             if(_locale){
                 if(string_append(_locale,locale)){
                     // NOTE convenient to use getlocale() instead of locale (although they should be the same)
                     localeValue=_getTextValue(string(_locale));
                     if(localeValue){
-                        if(!setVariable(NULL,M_LOCALE_VARIABLE_NAME,localeValue)){
+                        if(!setVariable(NULL,M_LOCALE_SETTINGS_VARIABLE_NAME,localeValue)){
                             output("%sFailed to save the new current locale '%s'.\n",M_ERROR_PREFIX,locale);
                             localeValue=NULL; // TODO would this be OK?
                         }
@@ -2012,16 +2021,17 @@ Mvalue* Msetlocale(Mvalue* _localeValue){Mallocationowner owner=getOwner(__LINE_
                 FREE_STRING(_locale,owner);
             }else
                 outputError("Failed to create the locale text");
+            */
         }else
             outputError("Proposed new locale not accepted");
     }else
         outputError("Proposed locale not of type text");
-    return localeValue;
+    return _getIntegerValue(result);
 }
-Mvalue* Mlocale(){Mallocationowner owner=getOwner(__LINE__);
-    Mvariable* localeVariable=getVariable(getExecutionEnvironment(),M_LOCALE_VARIABLE_NAME,false);
+Mvalue* Mlocalesettings(){Mallocationowner owner=getOwner(__LINE__);
+    Mvariable* localeVariable=getVariable(getExecutionEnvironment(),M_LOCALE_SETTINGS_VARIABLE_NAME,false);
     if(localeVariable)return localeVariable->_value;
-    output("%sVariable %s not found",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
+    output("%sVariable %s not found",M_ERROR_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
     return NULL;
 }
 
@@ -2032,7 +2042,7 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
     if(!completedValueValueFunction(_getFunction(_environment,owner_environment,"set"),"set",Mset))return false;
 
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"setlocale"),"setlocale",Msetlocale))return false;
-    if(!completedFunction(_getFunction(_environment,owner_environment,"locale"),"locale",Mlocale))return false;
+    if(!completedFunction(_getFunction(_environment,owner_environment,"localesettings"),"localesettings",Mlocalesettings))return false;
 
     // variable functions
 

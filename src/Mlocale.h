@@ -1,6 +1,9 @@
 #include <stdlib.h>
 
-#include "Mmemory.h"
+#include "Mlist.h"
+
+Mmap* getLocalesettingsMap(); // exposes the current locale value
+bool updateLocalesettingsMap();
 
 #define INT_STR_SIZE (CHAR_BIT*sizeof(int)*3/10 + 2)
 #define INT_SEP_STR_SIZE (INT_STR_SIZE * 3/2 + 1)

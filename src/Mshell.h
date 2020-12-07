@@ -113,6 +113,7 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue);
 // MDH@05DEC2020: added moduleDebugging flags
 bool shellInitialized(
 				char const * const settingCharacters,
+				char const * const locale,
 				unsigned long long moduleDebugging,
 				InputCharReadFunction _inputCharReadFunction,
 				InputResponseFunction _inputInfoFunction,

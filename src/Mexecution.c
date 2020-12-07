@@ -468,7 +468,6 @@ Mtext* _getText(char const * const text){//Mallocationowner owner=getOwner(__LIN
     return(text?(Mtext*)_strdup(text):NULL); // TODO assuming that _strdup will return a disowned text!!!
     // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
 }/* VALIDATED */
-
 Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
     Mtext* _charText=NULL;
     Mstring* _charString=owned_string(_getString("\""),owner);
@@ -478,6 +477,46 @@ Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text 
     }
     return disowned_text(_charText,owner);
 }/* VALIDATED */
+
+Mstring* _getQuotedTextString(char const * const text,char quote){Mallocationowner owner=getOwner(__LINE__);
+    if(text){
+        Mstring* _quotedTextString=owned_string(__string("_getQuotedTextString()"),owner);
+        if(_quotedTextString){
+            if((!quote||string_append_char(_quotedTextString,quote))&&string_append(_quotedTextString,text))
+                return disowned_string(_quotedTextString,owner);
+            FREE_STRING(_quotedTextString,owner);
+        }else
+            outputError("Failed to create a quoted text string");
+    }
+    return NULL;
+}/* VALIDATED */
+// MDH@07DEC2020: more often than not we're going to need an Mtext that starts with a certain quote character
+Mtext* _getSingleQuotedText(char const * const text){Mallocationowner owner=getOwner(__LINE__);
+    if(!text)return NULL;
+    Mstring* _singleQuotedTextString=owned_string(_getQuotedTextString(text,'\''),owner);
+    if(!_singleQuotedTextString)return NULL;
+    Mtext* _singleQuotedText=owned_text(_getText(string(_singleQuotedTextString)),owner);
+    FREE_STRING(_singleQuotedTextString,owner);
+    return disowned_text(_singleQuotedText,owner);
+} /* VALIDATED */
+Mstring* _getQuotedTextCharString(char _char,char quote){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _quotedTextCharString=owned_string(__string("_getQuotedTextCharString()"),owner);
+    if(_quotedTextCharString){
+        if((!quote||string_append_char(_quotedTextCharString,quote))&&(!_char||string_append_char(_quotedTextCharString,_char)))
+            return disowned_string(_quotedTextCharString,owner);
+        FREE_STRING(_quotedTextCharString,owner);
+    }else
+        outputError("Failed to create a quoted character string");
+    return NULL;
+}/* VALIDATED */
+Mtext* _getSingleQuotedCharText(char _char){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _singleQuotedTextCharString=owned_string(_getQuotedTextCharString(_char,'\''),owner);
+    if(!_singleQuotedTextCharString)return NULL;
+    Mtext* _singleQuotedCharText=owned_text(_getText(string(_singleQuotedTextCharString)),owner);
+    FREE_STRING(_singleQuotedTextCharString,owner);
+    return disowned_text(_singleQuotedCharText,owner);
+}/* VALIDATED */
+
 /*
 void free_list(Mlist* _list);
 void free_variable(Mvariable* _variable);

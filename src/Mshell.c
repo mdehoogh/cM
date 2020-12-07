@@ -86,7 +86,7 @@ const char M_COMMAND_CONTINUATION_CHARACTER='`'; // MDH@28OCT2020: the only char
 
 const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
 
-const char * const M_LOCALE_VARIABLE_NAME="LOCALE";
+const char * const M_LOCALE_SETTINGS_VARIABLE_NAME="LOCALE_SETTINGS";
 
 // you can set the modules to debug here using the module masks as defined in Mmodule.h
 unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized in shellInitialized()
@@ -11552,9 +11552,20 @@ bool settingApplied(char settingCharacter){
 }
 
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
-bool shellInitialized(char const * const settingCharacters,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
+// MDH@07DEC2020: added argument locale for setting the locale
+bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
 
 	M_MODULE_DEBUGGING=moduleDebugging; // MDH@05DEC2020
+
+	// MDH@07DEC2020: if locale is not NULL try to set the current (overall) locale to it
+	if(locale){
+		char* newlocale=setlocale(LC_ALL,locale);
+		if(!newlocale)
+			output("%sFailed to use proposed locale '%s'!",M_ERROR_PREFIX,locale);
+		else
+		if(strcmp(locale,newlocale)==0)
+			output("%sProposed locale '%s' not accepted. Still using '%s' as locale.\n",M_ERROR_PREFIX,locale,newlocale);
+	}
 
 	// initialize the random generator
 	long long randomSeedGeneratorInitializationResult=getValueInteger(Msrand(NULL));
@@ -11669,23 +11680,17 @@ bool shellInitialized(char const * const settingCharacters,unsigned long long mo
 			}
 
 			// MDH@05DEC2020: obtain the current LC_ALL locale, and save it to the LOCALE variable
-			Mvalue* LOCALE_value=NULL;
-			Mstring* _locale=owned_string(_getString("'"),owner);
-			if(_locale&&string_append(_locale,setlocale(LC_ALL,NULL)))
-				LOCALE_value=_getTextValue(string(_locale));
-			FREE_STRING(_locale,owner);
-			if(!LOCALE_value){
-				///////free_value(E_value);
-				output("%sFailed to create %s.\n",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
+			// MDH@07DEC2020: we're going to use a map to store both the current locale setting (in property '') as well as all the fields
+			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
+			if(!localesettingsValue)outputWarning("Failed to obtain the current locale settings value");
+			// the locale settings variable will be created as immutable, so once set it cannot be changed itself (although the map can be!!!)
+			if(!addVariable(_Menvironment,owner,M_LOCALE_SETTINGS_VARIABLE_NAME,VT_MAP,true)){
+				output("%sFailed to register '%s'.\n",M_ERROR_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
-			if(!addVariable(_Menvironment,owner,M_LOCALE_VARIABLE_NAME,VT_TEXT,false)){
-				output("%sFailed to register %s.\n",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
-				return NULL;
-			}
-			if(!setValue(_Menvironment,M_LOCALE_VARIABLE_NAME,LOCALE_value)){
+			if(!setValue(_Menvironment,M_LOCALE_SETTINGS_VARIABLE_NAME,localesettingsValue)){
 				//////free_value(E_value);
-				output("%sFailed to initialize %s.\n",M_ERROR_PREFIX,M_LOCALE_VARIABLE_NAME);
+				output("%sFailed to initialize '%s'.\n",M_ERROR_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
 

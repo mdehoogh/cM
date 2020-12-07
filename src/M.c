@@ -3875,7 +3875,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 	COMMAND_PROCESSOR_AVAILABLE=system(NULL); // check if there's a command processor available
 
-	// setlocale(LC_ALL,"C"); // TODO will this help???
+	// setlocale(LC_ALL,"C"); // now passing the locale to shellInitialized()!!
 
 #ifdef __DEBUG__
 	printf("\n%s","Operator token types:");
@@ -3963,7 +3963,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
-	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),moduleDebugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
+	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",moduleDebugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
 		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);
