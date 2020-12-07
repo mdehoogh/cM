@@ -172,7 +172,7 @@ static Mstring* _getIntegerTextLocale(char* integerText){Mallocationowner owner=
 }
 size_t outputBigintegerLocale(Mbiginteger* biginteger){Mallocationowner owner=getOwner(__LINE__);
   size_t written=0;
-  Mstring* _bigintegerText=_getBigintegerText(biginteger);
+  Mstring* _bigintegerText=owned_string(_getBigintegerText(biginteger),owner);
   if(_bigintegerText){
     Mstring* _bigintegerTextLocale=owned_string(_getIntegerTextLocale(string(_bigintegerText)),owner);
     if(_bigintegerTextLocale){ // we've got it
@@ -204,7 +204,7 @@ size_t outputFloatLocale(Mfloat* _float){Mallocationowner owner=getOwner(__LINE_
 }
 size_t outputDecimalLocale(Mdecimal* _decimal,bool fixedpoint){Mallocationowner owner=getOwner(__LINE__);
   size_t written=0;
-  Mstring* _decimalText=_getDecimalText(_decimal,fixedpoint);
+  Mstring* _decimalText=owned_string(_getDecimalText(_decimal,fixedpoint),owner);
   if(_decimalText){
     Mstring* _decimalTextLocale=owned_string(_getFloatTextLocale(string(_decimalText)),owner);
     if(_decimalTextLocale){ // we've got it

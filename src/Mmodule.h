@@ -7,7 +7,6 @@ typedef enum Mmoduleid {
     MI_SETTINGS,
     MI_TOKEN, // MDH@05DEC2020: renamed from MI_EXPRESSION to MI_TOKEN
     MI_MEMORY,
-    MI_LOCALE,
     MI_EXECUTION,
     MI_BIGINTEGER,
     MI_RATIONAL,
@@ -16,12 +15,14 @@ typedef enum Mmoduleid {
     MI_ITERATOR,
     MI_ARRAY,
     MI_LIST,
+    MI_LOCALE,
     MI_FUNCTIONS,
     MI_ENVIRONMENT,
     MI_SHELL,
+    MI_COLORS,
+    MI_SESSION,
     MI_MAIN
 }Mmoduleid;
-
 typedef enum Mmodulemask {
     MF_OUTPUT=(1<<MI_OUTPUT),
     MF_MESSAGE=(1<<MI_MESSAGE),
@@ -31,7 +32,6 @@ typedef enum Mmodulemask {
     MM_SETTINGS=(1<<MI_SETTINGS),
     MM_EXPRESSION=(1<<MI_TOKEN),
     MM_MEMORY=(1<<MI_MEMORY),
-    MM_LOCALE=(1<<MI_LOCALE),
     MM_EXECUTION=(1<<MI_EXECUTION),
     MM_BIGINTEGER=(1<<MI_BIGINTEGER),
     MM_RATIONAL=(1<<MI_RATIONAL),
@@ -40,8 +40,11 @@ typedef enum Mmodulemask {
     MM_ITERATOR=(1<<MI_ITERATOR),
     MM_ARRAY=(1<<MI_ARRAY),
     MM_LIST=(1<<MI_LIST),
+    MM_LOCALE=(1<<MI_LOCALE),
     MM_FUNCTIONS=(1<<MI_FUNCTIONS),
     MM_ENVIRONMENT=(1<<MI_ENVIRONMENT),
     MM_SHELL=(1<<MI_SHELL),
+    MM_COLORS=(1<<MI_COLORS),
+    MM_SESSION=(1<<MI_SESSION),
     MM_MAIN=(1<<MI_MAIN)
 }Mmodulemask;

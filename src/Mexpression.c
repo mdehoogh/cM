@@ -6,8 +6,7 @@
 extern unsigned long long M_MODULE_DEBUGGING;
 #define DEBUGGING false
 
-static uint16_t MODULE_ID=15;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_EXPRESSION,id};}
 
 extern char const * const M_ERROR_PREFIX;
 extern char const * const M_BUG_PREFIX;
