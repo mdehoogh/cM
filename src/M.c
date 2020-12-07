@@ -1167,7 +1167,8 @@ void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
 		long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
 		if(_allocationTypeSizes){
 			if(numberOfAllocationTypeSizes>0&&numberOfAllocationMarks>0)
-				output("Dynamically allocated memory: %s bytes.\n",LL_SEP(_allocationTypeSizes[1]));
+			{output("Dynamicaly allocated memory: ");outputLongLongLocale(_allocationTypeSizes[1]);output(".\n");}
+			// replacing: output("Dynamically allocated memory: %s bytes.\n",LL_SEP(_allocationTypeSizes[1]));
 			free(_allocationTypeSizes);
 		}else
 			outputError("No memory allocation information available!");
@@ -1855,24 +1856,25 @@ void clearCommand(){
 }
 // TODO find a way to not have to replicate as we do now what getValueText() is also doing (but without coloring of course)
 // MDH@13MAR2020: result type changed to size_t because now returning the number of characters written
+// MDH@07DEC2020: all numbers are displayed taking the current locale into account (what _getValueText() itself never does!!!)
 size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	size_t written=0;
 	if(_value){
 		switch(_value->type){
 			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);written=output("%s",M_UNDEFINED_VALUE_TEXT);break; // let's use the same color as for double quotes string (for now)
 			case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);written=output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
-			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);written=outputValue(NULL,_value,NULL);break;
-			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);written=outputBiginteger(NULL,_value->value._biginteger,NULL);break;
-			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
+			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);written=outputIntegerLocale(_value->value._integer);break;
+			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);written=outputBigintegerLocale(_value->value._biginteger);break;
+			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);written+=outputDecimalLocale(_value->value._decimal,false);break;
 			case VT_RATIONAL:
 				if(_value->value._rational){
 					written+=outputChar('(');
-					outputTokenTypeColor(TT_INTEGER);written+=outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
+					outputTokenTypeColor(TT_INTEGER);written+=outputBigintegerLocale(_value->value._rational->num);resetOutputColor();
 					written+=outputChar('/');
 					// written+=outputChar('/'); // MDH@28OCT2020: inserting
 					outputTokenTypeColor(TT_INTEGER);
 					if(_value->value._rational->den){
-						written+=outputBiginteger(NULL,_value->value._rational->den,NULL);
+						written+=outputBigintegerLocale(_value->value._rational->den);
 					}
 					else written+=outputChar('1'); // a missing denominator means it's equal to 1
 					resetOutputColor();
@@ -1880,18 +1882,21 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 					if(_value->value._rational->delta){
 						outputTokenTypeColor(TT_REAL);
 						if(_value->value._rational->delta->ld>=0)written+=outputChar('+');
+						written+=outputFloatLocale(_value->value._rational->delta);
+						/* MDH@07DEC2020: replacing:
 						Mstring* _realValueText=owned_string(__string(),owner);
 						if(_realValueText){
 							appendld(_realValueText,_value->value._rational->delta->ld);
 							written+=output("%s",string(_realValueText));
 							FREE_STRING(_realValueText,owner);
 						}
+						*/
 						// replacing:	output("%.*Lf",LDBL_DIG,_value->value._rational->delta->ld);
 						resetOutputColor();
 					}
 				}
 				break;
-			case VT_FLOAT:outputTokenTypeColor(TT_REAL);written+=outputValue(NULL,_value,NULL);break;
+			case VT_FLOAT:outputTokenTypeColor(TT_REAL);written+=outputFloatLocale(_value->value._float);break;
 			case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);written+=outputValue(NULL,_value,NULL);break;
 			case VT_ARRAY:
 				{

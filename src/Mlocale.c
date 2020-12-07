@@ -8,6 +8,11 @@ extern unsigned long long M_MODULE_DEBUGGING;
 #define DEBUGGING (M_MODULE_DEBUGGING|MM_LOCALE)
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_LOCALE,id};}
+/*
+#define INT_STR_SIZE (CHAR_BIT*sizeof(int)*3/10 + 2)
+#define INT_SEP_STR_SIZE (INT_STR_SIZE * 3/2 + 1)
+#define INT_SEP(x) int_sep((char[INT_SEP_STR_SIZE]) { "" }, INT_SEP_STR_SIZE, x)
+*/
 
 // keep all location settings in a single map
 static Mmap* _localesettingsMap=NULL;Mallocationowner owner_localesettingsmap=(Mallocationowner){MI_LOCALE,__LINE__,1};
@@ -76,8 +81,8 @@ Mmap* getLocalesettingsMap(){Mallocationowner owner=getOwner(__LINE__);
     outputError("Failed to create the map for storing the locale settings");
   return _localesettingsMap; // NOTE not returning the map disowned, so this module will keep ownership of the map
 }
-
-char *int_sep(char *s, size_t sz, int x){
+/*
+static char *int_sep(char *s, size_t sz, int x){
   struct lconv *locale_ptr = localeconv();
   const char *grouping = locale_ptr->grouping;
   char sep = locale_ptr->thousands_sep[0];
@@ -104,8 +109,8 @@ char *int_sep(char *s, size_t sz, int x){
   }
   return s;
 }
-
-char *ll_sep(char *s, size_t sz, long long x){
+*/
+static char *ll_sep(char *s, size_t sz, long long x){
   struct lconv *locale_ptr = localeconv();
   const char *grouping = locale_ptr->grouping;
   char sep = locale_ptr->thousands_sep[0];
@@ -131,4 +136,83 @@ char *ll_sep(char *s, size_t sz, long long x){
     memmove(s, ptr, (size_t) (&s[sz] - ptr));
   }
   return s;
+}
+#define LL_STR_SIZE (CHAR_BIT*sizeof(long long)*3/10 + 4)
+#define LL_SEP_STR_SIZE (LL_STR_SIZE * 3/2 + 1)
+#define LL_SEP(x) ll_sep((char[LL_SEP_STR_SIZE]){ "" },LL_SEP_STR_SIZE,x)
+size_t outputLongLongLocale(long long ll){return output(LL_SEP(ll));}
+size_t outputIntegerLocale(Minteger* integer){
+  return(integer?outputLongLongLocale(integer->ll):0);
+}
+
+// getIntegerTextLocale() returns the text of the integer provided formatted in using the current locale thousand separator
+static Mstring* _getIntegerTextLocale(char* integerText){Mallocationowner owner=getOwner(__LINE__);
+  struct lconv *locale_ptr=localeconv();
+  char sep=(locale_ptr?locale_ptr->thousands_sep[0]:'\0');
+  if(!sep)return NULL; // this is easiest, so that integerText will simply be output instead
+  // initialize _integerTextString with integerText
+  Mstring* _integerTextString=owned_string(_getString(integerText),owner);
+  if(!_integerTextString)return NULL;
+  const char *grouping=locale_ptr->grouping;
+  if(!grouping)return NULL; // NOTE should actually not happen though
+  // take the sign into account
+  size_t groupindex=0,sepinsertpos=string_length(_integerTextString),sign=(string_char(_integerTextString,0)=='-'?1:0);
+  uint8_t groupsize=3,group=grouping[groupindex]; // assume the group size is 3
+  while(group!=CHAR_MAX){
+    // if group is not '\0' which means keep using the current groupsize, use group as groupsize and get the next one (which could be zero)
+    if(group){
+      groupsize=group;
+      group=grouping[++groupindex];
+    }
+    if(groupsize<=sepinsertpos-sign)break;
+    sepinsertpos-=groupsize;
+    if(!string_insert_char(_integerTextString,sepinsertpos,sep))break;
+  }
+  return disowned_string(_integerTextString,owner);
+}
+size_t outputBigintegerLocale(Mbiginteger* biginteger){Mallocationowner owner=getOwner(__LINE__);
+  size_t written=0;
+  Mstring* _bigintegerText=_getBigintegerText(biginteger);
+  if(_bigintegerText){
+    Mstring* _bigintegerTextLocale=owned_string(_getIntegerTextLocale(string(_bigintegerText)),owner);
+    if(_bigintegerTextLocale){ // we've got it
+      written=output("%s",string(_bigintegerTextLocale));
+      FREE_STRING(_bigintegerTextLocale,owner);
+    }else
+      written=output("%s",string(_bigintegerText));
+    FREE_STRING(_bigintegerText,owner);
+  }
+  return written;
+}
+
+static Mstring* _getFloatTextLocale(char* floatText){
+  return NULL;
+}
+size_t outputFloatLocale(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__);
+  size_t written=0;
+  Mstring* _floatText=owned_string(_getFloatText(_float),owner);
+  if(_floatText){
+    Mstring* _floatTextLocale=owned_string(_getFloatTextLocale(string(_floatText)),owner);
+    if(_floatTextLocale){ // we've got it
+      written=output("%s",string(_floatTextLocale));
+      FREE_STRING(_floatTextLocale,owner);
+    }else
+      written=output("%s",string(_floatText));
+    FREE_STRING(_floatText,owner);
+  }
+  return written;
+}
+size_t outputDecimalLocale(Mdecimal* _decimal,bool fixedpoint){Mallocationowner owner=getOwner(__LINE__);
+  size_t written=0;
+  Mstring* _decimalText=_getDecimalText(_decimal,fixedpoint);
+  if(_decimalText){
+    Mstring* _decimalTextLocale=owned_string(_getFloatTextLocale(string(_decimalText)),owner);
+    if(_decimalTextLocale){ // we've got it
+      written=output("%s",string(_decimalTextLocale));
+      FREE_STRING(_decimalTextLocale,owner);
+    }else
+      written=output("%s",string(_decimalText));
+    FREE_STRING(_decimalText,owner);
+  }
+  return written;
 }
