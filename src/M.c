@@ -55,7 +55,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.5"; // MDH@05DEC2020: this is were Mexpression is renamed to Mtoken
-char const * const M_BUILD="2";char const * const M_DATE="5 December 2020"; // with Mlocale.c/h to be able to get/set the locale
+char const * const M_BUILD="3";char const * const M_DATE="8 December 2020"; // adding a VT_DATE for handling dates (see Mdate.c/h)
+//char const * const M_BUILD="2";char const * const M_DATE="7 December 2020"; // with Mlocale.c/h to be able to get/set the locale
 //char const * const M_BUILD="1";char const * const M_DATE="5 December 2020"; // MDH@24NOV2020: timsort and harmonica sort 'i' and 'b' variants
 
 //char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
@@ -1864,6 +1865,7 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);written=output("%s",M_UNDEFINED_VALUE_TEXT);break; // let's use the same color as for double quotes string (for now)
 			case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);written=output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);written=outputIntegerLocale(_value->value._integer);break;
+			case VT_TIME:outputTokenTypeColor(TT_INTEGER);written=outputLongLongLocale(_value->value._time->t);break; // MDH@08DEC2020: simple, NO?
 			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);written=outputBigintegerLocale(_value->value._biginteger);break;
 			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);written+=outputDecimalLocale(_value->value._decimal,false);break;
 			case VT_RATIONAL:

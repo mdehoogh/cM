@@ -140,7 +140,7 @@ static char *ll_sep(char *s, size_t sz, long long x){
 #define LL_STR_SIZE (CHAR_BIT*sizeof(long long)*3/10 + 4)
 #define LL_SEP_STR_SIZE (LL_STR_SIZE * 3/2 + 1)
 #define LL_SEP(x) ll_sep((char[LL_SEP_STR_SIZE]){ "" },LL_SEP_STR_SIZE,x)
-size_t outputLongLongLocale(long long ll){return output(LL_SEP(ll));}
+size_t outputLongLongLocale(long long ll){return output("%s",LL_SEP(ll));}
 size_t outputIntegerLocale(Minteger* integer){
   return(integer?outputLongLongLocale(integer->ll):0);
 }

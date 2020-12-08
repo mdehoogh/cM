@@ -646,6 +646,14 @@ Mstring* appendull(Mstring* const ms,unsigned long long ull){return string_appen
 Mstring* appendll(Mstring* const ms,long long ll){return string_append_ll(ms,ll);}/* VALIDATED */
 Mstring* appendld(Mstring* const ms,long double ld){return string_append_ld(ms,ld);}/* VALIDATED */
 
+Mstring* _getLongLongText(long long ll){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _s=owned_string(__string(),owner);
+    if(!_s)return NULL;
+    Mstring* p=appendll(_s,ll);
+    if(!p){FREE_STRING(_s,owner);return NULL;}
+	////////if(amVerbose())output("Integer '%s'.",string(s));
+	return disowned_string(_s,owner);
+}
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__LINE__);
@@ -1181,5 +1189,30 @@ void free_file(Mfile* _file){
         if(_file->_stat)FREE_1(_file->_stat,'f');
         if(_file->_name)FREE_1(_file->_name,'S');
         FREE_1(_file,'F');
+    }
+}
+
+// MDH@08DEC2020: and not times
+Mtime* owned_time(Mtime* _time,Mallocationowner owner_time){
+    if(!_time)return NULL;
+    return OWNED(_time,owner_time);
+}
+Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time){
+    if(!_time)return NULL;
+    return DISOWNED(_time,owner_time);
+}
+Mtime* __time(){Mallocationowner owner=getOwner(__LINE__);
+    Mtime* _time=CALLOC_1(sizeof(struct Mtime),'T',owner);
+    return disowned_time(_time,owner);
+}
+Mtime* _getTime(char const * const source,time_t t){Mallocationowner owner=getOwner(__LINE__);
+    Mtime* _time=owned_time(__time(),owner);
+    if(!_time)return NULL;
+    _time->t=t;
+    return disowned_time(_time,owner);
+}
+void free_time(Mtime* _time){
+    if(_time){
+        FREE_1(_time,'T');
     }
 }

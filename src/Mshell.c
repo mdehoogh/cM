@@ -11929,6 +11929,13 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}
+			// MDH@08DEC2020: register time functions
+			if(!completedFunction(_getFunction(_Menvironment,owner,"now"),"now",Mnow)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"time"),"time",Mparsetime)){
+				outputError("Failed to register the time functions");
+				return NULL;
+			}
+
 		}
 	}
 

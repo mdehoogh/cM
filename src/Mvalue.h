@@ -27,6 +27,7 @@ typedef union Mvalueunion{
     struct Mfunction* _function; // MDH@03MAR2020
     struct Menvironment* _environment; // MDH@03MAR2020
     struct Mfile* _file; // MDH@28SEP2020 (defined in Mexecution.h)
+    struct Mtime* _time; // MDH@08DEC2020 (defined in Mexecution.h)
     //////////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
@@ -497,3 +498,6 @@ Mvalue* mfreadline(Mvalue* file_value); // reads all bytes until a new line char
 Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value); // reads all bytes until a new line character is encountered 
 Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value);
 Mvalue* mfiles(Mvalue* wildcard_value);
+
+// MDH@08DEC2020
+Mvalue* _getValueOfTime(Mtime* _time);

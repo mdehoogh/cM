@@ -355,6 +355,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
             case VT_FUNCTION:if(_value->value._function){FREE_FUNCTION(_value->value._function,owner_value_data);_value->value._function=NULL;}break;
             case VT_ENVIRONMENT:if(_value->value._environment){FREE_ENVIRONMENT(_value->value._environment,owner_value_data);_value->value._environment=NULL;}break;
             case VT_FILE:if(_value->value._file){FREE_FILE(_value->value._file,owner_value_data);_value->value._file=NULL;}break; // MDH@28SEP2020
+            case VT_TIME:if(_value->value._time){FREE_TIME(_value->value._time,owner_value_data);_value->value._time=NULL;}break; // MDH@08DEC2020
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         FREE_DISOWNED_1(_value,'X',owner_value);
@@ -1764,6 +1765,7 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 		switch(_value->type){
             case VT_UNDEFINED:valueText=owned_string(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
 			case VT_INTEGER:valueText=owned_string(_getIntegerText(_value->value._integer),owner);break;
+			case VT_TIME:valueText=owned_string(_getLongLongText(_value->value._time->t),owner);break; // MDH@08DEC2020: simply?
             case VT_BIGINTEGER:valueText=owned_string(_getBigintegerText(_value->value._biginteger),owner);break; // how many characters do we need????
             case VT_DECIMAL:valueText=owned_string(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
             case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
@@ -2409,6 +2411,7 @@ long long isValueNull(Mvalue* value){
         case VT_FUNCTION:result=(value->value._function?M_FALSE:M_TRUE);break;
         case VT_ENVIRONMENT:result=(value->value._environment?M_FALSE:M_TRUE);break;
         case VT_FILE:result=(value->value._file?M_FALSE:M_TRUE);break; // MDH@28SEP2020
+        case VT_TIME:result=(value->value._time?M_FALSE:M_TRUE);break; // MDH@08DEC2020
     }
     return result;
 }/* VALIDATED */
@@ -2438,6 +2441,7 @@ long long isValueUndefined(Mvalue* value){
         case VT_FUNCTION:result=(value->value._function?M_FALSE:M_TRUE);break;
         case VT_ENVIRONMENT:result=(value->value._environment?M_FALSE:M_TRUE);break;
         case VT_FILE:result=(value->value._file?M_FALSE:M_TRUE);break; // MDH@28SEP2020
+        case VT_TIME:result=(value->value._time?M_FALSE:M_TRUE);break; // MDH@08DEC2020
     }
     return result;
 }/* VALIDATED */
@@ -2780,6 +2784,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
         case VT_FUNCTION:return(value1->value._function==value2->value._function);
         case VT_ENVIRONMENT:return(strcmp(value1->value._environment->_name->chars,value2->value._environment->_name->chars)==0); // TODO we might need to use the full name of the environment here though
         case VT_FILE:return string_equal(value1->value._file->_name,value2->value._file->_name); // MDH@28SEP2020: the same if files are the same (TODO should be canonical of course)
+        case VT_TIME:return value1->value._time->t==value2->value._time->t;
     }
     return false;
 }
@@ -3406,4 +3411,17 @@ Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
         }
    }*/
    return NULL;
+}
+
+Mvalue* _getValueOfTime(Mtime* _time){
+    if(!_time)return NULL;
+    Mvalue* _value=__value("time");
+    if(!_value){
+        if(Misdisowned(_time))free_time(_time);
+        return NULL;
+    }
+    _value->type=VT_TIME;
+    // MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
+    _value->value._time=(Misdisowned(_time)?owned_time(_time,owner_value_data):_time);
+    return _value;
 }
