@@ -9127,7 +9127,7 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 				}
 		}
 		if(result>0)
-			output("Duration of array sorting by quicksort: %.3f ms.\n",(clock()-sortstart)/1000.0);
+			output("Duration of array sorting by quicksort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
 	}
 	return result;
 }
@@ -9927,14 +9927,14 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 			}
 		}
 		if(result==M_TRUE){
-			clock_t duration=clock()-sortstart;
+			double duration=clock()-sortstart;
 			if(report)
 			{
 				outputArray("The sorted array: '",_array,"'.\n");
 				outputValue("First: '",*_array->values,"'.\n");
 				outputValue("Last: '",*(_array->values+_array->numberOfElements-1),"'.\n");
 			}
-			output("Duration of array sorting by harmonicasort: %.3f ms.\n",duration/1000.0);
+			output("Duration of array sorting by harmonicasort: %.3f ms.\n",duration/M_CLOCKS_PER_MS);
 		}
 	}
 	return result;
@@ -10883,11 +10883,11 @@ static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunc
 	sortstatistics.pointertests++;
 	if(_array){
 		result=M_TRUE;
-		clock_t sortstart=clock();
+		clock_t sortstart=clock(); // force to double
 		sortstatistics.fieldreferences++;
 		unsigned long long arraylength=_array->numberOfElements;
 		if(arraylength>1){
-			clock_t sortstart=clock();
+			double sortstart=clock();
 			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 			Mvalue** values=_array->values;
 			// sort the (fixed-size) runs with insertion sort
@@ -10902,7 +10902,7 @@ static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunc
 						return M_FALSE;
 					}
 		}
-		output("Duration of array sorting by timsort: %.3f ms.\n",(clock()-sortstart)/1000.0);
+		output("Duration of array sorting by timsort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
 	}
 	return result;
 }

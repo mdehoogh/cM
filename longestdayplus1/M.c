@@ -1761,7 +1761,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	clock_t before_evaluating=clock();
 	getExecutionEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
 	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
-	long long elapsed_evaluating=(clock()-before_evaluating)/1000;
+	long long elapsed_evaluating=(clock()-before_evaluating)/M_CLOCKS_PER_MS;
 
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
 	if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show

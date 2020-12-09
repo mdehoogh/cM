@@ -758,7 +758,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
                     output("%sCan't store more than %u characters in a string.\n",M_ERROR_PREFIX,SIZE_MAX);
             }else
                 outputError("Couldn't determine the size of a big integer");
-            if(then)output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
+            if(then)output("Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
         }else
             outputError("No big integer to represent");
     }else

@@ -2131,7 +2131,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	
 	// outputValue("Result value: '",*resultValue,"'.\n"); // DEBUG
 
-	long long elapsed_evaluating=(clock()-before_evaluating)/1000;
+	long long elapsed_evaluating=(clock()-before_evaluating)/M_CLOCKS_PER_MS;
 
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
 	if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show
@@ -2146,7 +2146,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	output(" = ");
 
 	// if the result is a null value, show the NULL_value
-	clock_t before_writing=clock();size_t written=outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);long long elapsed_writing=(clock()-before_writing)/1000;
+	clock_t before_writing=clock();size_t written=outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);long long elapsed_writing=(clock()-before_writing)/M_CLOCKS_PER_MS;
 	
 	newline(); // outputValueColored() doesn't do that!!
 	

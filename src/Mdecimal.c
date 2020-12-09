@@ -1158,7 +1158,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 
 		_decimal=owned_decimal(_getDecimal(s,decimalprecision,0,true),owner);
 
-		output("Number of milliseconds passed in total (for computing and storing pi): %lld.\n",(clock()-then)/1000);
+		output("Number of milliseconds passed in total (for computing and storing pi): %lld.\n",(clock()-then)/M_CLOCKS_PER_MS);
 
 	}else{ // decimalcontext->pi exists
 
@@ -1394,7 +1394,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 					outputError("Failed to make preparations for storing predefined sine/cosines in the decimal context!");
 			}
 
-			output("Number of milliseconds to compute the sine and cosine of 256 predefined angles: %lld.\n",(clock()-then)/1000);
+			output("It took %lld ms to compute the sine and cosine of 256 predefined angles.\n",(clock()-then)/M_CLOCKS_PER_MS);
 
 		}
 	}

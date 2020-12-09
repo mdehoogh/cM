@@ -723,7 +723,7 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         }else        
             outputError("Failed to create big integer 3");
         if(amVerboseDebugging())
-            {outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/1000);}
+            {outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);}
     }else
         outputError("Failed to create big integer 6");
     FREE_BIGINTEGER(_finalmultiplier,owner);
