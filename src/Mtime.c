@@ -10,30 +10,33 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_TIME,
 
 extern char const * const M_ERROR_PREFIX;
 extern char const * const M_WARNING_PREFIX;
+extern long long M_LL_INVALID;
 
 Mvalue* Mnow(){
-    time_t t=time(NULL);
-    return _getValueOfTime(_getTime("Mnow()",t)); 
+    time_t t=time(NULL); // what is returned is essentially UTC, therefore tzsec should be set to NULL
+    return _getValueOfTime(_getTime("Mnow()",t,0)); 
 }
 
 // helper function that takes a valid ymd, hms and timezone indicator
 static Mtime* _getCalendarTime(char* iso8601){
     if(!iso8601)return NULL;
-    int l=strlen(iso8601)-1;
-    if(l<0)return NULL;
+    size_t l=strlen(iso8601);
+    if(l==0){outputError("Missing ISO8601 timestamp.");return NULL;}
+    char* Tpos=strchr(iso8601,'T'); // should always be there!!!
+    if(!Tpos){output("%sMissing time in ISO8601 timestamp '%s'.\n",M_ERROR_PREFIX,iso8601);return NULL;}
     output("Parsing ISO8601 '%s'.\n",iso8601);
     // source: https://stackoverflow.com/questions/26895428/how-do-i-parse-an-iso-8601-date-with-optional-milliseconds-to-a-struct-tm-in-c
     // if there's NO timezone information assume that local timezone is intended!!!!
     bool timezonespecified=true;
     int year,month,monthday,hour,minute,tzh,tzm,tzsec=0;float second;
-    if(iso8601[l]=='Z'){ // not an UTC (unless of course +00:00 was specified (or -00:00 for that matter though))
+    if(iso8601[--l]=='Z'){ // not an UTC (unless of course +00:00 was specified (or -00:00 for that matter though))
         sscanf(iso8601,"%d-%d-%dT%d:%d:%fZ",&year,&month,&monthday,&hour,&minute,&second);
     }else
-    if(l>6&&(iso8601[l-5]=='-'||iso8601[l-5]=='+')){ // checking for a single blank is easier
+    if(strrchr(iso8601,'+')||strrchr(iso8601,'-')>Tpos){ // NOTE the - of the timezone is BEHIND the position of the 'T'
         // NOTE hopefully sscanf() is able to format %i
         sscanf(iso8601,"%d-%d-%dT%d:%d:%f%d:%d",&year,&month,&monthday,&hour,&minute,&second,&tzh,&tzm);
         tzsec=60*(60*tzh+tzm); // the number of seconds offset from the timezone
-        output("Timezone offset: %d s.\n",tzsec);
+        // output("Timezone offset: %d s.\n",tzsec);
     }else{
         timezonespecified=false;
         sscanf(iso8601,"%d-%d-%dT%d:%d:%f",&year,&month,&monthday,&hour,&minute,&second);
@@ -59,7 +62,7 @@ static Mtime* _getCalendarTime(char* iso8601){
         time_t t=(timezonespecified?timegm(&timestamp):mktime(&timestamp)); // if timezone information is specified get the UTC time
         // if timezone information is specified 
         if(t>=0)
-            return _getTime("_getCalendarTime",t-(timezonespecified?tzsec:0));
+            return _getTime("_getCalendarTime",t,(timezonespecified?tzsec:M_LL_INVALID));
         output("%sFailed to compute the time represented by '%s'!\n",M_ERROR_PREFIX,iso8601);
     }else{
         if(month<1||month>12)output("%sMonth (%i) out of range.\n",M_ERROR_PREFIX,month);
@@ -75,8 +78,9 @@ Mvalue* Mparsetime(Mvalue* _timetextValue){Mallocationowner owner=getOwner(__LIN
     Mvalue* result=NULL;
     if(_timetextValue){
         if(_timetextValue->type==VT_INTEGER||_timetextValue->type==VT_BIGINTEGER){
-            long long lltime=getValueInteger(_timetextValue);
-            if(lltime>=0)result=_getValueOfTime(_getTime("Mparsetime()",lltime));
+            time_t t=(time_t)getValueInteger(_timetextValue);
+            // preferably use time() (see Mnow()) instead of the entered value as is...
+            if(t!=-1)result=_getValueOfTime(_getTime("Mparsetime()",time(&t),0)); // assuming UTC
         }else
         if(_timetextValue->type==VT_TEXT){
             // <date> <time> <timezone>, <date> ends with either T or -|+|Z, <time> ends with either T or -|+|Z or the end of the string (in which it assumes Z)
