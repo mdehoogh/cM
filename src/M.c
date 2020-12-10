@@ -3878,7 +3878,7 @@ void showSeparatorLine(){
 	output("%.*s",3*columns,string(_separator)); // ASCII 196 is the character that spans an entire column in the middle (better then the underscore)
 }
 
-int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // using 0 is kind of an exception to the rule that every function has a positive function id
+int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__LINE__); // using 0 is kind of an exception to the rule that every function has a positive function id
 
 	COMMAND_PROCESSOR_AVAILABLE=system(NULL); // check if there's a command processor available
 
