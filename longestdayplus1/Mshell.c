@@ -2502,6 +2502,8 @@ Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
 Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
+	// MDH@10DEC2020: this is a bit of an issue with time values in that _getValueText technically returns the epoch time text representation
+	//                and not the timestamp (calendar time)
 	Mstring* _valueText=owned_string(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
 		if(amVerbose())

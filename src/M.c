@@ -1865,7 +1865,7 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);written=output("%s",M_UNDEFINED_VALUE_TEXT);break; // let's use the same color as for double quotes string (for now)
 			case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);written=output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);written=outputIntegerLocale(_value->value._integer);break;
-			case VT_TIME:outputTokenTypeColor(TT_INTEGER);written=outputLongLongLocale(_value->value._time->t);break; // MDH@08DEC2020: simple, NO?
+			case VT_TIME:outputTokenTypeColor(TT_INTEGER);written=outputLongLongLocale(_value->value._time->t-(_value->value._time->tzsec==M_LL_INVALID?0:_value->value._time->tzsec));break; // MDH@08DEC2020: simple, NO?
 			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);written=outputBigintegerLocale(_value->value._biginteger);break;
 			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);written+=outputDecimalLocale(_value->value._decimal,false);break;
 			case VT_RATIONAL:

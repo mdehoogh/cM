@@ -285,6 +285,7 @@ bool ldIsOne(long double ld);
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getLongLongText(long long ll);
 Mstring* _getIntegerText(Minteger* _integer);
+Mstring* _getTimeText(Mtime* _time);
 Mstring* _getBigintegerText(const Mbiginteger* const _biginteger);
 Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
 Mstring* _getFloatText(Mfloat* _real);

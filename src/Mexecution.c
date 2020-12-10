@@ -668,6 +668,24 @@ Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__L
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return disowned_string(_s,owner);
 }/* VALIDATED */
+
+Mstring* _getTimeText(Mtime* _time){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _s=owned_string(__string(),owner);
+    if(!_s)return NULL;
+    Mstring* p=_s;
+    if(amVerboseDebugging())
+        p=string_append_char(p,'i');
+    if(p&&_time){
+        if(_time->t>=0){
+            long long lltime=_time->t;
+            if(_time->tzsec!=M_LL_INVALID)lltime-=_time->tzsec;
+            p=appendll(p,lltime); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
+        }
+    }
+    if(!p){FREE_STRING(_s,owner);return NULL;}
+	////////if(amVerbose())output("Integer '%s'.",string(s));
+	return disowned_string(_s,owner);
+}
 /* replaced by getValueInteger()
 long long getInteger(Mvalue* _value){
     if(_value)

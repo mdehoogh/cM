@@ -1765,7 +1765,7 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 		switch(_value->type){
             case VT_UNDEFINED:valueText=owned_string(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
 			case VT_INTEGER:valueText=owned_string(_getIntegerText(_value->value._integer),owner);break;
-			case VT_TIME:valueText=owned_string(_getLongLongText(_value->value._time->t),owner);break; // MDH@08DEC2020: simply?
+			case VT_TIME:valueText=owned_string(_getTimeText(_value->value._time),owner);break; // MDH@08DEC2020: simply?
             case VT_BIGINTEGER:valueText=owned_string(_getBigintegerText(_value->value._biginteger),owner);break; // how many characters do we need????
             case VT_DECIMAL:valueText=owned_string(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
             case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;

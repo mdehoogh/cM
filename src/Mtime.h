@@ -11,4 +11,5 @@ MDH@08DEC2020:
 
 
 Mvalue* Mnow();
+Mvalue* Mcalendartime(Mvalue* _timeValue);
 Mvalue* Mparsetime(Mvalue* _timetextValue);

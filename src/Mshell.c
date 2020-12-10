@@ -88,6 +88,9 @@ const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
 
 const char * const M_LOCALE_SETTINGS_VARIABLE_NAME="LOCALE_SETTINGS";
 
+const char* const M_ISO8601_FORMAT="%Y-%m-%dT%H:%M:%S";
+const char* const M_ISO8601_UTC_FORMAT="%Y-%m-%dT%H:%M:%SZ";
+
 // you can set the modules to debug here using the module masks as defined in Mmodule.h
 unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized in shellInitialized()
 
@@ -2923,6 +2926,8 @@ Mvalue* Mf(Mvalue* _value){
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
 Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
+	// MDH@10DEC2020: this is a bit of an issue with time values in that _getValueText technically returns the epoch time text representation
+	//                and not the timestamp (calendar time)
 	Mstring* _valueText=owned_string(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
 		if(amVerbose())
@@ -11931,11 +11936,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 			// MDH@08DEC2020: register time functions
 			if(!completedFunction(_getFunction(_Menvironment,owner,"now"),"now",Mnow)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"calendartime"),"calendartime",Mcalendartime)
 				||!completedValueFunction(_getFunction(_Menvironment,owner,"time"),"time",Mparsetime)){
 				outputError("Failed to register the time functions");
 				return NULL;
 			}
-
 		}
 	}
 
