@@ -91,7 +91,7 @@ Mvalue* Mcalendartime(Mvalue* _timeValue){Mallocationowner owner=getOwner(__LINE
             time_t t=_time->t;
             long long tzsec=_time->tzsec;
             struct tm* _tm;
-            size_t maxsize=strlen(M_ISO8601_FORMAT)+1;
+            size_t maxsize=19; // yyyy-mm-ddThh:mm:ss
             if(tzsec!=M_LL_INVALID){ // not local time
                 _tm=gmtime(&t); // the t-part represents UTC
                 if(tzsec!=0)
@@ -101,20 +101,28 @@ Mvalue* Mcalendartime(Mvalue* _timeValue){Mallocationowner owner=getOwner(__LINE
             }else // local time
                 _tm=localtime(&t);
             output("Calendar time fields: year=%d - month=%d - monthday=%d - hour=%d - minute=%d - second=%d.\n"
-                    ,_tm->tm_year,_tm->tm_mon,_tm->tm_mday,_tm->tm_hour,_tm->tm_min,_tm->tm_sec);
-            char strtm[maxsize];
-            strftime(strtm,maxsize,M_ISO8601_FORMAT,_tm);
-            size_t l=strlen(strtm);
+                    ,_tm->tm_year+1900,_tm->tm_mon+1,_tm->tm_mday,_tm->tm_hour,_tm->tm_min,_tm->tm_sec);
+            char strtm[maxsize+1];
+            strtm[0]='\'';
+            strftime(strtm+1,maxsize,M_ISO8601_FORMAT,_tm);
             if(tzsec!=M_LL_INVALID){
-                strtm[maxsize-1]='\0';
-                if(tzsec>0){
-                    strtm[l]='+';
+                size_t l=strlen(strtm);
+                if(tzsec!=0){
+                    if(tzsec<0){
+                        tzsec=-tzsec;
+                        strtm[l]='-';
+                    }else
+                        strtm[l]='+';
+                    int tzh=(tzsec/3600);
+                    strtm[++l]=48+(tzh/10);
+                    strtm[++l]=48+(tzh%10);
+                    strtm[++l]=':';
+                    int tzm=(tzsec/60)%60;
+                    strtm[++l]=48+(tzm/10);
+                    strtm[++l]=48+(tzm%10);
                 }else
-                if(tzsec<0){
-                    strtm[l]='-';
-                }else{
                     strtm[l]='Z';
-                }
+                strtm[++l]='\0';
             }
             return _getTextValue(strtm);
         }
