@@ -11934,6 +11934,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}
+			// MDH@10DEC2020: register system function(s)
+			if(!completedFunction(_getFunction(_Menvironment,owner,"systemvariables"),"systemvariables",Msystemvariables)){
+				outputError("Failed to register the systemvariables() function");
+				return NULL;				
+			}
 			// MDH@08DEC2020: register time functions
 			if(!completedFunction(_getFunction(_Menvironment,owner,"now"),"now",Mnow)
 				||!completedValueFunction(_getFunction(_Menvironment,owner,"calendartime"),"calendartime",Mcalendartime)

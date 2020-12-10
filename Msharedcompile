@@ -68,7 +68,7 @@ chmod 644 *
 # MDH@03MAR2020: compile with the -g flag so we can debug it
 
 # MDH@24NOV2020: in order to create a shared library we need to compile with the -fPIC setting (and link with the static libraries we need in it immediately)
-cc -Wno-incompatible-pointer-types-discards-qualifiers -shared -fPIC Moutput.c Mmessage.c Malloc.c Mchars.c Mstring.c Msettings.c Mtoken.c Mmemory.c Mlocale.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Marray.c Mlist.c Mfunctions.c Menvironment.c Mshell.c -L. -ltommath -lmpdec -o libM.dylib
+cc -Wno-incompatible-pointer-types-discards-qualifiers -shared -fPIC Moutput.c Mmessage.c Malloc.c Mchars.c Mstring.c Msettings.c Mtoken.c Mmemory.c Mlocale.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Msystem.c Mtime.c Marray.c Mlist.c Mfunctions.c Menvironment.c Mshell.c -L. -ltommath -lmpdec -o libM.dylib
 ## replacing two steps: compiling to object files and 2. wrapping in a static library (archive):
 ##cc -Wno-incompatible-pointer-types-discards-qualifiers -g Moutput.c Mmessage.c Malloc.c Mchars.c Mstring.c Msettings.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Miterator.c Marray.c Mlist.c Mlocale.c Mfunctions.c Menvironment.c Mshell.c
 ##ar cvq libM.a *.o
