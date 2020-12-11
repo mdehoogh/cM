@@ -11935,8 +11935,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 			// MDH@10DEC2020: register system function(s)
-			if(!completedFunction(_getFunction(_Menvironment,owner,"systemvariables"),"systemvariables",Msystemvariables)){
-				outputError("Failed to register the systemvariables() function");
+			if(!completedFunction(_getFunction(_Menvironment,owner,"systemvariables"),"systemvariables",Msystemvariables)
+				||!completedFunction(_getFunction(_Menvironment,owner,"clearenv"),"clearenv",Mclearenv)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"getenv"),"getenv",Mgetenv)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"unsetenv"),"unsetenv",Munsetenv)
+				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"setenv"),"setenv",Msetenv)
+				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"putenv"),"putenv",Mputenv)
+			){
+				outputError("Failed to register the system environment functions");
 				return NULL;				
 			}
 			// MDH@08DEC2020: register time functions
