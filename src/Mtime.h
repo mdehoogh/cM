@@ -13,3 +13,6 @@ MDH@08DEC2020:
 Mvalue* Mnow();
 Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tzValue);
 Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tzValue);
+
+Mvalue* Msettimezone(Mvalue* _tzValue);
+Mvalue* Mgettimezone();

@@ -11947,6 +11947,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 			// MDH@08DEC2020: register time functions
 			if(!completedFunction(_getFunction(_Menvironment,owner,"now"),"now",Mnow)
+				||!completedFunction(_getFunction(_Menvironment,owner,"gettimezone"),"gettimezone",Mgettimezone)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"settimezone"),"settimezone",Msettimezone)
 				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"calendartime"),"calendartime",Mcalendartime)
 				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"time"),"time",Mparsetime)){
 				outputError("Failed to register the time functions");

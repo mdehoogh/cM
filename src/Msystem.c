@@ -52,7 +52,7 @@ Mvalue* Mgetenv(Mvalue* _systemVariableValue){Mallocationowner owner=getOwner(__
     if(_systemVariableValue&&_systemVariableValue->type==VT_TEXT){
         char* systemVariable=_systemVariableValue->value._text->_c;
         if(systemVariable)
-            return _getTextValue(getenv(systemVariable));
+            return _getValueOfText(_getSingleQuotedText(getenv(systemVariable)));
     }
     return NULL;
 }
@@ -71,7 +71,7 @@ Mvalue* Msetenv(Mvalue* _systemVariableValue,Mvalue* _value){Mallocationowner ow
             }else
                 outputError("System variable value not a text");
             // let's return the current value
-            return _getTextValue(getenv(systemVariable));
+            return _getValueOfText(_getSingleQuotedText(getenv(systemVariable)));
         }
     }
     return NULL;
@@ -114,7 +114,7 @@ Mvalue* Mputenv(Mvalue* _systemVariableValue,Mvalue* _value){Mallocationowner ow
             }else // intending to remove it
             if(unsetenv(systemVariable)!=0)
                 output("%sFailed to remove system variable '%s'.\n",M_ERROR_PREFIX,systemVariable);
-            return _getTextValue(getenv(systemVariable));
+            return _getValueOfText(_getSingleQuotedText(getenv(systemVariable)));
         }
     }
     return NULL;
