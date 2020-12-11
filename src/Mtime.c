@@ -82,7 +82,8 @@ static Mtime* _getCalendarTime(char* iso8601){
     }
     return NULL;
 }
-Mvalue* Mcalendartime(Mvalue* _timeValue){Mallocationowner owner=getOwner(__LINE__);
+// MDH@11DEC2020: same here
+Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tzValue){Mallocationowner owner=getOwner(__LINE__);
     // let's accept any text that conforms to ISO8601 i.e. a calendar date with timezone information of the format <date><time><timezone> where <time>should start with T and <timezone> with either - or + or Z
     Mvalue* result=NULL;
     if(_timeValue&&_timeValue->type==VT_TIME){
@@ -129,7 +130,8 @@ Mvalue* Mcalendartime(Mvalue* _timeValue){Mallocationowner owner=getOwner(__LINE
     }
     return result;
 }
-Mvalue* Mparsetime(Mvalue* _timetextValue){Mallocationowner owner=getOwner(__LINE__);
+// MDH@11DEC2020: allowing to pass in the tz to use (if _timetextValue does not contain timezone information)
+Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tzValue){Mallocationowner owner=getOwner(__LINE__);
     // let's accept any text that conforms to ISO8601 i.e. a calendar date with timezone information of the format <date><time><timezone> where <time>should start with T and <timezone> with either - or + or Z
     Mvalue* result=NULL;
     if(_timetextValue){
