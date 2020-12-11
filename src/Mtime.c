@@ -14,6 +14,11 @@ extern long long M_LL_INVALID;
 extern char const * const M_ISO8601_FORMAT;
 extern char const * const M_ISO8601_UTC_FORMAT;
 
+// timezone global data
+extern char* tzname[2];
+extern long int timezone;
+extern int daylight;
+
 Mvalue* Mnow(){
     time_t t=time(NULL); // what is returned is essentially UTC, therefore tzsec should be set to NULL
     return _getValueOfTime(_getTime("Mnow()",t,0)); 
@@ -340,10 +345,14 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tzValue){Mallocationowner own
 
 Mvalue* Msettimezone(Mvalue* _tzValue){
     if(_tzValue&&_tzValue->type==VT_TEXT){
-        char* timezone=(_tzValue->value._text?_tzValue->value._text->_c:NULL);
-        if(timezone){
+        char* _timezone=(_tzValue->value._text?_tzValue->value._text->_c:NULL);
+        if(_timezone){
             // TODO check the validity of the timezone (so that this function does better than Msetenv("TZ") would!)
-            if(setenv("TZ",_tzValue->value._text->_c,1)!=0)
+            if(setenv("TZ",_timezone,1)==0){
+                // how about showing some timezone information?
+                tzset(); // force initializing timezone information from the TZ environment variable explicitly
+                output("Timezone '%s': standard time descriptor='%s' - daylight saving time descriptor='%s' - offset=%li - daylight=%d.\n",_timezone,tzname[0],tzname[1],timezone,daylight);
+            }else
                 output("%sFailed to set the system-defined timezone to '%s'.\n",M_ERROR_PREFIX,_tzValue->value._text->_c);
         }else 
             outputError("Missing timezone text");
