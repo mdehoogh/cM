@@ -116,6 +116,7 @@ typedef struct Mdecimal{
 typedef struct Mtime{
     time_t t;
     long long tzsec; // TODO a bit overkill??????
+    uint16_t tznindex; // the index into the timezonenames array (see Mtime.c)
 }Mtime;
 
 bool isLittleEndian();
@@ -320,6 +321,6 @@ void free_file(Mfile* _file);
 Mtime* owned_time(Mtime* _time,Mallocationowner owner_time);
 Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time);
 Mtime* __time();
-Mtime* _getTime(char const * const source,time_t t,long long tzsec);
+Mtime* _getTime(char const * const source,time_t t,long long tzsec,uint16_t timezone);
 void free_time(Mtime* _time);
 #define FREE_TIME(_time,owner_time) free_time(disowned_time(_time,owner_time))

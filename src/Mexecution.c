@@ -1223,11 +1223,12 @@ Mtime* __time(){Mallocationowner owner=getOwner(__LINE__);
     Mtime* _time=CALLOC_1(sizeof(struct Mtime),'T',owner);
     return disowned_time(_time,owner);
 }
-Mtime* _getTime(char const * const source,time_t t,long long tzsec){Mallocationowner owner=getOwner(__LINE__);
+Mtime* _getTime(char const * const source,time_t t,long long tzsec,uint16_t tznindex){Mallocationowner owner=getOwner(__LINE__);
     Mtime* _time=owned_time(__time(),owner);
     if(!_time)return NULL;
     _time->t=t;
     _time->tzsec=tzsec; // store the timezone seconds deviation
+    _time->tznindex=tznindex;
     return disowned_time(_time,owner);
 }
 void free_time(Mtime* _time){
