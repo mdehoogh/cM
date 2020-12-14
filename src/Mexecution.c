@@ -685,7 +685,7 @@ Mstring* _getTimeText(Mtime* _time){Mallocationowner owner=getOwner(__LINE__);
             //                essentially the difference is between an Unix time that is a local time (with associated timezone name) and a non-local time (essentially the epoch time)
             if(_time->tznindex!=0){
                 p=string_append_char(p,'@');
-                p=string_append(p,Mtimezonenames[abs(_time->tznindex)]);
+                p=string_append(p,Mtimezonenames[abs(_time->tznindex)-1]);
             }
         }
     }
