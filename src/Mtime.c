@@ -10,27 +10,40 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_TIME,
 
 extern char const * const M_ERROR_PREFIX;
 extern char const * const M_WARNING_PREFIX;
+extern char const * const M_BUG_PREFIX;
 extern long long M_LL_INVALID;
 extern char const * const M_ISO8601_FORMAT;
 extern char const * const M_ISO8601_UTC_FORMAT;
 
-static char** _timezonenames=NULL;Mallocationowner owner_timezonenames=(Mallocationowner){MI_TIME,__LINE__,1}; // the locally remembered timezones
-static uint16_t gettznindex(char* tzn){
+// Mtimezonenames is no longer static as we need it in Mexecution.c/h for constructing the text representation of an Mtime
+char** Mtimezonenames=NULL;Mallocationowner owner_timezonenames=(Mallocationowner){MI_TIME,__LINE__,1}; // the locally remembered timezones which ends with a NULL timezone!!!
+static uint16_t _gettznindex(char* tzn){Mallocationowner owner=getOwner(__LINE__);
     if(!tzn)return 0;
-    if(!_timezonenames){
-        _timezonenames=MALLOC(sizeof(char*),1,-'t',owner_timezonenames);
-        if(!_timezonenames)return 0;
-        *_timezonenames=NULL;
+    if(!Mtimezonenames){
+        Mtimezonenames=MALLOC(sizeof(char*),1,-'t',owner_timezonenames);
+        if(!Mtimezonenames)return 0;
+        *Mtimezonenames=NULL;
     }
-    char** timezonenames=_timezonenames;
+    // ASSERT _timezonenames is not NULL
+    char** timezonenames=Mtimezonenames;
     while(*timezonenames&&strcmp(*timezonenames,tzn)!=0)timezonenames++;
-    uint16_t tznindex=(timezonenames-_timezonenames+1);
-    if(!*timezonenames){ // end reached
-        char** _newtimezonenames=REALLOC(_timezonenames,tznindex,tznindex+1,sizeof(char*),-'t');
-        if(!_newtimezonenames)return 0;
-        _timezonenames=_newtimezonenames;
-        _timezonenames[tznindex]=NULL;
-        _timezonenames[tznindex-1]=OWNED(_strdup(tz),Msubowner(owner_timezones,1));
+    uint16_t tznindex=(timezonenames-Mtimezonenames+1);
+    if(!*timezonenames){ // tzn currently not registered, because we ended up on the closing NULL timezone name
+        char** _newtimezonenames=REALLOC(Mtimezonenames,tznindex,tznindex+1,sizeof(char*),-'t');
+        if(_newtimezonenames){ // successfully enhanced
+            char *timezonename=OWNED(_strdup(tzn),owner);
+            if(timezonename){ // managed to create the timezone name to register
+                Mtimezonenames=_newtimezonenames;
+                Mtimezonenames[tznindex]=NULL; // essential!!!
+                Mtimezonenames[tznindex-1]=OWNED(DISOWNED(timezonename,owner),Msubowner(owner_timezonenames,1));
+            }else{
+                tznindex=0;
+                output("%sFailed to duplicate timezone name '%s'",M_ERROR_PREFIX,tzn);
+            }
+        }else{
+            tznindex=0;
+            output("%sFailed to register timezone name '%s'.\n",M_ERROR_PREFIX,tzn);
+        }
     }
     return tznindex;
 }
@@ -40,13 +53,35 @@ extern char* tzname[2];
 extern long int timezone;
 extern int daylight;
 
-Mvalue* Mnow(){
-    time_t t=time(NULL); // what is returned is essentially UTC, therefore tzsec should be set to NULL
-    return _getValueOfTime(_getTime("Mnow()",t,0,0)); 
+// _settzn returns 0 on success, -1 if invalid, 1 when failing to set the TZ variable
+static int16_t _tznset(char* tzn){
+    int16_t result=-1;
+    if(tzn){
+        size_t l=strlen(tzn);
+        // TODO currently only checking a couple of requisites stated in ftp://ftp.iana.org/tz/tzdb-2017c/theory.html
+        //      and we are assuming here that TZ is used for storing the timezone names and not the timezone codes (as was the original purpose)
+        if(l>2&&tzn[0]!='/'&&tzn[l-1]!='/'&&strrchr(tzn,'/')&&strchr(tzn,'/')!=strchr(tzn,'/')+1){
+            // the question is should any registered tzn also be registered here???????
+            // now the point is what the order should be??????
+            if(setenv("TZ",tzn,1)==0){
+                result=0;
+                // how about showing some timezone information?
+                tzset(); // force initializing timezone information from the TZ environment variable explicitly
+                output("System-defined timezone: name='%s' - standard time descriptor='%s' - daylight saving time descriptor='%s' - offset=%li - daylight=%d.\n",tzn,tzname[0],tzname[1],timezone,daylight);
+            }else{
+                result=1;
+                output("%sFailed to register '%s' as system-defined timezone.\n",tzn);
+            }
+        }else
+            output("%s'%s' is not a valid timezone name.",M_ERROR_PREFIX,tzn);
+    }
+    return result;
 }
 
 // helper function that takes a valid ymd, hms and timezone indicator
 // MDH@11DEC2020: tz added representing any user specified timezone (to replace any system default)
+// MDH@14DEC2020: essentially either iso8601 needs to contain a timezone specification, either Z or +/-hh:mm or a timezone name needs to be available (either as tzuser or through getenv("TZ"))
+//                
 static Mtime* _parsedTime(char const *  const iso8601,char const * const tzuser){Mallocationowner owner=getOwner(__LINE__);
     if(!iso8601)return NULL;
     size_t l=strlen(iso8601);
@@ -55,140 +90,173 @@ static Mtime* _parsedTime(char const *  const iso8601,char const * const tzuser)
     if(!Tpos){output("%sMissing time in ISO8601 timestamp '%s'.\n",M_ERROR_PREFIX,iso8601);return NULL;}
     Mtime* _calendarTime=NULL; // what we will return
     char *tz=NULL,*tzenv=NULL;
-    output("Parsing ISO8601 '%s'.\n",iso8601);
+    output("Parsing ISO8601 timestamp '%s'",iso8601);if(tz)output(" in timezone '%s'",tzuser);output(".\n");
     // source: https://stackoverflow.com/questions/26895428/how-do-i-parse-an-iso-8601-date-with-optional-milliseconds-to-a-struct-tm-in-c
     // if there's NO timezone information assume that local timezone is intended!!!!
-    bool isotimezonespecified=true;
-    long long tzsec;
-    uint16_t timezone=0; // MDH@13DEC2020
-    int year,month,monthday,hour,minute,second,tzh=0,tzm=0;
+    // MDH@14DEC2020: if the following combination persists no time can be constructed!!!!
+    int16_t tzsec=INT16_MIN;
+    uint16_t tznindex=0; // MDH@13DEC2020
+    int year,month,monthday,hour,minute,second;
     if(iso8601[--l]=='Z'){ // not an UTC (unless of course +00:00 was specified (or -00:00 for that matter though))
         sscanf(iso8601,"%d-%d-%dT%d:%d:%dZ",&year,&month,&monthday,&hour,&minute,&second);
+        tzsec=0;
     }else
     if(strrchr(iso8601,'+')||strrchr(iso8601,'-')>Tpos){ // NOTE the - of the timezone is BEHIND the position of the 'T'
+        int tzh=0,tzm=0;
         // NOTE hopefully sscanf() is able to format %i
         sscanf(iso8601,"%d-%d-%dT%d:%d:%d%d:%d",&year,&month,&monthday,&hour,&minute,&second,&tzh,&tzm);
+        tzsec=60*(60*tzh+tzm);
         // output("Timezone offset: %d s.\n",tzsec);
     }else{ // no explicit timezone offset defined in the timestamp
+        tzsec=INT16_MIN; // just in case
+        // we leave tzsec to what it is (INT16_MIN), and try to set tznindex (timezone name index)
         // here the problem is that getEnv("TZ") might not return something in which case no local timezone is available
         sscanf(iso8601,"%d-%d-%dT%d:%d:%d",&year,&month,&monthday,&hour,&minute,&second);
-        // we need to create a duplicate of what getenv() returns because it's a pointer (i.e. address) and although the address doesn't change, its contents can!!!!
-        // TODO using strdup is not preferable per se, and we have to ascertain to free it asap
+        // determine tznindex, and if we succeed it will be non-zero!!!
         char* tzsys=getenv("TZ");
-        if(!tzsys&&(!tzuser||!*tzuser)){
-            outputError("No timezone specified");
-            return NULL;
-        }
-        tzenv=OWNED(_strdup(tzsys),owner); // the current system-defined timezone
-        if(tzenv)output("System-defined timezone: '%s'.\n",tzenv);else output("No system-defined timezone.\n");
-        if(tzuser&&*tzuser){ // explicit user-defined timezone
-            output("Will use the user-defined timezone '%s'.\n",tzuser);
-            if(setenv("TZ",tzuser,1)!=0){ // failed to register the user-defined timezone, safest to actually fail to create the associated Mtime
-                output("%sFailed to temporarily register the user-defined timezone '%s'!",M_ERROR_PREFIX,tzuser);
-                return NULL;
+        if(tzuser&&*tzuser){ // explicit user-defined timezone (which might be incorrect!!!!)
+            // if we fail to actually set the current timezone (name) to tzuser, we should not continue
+            // 1. store a duplicate of the current timezone name in tzenv
+            if(tzsys){
+                tzenv=OWNED(_strdup(tzsys),owner);
+                // if failing to do so, we will not be able to restore this timezone, therefore we cannot continue
+                if(!tzenv){output("%sFailed to remember the current timezone '%s'.\n",M_ERROR_PREFIX,tzsys);return NULL;}
+                output("System-defined timezone '%s' remembered.\n",tzenv);
             }
-            tz=tzuser;
+            // ASSERT tzenv created, so it is essential to free it asap
+            output("Will use the user-defined timezone '%s'.\n",tzuser);
+            int16_t tznset=_tznset(tzuser);
+            if(tznset==0){ // success
+                // TODO improve on the following validity check
+                if(strcasecmp(tzuser,"UTC")!=0&&strcasecmp(tzuser,"GMT")!=0&&strcasecmp(tzname[0],"UTC")==0) // apparently now UTC
+                    output("%s'%s' not considered to be a valid timezone name",M_ERROR_PREFIX,tzuser);
+                else
+                    tznindex=_gettznindex(tz=tzuser);
+            }else // failed to register the user-defined timezone, safest to actually fail to create the associated Mtime
+                output("%sFailed to register user-defined timezone '%s'!",M_ERROR_PREFIX,tzuser);
         }else
-        if(tzenv){
-            tz=tzenv;
-            output("Will use the system-defined timezone '%s'.\n",tzenv);
-        }
-        // NOTE if a tz is specified, no need to report on that
-        if(tz){
-            isotimezonespecified=false;
-            output("%sNo explicit timezone specified in '%s'; the %s timezone '%s' will be used.\n",M_WARNING_PREFIX,iso8601,(tzuser&&*tzuser?"user-defined":"system-defined"),tz);
-        }/* the following can't happen anymore, since either tzenv or tzuser is going to be used
-        else
-        if(!tzuser||!*tzuser){
-            output("%sNo explicit timezone specified in '%s', and no system-defined timezone set: will assume UTC.\n",M_WARNING_PREFIX,iso8601);
-        }*/
-        // if(tzenv)output("System-defined timezone: '%s'.\n",tzenv);else output("No system-defined timezone.\n"); // DEBUG
+            tznindex=_gettznindex(tz=tzsys);
+        if(tznindex==0)output("Failed to (temporarily) register user-defined timezone '%s'.\n",M_ERROR_PREFIX,tzuser);
     }
-    
-    // NOTE if no timezone is specified, we ought to be using local time, and tzsec should be set to M_LL_INVALID
-    if(isotimezonespecified){
-        tzsec=60*(60*tzh+tzm);
-        output("ISO8601 timezone (%c%0*d:%0*d) offset: %lld s.\n",(tzh>=0?'+':'-'),2,tzh,2,tzm,tzsec);
-    }else
-        tzsec=M_LL_INVALID;
-    // are we doing anything with the tzh and tzm??????
-    // let's check on the input values
-    if(month>=1&&month<=12&&monthday>=1&&monthday<=31&&hour>=0&&hour<=23&&minute>=0&&minute<=59&&second>=0&&second<=61){
-        output("Calendar timestamp numbers: year=%d - month=%d - monthday=%d - hour=%d - minute=%d - second=%d - tzsec=%d.\n",year,month,monthday,hour,minute,second,tzsec);
-        struct tm timestamp;
-        timestamp.tm_year = year - 1900; // Year since 1900
-        timestamp.tm_mon = month - 1;     // 0-11
-        timestamp.tm_mday = monthday;        // 1-31
-        timestamp.tm_hour = hour;        // 0-23
-        timestamp.tm_min = minute;         // 0-59
-        timestamp.tm_sec = second;    // 0-61 (0-60 in C++11)
-        // timestamp.tm_gmtoff=1;
-        // TODO do we need to set tm_isdst???????
-        // because we're calling mktime() we do not need to set tm_zone here because mktime() ignores it and uses the local time zone: timestamp.tm_zone=timezone;
-        timestamp.tm_isdst=-1; // we're expecting mktime to deal with that
-        // 1. turn the input into a struct tm something
-        // 2. turn struct tm into a time_t
-        time_t t=(tzsec!=M_LL_INVALID?timegm(&timestamp):mktime(&timestamp)); // either use timegm for the UTC timestamp (when an iso timezone was defined), or determine the local time using mktime which will use the system timezone (currently tz)
-        // if timezone information is specified 
-        if(t>=0){
-            _calendarTime=owned_time(_getTime("_getCalendarTime",t,tzsec,timezone),owner);
-            output("DST flag with timezone %s: %i.\n",(isotimezonespecified?"specified":"not specified"),timestamp.tm_isdst);
-        }else
-            output("%sFailed to compute the time represented by '%s'!\n",M_ERROR_PREFIX,iso8601);
-    }else{
-        if(month<1||month>12)output("%sMonth (%i) out of range.\n",M_ERROR_PREFIX,month);
-        if(monthday<1||monthday>31)output("%sMonthday (%i) out of range.\n",M_ERROR_PREFIX,monthday);
-        if(hour<0||hour>23)output("%sHour (%i) out of range.\n",M_ERROR_PREFIX,hour);
-        if(minute<0||minute>59)output("%sMinute (%i) out of range.\n",M_ERROR_PREFIX,minute);
-        if(second<0||second>61)output("%sSecond (%i) out of range.\n",M_ERROR_PREFIX,second);
+    // if neither a timezone offset or timezone name index is defined, we can't create a time
+    if(tzsec!=INT16_MIN||tznindex!=0){
+        // are we doing anything with the tzh and tzm??????
+        // let's check on the input values
+        if(month>=1&&month<=12&&monthday>=1&&monthday<=31&&hour>=0&&hour<=23&&minute>=0&&minute<=59&&second>=0&&second<=61){
+            output("Calendar timestamp: year=%d - month=%d - monthday=%d - hour=%d - minute=%d - second=%d - tzsec=%d - tznindex=%d.\n",year,month,monthday,hour,minute,second,tzsec,tznindex);
+            struct tm timestamp;
+            timestamp.tm_year = year - 1900; // Year since 1900
+            timestamp.tm_mon = month - 1;     // 0-11
+            timestamp.tm_mday = monthday;        // 1-31
+            timestamp.tm_hour = hour;        // 0-23
+            timestamp.tm_min = minute;         // 0-59
+            timestamp.tm_sec = second;    // 0-61 (0-60 in C++11)
+            // timestamp.tm_gmtoff=1;
+            // TODO do we need to set tm_isdst???????
+            // because we're calling mktime() we do not need to set tm_zone here because mktime() ignores it and uses the local time zone: timestamp.tm_zone=timezone;
+            timestamp.tm_isdst=-1; // we're expecting mktime to deal with that
+            // 1. turn the input into a struct tm something
+            // 2. turn struct tm into a time_t
+            time_t t=(tzsec!=INT16_MIN?timegm(&timestamp):mktime(&timestamp)); // either use timegm for the UTC timestamp (when an iso timezone was defined), or determine the local time using mktime which will use the system timezone (currently tz)
+            // if timezone information is specified 
+            if(t>=0){
+                if(tznindex>0&&timestamp.tm_isdst)tznindex=-tznindex;
+                _calendarTime=owned_time(_getTime("_getCalendarTime",t,tzsec,tznindex),owner);
+                // if local time was extracted, show what the DST flag is
+                // how about using the DST flag 
+                if(tzsec==INT16_MIN)output("DST flag: %i.\n",timestamp.tm_isdst);
+            }else{
+                output("%sFailed to compute the time represented by '%s'",M_ERROR_PREFIX,iso8601);if(tz)output(" in timezone '%s'",tz);output(".\n");
+            }
+        }else{
+            if(month<1||month>12)output("%sMonth (%i) out of range.\n",M_ERROR_PREFIX,month);
+            if(monthday<1||monthday>31)output("%sMonthday (%i) out of range.\n",M_ERROR_PREFIX,monthday);
+            if(hour<0||hour>23)output("%sHour (%i) out of range.\n",M_ERROR_PREFIX,hour);
+            if(minute<0||minute>59)output("%sMinute (%i) out of range.\n",M_ERROR_PREFIX,minute);
+            if(second<0||second>61)output("%sSecond (%i) out of range.\n",M_ERROR_PREFIX,second);
+        }
     }
     // careful here: if we have a tz and it equals tzuser we need to reset the system timezone to what it was before
-    if(tz)if(tz==tzuser){
-        if(tzenv){
-            if(setenv("TZ",tzenv,1)!=0)
-                output("%sFailed to restore '%s' as system-defined timezone.\n",M_ERROR_PREFIX,tzenv);
-            else
-                output("'%s' restored as system-defined timezone.\n",tzenv);
-        }else{
-            if(unsetenv("TZ")!=0)
-                outputError("Failed to remove the system-defined timezone");
-            else
-                output("System-defined timezone removed!\n");
-        }
-        /* replacing:
-        int reset=(tzenv?setenv("TZ",tzenv,1):unsetenv("TZ"));
-        if(reset!=0)output("%sFailed to %s%s as system-defined timezone.\n",M_ERROR_PREFIX,(tzenv?"restore ":"clear"),(tzenv?tzenv:""));else output("System-defined timezone %s%s.\n",(tzenv?tzenv:""),(tzenv?" restored":"cleared"));
-        */
+    if(tzsec==INT16_MIN){ // no timezone offset defined
+        if(tzuser&&*tzuser){ // a user-defined timezone was specified, so tzenv should be reinstalled as timezone
+            output("Undoing the registration of user-defined timezone '%s'.\n",tzuser);
+            if(tzenv){
+                if(setenv("TZ",tzenv,1)!=0)
+                    output("%sFailed to re-register '%s' as system-defined timezone.\n",M_ERROR_PREFIX,tzenv);
+                else
+                    output("'%s' re-registered as system-defined timezone.\n",tzenv);
+            }else{
+                if(unsetenv("TZ")!=0)
+                    outputError("Failed to unregister the system-defined timezone");
+                else
+                    output("System-defined timezone unregistered!\n");
+            }
+            /* replacing:
+            int reset=(tzenv?setenv("TZ",tzenv,1):unsetenv("TZ"));
+            if(reset!=0)output("%sFailed to %s%s as system-defined timezone.\n",M_ERROR_PREFIX,(tzenv?"restore ":"clear"),(tzenv?tzenv:""));else output("System-defined timezone %s%s.\n",(tzenv?tzenv:""),(tzenv?" restored":"cleared"));
+            */
+        }else
+            output("No user-defined timezone to unregister.\n");
     }
     if(tzenv)FREE_DISOWNED(tzenv,strlen(tzenv)+1,-'"',owner); // see _strdup for how it allocates memory!!!
     return(_calendarTime?disowned_time(_calendarTime,owner):NULL);
 }
+
+Mvalue* Mnow(){
+    time_t t=time(NULL); // what is returned is essentially UTC, therefore tzmin should be set to 0
+    return _getValueOfTime(_getTime("Mnow()",t,0,0)); 
+}
+
 // MDH@11DEC2020: same here
-Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tzValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tznValue){Mallocationowner owner=getOwner(__LINE__);
     // let's accept any text that conforms to ISO8601 i.e. a calendar date with timezone information of the format <date><time><timezone> where <time>should start with T and <timezone> with either - or + or Z
     Mvalue* result=NULL;
     if(_timeValue&&_timeValue->type==VT_TIME){
         Mtime* _time=_timeValue->value._time;
         if(_time){
             time_t t=_time->t;
-            long long tzsec=_time->tzsec;
-            struct tm* _tm;
+            int16_t tzsec=_time->tzsec,tznindex=0;
+            char* tzenv=NULL; // the current system-defined timezone that we need to re-register afterwards (at least when tznindex is non-zero)
+            struct tm* _tm=NULL;
             size_t maxsize=19; // yyyy-mm-ddThh:mm:ss
-            if(tzsec!=M_LL_INVALID){ // not local time
+            bool isdst=false;
+            if(tzsec!=INT16_MIN){ // not local time
                 _tm=gmtime(&t); // the t-part represents UTC
                 if(tzsec!=0)
                     maxsize+=6;
                 else
                     maxsize+=1;
-            }else // local time
-                _tm=localtime(&t);
+            }else{ // local time
+                tznindex=_time->tznindex;
+                if(tznindex!=0){
+                    if(tznindex<0){isdst=true;tznindex=-tznindex;}
+                    if(Mtimezonenames[tznindex-1]){
+                        char *tzsys=getenv("TZ"),*tzenv=NULL;
+                        if(tzsys){
+                            tzenv=OWNED(_strdup(tzsys),owner);
+                            if(!tzenv){output("%sFailed to remember the current system-defined timezone name",tzsys);return NULL;}
+                        }
+                        if(!_tznset(Mtimezonenames[tznindex])){
+                            tznindex=INT16_MIN;
+                            output("%sFailed to register '%s' temporarily as system-defined timezone",M_ERROR_PREFIX,Mtimezonenames[tznindex]);
+                        }else
+                            _tm=localtime(&t);
+                    }else{
+                        output("%sTimezone name index %d invalid",M_BUG_PREFIX,tznindex);
+                        tznindex=INT16_MIN; // use as invalid value
+                    }
+                    // we'll be appending either tzname[0] or tzname[1]
+                    if(tznindex!=INT16_MIN)
+                        maxsize+=strlen(tzname[tznindex>0?0:1]);
+                }
+            }
             output("Calendar time fields: year=%d - month=%d - monthday=%d - hour=%d - minute=%d - second=%d.\n"
                     ,_tm->tm_year+1900,_tm->tm_mon+1,_tm->tm_mday,_tm->tm_hour,_tm->tm_min,_tm->tm_sec);
             char strtm[maxsize+1];
             strtm[0]='\'';
             strftime(strtm+1,maxsize,M_ISO8601_FORMAT,_tm);
-            if(tzsec!=M_LL_INVALID){
-                size_t l=strlen(strtm);
+            size_t l=strlen(strtm);
+            if(tzsec!=INT16_MIN){
                 if(tzsec!=0){
                     if(tzsec<0){
                         tzsec=-tzsec;
@@ -205,6 +273,24 @@ Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tzValue){Mallocationowner owne
                 }else
                     strtm[l]='Z';
                 strtm[++l]='\0';
+            }else
+            if(tznindex!=0&&tznindex!=INT16_MIN){
+                // we'd like to append either tzname[0] or tzname[1] depending!!!
+                char* _tzname=tzname[tznindex>0?0:1];
+                _tzname+=strlen(_tzname);
+                strtm[maxsize]='\0';
+                while(--maxsize>=l)strtm[maxsize]=*(--_tzname);
+            }
+            // re-register the current timezone (as stored in tzenv)
+            if(tznindex!=0&&tznindex!=INT16_MIN){
+                if(tzenv){
+                    if(!_tznset(tzenv))
+                        output("%sFailed to re-register '%s' as system-defined timezone.\n",M_ERROR_PREFIX,tzenv);
+                    FREE(tzenv,strlen(tzenv)+1,-'"');
+                }else{
+                    if(unsetenv(tzenv)!=0)
+                        output("%sFailed to unregister temporary timezone '%s'.\n",Mtimezonenames[abs(tznindex)]);
+                }
             }
             return _getTextValue(strtm);
         }
@@ -212,14 +298,14 @@ Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tzValue){Mallocationowner owne
     return result;
 }
 // MDH@11DEC2020: allowing to pass in the tz to use (if _timetextValue does not contain timezone information)
-Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tzValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner owner=getOwner(__LINE__);
     // let's accept any text that conforms to ISO8601 i.e. a calendar date with timezone information of the format <date><time><timezone> where <time>should start with T and <timezone> with either - or + or Z
     Mvalue* result=NULL;
     if(_timetextValue){
         if(_timetextValue->type==VT_INTEGER||_timetextValue->type==VT_BIGINTEGER){
             long long lltime=getValueInteger(_timetextValue);
             // OOPS can't use time() because time(&t) would simply put the current time (now) in t
-            if(lltime>=0)result=_getValueOfTime(_getTime("Mparsetime()",lltime,0)); // assuming UTC
+            if(lltime>=0)result=_getValueOfTime(_getTime("Mparsetime()",lltime,0,0)); // assuming UTC
         }else
         if(_timetextValue->type==VT_TEXT){
             // <date> <time> <timezone>, <date> ends with either T or -|+|Z, <time> ends with either T or -|+|Z or the end of the string (in which it assumes Z)
@@ -358,7 +444,7 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tzValue){Mallocationowner own
                     }else
                         outputError("No digits in calendar datetime text");
                     if(complete)
-                        result=_getValueOfTime(_parsedTime(string(_iso8601),(_tzValue&&_tzValue->type==VT_TEXT?_tzValue->value._text->_c:NULL)));
+                        result=_getValueOfTime(_parsedTime(string(_iso8601),(_tznValue&&_tznValue->type==VT_TEXT?_tznValue->value._text->_c:NULL)));
                     FREE_STRING(_iso8601,owner);
                 }else
                     outputError("Failed to initialize the ISO8601 datetime text");
@@ -372,21 +458,20 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tzValue){Mallocationowner own
     return result;
 }
 
-Mvalue* Msettimezone(Mvalue* _tzValue){
-    if(_tzValue&&_tzValue->type==VT_TEXT){
-        char* _timezone=(_tzValue->value._text?_tzValue->value._text->_c:NULL);
-        if(_timezone){
-            // TODO check the validity of the timezone (so that this function does better than Msetenv("TZ") would!)
-            if(setenv("TZ",_timezone,1)==0){
-                // how about showing some timezone information?
-                tzset(); // force initializing timezone information from the TZ environment variable explicitly
-                output("Timezone '%s': standard time descriptor='%s' - daylight saving time descriptor='%s' - offset=%li - daylight=%d.\n",_timezone,tzname[0],tzname[1],timezone,daylight);
-            }else
-                output("%sFailed to set the system-defined timezone to '%s'.\n",M_ERROR_PREFIX,_tzValue->value._text->_c);
+Mvalue* Msettimezone(Mvalue* _tznValue){
+    if(_tznValue&&_tznValue->type==VT_TEXT){
+        char* tzn=(_tznValue->value._text?_tznValue->value._text->_c:NULL);
+        if(tzn&&*tzn){
+            int16_t tznset=_tznset(tzn);
+            if(tznset<0)
+                output("%s'%s' not a valid timezone name.\n",M_ERROR_PREFIX,tzn);
+            else
+            if(tznset>0)
+                output("%sFailed to register '%s' as (system-defined) timezone.\n",M_ERROR_PREFIX,tzn);
         }else 
-            outputError("Missing timezone text");
-    }else 
-        outputError("Timezone value specified not of type text");
+            outputError("Missing timezone name");
+    }else
+        outputError("Timezone name specified not of type text");
     // return the current timezone (whatever it is)
     return _getValueOfText(_getSingleQuotedText(getenv("TZ")));
 }

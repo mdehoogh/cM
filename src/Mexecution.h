@@ -115,8 +115,8 @@ typedef struct Mdecimal{
 // MDH@08DEC2020: dealing with dates
 typedef struct Mtime{
     time_t t;
-    long long tzsec; // TODO a bit overkill??????
-    uint16_t tznindex; // the index into the timezonenames array (see Mtime.c)
+    int16_t tzsec; // if tzsec equals INT16_MIN it is not set and tznindex should not be zero!!!!
+    int16_t tznindex; // non-zero values indicate the timezone index, where negative values indicate a DST local time
 }Mtime;
 
 bool isLittleEndian();
@@ -321,6 +321,6 @@ void free_file(Mfile* _file);
 Mtime* owned_time(Mtime* _time,Mallocationowner owner_time);
 Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time);
 Mtime* __time();
-Mtime* _getTime(char const * const source,time_t t,long long tzsec,uint16_t timezone);
+Mtime* _getTime(char const * const source,time_t t,int16_t tzsec,int16_t tznindex);
 void free_time(Mtime* _time);
 #define FREE_TIME(_time,owner_time) free_time(disowned_time(_time,owner_time))

@@ -669,6 +669,7 @@ Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__L
 	return disowned_string(_s,owner);
 }/* VALIDATED */
 
+extern char** Mtimezonenames;
 Mstring* _getTimeText(Mtime* _time){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
     if(!_s)return NULL;
@@ -678,8 +679,14 @@ Mstring* _getTimeText(Mtime* _time){Mallocationowner owner=getOwner(__LINE__);
     if(p&&_time){
         if(_time->t>=0){
             long long lltime=_time->t;
-            if(_time->tzsec!=M_LL_INVALID)lltime-=_time->tzsec;
+            if(_time->tzsec!=INT16_MIN)lltime-=_time->tzsec;
             p=appendll(p,lltime); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
+            // MDH@14DEC2020: with the timezone name index now stored in _time->tznindex we're in trouble, because methods to change the timezone are not registered until Mtime.c/h
+            //                essentially the difference is between an Unix time that is a local time (with associated timezone name) and a non-local time (essentially the epoch time)
+            if(_time->tznindex!=0){
+                p=string_append_char(p,'@');
+                p=string_append(p,Mtimezonenames[abs(_time->tznindex)]);
+            }
         }
     }
     if(!p){FREE_STRING(_s,owner);return NULL;}
@@ -1219,11 +1226,13 @@ Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time){
     if(!_time)return NULL;
     return DISOWNED(_time,owner_time);
 }
+// __time() returns an time initialized as zero UTC (because tznindex and tzsec will be zero)
 Mtime* __time(){Mallocationowner owner=getOwner(__LINE__);
     Mtime* _time=CALLOC_1(sizeof(struct Mtime),'T',owner);
     return disowned_time(_time,owner);
 }
-Mtime* _getTime(char const * const source,time_t t,long long tzsec,uint16_t tznindex){Mallocationowner owner=getOwner(__LINE__);
+// NOTE _getTime() will return a result even if the tzsec and tznindex are an incorrect combination!!!
+Mtime* _getTime(char const * const source,time_t t,int16_t tzsec,int16_t tznindex){Mallocationowner owner=getOwner(__LINE__);
     Mtime* _time=owned_time(__time(),owner);
     if(!_time)return NULL;
     _time->t=t;
