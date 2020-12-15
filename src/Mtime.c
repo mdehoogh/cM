@@ -15,6 +15,12 @@ extern long long M_LL_INVALID;
 extern char const * const M_ISO8601_FORMAT;
 extern char const * const M_ISO8601_UTC_FORMAT;
 
+// timezone global data
+extern char* tzname[2];
+extern long int timezone;
+extern int daylight;
+
+// helper functions
 // Mtimezonenames is no longer static as we need it in Mexecution.c/h for constructing the text representation of an Mtime
 char** Mtimezonenames=NULL;Mallocationowner owner_timezonenames=(Mallocationowner){MI_TIME,__LINE__,1}; // the locally remembered timezones which ends with a NULL timezone!!!
 static uint16_t _gettznindex(char* tzn){Mallocationowner owner=getOwner(__LINE__);
@@ -47,12 +53,6 @@ static uint16_t _gettznindex(char* tzn){Mallocationowner owner=getOwner(__LINE__
     }
     return tznindex;
 }
-
-// timezone global data
-extern char* tzname[2];
-extern long int timezone;
-extern int daylight;
-
 // _settzn returns 0 on success, -1 if invalid, 1 when failing to set the TZ variable
 static int16_t _tznset(char* tzn){
     int16_t result=-1;
@@ -209,6 +209,22 @@ static Mtime* _parsedTime(char const *  const iso8601,char const * const tzuser)
     if(tzenv)FREE_DISOWNED(tzenv,strlen(tzenv)+1,-'"',owner); // see _strdup for how it allocates memory!!!
     return(_calendarTime?disowned_time(_calendarTime,owner):NULL);
 }
+// MDH@15DEC2020: alternative to parsing a calendar time (in ISO8601 format) we allow direct manipulation
+//                of an epoch time
+static Mtime* _parsedEpochTime(time_t t,char* tzn){
+    // is relatively simple: if tzn is defined and non-empty try to register it, and if success store with _time
+    // if tzn is not-defined return UTC of the given time
+    Mtime* _time=NULL;
+    if(tzn&&*tzn){
+        int16_t tznindex=_gettznindex(tzn);
+        if(tznindex!=0)
+            _time=_getTime("_parsedEpochTime",t,INT16_MIN,tznindex);
+        else
+            output("%s'%s' not accepted as timezone.\n",M_ERROR_PREFIX,tzn);
+    }else
+        _time=_getTime("_parsedEpochTime",t,0,0);
+    return _time;
+}
 
 Mvalue* Mnow(){
     time_t t=time(NULL); // what is returned is essentially UTC, therefore tzmin should be set to 0
@@ -219,8 +235,16 @@ Mvalue* Mnow(){
 Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tznValue){Mallocationowner owner=getOwner(__LINE__);
     // let's accept any text that conforms to ISO8601 i.e. a calendar date with timezone information of the format <date><time><timezone> where <time>should start with T and <timezone> with either - or + or Z
     Mvalue* result=NULL;
-    if(_timeValue&&_timeValue->type==VT_TIME){
-        Mtime* _time=_timeValue->value._time;
+    if(_timeValue){
+        // only integer or time values are usable
+        Mtime* _time=NULL;
+        if(_timeValue->type==VT_INTEGER||_timeValue->type==VT_BIGINTEGER)
+            _time=owned_time(
+                    _parsedEpochTime(getValueInteger(_timeValue),
+                        (_tznValue&&_tznValue->type==VT_TEXT?_tznValue->value._text->_c:NULL)),owner);
+        else
+        if(_timeValue->type==VT_TIME)
+            _time=_timeValue->value._time;
         if(_time){
             time_t t=_time->t;
             int16_t tzsec=_time->tzsec,tznindex=0;
@@ -261,6 +285,8 @@ Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tznValue){Mallocationowner own
                         maxsize+=strlen(tzname[isdst?1:0])+2;
                 }
             }
+            // if _time was created from a epoch time (integer) we should free it asap
+            if(_timeValue->type!=VT_TIME)FREE_TIME(_time,owner);
             output("Calendar time fields: year=%d - month=%d - monthday=%d - hour=%d - minute=%d - second=%d.\n"
                     ,_tm->tm_year+1900,_tm->tm_mon+1,_tm->tm_mday,_tm->tm_hour,_tm->tm_min,_tm->tm_sec);
             char strtm[maxsize+1];
