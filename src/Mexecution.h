@@ -324,3 +324,5 @@ Mtime* __time();
 Mtime* _getTime(char const * const source,time_t t,int16_t tzsec,int16_t tznindex);
 void free_time(Mtime* _time);
 #define FREE_TIME(_time,owner_time) free_time(disowned_time(_time,owner_time))
+
+long long getTimeLongLong(Mtime* _time);

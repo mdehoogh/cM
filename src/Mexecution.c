@@ -138,6 +138,7 @@ void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_bigintege
 
 // MDH@09APR2020: for all methods that call mp_int methods now require calling MP_INT_POINTER() on Mbiginteger instances
 Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__);
+    // if(ll==M_LL_INVALID)return NULL; // MDH@16DEC2020: essentially a long long could be larger so technically do not call _getBiginteger() with an invalid long long!!!!!
     Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
     // MDH@09APR2020: in the non-production version we're keeping track of the allocations and get_mpint on Mbiginteger will return what is required
     if(_biginteger)mp_set_i64(MP_INT_POINTER(_biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
@@ -1244,4 +1245,7 @@ void free_time(Mtime* _time){
     if(_time){
         FREE_1(_time,'T');
     }
+}
+long long getTimeLongLong(Mtime* _time){
+    return(_time?_time->t-(_time->tzsec==INT16_MIN?0:_time->tzsec):M_LL_INVALID);
 }

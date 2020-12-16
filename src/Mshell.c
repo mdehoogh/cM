@@ -5435,10 +5435,10 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 ///// MDH@18NOV2019 is now defined elsewhere!!: Mdecimal* getValueDecimal(Mvalue* _value);
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL; // MDH@24OCT2019: propagate NULL
-	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,add,true);
-	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,add,true);
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,add,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,add,true);
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add,true);
 	// MDH@24OCT2019: isValueZero() can now also return M_LL_INVALID and we do NOT want the value to be considered a 'true' zero when that happens!!!!!
 	if(isValueZero(_value1)==M_TRUE)return _value2;
@@ -5581,14 +5581,14 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	if(amVerboseDebugging())
 	{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,subtract,true);
-	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,subtract,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,subtract,true);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract,true);
 	// if either is zero, result is easy to determine
 	if(isValueZero(_value1)==M_TRUE)return Mneg(_value2);
 	if(isValueZero(_value2)==M_TRUE)return _value1;
 	if(amVerboseDebugging())
-		{outputValue("Subtracting scalar '",_value2,"'");outputValue(" from scalar '",_value1,"'.\n");}
+	{outputValue("Subtracting scalar '",_value2,"'");outputValue(" from scalar '",_value1,"'.\n");}
 	/*
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
@@ -5598,7 +5598,8 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	*/
 	// the other integer one could be a big integer in which case we return a big integer
 	// the other integer one could be a big integer in which case we return a big integer
-	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+	// MDH@16DEC2020: if the second value is a time we can convert it to an integer
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER||_value1->type==VT_TIME)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||_value2->type==VT_TIME)){
 		Mbiginteger* _differenceBiginteger=NULL;
 		// no need to use _getValueBiginteger because we know the source will be integer
 		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
@@ -5609,28 +5610,34 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
 		// ASSERT both integers are considered valid (i.e. not invalid)
-		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
-		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		Mbiginteger *_biginteger1=((_value1->type==VT_TIME
+									?owned_biginteger(_getBiginteger(getTimeLongLong(_value1->value._time)),owner)
+									:(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger)));
+		Mbiginteger *_biginteger2=((_value2->type==VT_TIME
+									?owned_biginteger(_getBiginteger(getTimeLongLong(_value2->value._time)),owner)
+									:(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger)));
 		if(_biginteger1&&_biginteger2){
 			if(amVerboseDebugging())
-				{outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+			{outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_differenceBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_differenceBiginteger&&mp_sub(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_differenceBiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_differenceBiginteger,owner);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
-				{outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
+			{outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert an integer to a big integer");
+		if(_value1->type==VT_TIME)smallinteger1=true; // MDH@16DEC2020: from here treat time value also as a small integer
+		if(_value2->type==VT_TIME)smallinteger2=true; // MDH@16DEC2020: from here treat time value also as a small integer
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
-		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner); 
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			if(!_differenceBiginteger)return _getIntegerValue(M_LL_INVALID);
-			long long llsum=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
+			long long lldifference=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llsum!=M_LL_INVALID){FREE_BIGINTEGER(_differenceBiginteger,owner);return _getIntegerValue(llsum);}
+			if(lldifference!=M_LL_INVALID){FREE_BIGINTEGER(_differenceBiginteger,owner);return _getIntegerValue(lldifference);}
 			outputWarning("Small integer difference out of range, will continue using big integer difference.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_differenceBiginteger,owner));
@@ -5680,8 +5687,8 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,multiply,true);
-	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,multiply,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,multiply,true);
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply,true);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
@@ -5789,6 +5796,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 
 Mvalue* _getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
 	switch(valuetype){
+		case VT_TIME:
 		case VT_INTEGER: return _getIntegerValue(1);
 		case VT_BIGINTEGER: return _getValueOfBiginteger(_getBiginteger(1));
 		case VT_FLOAT: return _getFloatValue(1.0);
@@ -6738,8 +6746,8 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,divide,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divide,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divide,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide,false);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO shouldn't we return infinity?????
@@ -6801,8 +6809,8 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,integerdivide,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,integerdivide,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,integerdivide,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide,false);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO or should we return some form of infinity?????
@@ -6921,8 +6929,8 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,divideremainder,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divideremainder,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divideremainder,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder,false);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
 	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getFloatValue(0));
@@ -7042,8 +7050,8 @@ static long long not(long long boolean){return(boolean==M_LL_INVALID?M_LL_INVALI
 Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwisexor,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwisexor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwisexor,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwisexor,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwisexor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 		return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
@@ -7069,8 +7077,8 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwiseand,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseand,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseand,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseand,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseand,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
@@ -7095,8 +7103,8 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwiseor,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseor,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseor,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 	return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
@@ -7124,8 +7132,8 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,logicaland,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicaland,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicaland,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicaland,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 		return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
@@ -7147,8 +7155,8 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,logicalor,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicalor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicalor,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicalor,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicalor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 		return _getIntegerValue(_value1->value._integer->ll||_value2->value._integer->ll);
@@ -7178,8 +7186,8 @@ long long integerShift(long long integer,long long shift){
 Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftleft,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftleft,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftleft,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@25OCT2019: if either value is zero the result is the first value
 	// ASSERT neither value zero
@@ -7255,8 +7263,8 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftright,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftright,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftright,false);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@26OCT2019: if either value is zero return _value1
 	// ASSERT neither value is zero
@@ -7412,7 +7420,9 @@ static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 	return M_LL_INVALID;
 }
 Mvalue* Msmallerthan(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msmallerthan,false);
 	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthan,false);
+	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Msmallerthan,false);
 	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthan,false);
 	return _getIntegerValue(smallerthan(_value1,_value2));
 }
@@ -7476,7 +7486,9 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 	return M_LL_INVALID;
 }
 Mvalue* Mlargerthan(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mlargerthan,false);
 	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthan,false);
+	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mlargerthan,false);
 	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthan,false);
 	return _getIntegerValue(largerthan(_value1,_value2));
 }
@@ -7542,7 +7554,9 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 	return M_LL_INVALID;
 }
 Mvalue* Mlargerthanorequalto(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mlargerthanorequalto,false);
 	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthanorequalto,false);
+	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mlargerthanorequalto,false);
 	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthanorequalto,false);
 	return _getIntegerValue(largerthanorequalto(_value1,_value2));
 }
@@ -7608,7 +7622,9 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 	return M_LL_INVALID;
 }
 Mvalue* Munequalto(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Munequalto,false);
 	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Munequalto,false);
+	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Munequalto,false);
 	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Munequalto,false);
 	return _getIntegerValue(unequalto(_value1,_value2));
 }
@@ -7683,7 +7699,9 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 	return M_LL_INVALID;
 }
 Mvalue* Mequalto(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mequalto,false);
 	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mequalto,false);
+	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mequalto,false);
 	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mequalto,false);
 	return _getIntegerValue(equalto(_value1,_value2));
 }
@@ -7749,7 +7767,9 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 	return M_LL_INVALID;
 }
 Mvalue* Msmallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msmallerthanorequalto,false);
 	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthanorequalto,false);
+	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Msmallerthanorequalto,false);
 	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthanorequalto,false);
 	return _getIntegerValue(smallerthanorequalto(_value1,_value2));
 }
