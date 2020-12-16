@@ -336,6 +336,24 @@ Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tznValue){Mallocationowner own
     return result;
 }
 // MDH@11DEC2020: allowing to pass in the tz to use (if _timetextValue does not contain timezone information)
+// MDH@16DEC2020: debugging the parsing process of composing the iso8601 text representation from the timetext presented
+static char* readint(char const * const intt,int * i){
+    // skip trailing blanks
+    char* t=intt;
+    while((*t)==' ')t++;
+    // the integer may start with signs
+    bool negative=false;
+    while(*t){if((*t)=='-')negative=!negative;else if((*t)!='+')break;t++;}
+    // process all digits until we bump into a non-digit
+    while((*t)>=48&&(*t)<=57){ // a digit character
+        if(*i==INT_MIN)*i=0;else (*i)*=10;
+        (*i)+=(*t)-48; // increment with digit
+        output("After processing '%c': %d.\n",*t,*i);
+        t++; // next character
+    }
+    if((*i)!=INT_MIN)if(negative)*i=-(*i); // make negative
+    return t;
+}
 Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner owner=getOwner(__LINE__);
     // let's accept any text that conforms to ISO8601 i.e. a calendar date with timezone information of the format <date><time><timezone> where <time>should start with T and <timezone> with either - or + or Z
     Mvalue* result=NULL;
@@ -350,7 +368,7 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner ow
             // <date> consists of exactly three numeric parts, <time> exists of at least one numeric part indicating the hour of the day
             // we'll ignore any nonnumeric characters in between?
             char* timetext=_timetextValue->value._text->_c;
-            if(timetext&&strlen(timetext)){
+            if(timetext&&*timetext){
                 // TODO correct timetext to be in ISO8601 format
                 // I suppose we can do that now
                 // expecting the format y m d h m s timezone where y m d h m s are digits so essentially we skip whatever there's in between
@@ -358,9 +376,75 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner ow
                 // y m d is obligatory in that order, h m s are all optional but we allow h, h m, h m s
                 Mstring *_iso8601=owned_string(__string("Mparsetime"),owner);
                 if(_iso8601){
+                    bool complete=false;
+                    // how about extracting the actual constituent parts
+                    // the obligatory parts are initialized to INT_MIN so we can for that afterwards
+                    int year=INT_MIN,month=INT_MIN,monthday=INT_MIN,hour=0,minute=0,second=0,tzh=INT_MIN,tzm=0;
+                    size_t yearcharacters=0;
+                    char c;
+                    char* t=timetext; // the pointer that is going to be changed
+                    while((*t)==' '||(*t)=='0')t++; // skip all trailing blanks and zeroes
+                    if(*t){
+                        char *yearstart=t;
+                        t=readint(t,&year);
+                        if((*t)&&(year!=INT_MIN)){
+                            yearcharacters=(t-yearstart); // remember how many year characters there are
+                            t++;
+                            t=readint(t,&month);
+                            if((*t)&&(month!=INT_MIN)){
+                                t++;
+                                t=readint(t,&monthday);
+                                if((c=*t)&&(monthday!=INT_MIN)){
+                                    // the hour, minute and second are optional
+                                    // we know that's the case if we bumped into a Z, + or - although theoretically which in a sense is problematic if someone put negative hours, minutes or seconds in there
+                                    // we can solve that by demanding a T to start the hour, minute and second part, essentially a minus or plus sign starts the timezone part, so you need something else
+                                    // than a Z + or - to start the hms part
+                                    if(c!='Z'&&c!='+'&&c!='-'){ // NOT the start of the timezone part
+                                        t++;
+                                        t=readint(t,&hour);
+                                        c=*t;
+                                        if(c!=0&&c!='Z'&&c!='+'&&c!='-'){ // NOT the start of the timezone part
+                                            t++;
+                                            t=readint(t,&minute);
+                                            c=*t;
+                                            if(c!=0&&c!='Z'&&c!='+'&&c!='-'){ // NOT the start of the timezone part
+                                                t++;
+                                                t=readint(t,&second);
+                                            }
+                                        }
+                                    }
+                                    c=*t;
+                                    if(c=='T'||c=='-'||c=='+'){ // there's a timezone part
+                                        t++;
+                                        t=readint(t,&tzh);
+                                        if((*t)&&(tzh!=INT_MIN)){
+                                            t++;
+                                            t=readint(t,&tzm);
+                                        }
+                                    }else
+                                    if(c=='Z')
+                                    tzh=0;
+                                }
+                            }
+                        }
+                        if(year!=INT_MIN&&month!=INT_MIN&&monthday!=INT_MIN){
+                            char iso8601[yearcharacters+15+(tzh==INT_MIN?6:1)+1];
+                            if(tzh>=0){ // a non-negative timezone offset
+                                if(tzh==0&&tzm==0)
+                                    sprintf(iso8601,"%d-%02d-%02dT%02d:%02d:%02dZ",year,month,monthday,hour,minute,second);
+                                else
+                                    sprintf(iso8601,"%d-%02d-%02dT%02d:%02d:%02d+%02d:%02d",year,month,monthday,hour,minute,second,tzh,tzm);
+                            }else
+                            if(tzh!=INT_MIN) // a negative timezone offset
+                                sprintf(iso8601,"%d-%02d-%02dT%02d:%02d:%02d-%02d:%02d",year,month,monthday,hour,minute,second,abs(tzh),tzm);
+                            else // undefined timezone offset
+                                sprintf(iso8601,"%d-%02d-%02dT%02d:%02d:%02d",year,month,monthday,hour,minute,second);
+                            if(string_append(_iso8601,iso8601))complete=true;
+                        }
+                    }
+                    /* replacing:
                     // we will consume timetext in the process (which we're allowed to do)
                     // 1. skip non-digits and leading zeroes at the start
-                    bool complete=false;
                     char timetextcharacter=*timetext;
                     while(timetextcharacter&&(timetextcharacter<=48||timetextcharacter>57))timetextcharacter=*(++timetext);
                     if(timetextcharacter){ // the first digit character of the year ('1' through '9')
@@ -481,6 +565,7 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner ow
                             outputError("Failed to append the year - month dash");
                     }else
                         outputError("No digits in calendar datetime text");
+                    */
                     if(complete)
                         result=_getValueOfTime(_parsedTime(string(_iso8601),(_tznValue&&_tznValue->type==VT_TEXT?_tznValue->value._text->_c:NULL)));
                     FREE_STRING(_iso8601,owner);
