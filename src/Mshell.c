@@ -565,17 +565,28 @@ mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEX
 // end Decimal support
 
 // very special M functions
-Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue){
+// MDH@20DEC2020: added the _invalidTokenValue to be evaluated when the condition is negative
+//                and changed the evaluation of the condition to a sign
+Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue,Mvalue* _undefinedTokenValue){
 	Mvalue* _result=NULL;
-	if(isValueUndefined(_conditionTokenValue)==M_TRUE||isValueZero(_conditionTokenValue)==M_TRUE){
-		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
-			getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
-			_result=getValueOfExpression("else clause",'e',NULL,0);
-		}
-	}else{
-		if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
-			getExecutionEnvironment()->expressionToken=_thenTokenValue->value._token;
-			_result=getValueOfExpression("then clause",'t',NULL,0);
+	if(_conditionTokenValue){
+		long long conditionSign=getValueSign(_conditionTokenValue);
+		if(conditionSign>0){
+			if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
+				getExecutionEnvironment()->expressionToken=_thenTokenValue->value._token;
+				_result=getValueOfExpression("then clause",'t',NULL,0);
+			}
+		}else
+		if(conditionSign==0){
+			if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
+				getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
+				_result=getValueOfExpression("else clause",'e',NULL,0);
+			}
+		}else{
+			if(_undefinedTokenValue&&_undefinedTokenValue->type==VT_TOKEN){
+				getExecutionEnvironment()->expressionToken=_undefinedTokenValue->value._token;
+				_result=getValueOfExpression("undefined clause",'e',NULL,0);
+			}
 		}
 	}
     return _result;
@@ -4728,8 +4739,11 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-2;	// i.e. evaluate the first two arguments only in the current context
 						}else
 						*/
-						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)||!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
+						if(!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
 							numberOfElementsToNotEvaluate=2;
+						}else
+						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)){
+							numberOfElementsToNotEvaluate=3; // MDH@20DEC2020: not certain about this
 						}else
 						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
 							numberOfElementsToNotEvaluate=5;
@@ -11756,7 +11770,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			_Menvironment->_functionMap=environmentFunctionMap;
 
 			// register if, while and for special functions
-		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
+			// MDH@20DEC2020: one additional token of the if function
+		    if(!completedValueTokenTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
 		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
 		    if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
 			// MDH@05AUG2019: the do function has a single token to process

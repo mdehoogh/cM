@@ -1041,7 +1041,7 @@ Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuet
     return NULL;
 }
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_TEXT,VT_MAP,VT_TOKEN);}/* VALIDATED */
-Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
+//Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_INTEGER,VT_INTEGER,VT_INTEGER);}/* VALIDATED */
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_UNDEFINED,VT_INTEGER);}/* VALIDATED */
 Mmap* _getMapMapListMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_MAP,VT_MAP,VT_LIST);}/* VALIDATED */
@@ -1084,6 +1084,7 @@ Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvalue
     return NULL;
 }
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4){return _getFourArgumentMap(name1,name2,name3,name4,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
+Mmap* _getValueTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4){return _getFourArgumentMap(name1,name2,name3,name4,VT_UNDEFINED,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 
 Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *name5,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3,Mvaluetype valuetype4,Mvaluetype valuetype5){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3&&name4&&name5){

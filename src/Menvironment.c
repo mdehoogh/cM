@@ -1850,17 +1850,17 @@ bool completedListValueIndexFunction(Mfunction* const _function,const char* cons
     }
     return false;
 }/* VALIDATED */
-bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);
-        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
-        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
-        _function->_parameterMap=owned_map(_getValueTokenTokenMap("if condition","then clause","else clause"),Msubowner(owner,1));
+        _function->type=FT_INTERNAL_FOUR_ARGUMENTS;
+        _function->functionunion.fourArgumentFunction=fourArgumentFunction;
+        _function->_parameterMap=owned_map(_getValueTokenTokenTokenMap("if condition","then clause","else clause","undefined clause"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register three token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+        output("%sFailed to register value three token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */

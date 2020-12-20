@@ -300,7 +300,6 @@ Mmap* _getListFunctionMap(char* name1,char* name2);
 Mmap* _getIntegerBooleanMap(char* name1,char* name2);
 Mmap* _getListTextMap(char* name1,char* name2);
 
-Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getMapMapListMap(char* name1,char* name2,char* name3);
@@ -308,6 +307,7 @@ Mmap* _getListFunctionValueMap(char* name1,char* name2,char* name3);
 
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
 Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5);
+Mmap* _getValueTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist const * const _list); // append a list to a (possibly empty) map using the indices as attribute name
