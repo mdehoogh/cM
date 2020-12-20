@@ -569,24 +569,22 @@ mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEX
 //                and changed the evaluation of the condition to a sign
 Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue,Mvalue* _undefinedTokenValue){
 	Mvalue* _result=NULL;
-	if(_conditionTokenValue){
-		long long conditionSign=getValueSign(_conditionTokenValue);
-		if(conditionSign>0){
-			if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
-				getExecutionEnvironment()->expressionToken=_thenTokenValue->value._token;
-				_result=getValueOfExpression("then clause",'t',NULL,0);
-			}
-		}else
-		if(conditionSign==0){
-			if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
-				getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
-				_result=getValueOfExpression("else clause",'e',NULL,0);
-			}
-		}else{
-			if(_undefinedTokenValue&&_undefinedTokenValue->type==VT_TOKEN){
-				getExecutionEnvironment()->expressionToken=_undefinedTokenValue->value._token;
-				_result=getValueOfExpression("undefined clause",'e',NULL,0);
-			}
+	long long conditionSign=getValueSign(_conditionTokenValue);
+	if(conditionSign>0){
+		if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
+			getExecutionEnvironment()->expressionToken=_thenTokenValue->value._token;
+			_result=getValueOfExpression("then clause",'t',NULL,0);
+		}
+	}else
+	if(conditionSign==0){
+		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
+			getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
+			_result=getValueOfExpression("else clause",'e',NULL,0);
+		}
+	}else{
+		if(_undefinedTokenValue&&_undefinedTokenValue->type==VT_TOKEN){
+			getExecutionEnvironment()->expressionToken=_undefinedTokenValue->value._token;
+			_result=getValueOfExpression("undefined clause",'e',NULL,0);
 		}
 	}
     return _result;

@@ -120,16 +120,16 @@ bool completedValueIntegerFunction(Mfunction* const _function,const char* const 
 
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
 bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
-bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 bool completedValueValueValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 bool completedMapMapListFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 bool completedListFunctionValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
-
-bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
-bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction);
-
 bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 bool completedListValueIndexFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+
+bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
+bool completedValueTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
+
+bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction);
 
 // MDH@28OCT2020 moved over to Mshell.h/c: Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
 
