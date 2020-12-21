@@ -589,6 +589,55 @@ Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue*
 	}
     return _result;
 }
+
+// MDH@21DEC2020: a new way to do a while is by receiving a single token list (just like do does!!)
+Mvalue* Mwhilefunction(Mvalue* _doTokenValue){
+	bool report=(amVerboseDebugging()||DEBUGGING);
+	Mvalue* _result=NULL;
+	if(_doTokenValue&&_doTokenValue->type==VT_LIST&&_doTokenValue->value._list){
+		Mlist* tokenList=_doTokenValue->value._list;
+		if(tokenList->numberOfElements>1){
+			Mlistelement* conditiontokenlistelement=tokenList->_first;
+			// we need the condition token and its successor
+			if(conditiontokenlistelement&&conditiontokenlistelement->_next){
+				Mtoken* conditiontoken=(conditiontokenlistelement&&conditiontokenlistelement->_value&&conditiontokenlistelement->_value->type==VT_TOKEN?conditiontokenlistelement->_value->value._token:NULL);
+				if(conditiontoken){
+					Mlistelement* looptokenlistelement;
+					Mtoken* looptoken;
+					while(1){
+						getExecutionEnvironment()->expressionToken=conditiontoken;
+						Mvalue* _conditionValue=getValueOfExpression("while condition",'w',NULL,0);
+						if(report)
+							outputValue("Condition value: '",_conditionValue,"'.\n");
+						// MDH@22OCT2020: we know that a condition evaluates to M_TRUE, M_FALSE or M_LL_INVALID (undecisive), and the last one (M_LL_INVALID) is not equal zero so testing for being positive is preferred
+						if(isValueZero(_conditionValue)==M_TRUE||isValueUndefined(_conditionValue)==M_TRUE)
+							break; // condition evaluates to zero
+						// evaluate the body
+						looptokenlistelement=conditiontokenlistelement->_next;
+						while(looptokenlistelement){
+							if(looptokenlistelement->_value&&looptokenlistelement->_value->type==VT_TOKEN){
+								looptoken=looptokenlistelement->_value->value._token;
+								if(looptoken){
+									getExecutionEnvironment()->expressionToken=looptoken;
+									_result=getValueOfExpression("while loop",'l',NULL,0);
+									if(report)
+										outputValue("Result so far: '",_result,"'.\n");
+								}
+							}
+							looptokenlistelement=looptokenlistelement->_next;
+						}
+					}
+				}else
+					outputBug("First while token list element not a token");
+			}else
+				outputBug("Missing while token list condition");
+		}else
+			outputError("A while loop takes a condition and at least one loop expression");
+	}else
+		outputBug("While loop arguments not a list");
+	return _result;
+}
+/* replacing the previous implementation
 Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue){
 	Mvalue* _result=NULL;
 	if(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN&&_whilebodyTokenValue&&_whilebodyTokenValue->type==VT_TOKEN){
@@ -605,6 +654,7 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 	}
 	return _result;
 }
+*/
 // MDH@05AUG2019: the do function allows for executing a single command in its own environment, so all variables created are local
 //                the problem is that we want to allow the user to enter a list of token things i.e. an infinite list of arguments instead of having to wrap the single argument in a list itself
 //                this is solvable if we convert the list of arguments to a single Mvalue wrapping the entire list of arguments before calling Mdofunction
@@ -4745,7 +4795,12 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						}else
 						*/
 						if(!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
-							numberOfElementsToNotEvaluate=2;
+							// MDH@21DEC2020: if we decide that all arguments are not to be evaluated
+							//                we can have as many as we want!!
+							numberOfElementsToNotEvaluate=LLONG_MAX; // all elements should NOT be evaluated
+							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
+							numberOfFunctionParameters=LLONG_MAX; // replacing 2 with the actual number of parameters we allow for the function
+							// replacing: numberOfElementsToNotEvaluate=2;
 						}else
 						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)){
 							numberOfElementsToNotEvaluate=3; // MDH@20DEC2020: not certain about this
@@ -4772,7 +4827,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								if(inputCharReadFunction){char c;output("Press any key to continue...");(*inputCharReadFunction)(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
-							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
+							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)
+								||!strcmp(_significantTokenText,WHILEFUNCTION_NAME) // MDH@21DEC2020: While as well
+							){
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
 								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
@@ -4791,7 +4848,10 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							outputValue("Function argument map: ",_getValueOfMap(_functionCallArgumentMap,false),".\n");
 							*/
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
-							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))FREE_LIST(functionCallArgumentList,owner);
+							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)
+								||!strcmp(_significantTokenText,WHILEFUNCTION_NAME) // MDH@21DEC2020
+							)
+								FREE_LIST(functionCallArgumentList,owner);
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
 							/*
 							if(amVerbose())output("Decrementing the reference count of the function arguments value!");
@@ -11777,8 +11837,12 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// register if, while and for special functions
 			// MDH@20DEC2020: one additional token of the if function
 		    if(!completedValueTokenTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
-		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
-		    if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
+		    
+			// MDH@21DEC2020: all while arguments are like with do() also tokens now
+		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
+			// replacing: if(!completedTokenTokenFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
+		    
+			if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
 			// MDH@05AUG2019: the do function has a single token to process
 		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
 		    if(!completedValueFunction(_getFunction(_Menvironment,owner,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
