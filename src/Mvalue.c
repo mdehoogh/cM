@@ -29,7 +29,11 @@ extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (defaul
 extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 
 Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable){
-    if(_variable->_name)disowned_chars(_variable->_name,owner_variable); // dynamically allocated (indicated by _) so we should free it...
+    if(_variable->_name){
+        // output("Disowning variable '%s'.\n",_variable->_name); // DEBUG
+        disowned_chars(_variable->_name,owner_variable);
+        // output("Variable '%s' disowned.\n",_variable->_name); // DEBUG
+    } // dynamically allocated (indicated by _) so we should free it...
     return(Mvariable*)DISOWNED(_variable,owner_variable);
 }
 Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable){
@@ -211,15 +215,16 @@ Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner
 }
 #endif
 long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
+    bool report=(amVerboseDebugging()||DEBUGGING);
     long long result=M_LL_INVALID;
     if(_mapelement){
-        if(amVerboseDebugging())
+        if(report)
             output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
         result=(_mapelement->_next?free_mapelement(_mapelement->_next,weak):0);
         _mapelement->_next=NULL;
         if(_mapelement->_variable){
             if(_mapelement->_variable->_name){
-                if(amVerboseDebugging())
+                if(report)
                     output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
             }else
                 outputWarning("Unnamed map attribute!");
@@ -229,7 +234,7 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
             outputWarning("No map attribute to free!");
         FREE_1(_mapelement,'m'/*,owner*/);
         result+=1;
-        if(amVerboseDebugging())
+        if(report)
             outputInfo("\tMap element freed!");
     }
     return result;

@@ -63,5 +63,5 @@ Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LI
 // utility function to free an Mchars* created using _getChars
 void freeChars(Mchars const * const _chars/*,Mallocationowner owner_chars*/){
     // if oid is not positive, assuming I was the owner to start with and use that as owner id
-    free_chars(_chars/*,owner_chars*/,1,strlen(_chars->chars)+1,'\'');
+    if(_chars)free_chars(_chars/*,owner_chars*/,1,strlen(_chars->chars)+1,'\'');
 }

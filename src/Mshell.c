@@ -621,7 +621,10 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 												&&addVariable(_doEnvironment,owner,"!",VT_INTEGER,false)
 												&&setValue(_doEnvironment,"!",_getIntegerValue(0));
 				if(doEnvironmentInitialized){
-					if(pushExecutionEnvironment(_doEnvironment)){
+					// MDH@21DEC2020 BUG FIX: pushing an environment will wrap it inside a value
+					//                        which should be able to take over membership
+					//                        which means you have to disown the environment!!!!
+					if(pushExecutionEnvironment(disowned_environment(_doEnvironment,owner))){ // _doEnvironment bound!!!
 						Mlistelement* tokenValueListelement=doList->_first;
 						Mvalue *tokenExpressionValue,*expressionValue=NULL;
 						while(tokenValueListelement){
@@ -639,10 +642,12 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 						Mvalue* doResultValue=getValue(_doEnvironment,"$");
 						_result=(doResultValue?doResultValue:expressionValue);
 						popExecutionEnvironment(); // pop the do environment we successfully pushed
-					}
-				}else
+					}else // _doEnvironment disowned, but not bound
+						free_environment(_doEnvironment);
+				}else{ // _doEnvironment bound to this function, so both disowned and free
+					FREE_ENVIRONMENT(_doEnvironment,owner); // MDH@17JUN2020: check if this should be here
 					outputError("Failed to create the do environment");
-				FREE_ENVIRONMENT(_doEnvironment,owner); // MDH@17JUN2020: check if this should be here
+				}
 			}
 		}
 	}
