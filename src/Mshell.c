@@ -304,7 +304,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 				outputError("Failed to add the exit flag variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else // MDH@22OCT2020: fail-through code that will add a list that would normally contain the additional arguments in a function call which we force to be present always this way
-			if(!addVariable(_functionExecutionEnvironment,owner,"_",VT_LIST,false))
+			if(!addVariable(_functionExecutionEnvironment,owner,M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME,VT_LIST,false))
 				outputInfo("Failed to add the additional arguments list variable to the function execution environment");
 		}else
 			outputError("Failed to initialize the function execution environment.");
@@ -673,6 +673,8 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			bool forEnvironmentInitialized=(_resultTokenValue?true:false);
 			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"$",VT_UNDEFINED,false))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"_",VT_INTEGER,false))forEnvironmentInitialized=false;
+			// MDH@21DEC2020: TODO we will need to change "_" to something else because _ is used in functions
+			//                     for storing the additional arguments
 			if(forEnvironmentInitialized&&!setValue(_forEnvironment,"_",_getIntegerValue(0)))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized){
 				if(pushExecutionEnvironment(_forEnvironment)){
