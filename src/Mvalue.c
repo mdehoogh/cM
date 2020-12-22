@@ -709,7 +709,7 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
 }
 
 // MDH@23MAY2020: although a value is (weakly but permanently) stored in _valuelist we can set its owner to the function that created it
-Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
     Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
     if(!_map)return NULL;
     Mvalue* _mapValue=__value(weak?"weak map":"strong map");
@@ -970,6 +970,22 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
     }
     assignValue(&_listMap->_first->_variable->_value,_listValue);
     return disowned_map(_listMap,owner);
+}/* VALIDATED */
+Mmap* _getMapMap(char* name,Mvalue* _mapValue){Mallocationowner owner=getOwner(__LINE__);
+    if(!name||strlen(name)==0)return NULL;
+    if(!_mapValue){
+        // if(amVerboseDebugging())
+            output("Unable to create map map: no map value to put in map.\n");
+        return NULL;
+    }
+    Mmap* _mapMap=owned_map(_getOneArgumentMap(name,VT_MAP),owner);
+    if(!_mapMap){
+        // if(amVerboseDebugging())
+           output("%sFailed to create a one argument map map.\n",M_ERROR_PREFIX);
+        return NULL;
+    }
+    assignValue(&_mapMap->_first->_variable->_value,_mapValue);
+    return disowned_map(_mapMap,owner);
 }/* VALIDATED */
 
 static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);

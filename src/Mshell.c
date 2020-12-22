@@ -3944,7 +3944,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 														assignValue(valueholder,_getListValue(VT_UNDEFINED,false,"value holder list creator"));
 														if(amVerboseDebugging())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 													}else{ // not all integers in the index list
-														assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
+														assignValue(valueholder,_getMapValue(VT_UNDEFINED,false,"getReferencedValue"));
 														if(amVerboseDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 													}
 													if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
@@ -4301,7 +4301,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 													if(report)
 														output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 												}else{ // not all integers in the index list
-													assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
+													assignValue(valueholder,_getMapValue(VT_UNDEFINED,false,"value holder list creator"));
 													if(report)
 														output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 												}
@@ -8556,6 +8556,76 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 	return _expressionValue;
 }
 
+// MDH@22DEC2020: I can simplify the for loop by wrapping it inside an environment by being able to create one
+//                on the fly with a local variable map similar to what the anonymous function does
+//                thus effectively separating commands inside the block from the declaration of local variables
+Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=(amVerboseDebugging()||DEBUGGING);
+	long long result=M_LL_INVALID;
+	if(!_localMapValue||_localMapValue->type==VT_MAP){
+		result=M_FALSE;
+		Mmap* localMap=(_localMapValue?_localMapValue->value._map:NULL);
+		if(!localMap)
+			outputWarning("No with (local) variables defined!");
+		else
+		if(localMap->numberOfElements==0)
+			outputWarning("With map empty!");
+		Menvironment* _withEnvironment=owned_environment(__environment(),owner);
+		if(_withEnvironment){
+			Mmapelement* withNameMapelement=(localMap?getMapelement(localMap,"."):NULL);
+			Mvariable* withNameVariable=(withNameMapelement?withNameMapelement->_variable:NULL);
+			Mstring* _withNameText=(withNameVariable?owned_string(_getValueText(withNameVariable->_value,true),owner):NULL);
+			// if a property "." is defined, it's text value will be the name of the with environment
+			_withEnvironment->_name=owned_chars(_getChars((_withNameText?string(_withNameText):"")),Msubowner(owner,1));
+			// copy local map
+			if(localMap)_withEnvironment->_variableMap=owned_map(_getMapCopy(localMap),Msubowner(owner,1));
+			if(!localMap||_withEnvironment->_variableMap){
+				if(!containsVariable(_withEnvironment,".",false)||removedFromMap(_withEnvironment->_variableMap,owner,".")==M_TRUE){
+					// almost there
+					if(!pushExecutionEnvironment(disowned_environment(_withEnvironment,owner))){ // _withEnvironment not bound!!!
+						free_environment(_withEnvironment);_withEnvironment=NULL;
+						output("%sFailed to register %senvironment",M_ERROR_PREFIX,(_withNameText?"":"the with "));
+						if(_withNameText)output(" '%s'",string(_withNameText));
+						output(".\n");
+					}else
+						result=M_TRUE;
+				}else
+				if(withNameMapelement)
+					outputError("Failed to remove the with environment name from the local variables map");	
+			}
+			if(result==M_FALSE)if(_withEnvironment)FREE_ENVIRONMENT(_withEnvironment,owner);
+			/* replacing:
+			Mmapelement* withVariableMapelement=localMap->_first;
+			while(withVariableMapelement){
+				withNameVariable=withVariableMapelement->_variable;
+				if(withNameVariable){
+					Mchars* withlocalVariableName=withNameVariable->_name;
+					if(withlocalVariableName->chars){
+						if(!addVariable(_withEnvironment,owner,withlocalVariableName,));
+						withVariableMapelement=withVariableMapelement->_next;
+					}
+				}
+			}
+			if(!withVariableMapelement){ // with environment successfully initialized
+			}else{
+				output("%sFailed to initialize %senvironment",M_ERROR_PREFIX,(_withNameText?"":"the with "));
+				if(_withNameText)output(" '%s'",string(_withNameText));
+				output(".\n");
+			}
+			*/
+			FREE_STRING(_withNameText,owner);
+		}
+	}else
+		outputError("With argument not a (local variable) map!");
+	return _getIntegerValue(result);
+}
+Mvalue* Mendwith(){Mallocationowner owner=getOwner(__LINE__);
+	// let's make endwith return a copy of the variable map of the environment we're going to pop!!!
+	// TODO we should check whether there's a with environment active!!!!!!!!
+	Mmap* _resultMap=owned_map(_getMapCopy(getExecutionEnvironment()->_variableMap),owner);
+	popExecutionEnvironment();
+	return(_resultMap?_getValueOfMap(disowned_map(_resultMap,owner)):NULL);
+}
 // the functions to create functions are moved here from Menvironment.h/c because they require parsing the command texts
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
 //                so these are actually anonymous functions
@@ -11849,6 +11919,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@28OCT2020: no longer internal functions as defined in Menvironment.h/c but moved over here because they need command parsing features
 		    if(!completedStringMapTokenFunction(_getFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
     		if(!completedMapMapListFunction(_getFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
+
+			// MDH@22DEC2020: register the with() and endwith() function
+			if(!completedMapFunction(_getFunction(_Menvironment,owner,"with"),"with",Mwith))return false;
+			if(!completedFunction(_getFunction(_Menvironment,owner,"end"),"end",Mendwith))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 		    // if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!

@@ -102,6 +102,7 @@ bool completedValueFunction(Mfunction* const _function,const char* const functio
 bool completedIntegerFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedFloatFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedMapFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 
 bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);

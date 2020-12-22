@@ -3564,7 +3564,7 @@ bool registerCommandEvaluation(char const * const commandText,Mvalue* evaluation
 		if(M_list){
 			// we know M_list is a list stored in an Mvalue which has owner getValueOwner()
 			Mallocationowner owner_M_list=Msubowner(getValueOwner(),1); // MDH@25MAY2020: the owner of M_list
-			Mvalue* commandresultValue=_getMapValue(VT_UNDEFINED,false); // the map that is to contain the command text and its result value text
+			Mvalue* commandresultValue=_getMapValue(VT_UNDEFINED,false,"registerCommandEvaluation"); // the map that is to contain the command text and its result value text
 			if(commandresultValue){
 				// NOTE we're wrapping the first token of the command into a value which is dangerous because when the list is freed, the token shouldn't!!
 				//      so theoretically that value is weak, whereas the evaluation result is strong

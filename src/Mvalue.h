@@ -200,6 +200,8 @@ Mmap* _getMapCopy(Mmap const * const map);
 Mmap* _getFloatMap(char* name,Mvalue* _floatValue);
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
 Mmap* _getListMap(char* name,Mvalue* _listValue);
+Mmap* _getMapMap(char* name,Mvalue* _mapValue);
+
 Mmap* _getStringStringMap(char* name1,char* name2);
 Mmap* _getFloatFloatMap(char* name1,char* name2);
 Mlist* _getMapAttributes(Mmap const * const _map);
@@ -232,7 +234,7 @@ Mvalue* _getCharTextValue(char _c);
 Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char const * const text);
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
-Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty map with all values to be of type mapValuetype
+Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,char const * const source); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 

@@ -803,7 +803,7 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
         Mallocationowner owner_variablemapelement=Msubowner(owner_environment,2),owner_variable=Msubowner(owner_environment,3),owner_variablename=Msubowner(owner_environment,4); // MDH@09JUN2020: the owner of the variable name
         while(_variable){
             // if the variable does not have a value
-            if(!_variable->_value)assignValue(&_variable->_value,_getMapValue(VT_UNDEFINED,false));
+            if(!_variable->_value)assignValue(&_variable->_value,_getMapValue(VT_UNDEFINED,false,"addVariable"));
             Mmap* map=(_variable->_value&&_variable->_value->type==VT_MAP?_variable->_value->value._map:NULL);
             if(!map){_variable=NULL;break;} // if its value is NOT a map failure...
             // update property
@@ -1593,6 +1593,22 @@ bool completedListFunction(Mfunction* const _function,const char* const function
     }
     return false;
 }/* VALIDATED */
+bool completedMapFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_ONE_ARGUMENT;
+        _function->functionunion.oneArgumentFunction=oneArgumentFunction;
+        // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
+        _function->_parameterMap=owned_map(_getMapMap("m",_getMapValue(VT_UNDEFINED,false,"completedMapFunction")),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered map function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register single map argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+
 bool completedListTextFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);
