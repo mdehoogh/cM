@@ -2971,10 +2971,10 @@ Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=
     if(_environmentName){
         Mstring* p=_environmentName;
         while(p&&_environment){
-            if(string_length(p)>0)p=string_insert_char(p,0,'.');
-            /////// printf("Prepending '%s'.\n",_environment->_name);
             if(_environment->_name)p=string_prepend(p,_environment->_name->chars);
+            /////// printf("Prepending '%s'.\n",_environment->_name);
             _environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
+            if(_environment)p=string_insert_char(p,0,'.');
         }
         if(!p){FREE_STRING(_environmentName,owner);_environmentName=NULL;}
     }

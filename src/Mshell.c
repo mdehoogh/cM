@@ -8572,6 +8572,8 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 			outputWarning("With map empty!");
 		Menvironment* _withEnvironment=owned_environment(__environment(),owner);
 		if(_withEnvironment){
+			if(report)
+				output("With environment created.\n");
 			Mmapelement* withNameMapelement=(localMap?getMapelement(localMap,"."):NULL);
 			Mvariable* withNameVariable=(withNameMapelement?withNameMapelement->_variable:NULL);
 			Mstring* _withNameText=(withNameVariable?owned_string(_getValueText(withNameVariable->_value,true),owner):NULL);
@@ -8580,20 +8582,29 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 			// copy local map
 			if(localMap)_withEnvironment->_variableMap=owned_map(_getMapCopy(localMap),Msubowner(owner,1));
 			if(!localMap||_withEnvironment->_variableMap){
-				if(!containsVariable(_withEnvironment,".",false)||removedFromMap(_withEnvironment->_variableMap,owner,".")==M_TRUE){
+				if(report)
+					output("Local variables map registered.\n");
+				if(!withNameMapelement||removedFromMap(_withEnvironment->_variableMap,owner,".")==M_TRUE){
 					// almost there
 					if(!pushExecutionEnvironment(disowned_environment(_withEnvironment,owner))){ // _withEnvironment not bound!!!
 						free_environment(_withEnvironment);_withEnvironment=NULL;
 						output("%sFailed to register %senvironment",M_ERROR_PREFIX,(_withNameText?"":"the with "));
 						if(_withNameText)output(" '%s'",string(_withNameText));
 						output(".\n");
-					}else
+					}else{
 						result=M_TRUE;
+						if(report)
+							output("With environment activated.\n");
+					}
 				}else
 				if(withNameMapelement)
 					outputError("Failed to remove the with environment name from the local variables map");	
 			}
-			if(result==M_FALSE)if(_withEnvironment)FREE_ENVIRONMENT(_withEnvironment,owner);
+			if(result==M_FALSE&&_withEnvironment!=NULL){
+				if(report)
+					output("Freeing the with environment!");
+				FREE_ENVIRONMENT(_withEnvironment,owner);
+			}
 			/* replacing:
 			Mmapelement* withVariableMapelement=localMap->_first;
 			while(withVariableMapelement){
@@ -8613,7 +8624,7 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 				output(".\n");
 			}
 			*/
-			FREE_STRING(_withNameText,owner);
+			if(_withNameText)FREE_STRING(_withNameText,owner);
 		}
 	}else
 		outputError("With argument not a (local variable) map!");
