@@ -8630,12 +8630,23 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 		outputError("With argument not a (local variable) map!");
 	return _getIntegerValue(result);
 }
-Mvalue* Mendwith(){Mallocationowner owner=getOwner(__LINE__);
+// MDH@23DEC2020: you can decide now to return whatever you want (from the current environment)
+//                but if the value is NULL the default i.e. the entire variable map is returned
+Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__);
 	// let's make endwith return a copy of the variable map of the environment we're going to pop!!!
 	// TODO we should check whether there's a with environment active!!!!!!!!
-	Mmap* _resultMap=owned_map(_getMapCopy(getExecutionEnvironment()->_variableMap),owner);
+	if(!getEnvironmentParent(getExecutionEnvironment())){
+		outputError("No (with) environment to end.");
+		return NULL;
+	}
+	Mmap* _resultMap=NULL;
+	if(_returnValue==NULL){ // no return value specified
+		_resultMap=owned_map(_getMapCopy(getExecutionEnvironment()->_variableMap),owner);
+		if(!_resultMap)
+			outputError("Failed to return the with environment variable map");
+	}
 	popExecutionEnvironment();
-	return(_resultMap?_getValueOfMap(disowned_map(_resultMap,owner)):NULL);
+	return(_resultMap?_getValueOfMap(disowned_map(_resultMap,owner)):_returnValue);
 }
 // the functions to create functions are moved here from Menvironment.h/c because they require parsing the command texts
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
@@ -11933,7 +11944,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			// MDH@22DEC2020: register the with() and endwith() function
 			if(!completedMapFunction(_getFunction(_Menvironment,owner,"with"),"with",Mwith))return false;
-			if(!completedFunction(_getFunction(_Menvironment,owner,"end"),"end",Mendwith))return false;
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"end"),"end",Mendwith))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 		    // if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
