@@ -915,20 +915,24 @@ Menvironment* _getNewEnvironment(){Mallocationowner owner=getOwner(__LINE__);
     return disowned_environment(_environment,owner);
 } /* VALIDATED */
 
+// MDH@23DEC2020 TODO perhaps it's better to replace environment+name by a variable that's either created or obtained beforehand??????
 bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
+    bool report=(amVerboseDebugging()||DEBUGGING);
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("Cannot set the value: no variable name");return false;}
-    if(amVerboseDebugging()){output("Setting the value of '%s'",name);outputValue(" to '",_value,"'.\n");}
-    Mvariable* variable=getVariable(_environment,name,amVerboseDebugging());
+    if(report)
+    {output("Setting the value of '%s'",name);outputValue(" to '",_value,"'.\n");}
+    Mvariable* variable=getVariable(_environment,name,report);
     if(variable){
         if(!variable->_value||!variable->immutable){
-            if(amVerboseDebugging())output("Value of variable '%s' to set.\n",variable->_name);
+            if(report)
+                output("Value of variable '%s' to set.\n",variable->_name);
             // _value needs to be of the right type
             // MDH@03NOV2019: unless it's null (i.e. the type of _value->type is VT_UNDEFINED)
             if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type||_value->type==VT_UNDEFINED){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
-                if(amVerboseDebugging()){
+                if(report){
                     Mstring* _valueText=owned_string(_getValueText(variable->_value,false),owner);
                     if(_valueText){
                         output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
@@ -1004,9 +1008,9 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
             }else
                 outputError("Circular reference not allowed");
         }else
-            output("%sCannot append the value to variable '%s': it does not contain a list!\n",M_ERROR_PREFIX,name);
+            output("%sCannot append the value to variable '%s': it's value is not a list!\n",M_ERROR_PREFIX,name);
     }else
-        output("%sCannot set the value of variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
+        output("%sCannot append the value to list variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
     return 0;
 }/* VALIDATED */
 

@@ -28,6 +28,7 @@ const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
+const char* const FORWITHFUNCTION_NAME="forw";
 const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="defun"; // MDH@04MAR2020: the 'classic' approach is by defining a function with a fixed name which cannot be passed along
@@ -591,13 +592,13 @@ Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue*
 }
 
 // MDH@21DEC2020: a new way to do a while is by receiving a single token list (just like do does!!)
-Mvalue* Mwhilefunction(Mvalue* _doTokenValue){
+Mvalue* Mwhilefunction(Mvalue* _whileTokenlistValue){
 	bool report=(amVerboseDebugging()||DEBUGGING);
 	Mvalue* _result=NULL;
-	if(_doTokenValue&&_doTokenValue->type==VT_LIST&&_doTokenValue->value._list){
-		Mlist* tokenList=_doTokenValue->value._list;
-		if(tokenList->numberOfElements>1){
-			Mlistelement* conditiontokenlistelement=tokenList->_first;
+	if(_whileTokenlistValue&&_whileTokenlistValue->type==VT_LIST&&_whileTokenlistValue->value._list){
+		Mlist* whileTokenlist=_whileTokenlistValue->value._list;
+		if(whileTokenlist->numberOfElements>1){
+			Mlistelement* conditiontokenlistelement=whileTokenlist->_first;
 			// we need the condition token and its successor
 			if(conditiontokenlistelement&&conditiontokenlistelement->_next){
 				Mtoken* conditiontoken=(conditiontokenlistelement&&conditiontokenlistelement->_value&&conditiontokenlistelement->_value->type==VT_TOKEN?conditiontokenlistelement->_value->value._token:NULL);
@@ -704,7 +705,8 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 	return _result;
 }
 // MDH@11MAR2020: the value of the result token is assigned to $ so that will become the result of the application of the Mforfunction
-Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){Mallocationowner owner=getOwner(__LINE__);
+// MDH@23DEC2020: Mforfunction renamed to Mforwithfunction because that's what it actually is, this will save the user from wrapping the for call in a with statement
+Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
 		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
@@ -842,6 +844,79 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 		}else
 			outputError("Failed to create the for loop execution environment");
 	}
+	return _result;
+}
+// MDH@23DEC2020: Mforfunction now implements the first choice Mforwithfunction for executing a for loop from a token list (of indefinite number of tokens just like while and do)
+Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=(amVerboseDebugging()||DEBUGGING);
+	Mvalue* _result=NULL;
+	if(_forTokenlistValue&&_forTokenlistValue->type==VT_LIST&&_forTokenlistValue->value._list){
+		Mlist* forTokenlist=_forTokenlistValue->value._list;
+		if(forTokenlist->numberOfElements>3){ // at least four elements required
+			// extracting valid initialization, condition and increment list element (of type VT_TOKEN)
+			Mlistelement* initializationTokenlistelement=forTokenlist->_first;
+			// NOTE ascertaining that the condition is NULL if the initialization token is not of the right type (or undefined)
+			Mlistelement* conditionTokenlistelement=(initializationTokenlistelement
+														&&(!initializationTokenlistelement->_value||initializationTokenlistelement->_value->type==VT_TOKEN)
+													?initializationTokenlistelement->_next
+													:NULL);
+			// NOTE let's allow the increment token list element to be NULL as well although this is not recommended
+			Mlistelement* incrementTokenlistelement=(conditionTokenlistelement&&conditionTokenlistelement->_value&&conditionTokenlistelement->_value->type==VT_TOKEN
+													?conditionTokenlistelement->_next
+													:NULL);
+			// we can suffice with testing the increment token
+			if(incrementTokenlistelement&&incrementTokenlistelement->_next){
+				Mtoken* conditionToken=conditionTokenlistelement->_value->value._token;
+				if(conditionToken){
+					// allowing the increment to be NULL although this is not recommended, as otherwise the user could forget to make the condition change!!
+					Mtoken* incrementToken=(incrementTokenlistelement->_value&&incrementTokenlistelement->_value->type==VT_TOKEN?incrementTokenlistelement->_value->value._token:NULL);
+					// initialize
+					Mtoken* initializationToken=(initializationTokenlistelement&&initializationTokenlistelement->_value?initializationTokenlistelement->_value->value._token:NULL);
+					if(initializationToken){
+						getExecutionEnvironment()->expressionToken=initializationToken;
+						Mvalue* _initializationValue=getValueOfExpression("for loop initialization",'v',NULL,0);
+						if(report)
+							outputValue("For loop initialization value: '",_initializationValue,"'.\n");
+					}
+					Mlistelement* loopTokenlistelement;
+					Mtoken* loopToken;
+					while(1){
+						getExecutionEnvironment()->expressionToken=conditionToken;
+						Mvalue* _conditionValue=getValueOfExpression("for loop condition",'i',NULL,0);
+						if(report)
+							outputValue("For loop condition value: '",_conditionValue,"'.\n");
+						// the condition is not met when the condition value is undefined or not positive
+						if(isValueUndefined(_conditionValue)==M_TRUE||isValuePositive(_conditionValue)!=M_TRUE)break; // condition is not met
+						// evaluate the body elements
+						loopTokenlistelement=incrementTokenlistelement->_next;
+						while(loopTokenlistelement){
+							if(loopTokenlistelement->_value&&loopTokenlistelement->_value->type==VT_TOKEN){
+								loopToken=loopTokenlistelement->_value->value._token;
+								if(loopToken){
+									getExecutionEnvironment()->expressionToken=loopToken;
+									_result=getValueOfExpression("for loop body",'l',NULL,0);
+									if(report)
+										outputValue("Result so far: '",_result,"'.\n");
+								}
+							}
+							loopTokenlistelement=loopTokenlistelement->_next;
+						}
+						// finish with evaluating the increment token (if defined)
+						if(initializationToken){
+							getExecutionEnvironment()->expressionToken=incrementToken;
+							Mvalue* _initializationValue=getValueOfExpression("for loop increment",'i',NULL,0);
+							if(report)
+								outputValue("For loop increment value: '",_initializationValue,"'.\n");
+						}
+					}
+				}else
+					outputBug("For loop condition list element missing or not a token");
+			}else
+				outputBug("For loop increment list element missing or not a token");
+		}else
+			outputError("A for loop takes an initialization (possibly undefined), a condition (obligatory), an increment (possibly undefined) and at least one loop expression");
+	}else
+		outputBug("For loop arguments not a list");
 	return _result;
 }
 
@@ -1716,7 +1791,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
 
 				// MDH@28OCT2020: defining user functions is no longer 'special' in that the body should simply be a list of command texts and tokenized by Mdefinefunction and Manonymousfunction itself
-				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;
+				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORWITHFUNCTION_NAME))pNewToken->argument=1;
 				/* replacing:
 				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
 				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME)||!strcmp(_functionName,DEFINEANONYMOUSFUNCTION_NAME))pNewToken->argument=1;
@@ -4632,7 +4707,14 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 		}else{
 			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
 			//                the same way as happens when you use the defun internal function
-			if(setValue(getExecutionEnvironment(),_valuereference->_name->chars,_newValue)){
+			// MDH@23DEC2020: BUG FIX we have an issue here in that the given variable should be created if it does not currently exist, which means we should NOT call setValue()
+			//                        because setValue() does not create the variable!!!!
+			//                SOLUTION so similar to what Mset() does we ascertain to add the variable if it does not yet exist, except we always use type VT_UNDEFINED (which is safer!!)
+			char* variableName=_valuereference->_name->chars;
+			Menvironment* executionEnvironment=getExecutionEnvironment();
+			Mvariable* variable=getVariable(executionEnvironment,variableName,false); // if the variable exists, variable will be non-NULL
+	        if((variable||addVariable(executionEnvironment,owner,variableName,VT_UNDEFINED,false))
+				&&setValue(executionEnvironment,variableName,_newValue)){
 				// NOTE even if the value itself is NULL, its address is never NULL
 				_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
 				result=true;
@@ -4648,6 +4730,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				}
 				if(report)
 					outputInfo("Value set!");
+			}else{
+				output("%sFailed to %s variable '%s'",M_ERROR_PREFIX,(variable?"set":"initialize"),variableName);outputValue(" to '",_newValue,"'.\n");
 			}
 		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
@@ -4794,6 +4878,15 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-2;	// i.e. evaluate the first two arguments only in the current context
 						}else
 						*/
+						// MDH@23DEC2020: the 'new' for function works the same way as while in that all arguments should not be evaluated beforehand (i.e. will be passed as tokens to Mforfunnction)
+						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){
+							// MDH@21DEC2020: if we decide that all arguments are not to be evaluated
+							//                we can have as many as we want!!
+							numberOfElementsToNotEvaluate=LLONG_MAX; // all elements should NOT be evaluated
+							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
+							numberOfFunctionParameters=LLONG_MAX; // replacing 2 with the actual number of parameters we allow for the function
+							// replacing: numberOfElementsToNotEvaluate=2;
+						}else
 						if(!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
 							// MDH@21DEC2020: if we decide that all arguments are not to be evaluated
 							//                we can have as many as we want!!
@@ -4805,7 +4898,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)){
 							numberOfElementsToNotEvaluate=3; // MDH@20DEC2020: not certain about this
 						}else
-						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
+						if(!strcmp(_significantTokenText,FORWITHFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
 							numberOfElementsToNotEvaluate=5;
 						}else
 						if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){ // all arguments to the do function should not be evaluated beforehand
@@ -4829,6 +4922,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)
 								||!strcmp(_significantTokenText,WHILEFUNCTION_NAME) // MDH@21DEC2020: While as well
+								||!strcmp(_significantTokenText,FORFUNCTION_NAME) // MDH@23DEC2020: for as well
 							){
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
@@ -4850,6 +4944,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)
 								||!strcmp(_significantTokenText,WHILEFUNCTION_NAME) // MDH@21DEC2020
+								||!strcmp(_significantTokenText,FORFUNCTION_NAME) // MDH@23DEC2020
 							)
 								FREE_LIST(functionCallArgumentList,owner);
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
@@ -11934,7 +12029,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
 			// replacing: if(!completedTokenTokenFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
 		    
-			if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
+			if(!completedTokenListFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false; // MDH@23DEC2020: just like while no initial evaluation before executing
+			if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORWITHFUNCTION_NAME),FORWITHFUNCTION_NAME,Mforwithfunction))return false;
+
 			// MDH@05AUG2019: the do function has a single token to process
 		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
 		    if(!completedValueFunction(_getFunction(_Menvironment,owner,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;

@@ -35,6 +35,7 @@ extern const char INPUTCHARACTERTYPES[];
 extern const char* const MFUNCTION_NAME; // the text to represent values that are undefined...
 extern const char* const DOFUNCTION_NAME;
 extern const char* const FORFUNCTION_NAME;
+extern const char* const FORWITHFUNCTION_NAME; // MDH@23DEC2020: this used to be the original for function in that it creates a temporary environment to execute in
 extern const char* const DEFINEUSERFUNCTION_NAME;
 extern const char* const DEFINEANONYMOUSFUNCTION_NAME; // MDH@08FEB2020
 extern const char* const M_NULL_VALUE_TEXT; // the text to represent values that are undefined...
@@ -55,7 +56,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.5"; // MDH@05DEC2020: this is were Mexpression is renamed to Mtoken
-char const * const M_BUILD="5";char const * const M_DATE="15 December 2020"; // adding a VT_DATE for handling dates (see Mdate.c/h)
+char const * const M_BUILD="6";char const * const M_DATE="23 December 2020"; // updating while(), for(), introducing with(), end(), fixing setValue (Menvironment module)
+//char const * const M_BUILD="5";char const * const M_DATE="15 December 2020"; // adding a VT_DATE for handling dates (see Mdate.c/h)
 //char const * const M_BUILD="4";char const * const M_DATE="14 December 2020"; // adding a VT_DATE for handling dates (see Mdate.c/h)
 //char const * const M_BUILD="3";char const * const M_DATE="8 December 2020"; // adding a VT_DATE for handling dates (see Mdate.c/h)
 //char const * const M_BUILD="2";char const * const M_DATE="7 December 2020"; // with Mlocale.c/h to be able to get/set the locale
