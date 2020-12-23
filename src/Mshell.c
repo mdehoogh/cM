@@ -568,24 +568,31 @@ mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEX
 // very special M functions
 // MDH@20DEC2020: added the _invalidTokenValue to be evaluated when the condition is negative
 //                and changed the evaluation of the condition to a sign
-Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue,Mvalue* _undefinedTokenValue){
+Mvalue* Miffunction(Mvalue* _conditionValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue,Mvalue* _undefinedTokenValue){
 	Mvalue* _result=NULL;
-	long long conditionSign=getValueSign(_conditionTokenValue);
-	if(conditionSign>0){
+	// MDH@23DEC2020:
+	// the sign will be -1 (negative), 0 (zero) or 1 (positive) or M_LL_INVALID (a non numeric thing)
+	// and an if has three possible outcomes instead of four, because we distinguish true / false or anything else
+	// but this really depends on how we define true and false
+	// typically in M M_TRUE equals 1 and M_FALSE equals 0 and undefined (can't compute) is M_LL_INVALID
+	// we can broaden that a bit by considering all positive values TRUE and all non-positive values (except M_LL_INVALID) as FALSE
+	// currently exactly one out of three possible arguments is evaluated
+	long long conditionSign=getValueSign(_conditionValue);
+	if(conditionSign==M_LL_INVALID){
+		if(_undefinedTokenValue&&_undefinedTokenValue->type==VT_TOKEN){
+			getExecutionEnvironment()->expressionToken=_undefinedTokenValue->value._token;
+			_result=getValueOfExpression("undefined clause",'e',NULL,0);
+		}
+	}else
+	if(conditionSign>0){ 
 		if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
 			getExecutionEnvironment()->expressionToken=_thenTokenValue->value._token;
 			_result=getValueOfExpression("then clause",'t',NULL,0);
 		}
-	}else
-	if(conditionSign==0){
+	}else{ // all non-positive values (except M_LL_INVALID)
 		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
 			getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
 			_result=getValueOfExpression("else clause",'e',NULL,0);
-		}
-	}else{
-		if(_undefinedTokenValue&&_undefinedTokenValue->type==VT_TOKEN){
-			getExecutionEnvironment()->expressionToken=_undefinedTokenValue->value._token;
-			_result=getValueOfExpression("undefined clause",'e',NULL,0);
 		}
 	}
     return _result;
@@ -608,11 +615,12 @@ Mvalue* Mwhilefunction(Mvalue* _whileTokenlistValue){
 					while(1){
 						getExecutionEnvironment()->expressionToken=conditiontoken;
 						Mvalue* _conditionValue=getValueOfExpression("while condition",'w',NULL,0);
+						// MDH@23DEC2020: similar to in Miffunction we use the sign to determine whether
+						//                or not the condition is 'true' (positive values only)
 						if(report)
 							outputValue("Condition value: '",_conditionValue,"'.\n");
-						// MDH@22OCT2020: we know that a condition evaluates to M_TRUE, M_FALSE or M_LL_INVALID (undecisive), and the last one (M_LL_INVALID) is not equal zero so testing for being positive is preferred
-						if(isValueZero(_conditionValue)==M_TRUE||isValueUndefined(_conditionValue)==M_TRUE)
-							break; // condition evaluates to zero
+						long long conditionSign=getValueSign(_conditionValue);
+						if(conditionSign<=0)break;
 						// evaluate the body
 						looptokenlistelement=conditiontokenlistelement->_next;
 						while(looptokenlistelement){
@@ -707,13 +715,14 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 // MDH@11MAR2020: the value of the result token is assigned to $ so that will become the result of the application of the Mforfunction
 // MDH@23DEC2020: Mforfunction renamed to Mforwithfunction because that's what it actually is, this will save the user from wrapping the for call in a with statement
 Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=(amVerboseDebugging()||DEBUGGING);
 	Mvalue* _result=NULL;
 	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
 		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
 		(!_incrementTokenValue||_incrementTokenValue->type==VT_TOKEN)&&
 		(_bodyTokenValue&&_bodyTokenValue->type==VT_TOKEN)&&
 		(!_resultTokenValue||_resultTokenValue->type==VT_TOKEN)){
-		if(amVerbose()){
+		if(report){
 			output("For loop:");
 			outputValue(" Initialization=",_initializationTokenValue,NULL);
 			outputValue(" Condition=",_conditionTokenValue,NULL);
@@ -769,12 +778,13 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 							outputChar('\n');resetOutputColor();
 							*/
 							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
-							if(amVerboseDebugging())outputValue("For loop condition value: '",_conditionValue,"'.\n");
-							// a for loop should continue unless the condition value is zero or undefined
-							if(isValueZero(_conditionValue)!=M_FALSE)break; // condition evaluates to zero or is undefined
+							if(report)
+								outputValue("For loop condition value: '",_conditionValue,"'.\n");
+							long long conditionSign=getValueSign(_conditionValue);
+							if(conditionSign<=0)break; // condition evaluates to zero or is undefined
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
 							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
-							if(amVerboseDebugging()){
+							if(report){
 								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
 								outputValue(" evaluates to '",_conditionValue,"'.\n");
 							}
@@ -787,7 +797,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 								newline();resetOutputColor();
 								*/
 								_forBodyValue=getValueOfExpression("for loop",'l',(TokenType[]){},0);
-								if(amVerboseDebugging()){
+								if(report){
 									outputValue("For loop body in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
@@ -802,7 +812,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 								newline();resetOutputColor();
 								*/
 								_forIncrementValue=getValueOfExpression("for increment",'i',(TokenType[]){},0);
-								if(amVerboseDebugging()){
+								if(report){
 									outputValue("For loop increment in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forIncrementValue,"'.\n");
 								}
@@ -821,14 +831,16 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 							_result=getValue(_forEnvironment,"$"); // get the result
 							if(!_result){
 								_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
-								if(amVerboseDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
+								if(report)
+									outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
 							}else
-							if(amVerboseDebugging())
+							if(report)
 								outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
 						}
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
-					if(amVerboseDebugging())outputInfo("For loop environment popped.");
+					if(report)
+						outputInfo("For loop environment popped.");
 				}else{
 					outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
@@ -885,8 +897,9 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 						Mvalue* _conditionValue=getValueOfExpression("for loop condition",'i',NULL,0);
 						if(report)
 							outputValue("For loop condition value: '",_conditionValue,"'.\n");
+						long long conditionSign=getValueSign(_conditionValue);
 						// the condition is not met when the condition value is undefined or not positive
-						if(isValueUndefined(_conditionValue)==M_TRUE||isValuePositive(_conditionValue)!=M_TRUE)break; // condition is not met
+						if(conditionSign<=0)break; // condition is not met
 						// evaluate the body elements
 						loopTokenlistelement=incrementTokenlistelement->_next;
 						while(loopTokenlistelement){
