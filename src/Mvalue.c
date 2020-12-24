@@ -3381,6 +3381,23 @@ Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=g
     }
     return _getIntegerValue(M_LL_INVALID);
 }
+// for persisting variables, we need to be able to load and save values
+// the values will be written as text but in such a way that they can be read ('loaded') without loss of precision
+Mvalue* mfsave(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=getOwner(__LINE__);
+    long long result=M_LL_INVALID;
+    Mfile* _file=(fileValue&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
+    if(_file){ // something to write to
+        // delegate as much as possible to _getValueText()
+    }
+    return _getIntegerValue(result); 
+}
+Mvalue* mfload(Mvalue* file_value){
+    Mvalue* _result=NULL;
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file){ // something to read from which should currently be open for reading text from
+    }    
+    return _result;
+}
 
 Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
     // let's allow either a text or a file, in any case we need a foldername

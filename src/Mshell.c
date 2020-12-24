@@ -9310,6 +9310,13 @@ static void outputSortStatistics(){
 			,sortstatistics.pointerassignments,sortstatistics.pointerreferences,sortstatistics.pointertests
 			,sortstatistics.fieldassignments,sortstatistics.fieldreferences,sortstatistics.fieldtests);
 }
+// delegate asmallerthan to smallerthan() which returns a long long instead of an int
+// asmallerthan will receive pointers to an Mvalue*
+static int alargerthan(void* aValue,void* bValue){
+	long long result=largerthan(*((Mvalue**)aValue),*((Mvalue**)bValue));
+	return(result<=0?-1:1);
+}
+static long long acsort(Marray* _array){if(!_array)return M_LL_INVALID;qsort(_array->values,_array->numberOfElements,sizeof(Mvalue*),alargerthan);return M_TRUE;}
 static void aswap(Mvalue** const values,long long index1,long long index2){
 	// normally we would not be allowed to do it this way, but the reference count
 	// of both values remains the same when we exchange their position in the list
@@ -11514,13 +11521,14 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 		if(_tosortValue->type==VT_ARRAY){
 			sortstatistics=(struct Msortstatistics){}; // this should work
 			switch(sortMethod){
+				case 'q':result=aquicksort(_tosortValue->value._array);break;
 				case 'b': // "biden" sort
 				case 'h':result=aharmonicasort(_tosortValue->value._array,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
 				case 't':result=atimsort(_tosortValue->value._array,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
+				default:result=acsort(_tosortValue->value._array);break; // MDH@24DEC2020: the C sort uses the built-in qsort() method
 				// case 'm':result=amergesort(_tosortValue->value._array);break;
-				default:result=aquicksort(_tosortValue->value._array);break;
 			}
-			outputSortStatistics();
+			if(sortMethod)outputSortStatistics();
 		}
 		if(report)
 			output("Done sorting!\n");
@@ -11530,6 +11538,7 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 	return _getIntegerValue(result);
 }
 // similar to Msort but does not change the input in any way, returns NULL on failure
+// MDH@24DEC2020 TODO it's advisable when sorting a list to create an array instead of a list to sort, and creating a list from the sorted array result
 Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	Mvalue* sortedValue=NULL;
@@ -11588,10 +11597,11 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 						case 'h':sortResult=aharmonicasort(_tosortArray,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
 						case 't':sortResult=atimsort(_tosortArray,(sortMethodVariant=='b'?abinaryinsertmerge:(sortMethodVariant=='i'?ainsertmerge:amerge)));break;
 						// case 'm':sortResult=amergesort(_tosortArray);break;
-						default:sortResult=aquicksort(_tosortArray);break;
+						case 'q':sortResult=aquicksort(_tosortArray);break;
+						default:sortResult=acsort(_tosortArray);break;
 					}
 					if(sortResult>0){ // _tosortList was successfully sorted
-						outputSortStatistics();
+						if(sortMethod)outputSortStatistics();
 						sortedValue=_getValueOfArray(disowned_array(_tosortArray,owner)); // NOTE will automatically
 					}else
 						FREE_ARRAY(_tosortArray,owner);

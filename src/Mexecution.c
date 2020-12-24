@@ -972,6 +972,7 @@ double mp_get_double(const Mbiginteger *a)
 */
 long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
 long double mp_get_long_double(Mbiginteger const * const a){
+    bool report=(amVerboseDebugging()||DEBUGGING);
     mp_int* mpi_a=MP_INT_POINTER(a); // MDH@09APR2020: get the mp_int pointer from the big integer
     if(!mpi_a)return M_LD_NAN; // if a undefined, return NaN
     int i=mpi_a->used;
@@ -983,20 +984,20 @@ long double mp_get_long_double(Mbiginteger const * const a){
         while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
     }
     long double d=(long double)mpi_a->dp[i]; // initialize d to the most significant big integer digit
-    if(amVerboseDebugging())
+    if(report)
         output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",MP_INT_POINTER(a)->dp[i],LDBL_DIG,d,i);
     while(--i>=0){
-        if(amVerboseDebugging())
+        if(report)
             output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
         d*=M_LD_DIGIT_MULTIPLIER;
-        if(amVerboseDebugging())
+        if(report)
             output("Result of multiplying by '%Lf': '%.*Lf'.\n",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
         d+=(long double)mpi_a->dp[i];
-        if(amVerboseDebugging())
+        if(report)
             output("Result of adding '%lld': '%.*Lf'.\n",mpi_a->dp[i],LDBL_DIG,d);
     }
     if(mpi_a->sign==MP_NEG&&!ldIsNaN(d))d=-d;
-    if(amVerboseDebugging())
+    if(report)
         output("Conversion of big integer to long double '%.*Lf' done!\n",LDBL_DIG,d);
     return d;
     // replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
