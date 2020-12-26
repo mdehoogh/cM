@@ -93,3 +93,5 @@ long long isDecimalNegative(Mdecimal const * const decimal);
 long long isDecimalZero(Mdecimal const * const decimal);
 long long isDecimalOne(Mdecimal const * const decimal);
 
+Mstring* _getDecimalJSON(Mdecimal const * const _decimal);
+Mdecimal* _getJSONDecimal(Mstring const * const _decimalJSON);

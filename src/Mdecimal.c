@@ -191,6 +191,54 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
     }else outputChar('?');
     return disowned_string(_decimalText,owner);
 }/* VALIDATED */
+// MDH@26DEC2020: get JSON representation of decimal
+Mstring* _getDecimalJSON(Mdecimal const * const _decimal){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _decimalJSON;
+	if(_decimal&&_decimal->mpd){
+		_decimalJSON=owned_string(__string(),owner);
+    	if(_decimalJSON){
+			Mstring* p=_decimalJSON;
+			p=string_append(p,JSON_OBJECT_START);
+
+			p=json_addproperty(p,"precision",true);p=appendll(p,_decimal->prec);
+
+			p=json_addproperty(p,"repeating",false);p=appendll(p,_decimal->repeating);
+			
+			p=json_addproperty(p,"value",false);
+			p=string_append(p,JSON_OBJECT_START);
+			mpd_t* decimal=_decimal->mpd;
+			p=json_addproperty(p,"flags",true);p=appendll(p,decimal->flags);
+			p=json_addproperty(p,"exponent",false);p=appendll(p,decimal->exp);
+			p=json_addproperty(p,"digits",false);p=appendll(p,decimal->digits);
+			p=json_addproperty(p,"length",false);p=appendll(p,decimal->len);
+			p=json_addproperty(p,"allocated",false);p=appendll(p,decimal->alloc);
+			mpd_ssize_t allocated=decimal->alloc;
+			if(allocated>0){
+				p=json_addproperty(p,"data",false);
+				p=string_append(p,JSON_ARRAY_START);
+				// writing backwards
+				do{
+					p=appendll(p,decimal->data[--allocated]);
+					if(allocated==0)break;
+					p=string_append(p,JSON_ITEM_SEPARATOR);
+				}while(1);
+				p=string_append(p,JSON_ARRAY_END);
+			}
+			p=string_append(p,JSON_OBJECT_END);
+
+			p=string_append(p,JSON_OBJECT_END);
+			// if succeeding in creating the JSON decimal representation, return 
+			if(p)return disowned_string(_decimalJSON,owner);
+			FREE_STRING(_decimalJSON,owner); // not returned disowned, so free here
+		}
+	}
+	return NULL;
+}
+// and vice versa (parse JSON decimal text representation back into a decimal)
+Mdecimal* _getJSONDecimal(Mstring const * const _decimalJSON){
+	// I suppose we can ask for specific properties that we know should be there!!
+	return NULL;
+}
 
 /**
  * \brief returns a copy of \p _decimal
