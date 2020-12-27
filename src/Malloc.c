@@ -12,7 +12,7 @@ extern unsigned long long M_MODULE_DEBUGGING;
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ALLOC,id};}
 
-static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue","Msystem","Mtime","Miterator","Marray","Mlist","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
+static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue","Msystem","Mtime","Miterator","Marray","Mlist","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
 
 static char const * const DISOWNED_FLAG_TEXTS[]={"","-"};
 static char const * const GLOBAL_FLAG_TEXTS[]={"f","m"};

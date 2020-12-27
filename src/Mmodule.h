@@ -4,6 +4,7 @@ typedef enum Mmoduleid {
     MI_ALLOC,
     MI_CHARS,
     MI_STRING,
+    MI_JSON,
     MI_SETTINGS,
     MI_TOKEN, // MDH@05DEC2020: renamed from MI_EXPRESSION to MI_TOKEN
     MI_MEMORY,
@@ -31,6 +32,7 @@ typedef enum Mmodulemask {
     MM_ALLOC=(1<<MI_ALLOC),
     MM_CHARS=(1<<MI_CHARS),
     MM_STRING=(1<<MI_STRING),
+    MM_JSON=(1<<MI_JSON),
     MM_SETTINGS=(1<<MI_SETTINGS),
     MM_EXPRESSION=(1<<MI_TOKEN),
     MM_MEMORY=(1<<MI_MEMORY),

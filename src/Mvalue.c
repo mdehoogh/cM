@@ -1223,6 +1223,28 @@ void checkList(Mlist* _list){
         }
     }
 }/* VALIDATED */
+
+// MDH@27DEC2020: for now static (as it's called from mfreadlines() only for now)
+static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner owner_list){Mallocationowner owner=getOwner(__LINE__);
+    if(_list){
+        Mlistelement* _appendedListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
+        if(_appendedListelement){
+            if(_list->_last){ // a last element to connect to!!!!
+                _appendedListelement->index=_list->_last->index;
+                _list->_last->_next=owned_listelement(_appendedListelement,Msubowner(owner_list,1));
+                _list->_last=_list->_last->_next;
+            }else{
+                _list->_first=owned_listelement(_appendedListelement,Msubowner(owner_list,1));
+                _list->_last=_list->_first;
+            }
+            _appendedListelement->index++;
+            _list->numberOfElements++;
+            return _appendedListelement;
+        }
+    }
+    return NULL;
+}
+
 // instead of returning a boolean we could return the assigned index (0 on failure)
 // MDH@02JUN2019: check (and correct) prepending
 // MDH@17OCT2019: passing in 0 should NOT do appending but prepending (use index len(l)+1 for appending!!!!!!)
@@ -3098,6 +3120,38 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 }
 
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
+Mvalue* _getValueOfFile(Mfile* _file){
+    if(!_file)return NULL;
+    Mvalue* _value=__value("file");
+    if(!_value){
+        if(Misdisowned(_file))free_file(_file);
+        return NULL;
+    }
+    _value->type=VT_FILE;
+    // MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
+    _value->value._file=(Misdisowned(_file)?owned_file(_file,owner_value_data):_file);
+    return _value;
+}
+static Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__LINE__);
+    Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
+    // the file might not exist in which case we could get rid of _file->_stat???
+    if(_file){
+        _file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
+        if(stat(string(_file->_name),_file->_stat)!=0){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
+        return disowned_file(_file,owner);
+    }
+    return NULL;
+}
+static Mfile* _getValueFile(Mvalue const * const file_value){
+    if(file_value){
+        if(file_value->type==VT_FILE)
+            return file_value->value._file;
+        if(file_value->type==VT_TEXT) // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
+            if(file_value->value._text)
+                return _getFile(file_value->value._text->_c);
+    }
+    return NULL;
+}
 bool isFileReadable(Mfile* _file){
     if(_file){
         if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='w'); // an open file is readable if it can be read from
@@ -3115,33 +3169,8 @@ bool isFileWriteable(Mfile* _file){
     return false;
     // a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
 }
-Mvalue* _getValueOfFile(Mfile* _file){
-    if(!_file)return NULL;
-    Mvalue* _value=__value("file");
-    if(!_value){
-        if(Misdisowned(_file))free_file(_file);
-        return NULL;
-    }
-    _value->type=VT_FILE;
-    // MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
-    _value->value._file=(Misdisowned(_file)?owned_file(_file,owner_value_data):_file);
-    return _value;
-}
-Mvalue* mfile(Mvalue* filename_value){Mallocationowner owner=getOwner(__LINE__);
-    if(filename_value!=NULL){
-        Mstring* _filename=owned_string(_getValueText(filename_value,true),owner); // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
-        if(_filename){
-            Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
-            // the file might not exist in which case we could get rid of _file->_stat???
-            if(_file){
-                _file->_name=SUBOWNED(_filename,1); // bind _filename to _file->_name (ownership one level down)
-                if(stat(string(_filename),_file->_stat)!=0){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
-                return _getValueOfFile(disowned_file(_file,owner));
-            }
-            free_string(_filename); // not bound to _file->_name so to be released
-        }
-    }
-    return NULL;
+Mvalue* mfile(Mvalue* file_value){
+    return(!file_value||file_value->type==VT_FILE?file_value:_getValueOfFile(_getValueFile(file_value)));
 }
 // delete a file
 Mvalue* mfdelete(Mvalue* file_value){
@@ -3259,78 +3288,110 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
     return NULL; // some error
 }
 Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
-    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    Mfile* _file=_getValueFile(file_value);
     if(_file){
+        Mvalue* result=NULL;
         if(_file->_stat){ // an existing file
             if(!_file->_f)openFile(_file,"r+");
             // if the file is not binary and can be read from
-            if(_file->mode[2]!='b'&&(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
-                Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
-                if(_bytesread){
-                    Mstring* p=_bytesread;
-                    // the file could be empty to start with
-                    char c='\0';
-                    while(!feof(_file->_f)){
-                        c=fgetc(_file->_f);
-                        if(c=='\n'||c=='\r')break; // either LF or CR would stop the reading
-                        p=string_append_char(p,c);
-                        if(!p)break;
+            if(_file->_f&&_file->mode[2]!='b'&&(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
+                if(!feof(_file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
+                    Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
+                    if(_bytesread){
+                        Mstring* p=_bytesread;
+                        // the file could be empty to start with
+                        int c=0;
+                        while(1){
+                            c=fgetc(_file->_f);
+                            if(feof(_file->_f))break; // to be tested AFTER reading
+                            // MDH@27DEC2020: whatever is read, it must not be negative!!!!
+                            if(c<SCHAR_MIN||c>SCHAR_MAX){
+                                output("%sInvalid character code (%i) read from '%s'.\n",c,string(_file->_name));
+                                break;
+                            }
+                            if(c=='\n'||c=='\r')break; // either LF or CR would stop the reading
+                            p=string_append_char(p,c);
+                            if(!p)break;
+                        }
+                        // skip the optional linefeed following any carriage return, if something else push back again
+                        if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
+                        result=(p?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
+                        FREE_STRING(_bytesread,owner);
                     }
-                    // skip the optional linefeed following any carriage return, if something else push back again
-                    if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
-                    Mvalue* result=(p?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
-                    FREE_STRING(_bytesread,owner);
-                    return result;
                 }
             }
         }
+        // if the file is disowned (which it will be if it was created)
+        if(Misdisowned(_file))free_file(_file);
+        return result;
     }
     return NULL; // some error
 }
 // MDH@01OCT2020: how about allowing to read a number of lines in one go??????
+// MDH@27DEC2020: if the list returned ends with NULL we failed
 Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationowner owner=getOwner(__LINE__);
-    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-    if(_file&&_file->_stat&&!S_ISDIR(_file->_stat->st_mode)){ // an existing (non directory) file
-        long long numberoflines=(numberoflines_value?getValueInteger(numberoflines_value):1); // the default is to read a single byte
-        if(numberoflines>=0){ // only non-negative values are considered valid
-        Mlist* lines_list=owned_list(_getListOfType(VT_TEXT),owner);
-        if(lines_list){
-            // before checking the mode to see if the file can be read from, we might need to open it
-            // it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
+    bool report=(amVerboseDebugging()||DEBUGGING);
+    Mfile* _file=_getValueFile(file_value);
+    if(_file){
+        Mvalue* result=NULL;
+        if(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)){ // an existing (non directory) file
+            if(report)
+                output("'%s' is a file.\n",_file);
+            long long numberoflines=(numberoflines_value?getValueInteger(numberoflines_value):1); // the default is to read a single byte
+            if(numberoflines>=0){ // only non-negative values are considered valid
+                // before checking the mode to see if the file can be read from, we might need to open it
+                // it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
                 // if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
                 if(!_file->_f)openFile(_file,"r+");
                 // if the file can be read from, we do
                 if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
                     if(_file->mode[2]!='b'){
-                        long long lineindex=0;
-                        char buffer[128]; // the buffer to use with fgets
-                        size_t line_length;
-                        bool eoln;
-                        while(!feof(_file->_f)){ // there are still additional lines
-                            Mstring* _line=owned_string(_getString("'"),owner);
-                            buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
-                            lineindex=0;
-                            // keep reading until all of the line is read (or some error occurs)
-                            while(fgets(buffer,128,_file->_f)!=NULL){
-                                // the problem is that buffer might not end with a new line
-                                line_length=strlen(buffer);
-                                if(line_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
-                                eoln=(buffer[line_length-1]=='\n');
-                                if(eoln)buffer[line_length-1]='\0';
-                                string_append(_line,buffer); // append the buffer to _line
-                                if(eoln){
-                                    lineindex=appendedToList(lines_list,owner,_getTextValue(string(_line)),M_LL_INVALID);
-                                    break;
+                        Mlist* lines_list=owned_list(_getListOfType(VT_TEXT),owner);
+                        if(lines_list){
+                            char buffer[128]; // the buffer to use with fgets
+                            size_t line_length;
+                            bool eoln;
+                            Mlistelement* listelement=NULL;
+                            while(!feof(_file->_f)){ // there are still additional lines
+                                // MDH@27DEC2020: 
+                                // by appending a list element (with value NULL) we can tell whether
+                                // reading the file failed afterwards (if the last list element is NULL)
+                                // if storing the line text fails, listelement must be NULLed so that the
+                                // entire list will be freed (and nothing is returned)
+                                listelement=getAppendedListelement(lines_list,owner);
+                                if(!listelement)break;
+                                Mstring* _line=owned_string(_getString("'"),owner);
+                                if(!_line)break;
+                                buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
+                                // keep reading until all of the line is read (or some error occurs)
+                                while(fgets(buffer,128,_file->_f)!=NULL){
+                                    // the problem is that buffer might not end with a new line
+                                    line_length=strlen(buffer);
+                                    if(line_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
+                                    eoln=(buffer[line_length-1]=='\n');
+                                    if(eoln)buffer[line_length-1]='\0';
+                                    if(!string_append(_line,buffer)){FREE_STRING(_line,owner);_line=NULL;break;} // append the buffer to _line
+                                    if(eoln){
+                                        assignValue(&listelement->_value,_getTextValue(string(_line)));
+                                        break;
+                                    }
                                 }
+                                if(!_line)break;
+                                FREE_STRING(_line,owner);
                             }
-                            FREE_STRING(_line,owner);
-                            if(lineindex<=0)break; // either an error or failed to append the line to the list!!!!
+                            // if we have a listelement we succeeded, well mostly
+                            if(listelement)
+                                result=_getValueOfList(disowned_list(lines_list,owner));
+                            // some error reading lines from the file
+                            FREE_LIST(lines_list,owner);
                         }
-                        return _getValueOfList(disowned_list(lines_list,owner));
                     }
                 }
-            }
+            }else
+                outputError("No lines to be read!");
         }
+        if(Misdisowned(_file))free_file(_file); // MDH@27DEC2020: if _file is disowned it should be freed as it was created here
+        return result;
     }
     return NULL;
 }

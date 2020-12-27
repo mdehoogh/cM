@@ -128,6 +128,7 @@ Mlist* _getReversedList(Mlist const * const list); // MDH@19JUN2020: convenience
 Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
 long long isListUndefined(Mlist* list);
 
+// Mlistelement* getAppendedListelement(Mlist * const _list); // MDH@27DEC2020
 /*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // MDH@23NOV2020: helper function to insert into a list with a certain index
 
