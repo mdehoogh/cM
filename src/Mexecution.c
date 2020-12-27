@@ -1199,6 +1199,7 @@ bool isDecimalZero(Mdecimal* _decimal){
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
     if(!_file)return NULL;
     if(_file->_stat)DISOWNED(_file->_stat,owner_file);
+    if(_file->_name)DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
     return DISOWNED(_file,owner_file);
 }
 Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){

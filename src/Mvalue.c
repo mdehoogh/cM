@@ -102,7 +102,7 @@ Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool imm
 
 Mlistelement* owned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
     if(!_listelement)return NULL;
-    owned_listelement(_listelement->_next,owner_listelement);
+    if(_listelement->_next)owned_listelement(_listelement->_next,owner_listelement);
     return OWNED(_listelement,owner_listelement);
 }
 Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
@@ -1227,14 +1227,16 @@ void checkList(Mlist* _list){
 // MDH@27DEC2020: for now static (as it's called from mfreadlines() only for now)
 static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner owner_list){Mallocationowner owner=getOwner(__LINE__);
     if(_list){
-        Mlistelement* _appendedListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
+        // NOTE it's a bit of a shortcut to immediately use Msubowner(owner_list,1) as owner
+        //      we can do that if nothing can go wrong in linking it to the end of _list which is (almost) certain
+        Mlistelement* _appendedListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',Msubowner(owner_list,1));
         if(_appendedListelement){
             if(_list->_last){ // a last element to connect to!!!!
                 _appendedListelement->index=_list->_last->index;
-                _list->_last->_next=owned_listelement(_appendedListelement,Msubowner(owner_list,1));
+                _list->_last->_next=_appendedListelement;
                 _list->_last=_list->_last->_next;
             }else{
-                _list->_first=owned_listelement(_appendedListelement,Msubowner(owner_list,1));
+                _list->_first=_appendedListelement;
                 _list->_last=_list->_first;
             }
             _appendedListelement->index++;
@@ -3288,6 +3290,9 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
     return NULL; // some error
 }
 Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
+    // MDH@27DEC2020: file_value really needs to be a file, although theoretically one
+    //                might want to read the first line of a file only???????
+    //                for now let's allow both although using the filename is not recommended
     Mfile* _file=_getValueFile(file_value);
     if(_file){
         Mvalue* result=NULL;
@@ -3331,9 +3336,9 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
 // MDH@27DEC2020: if the list returned ends with NULL we failed
 Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationowner owner=getOwner(__LINE__);
     bool report=(amVerboseDebugging()||DEBUGGING);
+    Mvalue* result=NULL;
     Mfile* _file=_getValueFile(file_value);
     if(_file){
-        Mvalue* result=NULL;
         if(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)){ // an existing (non directory) file
             if(report)
                 output("'%s' is a file.\n",_file);
@@ -3349,7 +3354,7 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
                         Mlist* lines_list=owned_list(_getListOfType(VT_TEXT),owner);
                         if(lines_list){
                             char buffer[128]; // the buffer to use with fgets
-                            size_t line_length;
+                            size_t buffer_length;
                             bool eoln;
                             Mlistelement* listelement=NULL;
                             while(!feof(_file->_f)){ // there are still additional lines
@@ -3362,38 +3367,65 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
                                 if(!listelement)break;
                                 Mstring* _line=owned_string(_getString("'"),owner);
                                 if(!_line)break;
-                                buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
-                                // keep reading until all of the line is read (or some error occurs)
-                                while(fgets(buffer,128,_file->_f)!=NULL){
-                                    // the problem is that buffer might not end with a new line
-                                    line_length=strlen(buffer);
-                                    if(line_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
-                                    eoln=(buffer[line_length-1]=='\n');
-                                    if(eoln)buffer[line_length-1]='\0';
-                                    if(!string_append(_line,buffer)){FREE_STRING(_line,owner);_line=NULL;break;} // append the buffer to _line
-                                    if(eoln){
-                                        assignValue(&listelement->_value,_getTextValue(string(_line)));
-                                        break;
+                                eoln=false;
+                                char* newbuffer;
+                                 // keep reading until all of the line is read (or some error occurs)
+                                do{
+                                    buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
+                                    newbuffer=fgets(buffer,128,_file->_f);
+                                    // detect read error
+                                    if(!newbuffer&&!feof(_file->_f)){
+                                        FREE_STRING(_line,owner);
+                                        _line=NULL;
+                                        output("%sSome error reading text from '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+                                    }else{
+                                        // the problem is that buffer might not end with a new line
+                                        buffer_length=strlen(buffer);
+                                        if(buffer_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
+                                        buffer_length--;
+                                        if(buffer[buffer_length]=='\n'){ // eoln
+                                            buffer[buffer_length]='\0';
+                                            eoln=true;
+                                        }
+                                        if(!newbuffer)eoln=true; // we do want to add the last buffer
+                                        if(!string_append(_line,buffer)){ // error appending the buffer
+                                            FREE_STRING(_line,owner);
+                                            _line=NULL;
+                                        }else{
+                                            if(report)
+                                                output("Buffer '%s' appended to '%s'.\n",buffer,string(_line));
+                                            // if eoln the current line should be considered complete
+                                            if(eoln)break;
+                                        }
                                     }
-                                }
+                                }while(_line&&newbuffer);
                                 if(!_line)break;
+                                // register this line
+                                assignValue(&listelement->_value,_getTextValue(string(_line)));
+                                if(report)
+                                    output("Line '%s' read.\n",string(_line));
                                 FREE_STRING(_line,owner);
                             }
                             // if we have a listelement we succeeded, well mostly
                             if(listelement)
                                 result=_getValueOfList(disowned_list(lines_list,owner));
-                            // some error reading lines from the file
-                            FREE_LIST(lines_list,owner);
+                            else
+                                FREE_LIST(lines_list,owner);
                         }
-                    }
-                }
+                    }else
+                        output("%sUnable to read text lines from binary file '%s' (mode: %s).\n",M_ERROR_PREFIX,string(_file->_name),_file->mode);
+                }else
+                    output("%sUnable to read the lines in '%s' (mode: %s).\n",M_ERROR_PREFIX,string(_file->_name),_file->mode);
             }else
                 outputError("No lines to be read!");
-        }
+        }else
+        if(!_file->_stat)
+            output("%s'$s' does not exist.\n",M_ERROR_PREFIX,string(_file->_name));
+        else
+            output("%s'%s' is a directory not a file.\n",M_ERROR_PREFIX,string(_file->_name));
         if(Misdisowned(_file))free_file(_file); // MDH@27DEC2020: if _file is disowned it should be freed as it was created here
-        return result;
     }
-    return NULL;
+    return result;
 }
 
 Mvalue* mfclose(Mvalue* file_value){
