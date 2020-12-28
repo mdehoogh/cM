@@ -490,7 +490,7 @@ Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first a
 Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
 
 // Mfile is added starting from v0.1.4
-Mvalue* _getValueOfFile(Mfile* _file);
+// Mvalue* _getValueOfFile(Mfile* _file);
 
 Mvalue* mfile(Mvalue* filename_value);
 Mvalue* mfdelete(Mvalue* file_value);

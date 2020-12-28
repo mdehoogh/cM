@@ -16,13 +16,13 @@
 #include "Mexecution.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_EXECUTION)
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_EXECUTION,id};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char* const M_ERROR_PREFIX;
+extern const char* const M_WARNING_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const char* const M_UNDEFINED_VALUE_TEXT; // TODO might be called M_NULL_VALUETEXT though
 extern const mpd_context_t* _decimalContext;
@@ -972,7 +972,7 @@ double mp_get_double(const Mbiginteger *a)
 */
 long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
 long double mp_get_long_double(Mbiginteger const * const a){
-    bool report=(amVerboseDebugging()||DEBUGGING);
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
     mp_int* mpi_a=MP_INT_POINTER(a); // MDH@09APR2020: get the mp_int pointer from the big integer
     if(!mpi_a)return M_LD_NAN; // if a undefined, return NaN
     int i=mpi_a->used;
@@ -1212,11 +1212,57 @@ Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
     _file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
     return disowned_file(_file,owner);
 }
+// MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
+bool closeFile(Mfile* _file){
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
+    if(!_file){outputWarning("No file to close");return false;} // nothing to close
+    assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
+    if(!_file->_f){output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));return true;} // already closed
+    if(report)
+        output("Closing '%s'.\n",string(_file->_name));
+    if(fclose(_file->_f)==0){
+        _file->_f=NULL;
+        if(report)
+            output("'%s' closed.\n",string(_file->_name));
+        return true;
+    }
+    output("%sFailed to close '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+    return false;
+}
 void free_file(Mfile* _file){
     if(_file){
+        if(_file->_f)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
         if(_file->_stat)FREE_1(_file->_stat,'f');
         if(_file->_name)FREE_1(_file->_name,'S');
         FREE_1(_file,'F');
+    }
+}
+// opening a file might mean that afterwards the file exists, and we then should update _file->_stat accordingly!!!
+void openFile(Mfile* _file,char* mode){
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
+    // only open when defined and currently not open
+    if(_file&&mode){ // valid input
+        if(!_file->_f){ // not opened yet
+            if(!_file->_stat||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
+                assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
+                _file->_f=fopen(string(_file->_name),mode);
+                if(_file->_f){ // now opened
+                    if(report)
+                        output("'%s' opened!\n",string(_file->_name));
+                    _file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
+                    // update stat (even if already set, because the file existed to start with)
+                    if(stat(string(_file->_name),_file->_stat)!=0){
+                        FREE_1(_file->_stat,'f');
+                        _file->_stat=NULL;
+                        output("%sFailed to update the stats of '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+                    }else
+                    if(report)
+                        output("Stats of '%s' updated.\n",string(_file->_name));
+                }else
+                    output("%sFailed to open '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+            }
+        }else
+            output("%s'%s' already open!\n",M_WARNING_PREFIX,string(_file->_name));
     }
 }
 

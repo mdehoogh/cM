@@ -9,7 +9,6 @@
 static bool DEBUGGING=true;
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_VALUE)
 
 static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MI_VALUE,id};}
 
@@ -215,7 +214,7 @@ Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner
 }
 #endif
 long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
-    bool report=(amVerboseDebugging()||DEBUGGING);
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
     long long result=M_LL_INVALID;
     if(_mapelement){
         if(report)
@@ -374,13 +373,16 @@ extern const char* const VALUETYPENAMES[];
 // can be asked to remove unused values
 // TODO check whether it functions correctly (think so though)
 size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(__LINE__);
+    bool report=(showInfo||(M_MODULE_DEBUGGING&MM_VALUE));
     unsigned long long tofree=0,removed=0;
     if(_valueList){
-        if(showInfo||DEBUGGING)output("Garbage collecting unused values.\n");
+        if(report)
+            output("Garbage collecting unused values.\n");
         Mallocationowner owner_valueListelement=Msubowner(owner_valueList,1);
         Mallocationowner owner_value=Msubowner(owner_valueList,2);
         Mlistelement* _valueListelement=_valueList->_first;
-        if(showInfo||DEBUGGING)output("Number of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
+        if(report)
+            output("Number of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
         unsigned long long checked=0;
         while(_valueListelement){
             checked++;
@@ -400,7 +402,8 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
                 output("%sNo value stored in value #%llu.\n",M_BUG_PREFIX,checked); // technically a bug not an error
             _valueListelement=_valueListelement->_next;
         }
-        if(showInfo||DEBUGGING)output("Number of values checked: %llu.\nNumber of values to remove: %llu.\n",checked,tofree);
+        if(report)
+            output("Number of values checked: %llu.\nNumber of values to remove: %llu.\n",checked,tofree);
         // the list is now intact, are we going to correct the links??????
         if(tofree>0){ // some values were freed
             Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
@@ -426,12 +429,13 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
                 // next to check!!!
                 _valueListelement=_nextValueListelement;
             }
-            if(showInfo||DEBUGGING)output("Actual number of values removed: %llu.\n",removed);
+            if(report)
+                output("Actual number of values removed: %llu.\n",removed);
             // update the first and last in the list (could both be NULL!!!)
             _valueList->_first=_firstValueListelement;
             _valueList->_last=_lastValueListelement;
             // let's check how many we have left
-            if(showInfo||DEBUGGING){
+            if(report){
                 unsigned long long left=0;
                 _valueListelement=_valueList->_first;
                 while(_valueListelement){left++;_valueListelement=_valueListelement->_next;}
@@ -1479,7 +1483,7 @@ Mmapelement* getMapelement(Mmap const * const map,char const * const attributeNa
 }
 // MDH@24MAY2019: if already in the map should replace the current value
 long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue){Mallocationowner owner=getOwner(__LINE__);
-    bool report=amVerboseDebugging(); //||DEBUGGING;
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
     long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
     if(result!=M_LL_INVALID){
         if(!_map->immutable){ // the map is mutable
@@ -1594,7 +1598,7 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
 
 Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
     // as this is more like a tuple than a list (Python equivalent data structures)
-    bool report=(amVerboseDebugging()||DEBUGGING);
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	Mstring* result=owned_string(__string(),owner);
     if(result){
         Mstring* p=result;
@@ -1653,7 +1657,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
 Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
     ///////output("List to output.");char c;inputCharRead(&c);
-    bool report=amVerboseDebugging()||DEBUGGING;
+    bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE);
 	Mstring* result=owned_string(__string(),owner);
     if(result){
         Mstring* p=result;
@@ -3121,19 +3125,6 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 
 }
 
-// MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
-Mvalue* _getValueOfFile(Mfile* _file){
-    if(!_file)return NULL;
-    Mvalue* _value=__value("file");
-    if(!_value){
-        if(Misdisowned(_file))free_file(_file);
-        return NULL;
-    }
-    _value->type=VT_FILE;
-    // MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
-    _value->value._file=(Misdisowned(_file)?owned_file(_file,owner_value_data):_file);
-    return _value;
-}
 static Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__LINE__);
     Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
     // the file might not exist in which case we could get rid of _file->_stat???
@@ -3154,7 +3145,19 @@ static Mfile* _getValueFile(Mvalue const * const file_value){
     }
     return NULL;
 }
-bool isFileReadable(Mfile* _file){
+static Mvalue* _getValueOfFile(Mfile* _file){
+    if(!_file)return NULL;
+    Mvalue* _value=__value("file");
+    if(!_value){
+        if(Misdisowned(_file))free_file(_file);
+        return NULL;
+    }
+    _value->type=VT_FILE;
+    // MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
+    _value->value._file=(Misdisowned(_file)?owned_file(_file,owner_value_data):_file);
+    return _value;
+}
+static bool isFileReadable(Mfile* _file){
     if(_file){
         if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='w'); // an open file is readable if it can be read from
         // an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
@@ -3163,7 +3166,7 @@ bool isFileReadable(Mfile* _file){
     }
     return false;
 }
-bool isFileWriteable(Mfile* _file){
+static bool isFileWriteable(Mfile* _file){
     if(_file){
         if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='r');
         return(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)&&_file->_stat->st_mode&W_OK);
@@ -3171,6 +3174,7 @@ bool isFileWriteable(Mfile* _file){
     return false;
     // a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
 }
+// end file helper functions
 Mvalue* mfile(Mvalue* file_value){
     return(!file_value||file_value->type==VT_FILE?file_value:_getValueOfFile(_getValueFile(file_value)));
 }
@@ -3188,21 +3192,6 @@ Mvalue* mfdelete(Mvalue* file_value){
         }
     }
     return NULL;
-}
-// opening a file might mean that afterwards the file exists, and we then should update _file->_stat accordingly!!!
-static void openFile(Mfile* _file,char* mode){
-    // only open when defined and currently not open
-    if(_file&&mode){ // valid input
-        if(!_file->_f){ // not opened yet
-            if(!_file->_stat||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
-                _file->_f=fopen(string(_file->_name),mode);
-                if(_file->_f){ // now opened
-                    _file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
-                    if(stat(string(_file->_name),_file->_stat)!=0){FREE_1(_file->_stat,'f');_file->_stat=NULL;} // update stat (even if already set, because the file existed to start with)
-                }
-            }
-        }
-    }
 }
 // things we can do with a Mfile
 Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){Mallocationowner owner=getOwner(__LINE__);
@@ -3327,7 +3316,10 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
             }
         }
         // if the file is disowned (which it will be if it was created)
-        if(Misdisowned(_file))free_file(_file);
+        if(Misdisowned(_file)){
+            outputWarning("Reading a single line of text from a locally created file like this will always return the first text line!");
+            free_file(_file); // MDH@28DEC2020: will take care of closing the file as well now
+        }
         return result;
     }
     return NULL; // some error
@@ -3335,7 +3327,7 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
 // MDH@01OCT2020: how about allowing to read a number of lines in one go??????
 // MDH@27DEC2020: if the list returned ends with NULL we failed
 Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationowner owner=getOwner(__LINE__);
-    bool report=(amVerboseDebugging()||DEBUGGING);
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
     Mvalue* result=NULL;
     Mfile* _file=_getValueFile(file_value);
     if(_file){
@@ -3423,17 +3415,14 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
             output("%s'$s' does not exist.\n",M_ERROR_PREFIX,string(_file->_name));
         else
             output("%s'%s' is a directory not a file.\n",M_ERROR_PREFIX,string(_file->_name));
-        if(Misdisowned(_file))free_file(_file); // MDH@27DEC2020: if _file is disowned it should be freed as it was created here
+        if(Misdisowned(_file))free_file(_file);  // MDH@28DEC2020: will take care of closing the file as well now // MDH@27DEC2020: if _file is disowned it should be freed as it was created here
     }
     return result;
 }
 
 Mvalue* mfclose(Mvalue* file_value){
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-    if(_file&&_file->_f){
-        if(fclose(_file->_f)==0){_file->_f=NULL;return _getIntegerValue(M_TRUE);}return _getIntegerValue(M_FALSE);
-    }
-    return _getIntegerValue(M_LL_INVALID);
+    return _getIntegerValue(_file?(closeFile(_file)?M_TRUE:M_FALSE):M_LL_INVALID);
 }
 /*
 static void openFileForWriting(Mfile* _file){

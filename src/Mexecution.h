@@ -303,6 +303,7 @@ size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,con
 #include "sys/stat.h"
 
 // Mfile holds all information related to a single file
+// MDH@28DEC2020: opening and closing a file is moved from Mvalue.c/h to here!!!!
 typedef struct Mfile{
     struct stat* _stat;
     Mstring* _name; // if the file exists _name will contain the name of the file
@@ -313,10 +314,11 @@ typedef struct Mfile{
 }Mfile;
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);
-
 Mfile* __file();
+bool closeFile(Mfile* _file);
 void free_file(Mfile* _file);
 #define FREE_FILE(_file,owner_file) free_file(disowned_file(_file,owner_file))
+void openFile(Mfile* _file,char* mode);
 
 Mtime* owned_time(Mtime* _time,Mallocationowner owner_time);
 Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time);
