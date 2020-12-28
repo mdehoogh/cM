@@ -4,7 +4,6 @@
 
 // MDH@05DEC2020: replaced by Mtoken.h/c in v0.1.5
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING false
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_EXPRESSION,id};}
 

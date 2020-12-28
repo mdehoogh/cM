@@ -4,7 +4,6 @@
 #include "Msystem.h"
 
 extern long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING|MM_SYSTEM)
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_SYSTEM,id};}
 

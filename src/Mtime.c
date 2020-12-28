@@ -4,7 +4,6 @@
 #include "Mtime.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_TIME)
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_TIME,id};}
 

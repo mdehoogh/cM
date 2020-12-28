@@ -1,7 +1,6 @@
 #include "Mrational.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_RATIONAL)
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_RATIONAL,id};}
 
@@ -180,7 +179,7 @@ mp_err _qdiv_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
  * \brief computes the difference of \p a and \p b and puts the result in \p c
  */
 mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
-    bool report=amVerboseDebugging()||DEBUGGING;
+    bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_RATIONAL);
     mp_err status=((c&&!c->num&&!c->den)&&(a||b)?MP_OKAY:MP_ERR); // MDH@24MAY2020: demanding that c->num and c->den are currently undefined!!!
     if(status==MP_OKAY){ // c and at least a or b provided
         // should we NULL the numerator and denominator of c?????
@@ -1266,7 +1265,7 @@ Mrational* _getLongDoubleRational(long double ld,int maxiter){Mallocationowner o
 // MDH@07JUN2019: converting a rational to a double
 // MDH@19SEP2019: TODO the conversion of the numerator or denominator big integer might fail if the big integer is too large, therefore actually performing the division of the big integers seems a better approach 
 long double getRationalLongDouble(Mrational const * const _rational){
-    bool report=amVerboseDebugging()||DEBUGGING;
+    bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_RATIONAL);
     long double result=M_LD_NAN;
     if(_rational){
         // as you can see up we're storing the delta in our rationals as well, so if we want to get ld back out of it the formula is: (numerator+delta)/denominator

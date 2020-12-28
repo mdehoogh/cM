@@ -18,7 +18,6 @@
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_MAIN,id};}
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_MAIN)
 
 extern char const * const M_MODULE_DEBUG_CHARACTERS; // MDH@05DEC2020: as defined in Mmodule.h
 
@@ -97,9 +96,9 @@ char const * const M_BUILD="7";char const * const M_DATE="28 December 2020"; // 
 // char const * const M_VERSION="0.1.2";
 // char const * const M_BUILD="1";char const * const M_DATE="21 April 2020, 17:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 // char const * const M_BUILD="2";char const * const M_DATE="22 April 2020"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
-// char const * const M_BUILD="3";char const * const M_DATE="02 May 2020"; // dynamic allocation debugging debugging
-// char const * const M_BUILD="4";char const * const M_DATE="03 May 2020"; // dynamic allocation debugging debugging
-// char const * const M_BUILD="5";char const * const M_DATE="06 May 2020"; // dynamic allocation debugging debugging
+// char const * const M_BUILD="3";char const * const M_DATE="02 May 2020"; // dynamic allocation (M_MODULE_DEBUGGING&MM_MAIN) (M_MODULE_DEBUGGING&MM_MAIN)
+// char const * const M_BUILD="4";char const * const M_DATE="03 May 2020"; // dynamic allocation (M_MODULE_DEBUGGING&MM_MAIN) (M_MODULE_DEBUGGING&MM_MAIN)
+// char const * const M_BUILD="5";char const * const M_DATE="06 May 2020"; // dynamic allocation (M_MODULE_DEBUGGING&MM_MAIN) (M_MODULE_DEBUGGING&MM_MAIN)
 
 //char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
@@ -382,10 +381,10 @@ void restoreCursor(){printf("\0338");}
 */
 
 void displayFlags(){
-	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
+	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amVerboseDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
 }
 void outputFlags(){
-	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
+	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amVerboseDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
 }
 
 // the user input (either the shell command or the M user input command)
@@ -445,7 +444,7 @@ static size_t removeUserinputline(){
 // MDH@30OCT2019 END
 size_t toInfoInputLine(){
 	size_t linesUp=0,lines=getNumberOfCommandLines(); // ASSERT lines should be at least 1
-	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();// debugging: output("[%zd]",lines);
+	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();// (M_MODULE_DEBUGGING&MM_MAIN): output("[%zd]",lines);
     return linesUp;
 } // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
 // output functions that require access to the current token
@@ -706,7 +705,7 @@ void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext/
 Mtoken* immediateFeedforwardToken=NULL;
 void deleteTokenautocompletiontexts(){
 	deleteAutocompletionText();
-	////////if(amDebugging())inputInfo("Autocompletion text deleted.");
+	////////if(amVerboseDebugging())inputInfo("Autocompletion text deleted.");
 	/////////////////numberOfBehindPromptCharactersWritten=getCommandLength(); // MDH@25SEP2019: TODO if you know a better place to do this then here let me know
 	free_tokenautocompletiontext(_firstTokenautocompletiontext);
 	_firstTokenautocompletiontext=NULL; // OOPS pretty essential!!!!
@@ -1110,7 +1109,7 @@ unsigned long long showContinuedPrompt(int64_t offset,bool newline){
 			clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
 			promptCharactersWritten+=outputChar('\n'); // move over to the next line
 		}
-		// promptCharactersWritten+=output("(%lld)",offset); // debugging
+		// promptCharactersWritten+=output("(%lld)",offset); // (M_MODULE_DEBUGGING&MM_MAIN)
 		uint8_t blanks=promptLength;while(blanks>3){promptCharactersWritten+=outputChar(' ');blanks--;}
 		resetOutputColor();
 		promptCharactersWritten+=output(" %c ",(offset>=0?'=':' ')); // if not suggested write an equal sign, otherwise write a blank (as what's being written is not part of the command yet)
@@ -1822,7 +1821,7 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 		if(amVerbose())inputInfo("No identifier continuation.");
 	}
 	*/
-	if(amDebugging())inputInfo("User input command identifier continuation updated.");
+	if(amVerboseDebugging())inputInfo("User input command identifier continuation updated.");
 }/* VALIDATED */
 
 Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
@@ -2153,7 +2152,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
 	}
 
-	if(amDebugging())
+	if(amVerboseDebugging())
 		output("Number of allocated/freed formula elements before evaluating the command: (%zd,%zd).\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to
@@ -2201,7 +2200,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 
 	///////if(amVerbose())outputInfo("Command to release!");
 
-	if(amDebugging())
+	if(amVerboseDebugging())
 		output("Number of allocated/freed formula elements after evaluating the command: (%llu,%llu).\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 
 	////////if(amVerbose())outputInfo("Command released!");
@@ -2218,7 +2217,7 @@ size_t outputCommand(Mcommand * const command){
 	while(token){
 		// MDH@16OCT2020: doing the following is debatable as we could argue that the command itself hasn't changed since it was entered but consider the fact that the number of available line characters could have changed!!!!!
 		if(token->position!=cursormovement.position){
-			// output("[%zd!=%zd]",token->position,cursormovement.position); // MDH@16OCT2020 debugging
+			// output("[%zd!=%zd]",token->position,cursormovement.position); // MDH@16OCT2020 (M_MODULE_DEBUGGING&MM_MAIN)
 			token->position=cursormovement.position; // MDH@24SEP2020: adding this because the prompt length might've changed in which case token->position would not be correct anymore
 		}
 		// MDH@24SEP2020: passing the cursor movement in to outputToken in order to keep track of where to place the continued prompts
@@ -2508,7 +2507,7 @@ void showSuggestedText(){
 	//                the commented code below did not work when dealing with explicit newlines, therefore we need to use cursormovement explicitly to determine what to do with the cursor
 	//                in order to do so, I added lines field to Mcursormovement (replacing skipped) to contain the number of lines moved down
 
-	// debugging: output("[%zd]",(_userinputline?_userinputline->offset:0));
+	// (M_MODULE_DEBUGGING&MM_MAIN): output("[%zd]",(_userinputline?_userinputline->offset:0));
 
 	toUserInputCursorPosition(-cursormovement.lines);
 
@@ -2886,14 +2885,14 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 void createUserInputCommand(){
 	// MDH@24APR2019 obsolete: getCommandLength()=string_length(feedforwardText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
-	// if(amDebugging())inputInfo("Creating the new user input command.");
+	// if(amVerboseDebugging())inputInfo("Creating the new user input command.");
 	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
 	_userInputCommand=owned_command(_getNewCommand(true),owner_userInputCommand);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand){
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
 		updateLastTokenAutocompletionText(false); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
-		// if(amDebugging())inputInfo("New user input command created.");
+		// if(amVerboseDebugging())inputInfo("New user input command created.");
 	}else
 		inputError("Failed to create a new user input command.");
 	/* replacing: 
@@ -2968,7 +2967,7 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 		_newUserInputCommand->_lastToken->position=_tokenToCopy->position;
 		_newUserInputCommand->_lastToken->envid=_tokenToCopy->envid;
 		_newUserInputCommand->_lastToken->prevIdentifier=_tokenToCopy->prevIdentifier;
-		// debugging: output("[%zd]",_newUserInputCommand->_lastToken->position);
+		// (M_MODULE_DEBUGGING&MM_MAIN): output("[%zd]",_newUserInputCommand->_lastToken->position);
 #ifdef __DEBUG__
 		printf("%d:%s",_userInputCommand->_lastToken->type,string(_userInputCommand->_lastToken->text));
 #endif
@@ -3347,7 +3346,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	// MDH@21SEP2020: clearInfo() is also responsible for the problem with right arrow because the result is that the character is output one line down with every right arrow
 	// clearInfo(); // MDH@28FEB2020: is responsible for the experienced problem
 	/////outputChar('4');
-	/////////if(amDebugging())inputInfo("A");
+	/////////if(amVerboseDebugging())inputInfo("A");
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
 	if(inputCharType=='C'){
 		_userInputCommand->_lastToken->type^=0x70; // toggling bit 7
@@ -3385,7 +3384,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		*/
 	}
 
-	/////if(amDebugging())inputInfo("J");
+	/////if(amVerboseDebugging())inputInfo("J");
 #ifdef __DEBUG__
 	printf("[%s]",string(_userInputCommand->_lastToken->text));
 #endif
@@ -3418,12 +3417,12 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	//                BUT 
 	// MDH@01OCT2019: argument aSuggestedCharacter is no longer used in tokenCheckedForBeingAFunction and consequently by this function, so it is removed as argument and replaced by updateidentifiercontinuation (which we do need)
 	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,endOfInput/*,aSuggestedCharacter*/); // MDH@28MAY2019: ALWAYS check for being a function!!!!
-	/////if(amDebugging())inputInfo("K");
+	/////if(amVerboseDebugging())inputInfo("K");
 	if(endOfInput){
 		/* MDH@20SEP2019: because I created updateLastTokenAutocompletionText which should take care of adding the right token feed forward I do not need to do the following
 		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
 		if(notCheckedForBeingAFunction){
-			/////if(amDebugging())inputInfo("L");
+			/////if(amVerboseDebugging())inputInfo("L");
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 			if(_userInputCommand->_lastToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
@@ -3471,7 +3470,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 						setLastTokenAutocompletionText("="); // MDH@20SEP2019 replacing: string_insert_char(feedforwardText,0,'=');
 				}
 			}
-			/////if(amDebugging())inputInfo("M");
+			/////if(amVerboseDebugging())inputInfo("M");
 		}
 		*/
 		if(aSuggestedCharacter){
@@ -3483,12 +3482,12 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		}
 		updateLastTokenAutocompletionText(/*acceptedFirstSuggestedCharacterDeleted*/false); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
 		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
-		/////if(amDebugging())inputInfo("N");
+		/////if(amVerboseDebugging())inputInfo("N");
 		// debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
 		//////////if(!initializationsChanged)outputStatus(inputChar,*inputCharacterType);
-		/////if(amDebugging())inputInfo("O");
+		/////if(amVerboseDebugging())inputInfo("O");
 	}
-	/////if(amDebugging())inputInfo("P");
+	/////if(amVerboseDebugging())inputInfo("P");
 	return result;
 }
 
@@ -3948,14 +3947,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
-	unsigned long long moduleDebugging=0; // MDH@05DEC2020
+	unsigned long long Debugging=0; // MDH@05DEC2020
 	Mstring* _settingsCharacterText=owned_string(__string(),owner);
 	if(_settingsCharacterText){
 		output("Settings characters text: '%s'.\n",string(_settingsCharacterText));
 		if(argc>1){
 			printf("%s\n","Arguments");
-			char moduleDebuggingCharacters[]={'\0','\0','\0','\0'}; // for each module we take two successive characters
-			char settingCharacter,moduleDebuggingCharacter;
+			char debuggingCharacters[]={'\0','\0','\0','\0'}; // for each module we take two successive characters
+			char settingCharacter,debuggingCharacter;
 			for(int arg=1;arg<argc;arg++){
 				printf("%i. %s\n",arg,argv[arg]);
 				if(argv[arg][0]=='-'){ // a setting flag (or flags)
@@ -3968,29 +3967,29 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						}
 					}
 				}else
-				if(argv[arg][0]=='+'){ // a debugging flag (or flags)
+				if(argv[arg][0]=='+'){ // a (M_MODULE_DEBUGGING&MM_MAIN) flag (or flags)
 					// for most modules we can stick to using the first two character of the module
 					int i=0;char* pos;unsigned long long moduleMask;
-					while((moduleDebuggingCharacter=argv[arg][++i])){
-						if(moduleDebuggingCharacter>=97)moduleDebuggingCharacter-=32; // just in case
-						moduleDebuggingCharacters[strlen(moduleDebuggingCharacters)]=moduleDebuggingCharacter;
-						if(strlen(moduleDebuggingCharacters)==2){ // we've got two successive characters
-							moduleDebuggingCharacters[2]=' '; // when we're looking
-							pos=strstr(M_MODULE_DEBUG_CHARACTERS,moduleDebuggingCharacters);
-							moduleDebuggingCharacters[2]='\0'; // done looking
+					while((debuggingCharacter=argv[arg][++i])){
+						if(debuggingCharacter>=97)debuggingCharacter-=32; // just in case
+						debuggingCharacters[strlen(debuggingCharacters)]=debuggingCharacter;
+						if(strlen(debuggingCharacters)==2){ // we've got two successive characters
+							debuggingCharacters[2]=' '; // when we're looking
+							pos=strstr(M_MODULE_DEBUG_CHARACTERS,debuggingCharacters);
+							debuggingCharacters[2]='\0'; // done looking
 							if(pos){ // TODO if we can find a better way to get the flag
 								moduleMask=(1<<((pos-M_MODULE_DEBUG_CHARACTERS)/3));
-								output("Module debugging mask: 0x%x.\n",moduleMask);
-								moduleDebugging|=moduleMask;
+								output("Module (M_MODULE_DEBUGGING&MM_MAIN) mask: 0x%x.\n",moduleMask);
+								Debugging|=moduleMask;
 							}else
-								output("%s'%s' does not denote a module.",M_ERROR_PREFIX,moduleDebuggingCharacters);
+								output("%s'%s' does not denote a module.",M_ERROR_PREFIX,debuggingCharacters);
 							// and reinitialize
-							moduleDebuggingCharacters[0]='\0';
-							moduleDebuggingCharacters[1]='\0';
+							debuggingCharacters[0]='\0';
+							debuggingCharacters[1]='\0';
 						}
 					}
-					moduleDebuggingCharacters[0]='\0'; // just in case a user forgot the second character!!! 
-					output("Module debugging flags: 0x%x.\n",moduleDebugging);
+					debuggingCharacters[0]='\0'; // just in case a user forgot the second character!!! 
+					output("Module (M_MODULE_DEBUGGING&MM_MAIN) flags: 0x%x.\n",Debugging);
 				}
 			}
 		}
@@ -4008,7 +4007,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
 	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
-	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",moduleDebugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
 		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);
@@ -4155,7 +4154,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// if we have manual feed forward starting with the given identifier continuation, the identifier continuation will remain
 				// and the identifier continuation will be removed from the manual feed forward
 				if(_manualFeedforwardText){ // existing manual feed forward text that may block identifier continuation characters
-					if(amDebugging())inputInfo("Determining manual feed forward text.");
+					if(amVerboseDebugging())inputInfo("Determining manual feed forward text.");
 					// if _manualFeedforwardText is empty ANY identifier continuation will be blocked (e.g. when a single identifier continuation character is removed)
 					numberOfIdentifierContinuationManualFeedforwardCharacters=string_number_of_matching_chars(_manualFeedforwardText,_identifierContinuationCharacters);
 					// MDH@08OCT2019: when the manual feed forward matches the start of the identifier continuation use the latter
@@ -4198,7 +4197,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						*/
 					//////////}
 				}
-				////////////if(amVerbose()||!amDebugging())inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
+				////////////if(amVerbose()||!amVerboseDebugging())inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
@@ -4213,7 +4212,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				////outputChar('C');
 				showSuggestedText();
 				////outputChar('D');
-				if(amDebugging())outputDebugInfo();
+				if(amVerboseDebugging())outputDebugInfo();
 				/////outputChar('E');
 
 				// if the line is full now we put the character on the next line
@@ -4247,7 +4246,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			///// WHY WAS IT DOING THIS!!!!!!! outputChar(inputCharType);
 			/* something terribly going wrong when the following code is executed!!!
 			if(inputMode==IM_COMMAND){
-				if(!amDebugging())outputStatus(inputChar,inputCharType);
+				if(!amVerboseDebugging())outputStatus(inputChar,inputCharType);
 			}
 			*/
 			////////printf("(%d)",inputCharType);
@@ -4920,7 +4919,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						// finish the last token???
 						if(_userInputCommand->_lastToken->significantCharacterCount==0)_userInputCommand->_lastToken->significantCharacterCount=string_length(_userInputCommand->_lastToken->text);
 						_userInputCommand->_firstTokenToEvaluate=_userInputCommand->_firstToken; // but only when not at start of command!!!
-						if(amDebugging())outputTokenInfo();
+						if(amVerboseDebugging())outputTokenInfo();
 					}
 				}else // no command yet, although we might be looking at a previous command
 				if(commandIndex&&getUserInputLength()) // NOTE using getUserInputLength() is better than using amAcceptinghistorycommand() (causing it!!)
@@ -4989,10 +4988,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
 
 					// garbage collection: remove any values not used anymore...
-					// if(amDebugging())
+					// if(amVerboseDebugging())
 					if(amVerboseDebugging())
 						outputInfo("Removing unreferenced values.");
-					size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
+					size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
 					if(amVerboseDebugging())
 						{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
 

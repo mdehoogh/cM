@@ -9,7 +9,6 @@
 #include "Menvironment.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_ENVIRONMENT)
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ENVIRONMENT,id};}
 
@@ -917,7 +916,7 @@ Menvironment* _getNewEnvironment(){Mallocationowner owner=getOwner(__LINE__);
 
 // MDH@23DEC2020 TODO perhaps it's better to replace environment+name by a variable that's either created or obtained beforehand??????
 bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
-    bool report=(amVerboseDebugging()||DEBUGGING);
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_ENVIRONMENT));
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("Cannot set the value: no variable name");return false;}
     if(report)

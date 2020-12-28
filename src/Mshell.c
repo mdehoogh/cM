@@ -95,8 +95,6 @@ const char* const M_ISO8601_UTC_FORMAT="%Y-%m-%dT%H:%M:%SZ";
 // you can set the modules to debug here using the module masks as defined in Mmodule.h
 unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized in shellInitialized()
 
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_SHELL)
-
 // as needed by the tokenizer (as part of evaluating a command)
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
 // t=tab(feedforward variable),n=newline(end of command),U=unary operator,D=double quoted string literal,C=comment,L=letter (in identifiers),l=letter (not at start of identifier)
@@ -600,7 +598,7 @@ Mvalue* Miffunction(Mvalue* _conditionValue,Mvalue* _thenTokenValue,Mvalue* _els
 
 // MDH@21DEC2020: a new way to do a while is by receiving a single token list (just like do does!!)
 Mvalue* Mwhilefunction(Mvalue* _whileTokenlistValue){
-	bool report=(amVerboseDebugging()||DEBUGGING);
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	Mvalue* _result=NULL;
 	if(_whileTokenlistValue&&_whileTokenlistValue->type==VT_LIST&&_whileTokenlistValue->value._list){
 		Mlist* whileTokenlist=_whileTokenlistValue->value._list;
@@ -715,7 +713,7 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 // MDH@11MAR2020: the value of the result token is assigned to $ so that will become the result of the application of the Mforfunction
 // MDH@23DEC2020: Mforfunction renamed to Mforwithfunction because that's what it actually is, this will save the user from wrapping the for call in a with statement
 Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=(amVerboseDebugging()||DEBUGGING);
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	Mvalue* _result=NULL;
 	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
 		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
@@ -860,7 +858,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 }
 // MDH@23DEC2020: Mforfunction now implements the first choice Mforwithfunction for executing a for loop from a token list (of indefinite number of tokens just like while and do)
 Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=(amVerboseDebugging()||DEBUGGING);
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	Mvalue* _result=NULL;
 	if(_forTokenlistValue&&_forTokenlistValue->type==VT_LIST&&_forTokenlistValue->value._list){
 		Mlist* forTokenlist=_forTokenlistValue->value._list;
@@ -3064,7 +3062,7 @@ Mvalue* Mf(Mvalue* _value){
 	if(!_value||_value->type==VT_FLOAT)return _value;
 	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mf));
 	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mf));
-	bool report=amVerboseDebugging(); //||DEBUGGING;
+	bool report=amVerboseDebugging(); //||(M_MODULE_DEBUGGING&MM_SHELL);
 	long double ld=M_LD_NAN;
 	if(report){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 	switch(_value->type){
@@ -3913,7 +3911,7 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 // MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
 // MDH@19OCT2020: I thought I had it in here somewhere that if the item id list contains a single element that the result would also be a single value instead of a list
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner owner=getOwner(__LINE__);
-	bool report=(amVerboseDebugging()||DEBUGGING);
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
 	if(report)
@@ -4289,7 +4287,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
 bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner owner_valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
 		if(report)
@@ -8013,7 +8011,7 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 }
 // MDH@25NOV2020: preferable to store the range elements in an array
 static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Marray* _scalarRangeArray=NULL; // can't create the array until we know how many values will be in it
 	if(firstRangeValue&&lastRangeValue){
 		long long direction=smallerthanorequalto(firstRangeValue,lastRangeValue);
@@ -8668,7 +8666,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 //                on the fly with a local variable map similar to what the anonymous function does
 //                thus effectively separating commands inside the block from the declaration of local variables
 Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=(amVerboseDebugging()||DEBUGGING);
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	long long result=M_LL_INVALID;
 	if(!_localMapValue||_localMapValue->type==VT_MAP){
 		result=M_FALSE;
@@ -9093,7 +9091,7 @@ Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
 
 // MDH@29OCT2020: the famous array functions of JS: foreach, map, reduce, filter
 Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccumulatedValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _accumulatedValue=_initialAccumulatedValue;
 	// it's up to the user to supply an initial accumulated value like a default
     Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
@@ -9137,7 +9135,7 @@ Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccum
 }
 
 Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _mapValue=NULL;
 	// it's up to the user to supply an initial accumulated value like a default
     Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
@@ -9186,7 +9184,7 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
 	return _mapValue;
 }
 Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _filterValue=NULL;
 	// it's up to the user to supply an initial accumulated value like a default
     Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
@@ -9246,7 +9244,7 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 }
 // NOTE how does foreach compare to map???? as it seems that foreach does not return a value as opposed to map
 Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long foreachCount=M_LL_INVALID; // counting the number of times the function was applied
 	// similar to map but returning the number of elements the function was applied to
 	// it's up to the user to supply an initial accumulated value like a default
@@ -9353,7 +9351,7 @@ static unsigned long long apartition(Mvalue** const values,unsigned long long l,
 }
 // MDH@25NOV2020: because we want to work with unsigned long long values, adapting apartition accordingly
 static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
 	if(_array){
@@ -9507,7 +9505,7 @@ static Mlistelement* lpartition(Mlist* const list,Mlistelement* const lmin1,Mlis
 // helper function to sort a list
 // MDH@02NOV2020: how about returning the number of stack values we actually needed to give some additional information
 static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
 	if(_list){
@@ -9622,7 +9620,7 @@ typedef struct Mindexrange{
 // helper functions
 // abinarymerge is called from aharmonicabinarysort trying to speed up merging by using binary search to find the insert position
 static bool abinarymerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
-	// bool report=amVerboseDebugging()||DEBUGGING;
+	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=false;
 	return result;
 }
@@ -9641,7 +9639,7 @@ static void outputValues(char const * const prefix,char const * const info,Mvalu
 }
 // the default amerge copies the presumable original values, then uses the copy to overwrite the original with the new values
 static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
-	// bool report=amVerboseDebugging()||DEBUGGING;
+	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	if(report)
 		output("Merging ordered arrays of indices [%llu,%llu] and [%llu,%llu].\n",l,m,m+1,r);
 	if(l>m||m>=r)return true; // if either list is empty return true
@@ -9727,7 +9725,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 // an possible improvement on amerge() is to only create a copy of the second sequence, so that these positions become available in the merging process
 // by go backwards through the second sequence elements we can accomplish to move every value in the first sequence at most once (as intended)
 static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
-	// bool report=amVerboseDebugging()||DEBUGGING;
+	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	if(report)
 		output("Insert merging ordered arrays of indices [%llu,%llu] and [%llu,%llu].\n",l,m,m+1,r);
 	if(l>m||m>=r)return true; // if either list is empty return true
@@ -9811,7 +9809,7 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 }
 // MDH@02DEC2020: we may further limit the number of comparisons by using a binary search when looking for the first smaller value
 static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
-	// bool report=amVerboseDebugging()||DEBUGGING;
+	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	// report=true;
 	if(report)
 		output("Binary insert merging ordered arrays of indices [%llu,%llu] and [%llu,%llu].\n",l,m,m+1,r);
@@ -9917,7 +9915,7 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 // MDH@05NOV2020: lmerge does not need to keep the index values ascending so it can safely
 //                exchange the position of list elements in the list
 static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirstone,Mlistelement * const lastone,Mlistelement * const lastanother){
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 
 	Mlistelement* nextlastanother=lastanother->_next; // remember the successor of the current last another
 	// as compared to lmerge (which simply is sort of an insertion algorithm at the moment (although it could be improved on though))
@@ -9991,7 +9989,7 @@ static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirst
 /* lmerge replaces linsertingmerge by NOT receiving the beforefirstone but instead the firstone, and returning 
 // we solve the problem of requiring both the new start and end by 
 static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirstone,Mlistelement * const lastone,Mlistelement * const lastanother){
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 
 	Mlistelement* nextlastanother=lastanother->_next; // remember the successor of the current last another
 
@@ -10113,7 +10111,7 @@ typedef bool (*ArrayMergeFunction)(Mvalue** const values,unsigned long long l,un
 
 // lharmonicasort is the original harmonicasort which is quite slow
 static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunction){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=M_LL_INVALID;
 	if(_array){
 		result=M_TRUE;
@@ -10251,7 +10249,7 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 	return result;
 }
 static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=(_list?M_TRUE:M_LL_INVALID);
 	if(result==M_TRUE){
 		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
@@ -10491,7 +10489,7 @@ static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long
 }
 // MDH@11NOV2020: the stack multiplier tells us how many times the stack size is to be multiplied with
 static long long lharmonicabinarysort(Mlist* const _list,long long stackmultiplier){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=(_list?M_TRUE:M_LL_INVALID);
 	if(result==M_TRUE){
 		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
@@ -11002,7 +11000,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 // timsort implementation (based on geeksforgeeks.org/timsort)
 /* replacing:
 static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mlistelement* lastanother){
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mlistelement *one=firstone,*another=lastone->_next,*nextone;
 	if(report){
 		outputValue("First value to first sequence to merge: '",firstone->_value,"'.\n");
@@ -11044,7 +11042,7 @@ static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mli
 // due to the merge the last element (containing the maximum could have changed), so we return it
 static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanother,Mlistelement* lastanother){
 	
-	bool report=amVerboseDebugging(); //||DEBUGGING;
+	bool report=amVerboseDebugging(); //||(M_MODULE_DEBUGGING&MM_SHELL);
 
 	// 1. merging may result in a new smallest and largest element therefore it makes sense to actually take care of that first
 	// if the minimum of the second sequence is the actual minimum we're going to remember this element as beforeone has to point to that element afterwards
@@ -11145,7 +11143,7 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 	// ASSERT first and last are assumed to be array positions (one-based) not zero-based
 	//        which means that we need to insert [first,last-1] instead of (originally)
 	//        this is done because we're using unsigneds so we cannot go below 0
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* toinsertValue=NULL;
 	if(report)
 		output("Insertion sorting array elements [%llu,%llu].\n",first,last);
@@ -11189,7 +11187,7 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 	}
 }
 static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunction){
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=M_LL_INVALID;
 	sortstatistics.pointertests++;
 	if(_array){
@@ -11220,7 +11218,7 @@ static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunc
 // linsertinginsertionSort works the same way linsertionSort does, except that it rearranges the list elements instead of moving the values
 // and it returns the new last (if any)
 static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * const beforefirst,Mlistelement * const last){
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	// ASSERT last should NOT be NULL
 	Mlistelement* smallest=(beforefirst?beforefirst->_next:_list->_first); // called first in linsertionSort
 	if(report){outputValue("Insertion sorting '",smallest->_value,"'");outputValue(" through '",last->_value,"'.\n");}
@@ -11297,7 +11295,7 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 // NOTE linsertionSort moves the values NOT the list elements, therefore there's no need to change the index
 static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	// ASSERT last should NOT be NULL
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mlistelement *afterlast=last->_next; // remember the successor of the last element
 	// keep track of the smallest and largest list element found so far (that we need to link afterwards to the elements in front and behind)
 	Mvalue* largestValue=first->_value;
@@ -11339,7 +11337,7 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 */
 // MDH@05NOV2020: changing timsort by registering the index ranges first, and writing the indices at the end
 static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
 	if(_list){
@@ -11486,7 +11484,7 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 }
 // Msort is the generic entry point for sorting lists
 Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	// we've got merge, tim and quick sort, below you can see what the default is
 	char sortMethodVariant='\0',sortMethod='\0';
@@ -11540,7 +11538,7 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 // similar to Msort but does not change the input in any way, returns NULL on failure
 // MDH@24DEC2020 TODO it's advisable when sorting a list to create an array instead of a list to sort, and creating a list from the sorted array result
 Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* sortedValue=NULL;
 	if(_tosortValue){
 		if(_tosortValue->type==VT_MAP){
@@ -11617,7 +11615,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 
 // MDH@01NOV2020: grouping can make seperate sublists from a list either into a list or a map
 Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	if((!_listValue||_listValue->type==VT_LIST)&&(!_functionValue||_functionValue->type==VT_FUNCTION)){
 		Mlist* list=(_listValue?_listValue->value._list:NULL);
 		if(list){

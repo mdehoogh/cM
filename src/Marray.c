@@ -1,7 +1,6 @@
 #include "Marray.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_ARRAY)
 
 // MDH@22NOV2020
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ARRAY,id};}

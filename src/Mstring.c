@@ -5,7 +5,6 @@
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //                TODO if blocks is zero failed to 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_STRING)
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_STRING,id};}
 

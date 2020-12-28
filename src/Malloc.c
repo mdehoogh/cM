@@ -8,7 +8,6 @@
 #include "Malloc.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
-#define DEBUGGING (M_MODULE_DEBUGGING&MM_ALLOC)
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ALLOC,id};}
 
@@ -28,7 +27,7 @@ static void tell(char const * fmt,...){
     va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
 static void info(char const * fmt,...){
-    if(DEBUGGING){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
+    if((M_MODULE_DEBUGGING&MM_ALLOC)){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 }
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
