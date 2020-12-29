@@ -10,4 +10,37 @@
 #define JSON_PROPERTY_NAME_END "\""
 #define JSON_PROPERTY_NAME_VALUE_SEPARATOR ":"
 
+// MDH@29DEC2020: how about parsing text to and from an Mjson structure????
+// a JSON object is simply a property bag where each property value is either a simple value (stored as Mstring) or a composite value (either Mjsonobject or Mjsonobject)
+typedef enum Mjsonvaluetype {JVT_OBJECT,JVT_ARRAY,JVT_VALUE}Mjsonvaluetype;
+struct Mjsonobject;
+struct Mjsonarray;
+typedef union Mjsonvalueunion{
+    char* _chars;
+    struct Mjsonobject* _object;
+    struct Mjsonarray* array;
+}Mjsonvalueunion;
+typedef struct Mjsonvalue{
+    Mjsonvaluetype valuetype;
+    Mjsonvalueunion* _value;
+}Mjsonvalue;
+
+typedef struct Mjsonproperty{
+    char* _name;
+    Mjsonvalue* _value;
+    struct Mjsonproperty* _next;
+}Mjsonproperty;
+
+typedef struct Mjsonobject{
+    Mjsonproperty* _firstproperty;
+}Mjsonobject;
+typedef struct Mjsonarray{
+    size_t numberOfValues;
+    Mjsonobject* _values[1];
+}Mjsonarray;
+
 Mstring* json_addproperty(Mstring * const str,char const * const propertyName,bool first);
+
+Mjsonvalue* json_getpropertyvalue(Mjsonobject const * const _jsonobject,char const * const propertyName);
+
+Mjsonvalue* json_parse(char const * const _text,size_t *pos);
