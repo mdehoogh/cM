@@ -9037,19 +9037,65 @@ static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
     if(iterator)outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
 }
+// MDH@04JAN2021: if the first element of the iterator is a list itself, we should be returning an array of sample statistics for each list element
+//                and a correlation matrix for the combined samples but only for pairs with the same number of elements
 static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
     Mmap* _statsMap=NULL;
     if(iterator){
-        if(iterator->valuetype!=VT_MAP&&iterator->valuetype!=VT_REFERENCE&&iterator->valuetype!=VT_LIST){
-            // the values in the list need to be scalars of the same type
-            if(iterator->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(iterator),owner);else
-            if(iterator->valuetype==VT_UNDEFINED)_statsMap=owned_map(_getSampleStatisticsMap(iterator),owner);
-        }else
-            output("All values in the iterator should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
+		// MDH@04JAN2021: the valuetype of the iterator is the valuetype of the array or the list
+		//                I suppose that we should now accomodate MAP and LIST value iterators as well
+		//                if the value type of the array is not set i.e. it can store values of any type, we use the type of the first element
+		Mvalue* firstvalue=NULL;
+		Mvaluetype valuetype=iterator->valuetype;
+		if(valuetype==VT_UNDEFINED){
+			// assume valueholder is a pointer to the first element of 
+			firstvalue=(iterator->valueholder?*(iterator->valueholder):NULL);
+			if(firstvalue)valuetype=firstvalue->type; // if firstvalue is NULL (i.e. on an empty list), valuetype will remain VT_UNDEFINED
+		}
+		if(valuetype==VT_LIST||valuetype==VT_ARRAY){ // both support iterators
+			// does it really matter whether we return a list or array???????? I guess we can return a list because a lot of elements could be NULL in the array as well
+			_statsMap=owned_map(__map("_getStatsMap"),owner);
+			if(_statsMap){
+				if(appendedToMap(_statsMap,owner,'statistics',__list("getStatsMap"))==M_TRUE&&appendedToMap(_statsMap,owner,'correlations',__array("_getStatsMap"))==M_TRUE){
+					Mmapelement* mapelement=getMapelement(_statsMap,'statistics');
+					Mvalue* mapelementValue=(mapelement?mapelement->_variable->_value:NULL);
+					if(mapelementValue->type==VT_LIST){
+						Mlist* statisticsList=mapelementValue->value._list;
+						if(statisticsList){
+							Mvalue* value;
+							unsigned long long index=0;
+							while((index=iter_nextindex(iterator))){
+								// output("Index: %llu",index); // DEBUG
+								value=iter_next(iterator);
+								if(value&&value->type==VT_LIST){
+									
+								}
+							}
+						}
+					}
+				}
+				FREE_MAP(_statsMap,owner);_statsMap=NULL;
+			}
+		}else
+        if(valuetype==VT_INTEGER)
+			_statsMap=owned_map(_getIntegerSampleStatisticsMap(iterator),owner);
+		else
+        if(valuetype==VT_BIGINTEGER)
+			_statsMap=owned_map(_getBigintegerSampleStatisticsMap(iterator),owner);
+		else
+    	if(valuetype==VT_RATIONAL)
+			_statsMap=owned_map(_getRationalSampleStatisticsMap(iterator),owner);
+		else
+        if(valuetype==VT_DECIMAL)
+			_statsMap=owned_map(_getDecimalSampleStatisticsMap(iterator),owner);
+		else
+        if(valuetype==VT_FLOAT)
+			_statsMap=owned_map(_getFloatSampleStatisticsMap(iterator),owner);
+		else
+        if(valuetype==VT_UNDEFINED)
+			_statsMap=owned_map(_getSampleStatisticsMap(iterator),owner);
+        else
+            output("%sInvalid iterator value type '%s' in computing statistics.\n",M_ERROR_PREFIX,VALUETYPENAMES[valuetype]);
     }
     return disowned_map(_statsMap,owner);
 }
