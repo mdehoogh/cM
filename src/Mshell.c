@@ -9056,25 +9056,60 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 			// does it really matter whether we return a list or array???????? I guess we can return a list because a lot of elements could be NULL in the array as well
 			_statsMap=owned_map(__map("_getStatsMap"),owner);
 			if(_statsMap){
-				if(appendedToMap(_statsMap,owner,'statistics',__list("getStatsMap"))==M_TRUE&&appendedToMap(_statsMap,owner,'correlations',__array("_getStatsMap"))==M_TRUE){
-					Mmapelement* mapelement=getMapelement(_statsMap,'statistics');
-					Mvalue* mapelementValue=(mapelement?mapelement->_variable->_value:NULL);
-					if(mapelementValue->type==VT_LIST){
-						Mlist* statisticsList=mapelementValue->value._list;
-						if(statisticsList){
+				Mlist *_statsList=owned_list(__list("_getStatsMap"),owner)
+						,*_corrsList=owned_list(__list("_getStatsMap"),owner);
+				if(_statsList&&_corrsList){
+					// wrap the lists and append them to the map
+					// NOTE by disowning the lists they will be freed if failing to wrap them
+					//      which means we do not need to free them anymore
+					Mvalue *statsListValue=_getValueOfList(disowned_list(_statsList,owner))
+							,*corrsListValue=_getValueOfList(disowned_list(_corrsList,owner));
+					if(statsListValue&&corrsListValue){
+						if(appendedToMap(_statsMap,owner,"statistics",statsListValue)==M_TRUE
+							&&appendedToMap(_statsMap,owner,"correlations",corrsListValue)==M_TRUE){
 							Mvalue* value;
+							Miterator valueiterator;
+							Mmap* _valuestatsMap;
 							unsigned long long index=0;
 							while((index=iter_nextindex(iterator))){
 								// output("Index: %llu",index); // DEBUG
 								value=iter_next(iterator);
-								if(value&&value->type==VT_LIST){
-									
+								if(value){
+									valueiterator=(Miterator){};
+									if(value->type==VT_LIST)
+										valueiterator=getListiterator(value->value._list);
+									else
+									if(value->type==VT_ARRAY)
+										valueiterator=getArrayiterator(value->value._array);
+									if(valueiterator.next){ // we've got an iterator
+										Mvalue* valuestatsMapValue=NULL;
+										_valuestatsMap=owned_map(_getStatsMap(&valueiterator),owner);
+										if(_valuestatsMap){
+											valuestatsMapValue=_getValueOfMap(disowned_map(_valuestatsMap,owner));
+											if(valuestatsMapValue){
+												if(appendedToList(_statsList,owner,valuestatsMapValue,index)<=0){
+													valuestatsMapValue=NULL;
+													output("%s",M_ERROR_PREFIX);
+													outputValue("Failed to compute the statistics of '",value,"'.\n");
+												}
+											}
+										}
+										// if we fail to wrap or create the valuestatsMap
+										if(!valuestatsMapValue){
+											FREE_MAP(_valuestatsMap,owner);
+											output("%s",M_ERROR_PREFIX);
+											outputValue("Failed to compute the statistics of '",value,"'.\n");
+										}
+									}
 								}
 							}
 						}
 					}
+				}else{ // failed to create both lists
+					if(_statsList)FREE_LIST(_statsList,owner);
+					if(_corrsList)FREE_LIST(_corrsList,owner);
+					FREE_MAP(_statsMap,owner);_statsMap=NULL;
 				}
-				FREE_MAP(_statsMap,owner);_statsMap=NULL;
 			}
 		}else
         if(valuetype==VT_INTEGER)
