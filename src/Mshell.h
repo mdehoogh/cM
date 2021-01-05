@@ -108,6 +108,9 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue);
 Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue);
 Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue);
 
+Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value);
+Mvalue* Mstats(Mvalue* _sequenceValue);
+
 // and finally obtaining a root environment
 // in general initializing the shell with the callbacks and the M setting characters
 // MDH@05DEC2020: added moduleDebugging flags

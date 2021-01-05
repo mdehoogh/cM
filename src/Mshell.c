@@ -9037,6 +9037,58 @@ static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
     if(iterator)outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
 }
+Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
+	if(_sequence1Value&&_sequence2Value){
+		// the sequences need to have the same number of elements
+		if((_sequence1Value->type==VT_LIST||_sequence1Value->type==VT_ARRAY)
+			&&(_sequence2Value->type==VT_LIST||_sequence2Value->type==VT_ARRAY)){
+			unsigned long long numberOfElements1=(_sequence1Value->type==VT_LIST?_sequence1Value->value._list->numberOfElements:_sequence1Value->value._array->numberOfElements);
+			unsigned long long numberOfElements2=(_sequence2Value->type==VT_LIST?_sequence2Value->value._list->numberOfElements:_sequence2Value->value._array->numberOfElements);
+			if(numberOfElements1==numberOfElements2){
+				Miterator iterator1=(_sequence1Value->type==VT_LIST?getListiterator(_sequence1Value->value._list):getArrayiterator(_sequence1Value->value._array));
+				Miterator iterator2=(_sequence1Value->type==VT_LIST?getListiterator(_sequence1Value->value._list):getArrayiterator(_sequence1Value->value._array));
+				// we should only use the elements when the index is the same
+				// this means that the correlation could still be undefined
+				unsigned long long index1=0,index2=0,count=0;
+				Mvalue *value1,*value2,*prod12,*prod1,*prod2;
+				Mvalue *sum12,*sum1,*sum2,*ssq1,*ssq2;
+				while((index1=iter_nextindex(&iterator1))){
+					if(index2<index1)
+					while((index2=iter_nextindex(&iterator2))<index1);
+					if(index1==index2){
+						value1=iter_next(&iterator1);
+						value2=iter_next(&iterator2);
+						prod12=multiply(value1,value2);
+						prod1=multiply(value1,value1);
+						prod2=multiply(value2,value2);
+						if(Misnumeric(prod1)&&Misnumeric(prod2)&&Misnumeric(prod12)){
+							if(count){
+								ssq1=add(ssq1,prod1);
+								ssq2=add(ssq2,prod2);
+								sum12=add(sum12,prod12);
+							}else{ // initialize
+								ssq1=prod1;
+								ssq2=prod2;
+								sum1=value1;
+								sum2=value2;
+								sum12=prod12;
+							}
+							count++;
+						}
+					}
+				}
+				if(count){
+					
+				}
+			}else{
+				output("%sCannot compute the correlation between ",M_WARNING_PREFIX);
+				outputValue("'",_sequence1Value,"' and ");
+				outputValue("'",_sequence2Value,"' as they do not have the same number of elements.\n");
+			}
+		}
+	}
+	return NULL;
+}
 // MDH@04JAN2021: if the first element of the iterator is a list itself, we should be returning an array of sample statistics for each list element
 //                and a correlation matrix for the combined samples but only for pairs with the same number of elements
 static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
@@ -9056,6 +9108,8 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 			// does it really matter whether we return a list or array???????? I guess we can return a list because a lot of elements could be NULL in the array as well
 			_statsMap=owned_map(__map("_getStatsMap"),owner);
 			if(_statsMap){
+				// should we be storing the correlations in a list or in an array????
+				// we might get a lot of NULL values in an array if the input is a sparse list
 				Mlist *_statsList=owned_list(__list("_getStatsMap"),owner)
 						,*_corrsList=owned_list(__list("_getStatsMap"),owner);
 				if(_statsList&&_corrsList){
@@ -9065,40 +9119,44 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 					Mvalue *statsListValue=_getValueOfList(disowned_list(_statsList,owner))
 							,*corrsListValue=_getValueOfList(disowned_list(_corrsList,owner));
 					if(statsListValue&&corrsListValue){
+						// with the lists bound to the values, they will be freed if the values are gc'ed
 						if(appendedToMap(_statsMap,owner,"statistics",statsListValue)==M_TRUE
 							&&appendedToMap(_statsMap,owner,"correlations",corrsListValue)==M_TRUE){
-							Mvalue* value;
-							Miterator valueiterator;
-							Mmap* _valuestatsMap;
-							unsigned long long index=0;
+							Mvalue *value,*nextvalue;
+							Miterator nextiterator;
+							unsigned long long index=0,nextindex;
 							while((index=iter_nextindex(iterator))){
 								// output("Index: %llu",index); // DEBUG
 								value=iter_next(iterator);
 								if(value){
-									valueiterator=(Miterator){};
-									if(value->type==VT_LIST)
-										valueiterator=getListiterator(value->value._list);
-									else
-									if(value->type==VT_ARRAY)
-										valueiterator=getArrayiterator(value->value._array);
-									if(valueiterator.next){ // we've got an iterator
-										Mvalue* valuestatsMapValue=NULL;
-										_valuestatsMap=owned_map(_getStatsMap(&valueiterator),owner);
-										if(_valuestatsMap){
-											valuestatsMapValue=_getValueOfMap(disowned_map(_valuestatsMap,owner));
-											if(valuestatsMapValue){
-												if(appendedToList(_statsList,owner,valuestatsMapValue,index)<=0){
-													valuestatsMapValue=NULL;
-													output("%s",M_ERROR_PREFIX);
-													outputValue("Failed to compute the statistics of '",value,"'.\n");
+									if(value->type==VT_LIST||value->type==VT_ARRAY){
+										// as we'll be storing all correlations with successive lists
+										// we need to ascertain to have such a list
+										if(index!=iterator->lastindex){ // assumedly not the last list/array
+											Mlist* _nextcorrsList=owned_list(__list("_getStatsMap"),owner);
+											if(_nextcorrsList){
+												if(appendedToList(_corrsList,owner,_getValueOfList(_nextcorrsList),index)>0){
+													nextiterator=*iterator;
+													while((nextindex=iter_nextindex(&nextiterator))){
+														nextvalue=iter_next(&nextiterator);
+														if(!nextvalue)continue;
+														if(nextvalue->type==VT_LIST||nextvalue->type==VT_ARRAY){
+														}
+													}
+												}else{
+													outputError("Failed to create a list to store correlations");
+													free_list(_nextcorrsList);
 												}
 											}
 										}
-										// if we fail to wrap or create the valuestatsMap
-										if(!valuestatsMapValue){
-											FREE_MAP(_valuestatsMap,owner);
-											output("%s",M_ERROR_PREFIX);
-											outputValue("Failed to compute the statistics of '",value,"'.\n");
+										// most convenient to use Mstats 
+										Mvalue* valuestatsMapValue=Mstats(value);
+										if(valuestatsMapValue){
+											if(appendedToList(_statsList,owner,valuestatsMapValue,index)<=0){
+												valuestatsMapValue=NULL;
+												output("%s",M_ERROR_PREFIX);
+												outputValue("Failed to compute the statistics of '",value,"'.\n");
+											}
 										}
 									}
 								}
