@@ -9,6 +9,7 @@ extern unsigned long long M_MODULE_DEBUGGING;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_MEMORY,id};}
 
 extern char const * const M_ERROR_PREFIX;
+extern char const * const M_WARNING_PREFIX;
 
 /**
  * _strdup() adds writing a error message to strdup()
@@ -37,12 +38,12 @@ long long _strtoll(char* _c,long long invalid){
     long long ll=strtoll(_c,&eptr,0); // assume decimal (TODO allow other representations as well)
     if(!ll){
         if (errno==EINVAL){
-            output("ERROR: Conversion of '%s' to an integer failed.",_c);
+            output("%sFailed to convert '%s' to an integer.\n",M_WARNING_PREFIX,_c);
             return invalid;
         }
         /* If the value provided was out of range, display a warning message */
         if (errno==ERANGE){
-            output("\nERROR: The integer represented by  '%s' is out of range.",_c);
+            output("%sThe integer represented by '%s' is out of range.\n",M_WARNING_PREFIX,_c);
             return invalid;
         }
     }

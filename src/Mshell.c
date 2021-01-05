@@ -9038,6 +9038,7 @@ static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
     return NULL;
 }
 Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	if(_sequence1Value&&_sequence2Value){
 		// the sequences need to have the same number of elements
 		if((_sequence1Value->type==VT_LIST||_sequence1Value->type==VT_ARRAY)
@@ -9046,7 +9047,7 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 			unsigned long long numberOfElements2=(_sequence2Value->type==VT_LIST?_sequence2Value->value._list->numberOfElements:_sequence2Value->value._array->numberOfElements);
 			if(numberOfElements1==numberOfElements2){
 				Miterator iterator1=(_sequence1Value->type==VT_LIST?getListiterator(_sequence1Value->value._list):getArrayiterator(_sequence1Value->value._array));
-				Miterator iterator2=(_sequence1Value->type==VT_LIST?getListiterator(_sequence1Value->value._list):getArrayiterator(_sequence1Value->value._array));
+				Miterator iterator2=(_sequence2Value->type==VT_LIST?getListiterator(_sequence2Value->value._list):getArrayiterator(_sequence2Value->value._array));
 				// we should only use the elements when the index is the same
 				// this means that the correlation could still be undefined
 				unsigned long long index1=0,index2=0,count=0;
@@ -9061,10 +9062,12 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 						prod12=multiply(value1,value2);
 						prod1=multiply(value1,value1);
 						prod2=multiply(value2,value2);
-						if(Misnumeric(prod1)&&Misnumeric(prod2)&&Misnumeric(prod12)){
+						if(isnumeric(prod1)==M_TRUE&&isnumeric(prod2)==M_TRUE&&isnumeric(prod12)==M_TRUE){
 							if(count){
 								ssq1=add(ssq1,prod1);
 								ssq2=add(ssq2,prod2);
+								sum1=add(sum1,value1);
+								sum2=add(sum2,value2);
 								sum12=add(sum12,prod12);
 							}else{ // initialize
 								ssq1=prod1;
@@ -9078,7 +9081,21 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 					}
 				}
 				if(count){
-					
+					Mvalue* countValue=_getIntegerValue(count);
+					if(countValue){
+						// if(report)
+						{
+							output("Correlation constituent parts:");
+							outputValue(" Count=",countValue,NULL);
+							output(" | X:");outputValue(" sum=",sum1,NULL);outputValue(" - ssq=",ssq1,NULL);
+							output(" | Y:");outputValue(" sum=",sum2,NULL);outputValue(" - ssq=",ssq2,NULL);
+							outputValue(" | X*Y: sum=",sum12,".\n");
+						}
+						Mvalue* numerator=subtract(sum12,divide(multiply(sum1,sum2),countValue));
+						Mvalue* denominator=Msqrt(multiply(subtract(ssq1,divide(multiply(sum1,sum1),countValue)),subtract(ssq2,divide(multiply(sum2,sum2),countValue))));
+						return divide(numerator,denominator);
+					}else
+						outputError("Failed to wrap the sample count in computing a correlation coefficient");
 				}
 			}else{
 				output("%sCannot compute the correlation between ",M_WARNING_PREFIX);
@@ -9136,18 +9153,27 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 											Mlist* _nextcorrsList=owned_list(__list("_getStatsMap"),owner);
 											if(_nextcorrsList){
 												if(appendedToList(_corrsList,owner,_getValueOfList(_nextcorrsList),index)>0){
-													nextiterator=*iterator;
+													nextiterator=*iterator; // get a copy
 													while((nextindex=iter_nextindex(&nextiterator))){
 														nextvalue=iter_next(&nextiterator);
 														if(!nextvalue)continue;
 														if(nextvalue->type==VT_LIST||nextvalue->type==VT_ARRAY){
+															Mvalue* corr=Mcorr(value,nextvalue);
+															if(corr){
+																if(appendedToList(_nextcorrsList,owner,corr,nextindex)<=0){
+																	output("%sFailed to store correlation coefficient ",M_ERROR_PREFIX);
+																	outputValue("'",corr,"'.\n");
+																}
+															}else 
+																outputError("Failed to compute a correlation coefficient");
 														}
 													}
 												}else{
 													outputError("Failed to create a list to store correlations");
 													free_list(_nextcorrsList);
 												}
-											}
+											}else
+												outputError("Failed to create a list to store computed correlation coefficients");
 										}
 										// most convenient to use Mstats 
 										Mvalue* valuestatsMapValue=Mstats(value);
@@ -12303,6 +12329,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return false;
 			}
 			if(!completedListFunction(_getFunction(_Menvironment,owner,"statistics"),"statistics",Mstats)
+					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"corr"),"corr",Mcorr) // MDH@05JAN2021: for those only interested in the correlation coefficient (and not simple sample statistics) 
 					||!completedListFunction(_getFunction(_Menvironment,owner,"first"),"first",Mfirst)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"last"),"last",Mlast)
 				){

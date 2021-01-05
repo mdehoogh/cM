@@ -13,6 +13,7 @@ Mvalue* Mpositive(Mvalue* _value);
 Mvalue* Mnegative(Mvalue* _value);
 Mvalue* Mscalar(Mvalue* _value);
 // MDH@28OCT2020: might come in handy
+long long isnumeric(Mvalue* _value); // helper that we could use elsewhere
 Mvalue* Misnumeric(Mvalue* _value);
 Mvalue* Misalist(Mvalue* _value);
 

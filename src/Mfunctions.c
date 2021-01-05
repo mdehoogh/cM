@@ -525,7 +525,7 @@ Mvalue* Mscalar(Mvalue* _value){
 }/* VALIDATED */
 
 // MDH@29OCT2020: might come in handy
-static long long isnumeric(Mvalue* _value){
+long long isnumeric(Mvalue* _value){
     return(_value?(_value->type==VT_BIGINTEGER||_value->type==VT_DECIMAL||_value->type==VT_FLOAT||_value->type==VT_INTEGER||_value->type==VT_RATIONAL?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
 Mvalue* Misnumeric(Mvalue* _value){
