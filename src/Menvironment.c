@@ -1771,6 +1771,21 @@ bool completedValueTextValueFunction(Mfunction* const _function,const char* cons
     }
     return false;
 }/* VALIDATED */
+bool completedValueValueValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=owned_map(_getValueValueValueMap("text(s)","separator(s)","item wrapper(s)"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register a value text value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}
+
 bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);

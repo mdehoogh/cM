@@ -655,6 +655,207 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
     }
     return _getIntegerValue(result);
 }
+// MDH@06JAN2020: split string(s) by separator(s)
+static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallocationowner owner=getOwner(__LINE__);
+    char** _texts=NULL;
+    if(textcount){
+        *textcount=0;
+        if(textsValue){
+            if(textsValue->type==VT_ARRAY){
+                Marray* textArray=textsValue->value._array;
+                if(textArray){
+                    *textcount=textArray->numberOfElements;
+                    if(*textcount>0){
+                        Mvalue** textValues=textArray->values;
+                        if(textValues){
+                            _texts=MALLOC(sizeof(char*),*textcount,'c',owner);
+                            if(_texts){
+                                unsigned long long textindex=*textcount;
+                                do{
+                                    textindex--;
+                                    Mstring* _valueText=owned_string(_getValueText(textValues[textindex],true),owner);
+                                    if(_valueText){
+                                        _texts[textindex]=_strdup(string(_valueText));
+                                        FREE_STRING(_valueText,owner);
+                                    }else
+                                        _texts[textindex]=NULL;
+                                }while(textindex>0);
+                            }else{
+                                *textcount=0;
+                                outputError("Failed to allocate memory for storing texts");
+                            }
+                        }else 
+                            outputBug("Missing array values");
+                    }
+                }else 
+                    outputBug("Missing value array");
+            }else
+            if(textsValue->type==VT_LIST){
+                Mlist* textList=textsValue->value._list;
+                if(textList){
+                    // we may decide to maintain sparseness????? in which case we should use the index of the last element!!!!
+                    // although technically we could split the texts and take over the index values later on (let's do that)
+                    *textcount=textList->numberOfElements;
+                    if(*textcount>0){
+                        _texts=CALLOC(sizeof(char*),*textcount,'c',owner);
+                        if(_texts){
+                            unsigned long long textindex=0;
+                            Mlistelement* listelement=textList->_first;
+                            while(listelement){
+                                if(textindex>=*textcount){outputBug("Number of elements of list incorrect trying to split texts");break;}
+                                Mstring* _valueText=owned_string(_getValueText(listelement->_value,true),owner);
+                                if(_valueText){
+                                    _texts[textindex++]=_strdup(string(_valueText));
+                                    FREE_STRING(_valueText,owner);
+                                }else
+                                    _texts[textindex++]=NULL;
+                                listelement=listelement->_next;
+                            }
+                        }else{
+                            *textcount=0;
+                            outputError("Failed to allocate memory for storing texts");
+                        }                        
+                    }
+                }else 
+                    outputBug("Missing value list");
+            }else
+            if(textsValue->type==VT_TEXT){ // only a single text!
+                if(textsValue->value._text){
+                    _texts=MALLOC(sizeof(char*),1,'c',owner);
+                    if(_texts){
+                        *textcount=1;
+                        *_texts=_strdup(textsValue->value._text->_c);
+                    }else 
+                        outputError("Failed to allocate memory for storing the text to split");
+                }else 
+                    outputBug("Missing value text");
+            }else 
+                outputError("Cannot split a value that is not a text (or list and array with texts)");
+            if(_texts)return DISOWNED(_texts,owner);
+        }
+    }
+    return NULL;
+}
+static void freetexts(char** const texts,unsigned long long textcount,Mallocationowner owner){
+    if(!texts)return;
+    for(register unsigned long long textindex=0;textindex<textcount;textindex++)if(texts[textindex])free(texts[textindex]);
+    FREE_DISOWNED(texts,textcount,'c',owner);
+}
+static Mlist* splits(char** const texts,unsigned long long textcount,char** const separators,unsigned long long separatorcount,char** const itemwrappers,unsigned long long itemwrappercount){Mallocationowner owner=getOwner(__LINE__);
+    if(texts&&textcount&&separators&&separatorcount){
+        // every element in the split text list will be a list (of texts)
+        Mlist* _splitTextsList=owned_list(_getListOfType(VT_LIST),owner);
+        if(_splitTextsList){
+            unsigned long long textindex=textcount;
+            long long separatorindex;
+            // if there are item wrappers splitting will be slow
+            if(itemwrappers&&itemwrappercount){
+
+            }else{
+                char* *_text=texts;
+                do{
+                    if(*_text){ // something to split
+                        Mlist* _splitTextList=owned_list(_getListOfType(VT_TEXT),owner);
+                        if(_splitTextList){
+                            Mstring* _splitText=owned_string(_getString("'"),owner); // local!!!
+                            if(_splitText){
+                                char c;
+                                while((c=**_text)){
+                                    if(!string_append_char(_splitText,c)){output("%sFailed to collect split character '%c'.\n",M_ERROR_PREFIX,c);break;}
+                                    // if _splitText ends with one of the separators, we cut it off and break
+                                    separatorindex=separatorcount;
+                                    while(--separatorindex>=0&&!string_endswith(_splitText,separators[separatorindex]));
+                                    if(separatorindex>=0){ // matching a separator
+                                        if(!string_shorten(_splitText,strlen(separators[separatorindex])))output("%sFailed to cut off the separator of '%s'.\n",string(_splitText));
+                                        break;
+                                    }
+                                    _text++;
+                                }while(1);
+                                Mtext* splitText=owned_text(_getText(string(_splitText)),owner);
+                                if(splitText){
+                                    Mvalue* splitTextValue=_getValueOfText(disowned_text(splitText,owner));
+                                    if(splitTextValue){
+                                        if(appendedToList(_splitTextList,owner,splitTextValue,M_LL_INVALID)<=0)
+                                            output("%sFailed to add split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+                                    }else
+                                        output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+                                }else 
+                                    output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+                                FREE_STRING(_splitText,owner); // freed!!!!
+                            }else 
+                                output("%sFailed to collect characters from text to split '%s'.",M_ERROR_PREFIX,*_text);
+                            Mvalue* _splitTextListValue=_getValueOfList(disowned_list(_splitTextList,owner));
+                            // NOTE if appending fails the gc should take care of freeing this value, and the contained list!!!!
+                            if(appendedToList(_splitTextsList,owner,_splitTextListValue,M_LL_INVALID)<=0)
+                                output("%sFailed to append the list of split texts of '%s'.\n",M_ERROR_PREFIX,*_text);
+                        }else
+                            output("%sUnable to create the list to store the split parts of '%s'.",M_ERROR_PREFIX,*_text);
+                    }
+                    _text++;
+                }while(--textindex>0);
+            }
+            return disowned_list(_splitTextsList,owner);
+        }
+        outputError("Failed to create the split text list");
+    }else 
+        outputError("Input to the split function undefined or incomplete");
+    return NULL;
+}
+Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperValue){Mallocationowner owner=getOwner(__LINE__);
+    if(_textValue&&_separatorValue){
+        Mlist* _splitTextsList=NULL;
+        // let's compose the list of separators, but multiple separators is an issue
+        unsigned long long separatorcount;char** _separators=OWNED(_getTexts(_separatorValue,&separatorcount),owner);
+        unsigned long long textcount;char** _texts=OWNED(_getTexts(_textValue,&textcount),owner);
+        if(_texts&&_separators){
+            unsigned long long itemwrappercount;char** _itemwrappers=OWNED(_getTexts(_itemwrapperValue,&itemwrappercount),owner);
+            _splitTextsList=owned_list(splits(_texts,textcount,_separators,separatorcount,_itemwrappers,itemwrappercount),owner);
+
+            freetexts(_itemwrappers,itemwrappercount,owner);
+        }
+        freetexts(_texts,textcount,owner);
+        freetexts(_separators,separatorcount,owner);
+        if(_splitTextsList){
+            // if a single type return the first value in the list
+            if(_textValue->type==VT_TEXT){
+                Mvalue* splitValue=(_splitTextsList->_first?_splitTextsList->_first->_value:NULL);
+                FREE_LIST(_splitTextsList,owner); // NOTE although the reference count of splitValue might become 0, it will remove not be removed from the global value list until gc'ed
+                return splitValue;
+            }
+            if(_textValue->type==VT_LIST){ // we'll have to update the index values of the returned list with the index values of the original list (if 'sparse')
+                if(_textValue->value._list->_last){
+                    if(_textValue->value._list->numberOfElements<_textValue->value._list->_last->index){
+                        Mlistelement *textValueListelement=_textValue->value._list->_first,*splitTextValueListelement=_splitTextsList->_first;
+                        while(textValueListelement&&splitTextValueListelement){
+                            splitTextValueListelement->index=textValueListelement->index;
+                            textValueListelement=textValueListelement->_next;
+                            splitTextValueListelement=splitTextValueListelement->_next;
+                        }
+                    }
+                }
+                return _getValueOfList(disowned_list(_splitTextsList,owner));
+            }
+            if(_textValue->type==VT_ARRAY){
+                Marray* _splitTextsArray=owned_array(_getArray("Msplit",_splitTextsList->numberOfElements),owner);
+                if(!_splitTextsArray){outputError("Not enough memory to return the split texts in an array");return _getValueOfList(disowned_list(_splitTextsList,owner));}
+                // move the values in the split text list over to splitTextArray
+                unsigned long long splittextindex=0;
+                Mlistelement* splitTextsListelement=_splitTextsList->_first;
+                Mvalue** splitTextsArrayelement=_splitTextsArray->values;
+                while(splitTextsListelement){
+                    if(++splittextindex>_splitTextsList->numberOfElements)break; // the number of elements in the split texts list is too small (and therefore incorrect!!!)
+                    assignValue(splitTextsArrayelement,splitTextsListelement->_value);
+                    splitTextsListelement=splitTextsListelement->_next;
+                    splitTextsArrayelement++;
+                }
+                if(splitTextsListelement)outputBug("Number of split text list elements incorrect");
+                FREE_LIST(_splitTextsList,owner); // no need for the list anymore after moving its values over to the split text array
+                return _getValueOfArray(disowned_array(_splitTextsArray,owner));
+            }
+        }
+    }
+    return NULL;
+}
 
 // 25OCT2019: get the length of a text with M's tl function
 Mvalue* Mtl(Mvalue* _value){

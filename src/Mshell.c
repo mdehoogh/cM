@@ -12317,10 +12317,13 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the zero, positive and negative functions");
 				return NULL;
 			}
+			// MDH@06JAN2021: adding the split function!!
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sum"),"sum",Msum)
 					||!completedValueIntegerFunction(_getFunction(_Menvironment,owner,"setlength"),"setlength",Msetlen)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"length"),"length",Mlen)){
-				outputError("Failed to register the sum and len list functions");
+					||!completedValueValueValueFunction(_getFunction(_Menvironment,owner,"split"),"split",Msplit)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"length"),"length",Mlen)
+			){
+				outputError("Failed to register the split function and the sum, length and setlength list functions");
 				return NULL;
 			}
 			// MDH@01NOV2019: I have some generic list functions implemented

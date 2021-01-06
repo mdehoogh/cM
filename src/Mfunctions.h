@@ -21,6 +21,7 @@ Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
 
 Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
 Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value);
+Mvalue* Msplit(Mvalue* _value,Mvalue* _separatorValue,Mvalue* _itemwrapperValue); // MDH@06JAN2020: split string(s) by separator(s)
 
 Mvalue* Mfacd(Mvalue* _value); // faculty (for an integer)
 Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)

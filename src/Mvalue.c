@@ -1069,6 +1069,7 @@ Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){return _getThre
 //Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_INTEGER,VT_INTEGER,VT_INTEGER);}/* VALIDATED */
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_UNDEFINED,VT_INTEGER);}/* VALIDATED */
+Mmap* _getValueValueValueMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_UNDEFINED,VT_UNDEFINED);}/* VALIDATED */
 Mmap* _getMapMapListMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_MAP,VT_MAP,VT_LIST);}/* VALIDATED */
 Mmap* _getListFunctionValueMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_FUNCTION,VT_UNDEFINED);}/* VALIDATED */
 

@@ -305,6 +305,7 @@ Mmap* _getListTextMap(char* name1,char* name2);
 
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
+Mmap* _getValueValueValueMap(char* name1,char* name2,char* name3);
 Mmap* _getMapMapListMap(char* name1,char* name2,char* name3);
 Mmap* _getListFunctionValueMap(char* name1,char* name2,char* name3);
 
