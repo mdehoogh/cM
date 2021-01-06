@@ -661,6 +661,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
     if(textcount){
         *textcount=0;
         if(textsValue){
+            outputValue("Extracting text(s) from '",textsValue,"'.\n"); // DEBUGGING
             if(textsValue->type==VT_ARRAY){
                 Marray* textArray=textsValue->value._array;
                 if(textArray){
@@ -675,7 +676,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
                                     textindex--;
                                     Mstring* _valueText=owned_string(_getValueText(textValues[textindex],true),owner);
                                     if(_valueText){
-                                        _texts[textindex]=_strdup(string(_valueText));
+                                        _texts[textindex]=OWNED(_strdup(string(_valueText)),Msubowner(owner,1));
                                         FREE_STRING(_valueText,owner);
                                     }else
                                         _texts[textindex]=NULL;
@@ -705,7 +706,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
                                 if(textindex>=*textcount){outputBug("Number of elements of list incorrect trying to split texts");break;}
                                 Mstring* _valueText=owned_string(_getValueText(listelement->_value,true),owner);
                                 if(_valueText){
-                                    _texts[textindex++]=_strdup(string(_valueText));
+                                    _texts[textindex++]=OWNED(_strdup(string(_valueText)),Msubowner(owner,1));
                                     FREE_STRING(_valueText,owner);
                                 }else
                                     _texts[textindex++]=NULL;
@@ -721,10 +722,11 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
             }else
             if(textsValue->type==VT_TEXT){ // only a single text!
                 if(textsValue->value._text){
-                    _texts=MALLOC(sizeof(char*),1,'c',owner);
+                    _texts=MALLOC_1(sizeof(char*),'c',owner);
                     if(_texts){
                         *textcount=1;
-                        *_texts=_strdup(textsValue->value._text->_c);
+                        output("Duplicating '%s'.\n",textsValue->value._text->_c);
+                        _texts[0]=OWNED(_strdup(textsValue->value._text->_c),Msubowner(owner,1));
                     }else 
                         outputError("Failed to allocate memory for storing the text to split");
                 }else 
@@ -732,13 +734,17 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
             }else 
                 outputError("Cannot split a value that is not a text (or list and array with texts)");
             if(_texts)return DISOWNED(_texts,owner);
+            outputError("Failed to extract text(s)");
         }
     }
     return NULL;
 }
 static void freetexts(char** const texts,unsigned long long textcount,Mallocationowner owner){
     if(!texts)return;
-    for(register unsigned long long textindex=0;textindex<textcount;textindex++)if(texts[textindex])free(texts[textindex]);
+    for(register unsigned long long textindex=0;textindex<textcount;textindex++)if(texts[textindex]){
+        output("Freeing text '%s'.\n",texts[textindex]); // DEBUGGING
+        FREE_DISOWNED(texts[textindex],strlen(texts[textindex])+1,-'"',owner); // the reverse of the allocation by _strdup()
+    }
     FREE_DISOWNED(texts,textcount,'c',owner);
 }
 static Mlist* splits(char** const texts,unsigned long long textcount,char** const separators,unsigned long long separatorcount,char** const itemwrappers,unsigned long long itemwrappercount){Mallocationowner owner=getOwner(__LINE__);
@@ -802,19 +808,31 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
     return NULL;
 }
 Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperValue){Mallocationowner owner=getOwner(__LINE__);
+    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_FUNCTIONS));
     if(_textValue&&_separatorValue){
         Mlist* _splitTextsList=NULL;
-        // let's compose the list of separators, but multiple separators is an issue
-        unsigned long long separatorcount;char** _separators=OWNED(_getTexts(_separatorValue,&separatorcount),owner);
         unsigned long long textcount;char** _texts=OWNED(_getTexts(_textValue,&textcount),owner);
-        if(_texts&&_separators){
-            unsigned long long itemwrappercount;char** _itemwrappers=OWNED(_getTexts(_itemwrapperValue,&itemwrappercount),owner);
-            _splitTextsList=owned_list(splits(_texts,textcount,_separators,separatorcount,_itemwrappers,itemwrappercount),owner);
-
-            freetexts(_itemwrappers,itemwrappercount,owner);
+        if(_texts){
+            // if(report)
+            {
+                output("Splitting texts:\n");
+                for(unsigned long long textindex=0;textindex<textcount;textindex++)output("\t'%s'\n",_texts[textindex]);
+            }
+            // let's compose the list of separators, but multiple separators is an issue
+            unsigned long long separatorcount;char** _separators=OWNED(_getTexts(_separatorValue,&separatorcount),owner);
+            if(_separators){
+                // if(report)
+                {
+                    output("Using separators:\n");
+                    for(unsigned long long separatorindex=0;separatorindex<separatorcount;separatorindex++)output("\t'%s'\n",_separators[separatorindex]);
+                }
+                unsigned long long itemwrappercount;char** _itemwrappers=OWNED(_getTexts(_itemwrapperValue,&itemwrappercount),owner);
+                _splitTextsList=owned_list(splits(_texts,textcount,_separators,separatorcount,_itemwrappers,itemwrappercount),owner);
+                if(_itemwrappers)freetexts(_itemwrappers,itemwrappercount,owner);
+                freetexts(_separators,separatorcount,owner);
+            }
+            freetexts(_texts,textcount,owner);
         }
-        freetexts(_texts,textcount,owner);
-        freetexts(_separators,separatorcount,owner);
         if(_splitTextsList){
             // if a single type return the first value in the list
             if(_textValue->type==VT_TEXT){
