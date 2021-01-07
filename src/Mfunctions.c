@@ -765,6 +765,39 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
                         if(_splitTextList){
                             Mstring* _splitText=owned_string(_getString("'"),owner); // local!!!
                             if(_splitText){
+                                // we can reuse _splitText by setting it's length to 1 every next time
+                                // MDH@07JAN2021: instead of iterating over the text myself I could simply try to detect the next occurrence of any of the separators?
+                                char* textStart=*_text; // initialize the pointer to the start of the text to search for the next separator
+                                char *sepstr,*firstsepstr;
+                                unsigned long long firstseplength;
+                                do{
+                                    firstsepstr=NULL;
+                                    char* *separator=separators; // point to the first separator
+                                    separatorindex=separatorcount;
+                                    while(separatorindex-->0){ // apologizing for doing it this way
+                                        sepstr=strstr(textStart,*separator);
+                                        if(sepstr)if(firstsepstr==NULL||sepstr<firstsepstr){firstsepstr=sepstr;firstseplength=strlen(*separator);} // we need to remember the length of the best separator
+                                        separator++;
+                                    }
+                                    // if one of the separators was found, firstsepstr will point to the first character of that separator, and by zero'ing the character there the split text will be correctly appended
+                                    if(firstsepstr)*firstsepstr='\0'; // replace the first character of the separator by the end of text, so textStart will contain the split text
+                                    if(!string_append(_splitText,textStart)){output("%sFailed to collect split text '%s'.\n",M_ERROR_PREFIX,textStart);break;}
+                                    // ready to append _splitText to the split text list
+                                    Mtext* splitText=owned_text(_getText(string(_splitText)),owner);
+                                    if(splitText){
+                                        Mvalue* splitTextValue=_getValueOfText(disowned_text(splitText,owner));
+                                        if(splitTextValue){
+                                            if(appendedToList(_splitTextList,owner,splitTextValue,M_LL_INVALID)<=0)
+                                                output("%sFailed to add split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+                                        }else
+                                            output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+                                    }else 
+                                        output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+                                    if(!firstsepstr)break;
+                                    string_setlength(_splitText,1); // re-use _splitText!!!
+                                    textStart=firstsepstr+firstseplength; // start looking for the next separator starting at strlen(*separator) further
+                                }while(1);
+                                /* replacing:
                                 char c;
                                 while((c=**_text)){
                                     if(!string_append_char(_splitText,c)){output("%sFailed to collect split character '%c'.\n",M_ERROR_PREFIX,c);break;}
@@ -787,6 +820,7 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
                                         output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
                                 }else 
                                     output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+                                */
                                 FREE_STRING(_splitText,owner); // freed!!!!
                             }else 
                                 output("%sFailed to collect characters from text to split '%s'.",M_ERROR_PREFIX,*_text);
