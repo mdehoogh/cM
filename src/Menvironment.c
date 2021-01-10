@@ -2122,6 +2122,7 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
     if(!completedValueTextValueFunction(_getFunction(_environment,owner_environment,"settype"),"settype",Msettype))return false;
     if(!completedFloatFloatFunction(_getFunction(_environment,owner_environment,"pow"),"pow",Mpow))return false;
 
+    if(!completedFunction(_getFunction(_environment,owner_environment,"break"),"break",Mbreak))return false;
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"return"),"return",Mreturn))return false;
 
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"out"),"out",Mout))return false;

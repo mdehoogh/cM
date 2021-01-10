@@ -1819,7 +1819,8 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
 
 				// MDH@28OCT2020: defining user functions is no longer 'special' in that the body should simply be a list of command texts and tokenized by Mdefinefunction and Manonymousfunction itself
-				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORWITHFUNCTION_NAME))pNewToken->argument=1;
+				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORWITHFUNCTION_NAME))
+					pNewToken->argument=1;
 				/* replacing:
 				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
 				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME)||!strcmp(_functionName,DEFINEANONYMOUSFUNCTION_NAME))pNewToken->argument=1;
@@ -1827,7 +1828,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
 				*/
 				else 
-				pNewToken->argument=-2;
+					pNewToken->argument=-2;
 
 				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
 				if(pNewToken->argument>0){ // a special function call // MDH@09MAR2020: added >0 TODO is that correct?
