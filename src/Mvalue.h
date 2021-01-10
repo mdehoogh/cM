@@ -65,6 +65,8 @@ typedef struct Mvariable{
     size_t referencecount; // MDH@04NOV2019: keep track of all its references
     bool immutable:1; // whether or not mutable
 }Mvariable;
+long long isImmutable(Mvariable* _variable); // MDH@10JAN2020
+long long setImmutable(Mvariable* _variable,bool immutable); // MDH@10JAN2020
 
 typedef struct Mreference{
     Mvariable* variable;

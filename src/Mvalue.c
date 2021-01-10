@@ -27,6 +27,17 @@ extern const long double LD_PI; // for Mfacd()
 extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (default) decimal context
 extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 
+ // MDH@10JAN2020
+long long isImmutable(Mvariable* _variable){
+    return(_variable?(_variable->immutable?M_TRUE:M_FALSE):M_LL_INVALID);
+}
+long long setImmutable(Mvariable* _variable,bool immutable){
+    if(!_variable)return M_LL_INVALID;
+    long long result=(_variable->immutable?M_TRUE:M_FALSE);
+    _variable->immutable=immutable;
+    return result;
+}
+
 Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable){
     if(_variable->_name){
         // output("Disowning variable '%s'.\n",_variable->_name); // DEBUG

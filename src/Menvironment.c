@@ -1976,12 +1976,22 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* _command,Mal
     return false;
 }
 */
-
+// MDH@10JAN2020: there's not much that can go wrong here
+Mvalue* Mbreak(){
+    return _getIntegerValue(setImmutable(getVariable(NULL,"$",false),true));
+}
 Mvalue* Mreturn(Mvalue* _value){
     // sets the value of the function execution result variable to _value
     // if you call return with NO value, the current value of $ will be used (or the value of the last executed function body command)
     // do NOT replace the value of "$" if _value is NULL (which should indicate a return without argument), this means you cannot undo the result value
     // perhaps with $=NULL though
+    // MDH@10JAN2021
+    long long result=M_LL_INVALID;
+    if(setValue(getExecutionEnvironment(),"$",_value)){
+        result=setImmutable(getVariable(NULL,"$",false),true);
+    }
+    return _getIntegerValue(result);
+    /* replacing:
     if(_value!=NULL&&!setValue(getExecutionEnvironment(),"$",_value)){
         outputError("Failed to set the function execution result variable");
         return NULL;
@@ -1992,6 +2002,7 @@ Mvalue* Mreturn(Mvalue* _value){
         return NULL;
     }
     return _value; // echo the input value
+    */
 }/*VALIDATED */
 
 // MDH@23OCT2020: it would be neat if we could even refer to an environment in the name of the variable, 

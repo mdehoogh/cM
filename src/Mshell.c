@@ -299,10 +299,12 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 				outputError("Failed to add the result variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else // also add the function exit flag variable (with name ! which cannot be set in the code because it is an invalid name)
+			/* MDH@10JAN2021: no need to use the ! exit flag variable anymore (now replaced by the immutable flag of the result variable)
 			if(!addVariable(_functionExecutionEnvironment,owner,"!",VT_UNDEFINED,false)){
 				outputError("Failed to add the exit flag variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else // MDH@22OCT2020: fail-through code that will add a list that would normally contain the additional arguments in a function call which we force to be present always this way
+			*/
 			if(!addVariable(_functionExecutionEnvironment,owner,M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME,VT_LIST,false))
 				outputInfo("Failed to add the additional arguments list variable to the function execution environment");
 		}else
@@ -674,9 +676,12 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 			if(_doEnvironment){
 				_doEnvironment->_name=owned_chars(_getChars("do"),Msubowner(owner,1));
 				// let's add variable $ as result variable and ! as exit flag variable
+				// MDH@10JAN2020: ! is replaced by making "$" immutable to indicate being done
 				bool doEnvironmentInitialized=addVariable(_doEnvironment,owner,"$",VT_UNDEFINED,false)
+				/* removing
 												&&addVariable(_doEnvironment,owner,"!",VT_INTEGER,false)
-												&&setValue(_doEnvironment,"!",_getIntegerValue(0));
+												&&setValue(_doEnvironment,"!",_getIntegerValue(0))*/
+												;
 				if(doEnvironmentInitialized){
 					// MDH@21DEC2020 BUG FIX: pushing an environment will wrap it inside a value
 					//                        which should be able to take over membership
@@ -690,7 +695,11 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 								_doEnvironment->expressionToken=tokenExpressionValue->value._token;
 								if(_doEnvironment->expressionToken){
 									expressionValue=getValueOfExpression("do",'d',(TokenType[]){},0); // evaluate the expression
-									if(isValueZero(getValue(_doEnvironment,"!"))!=M_TRUE)break; // if the exit flag was set, exit
+									// if the exit flag was set, exit
+									if(isImmutable(getVariable(NULL,"$",false))==M_TRUE)break;
+									/* replacing:
+									if(isValueZero(getValue(_doEnvironment,"!"))!=M_TRUE)break; 
+									*/
 								}
 							}
 							// move over to the next expression to evaluate...
@@ -800,6 +809,8 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
 							}
+							// MDH@10JAN2021: break if "$" is now immutable
+							if(isImmutable(getVariable(NULL,"$",false))==M_TRUE)break;
 							if(_incrementTokenValue){
 								// evaluate the increment
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
@@ -908,6 +919,12 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 									_result=getValueOfExpression("for loop body",'l',NULL,0);
 									if(report)
 										outputValue("Result so far: '",_result,"'.\n");
+									/* OOPS this (new) for function does NOT run in it's own environment
+									   one would need to wrap the for function call in a with (or do)
+									// NOTE only the evaluation of the loop token can change the immutability of the result variable
+									// MDH@10JAN2021: break if "$" is now immutable
+									if(isImmutable(getVariable(NULL,"$",false))==M_TRUE)break;
+									*/
 								}
 							}
 							loopTokenlistelement=loopTokenlistelement->_next;
@@ -3620,7 +3637,11 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 								// evaluate the body command and remember the result
 								functionBodyCommandValue=getValueOfExpression("function body command evaluation",'f',(TokenType[]){},0);
 								// MDH@24JUL2019: check the function exit flag variable if it is set we're done
+								// MDH@10JAN2021
+								if(isImmutable(getVariable(NULL,"$",false))==M_TRUE)break; 
+								/* replacing:
 								if(getValue(_functionExecutionEnvironment,"!"))break; // the exit variable is set (by the return statement!!!!)
+								*/
 								functionEvaluationValue=functionBodyCommandValue; // store command evaluation result as function result
 								if(!setVariable(_functionExecutionEnvironment,"",functionEvaluationValue))
 									outputError("Failed to store the function command execution value");

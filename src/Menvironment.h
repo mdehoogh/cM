@@ -136,6 +136,7 @@ bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const
 
 //                the return function returns its value as result of the function it is executing
 Mvalue* Mreturn(Mvalue* _value);
+Mvalue* Mbreak();
 
 // MDH@23OCT2020: a get and set function might come in handy
 Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value);

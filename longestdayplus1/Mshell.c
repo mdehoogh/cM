@@ -665,6 +665,8 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
 							}
+							// MDH@10JAN2021: break if "$" is now immutable
+							if(isImmutable(getVariable(NULL,"$",false))==M_TRUE)break;
 							if(_incrementTokenValue){
 								// evaluate the increment
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
