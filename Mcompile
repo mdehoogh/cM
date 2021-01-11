@@ -83,8 +83,8 @@ if [ -f M ]; then
     fi
     # copy M one directory up
     if [ -f ../M ]; then
-        rm ../M
-        echo "Previous M removed..."
+        mv -f ../M ../Mprev
+        echo "Previous M copied to Mprev..."
     fi
     cp M ..
     cd ..

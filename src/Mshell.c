@@ -1002,16 +1002,16 @@ bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierE
 	bool found=false;
 	size_t l=strlen(identifierName);
 	Mtoken* commandIdentifier=command->_lastToken->prevIdentifier;
-	char *match,*commandIdentifierName;
 	uint64_t commandIdentifierEnvironmentId,commandIdentifierEnvironmentLevels,ander=(1<<M_BITS_PER_ENV_LEVEL)-1;
 	while(!found&&commandIdentifier){
 		// if a function call or end of function call identifier, no need to check!!
 		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){ // a (new) variable
-			commandIdentifierName=string(commandIdentifier->text); // I have to do this to get the closing '\0' placed!!!
-			if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
-				// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
-				match=strstr(commandIdentifierName,identifierName);
-				if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){ // the names match
+			// MDH@11JAN2021: the commandIdentifier can now also be a map property, but only in calls to do() and forw() and I guess function()
+			// MDH@11JAN2021: by using string_replacedchar() the length of the command identifier won't change, but string(commandIdentifier) will still bump into this '\0' if it is in front of the original '\0'
+			//                the length of commandIdentifier (which is stored in Mstring so does not need to be computed!!!!) needs to be at least equal to that of the length of identifierName!!
+			if(commandIdentifier->significantCharacterCount==l){ // the command identifier has the same number of significant characters as identifierName!!
+				char* commandIdentifierName=string(commandIdentifier->text);
+				if(strncmp(commandIdentifierName,identifierName,l)==0){ // the non-whitespace matches
 					if(commandIdentifier->argument==1){ // the identifier is local to one of the special function calls (which is present in `do`, `for` and `function` function calls)
 						// we can't tell for sure that this local identifier is in the same special function call unless `expr` field matches imagine the situation where multiple do's are in the same command following each other
 						// the local variables in the first are not local to the second do call it's all about scope meaning we have to mark the end of a scope as well so we know which identifiers to skip i.e. those identifiers local to another special function call
@@ -1044,8 +1044,8 @@ bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierE
 						*/
 					}else
 						found=true;
-				} // TODO will blank always be the only possible whitespace character????? 
-			}
+				}
+			} // TODO will blank always be the only possible whitespace character????? 
 		}
 		// get the next identifier
 		commandIdentifier=commandIdentifier->prevIdentifier;
@@ -1722,6 +1722,61 @@ void free_command(Mcommand* _command){
 	FREE_1(_command,'K');
 }
 
+// MDH@11JAN2021: if we want to recognize local variables in do, for with, and function commands, we will need to be able to remember the map properties of the first argument to these function calls
+//                given that such a variable should be active as soon as the value has been entered (i.e. on the comma following it), there will be one active at any time depending on the envid
+typedef struct Mlocalvariable{
+	char* _name;
+	uint64_t envid;
+	struct Mlocalvariable* _prev;
+}Mlocalvariable;
+Mlocalvariable *_lastlocalvariable=NULL;Mallocationowner owner_localvariables=(Mallocationowner){MI_SHELL,__LINE__,1};
+static bool push_localvariable(char* name,uint64_t envid){
+	if(!name)return false;
+	Mlocalvariable* _localvariable=CALLOC_1(sizeof(Mlocalvariable),'L',owner_localvariables);
+	if(!_localvariable){output("%sFailed to create local variable '%s'.\n",M_ERROR_PREFIX,name);return false;}
+	_localvariable->_name=OWNED(_strdup(name),Msubowner(owner_localvariables,1));
+	if(!_localvariable->_name){output("%sFailed to store local variable '%s'.n",M_ERROR_PREFIX,name);FREE_DISOWNED_1(_localvariable,'L',owner_localvariables);return false;}
+	_localvariable->envid=envid;
+	_localvariable->_prev=_lastlocalvariable;
+	_lastlocalvariable=_localvariable;
+	return true;
+}
+static void free_localvariable(Mlocalvariable* _localvariable){
+	if(!_localvariable)return;
+	if(_localvariable->_prev)free_localvariable(_localvariable->_prev);
+	if(_localvariable->_name)FREE_DISOWNED(_localvariable->_name,strlen(_localvariable->_name)+1,-'"',owner_localvariables);
+	FREE_DISOWNED_1(_localvariable,'L',owner_localvariables);
+}
+static void initialize_localvariables(){
+	if(_lastlocalvariable){free_localvariable(_lastlocalvariable);_lastlocalvariable=NULL;}
+}
+// pop the local variables at the end of the special function call
+static size_t pop_localvariables(uint64_t envid){
+	size_t popped=0;
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
+	Mlocalvariable *prevlocalvariable,*localvariable=_lastlocalvariable;
+	while(localvariable){
+		if(localvariable->envid!=envid)break;
+		prevlocalvariable=localvariable->_prev; // remember the predecessor (to check next)
+		// free all of localvariable (first the name then itself)
+		if(localvariable->_name){
+			if(report)
+				output("Releasing local variable '%s'.\n",localvariable->_name);
+			FREE_DISOWNED(localvariable->_name,strlen(localvariable->_name)+1,-'"',owner_localvariables);
+		}
+		FREE_DISOWNED_1(localvariable,'L',owner_localvariables);
+		popped++;
+		localvariable=prevlocalvariable;
+	}
+	_lastlocalvariable=localvariable;
+	return popped;
+}
+static bool existsInFunctionCall(char* identifierName,uint64_t envid){
+	Mlocalvariable* localvariable=_lastlocalvariable;
+	while(localvariable&&(strcmp(identifierName,localvariable->_name)&&localvariable->envid!=envid))localvariable=localvariable->_prev;
+	return(localvariable!=NULL);
+}
+
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
 //                therefore it is best to set the last token type using a separate function
 // MDH@03OCT2019: every time the token type changes we need to sync the immediate feed forward text as well!!!!
@@ -1848,7 +1903,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			}else{ // not a function identifier	
 				/////if(amDebugging())inputInfo("E4");		
 				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE&&prevToken->type!=TT_END_OF_FUNCTION_CALL) // not behind a variable identifier or end of function call
-					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);	
+					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);
 					pNewToken->prevIdentifier=prevToken->prevIdentifier;
 				else // behind a variable identifier or end of function call
 					pNewToken->prevIdentifier=prevToken;
@@ -1898,6 +1953,29 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				}
 				/////if(amDebugging())inputInfo("E7");
 			}
+			// MDH@11JAN2021: at every colon that defines the value of a local variable (to a do(), forw() or function() call, we remember the name of the property and register it when we encounter a comma)
+			if(newTokenType==TT_MAP_VALUE){
+				if(pNewToken->argument==1){
+					if(inputInfoFunction)(*inputInfoFunction)("Property value token in first special function argument!\n");
+					// the property name can be a literal or the name of a variable, of which we know the current value (essentially not something that currently exists in the command, because then we could not evaluate its value!!)
+					if(prevToken->type==TT_END_OF_SQSTRING||prevToken->type==TT_END_OF_DQSTRING){
+						if(prevToken->prev){
+							// register the actual name (without the quote that prefixes the property name)
+							bool localvariablepushed=push_localvariable(string(prevToken->prev->text)+1,pNewToken->envid);
+							if(inputInfoFunction){
+								if(localvariablepushed)
+									(*inputInfoFunction)("Local variable '%s' registered.\n",_lastlocalvariable->_name);
+								else
+									(*inputInfoFunction)("%sFailed to register property name '%s'.\n",M_ERROR_PREFIX,string(prevToken->prev->text)+1);
+							}
+						}
+					}else
+					if(prevToken->type==TT_VARIABLE){
+					}
+				}else{
+					if(inputInfoFunction)(*inputInfoFunction)("Property value token!\n");
+				}
+			}
 		}
 		/////if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
@@ -1907,7 +1985,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			pNewToken->type=TT_ERROR; 
 			if(inputErrorFunction)(*inputErrorFunction)("Failed to initialize the new token.");
 		}
-		if(amDebugging())inputInfo("New token text initialized."); // TODOhow about 
+		if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New token text initialized."); // TODOhow about 
 		/////if(amDebugging())inputInfo("E9");
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
@@ -12082,6 +12160,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(!_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
 	if(!_outputCommandInfoFunction)outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
 
+	if(!inputInfoFunction)outputWarning("No input info function!");
+	if(!inputErrorFunction)outputWarning("No input error function!");
+	if(!inputCharReadFunction)outputWarning("No input char read function!");
+	if(!outputTokenFunction)outputWarning("No output token function!");
+	if(!reoutputTokenFunction)outputWarning("No reoutput token function!");
+	if(!updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");
+	if(!outputCommandInfoFunction)outputWarning("No output command info function!");
+	
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return NULL; // let's force starting with a default decimal context
 	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
