@@ -1113,6 +1113,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	Mtoken* functionToken=command->_lastToken;
 	char* _identifierName=_getSignificantTokenCharacters(functionToken); // same as: =_stringstart(functionToken->text,getTokenSignificantCharacterCount(functionToken)); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
+	// MDH@11JAN2020 TODO: this isn't true per se, because we now allow using local variables immediately after initializing them 
 	if(functionToken->argument==1)
 		functionToken->type=TT_NEW_VARIABLE;
 	else
@@ -1724,6 +1725,7 @@ void free_command(Mcommand* _command){
 
 // MDH@11JAN2021: if we want to recognize local variables in do, for with, and function commands, we will need to be able to remember the map properties of the first argument to these function calls
 //                given that such a variable should be active as soon as the value has been entered (i.e. on the comma following it), there will be one active at any time depending on the envid
+// MDH@14JAN2021 NOTE: essentially the property names of a local variable map (first argument in do's and forwith's)
 typedef struct Mlocalvariable{
 	char* _name;
 	uint64_t envid;
@@ -1733,9 +1735,9 @@ Mlocalvariable *_lastlocalvariable=NULL;Mallocationowner owner_localvariables=(M
 static bool push_localvariable(char* name,uint64_t envid){
 	if(!name)return false;
 	Mlocalvariable* _localvariable=CALLOC_1(sizeof(Mlocalvariable),'L',owner_localvariables);
-	if(!_localvariable){output("%sFailed to create local variable '%s'.\n",M_ERROR_PREFIX,name);return false;}
+	if(!_localvariable){if(inputInfoFunction)(*inputInfoFunction)("%sFailed to create local variable '%s'.\n",M_ERROR_PREFIX,name);return false;}
 	_localvariable->_name=OWNED(_strdup(name),Msubowner(owner_localvariables,1));
-	if(!_localvariable->_name){output("%sFailed to store local variable '%s'.n",M_ERROR_PREFIX,name);FREE_DISOWNED_1(_localvariable,'L',owner_localvariables);return false;}
+	if(!_localvariable->_name){if(inputInfoFunction)(*inputInfoFunction)("%sFailed to store local variable '%s'.n",M_ERROR_PREFIX,name);FREE_DISOWNED_1(_localvariable,'L',owner_localvariables);return false;}
 	_localvariable->envid=envid;
 	_localvariable->_prev=_lastlocalvariable;
 	_lastlocalvariable=_localvariable;
@@ -1932,14 +1934,14 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 							//                there's different behaviour for the different arguments
 							if(pNewToken->expr->argument>0){
 								pNewToken->argument=pNewToken->argument-1;
-								if(amDebugging())inputInfo("New function call argument!");
+								if(amVerboseDebugging())inputInfo("New function call argument!");
 								// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
 								//                what we would do on ) 
 								if(pNewToken->argument==0){
 
 								}
 							}else
-							if(amDebugging())
+							if(amVerboseDebugging())
 								inputInfo("Non-local variable function call argument");
 						}else
 						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP){
@@ -1955,26 +1957,53 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			}
 			// MDH@11JAN2021: at every colon that defines the value of a local variable (to a do(), forw() or function() call, we remember the name of the property and register it when we encounter a comma)
 			if(newTokenType==TT_MAP_VALUE){
+				// outputChar('A');
 				if(pNewToken->argument==1){
+					outputChar('A');
 					if(inputInfoFunction)(*inputInfoFunction)("Property value token in first special function argument!\n");
 					// the property name can be a literal or the name of a variable, of which we know the current value (essentially not something that currently exists in the command, because then we could not evaluate its value!!)
 					if(prevToken->type==TT_END_OF_SQSTRING||prevToken->type==TT_END_OF_DQSTRING){
+						outputChar('C');
 						if(prevToken->prev){
+							outputChar('E');
 							// register the actual name (without the quote that prefixes the property name)
 							bool localvariablepushed=push_localvariable(string(prevToken->prev->text)+1,pNewToken->envid);
-							if(inputInfoFunction){
-								if(localvariablepushed)
-									(*inputInfoFunction)("Local variable '%s' registered.\n",_lastlocalvariable->_name);
-								else
-									(*inputInfoFunction)("%sFailed to register property name '%s'.\n",M_ERROR_PREFIX,string(prevToken->prev->text)+1);
-							}
+							if(localvariablepushed){
+								outputChar('G');
+								if(inputInfoFunction)(*inputInfoFunction)("Local variable '%s' registered.\n",_lastlocalvariable->_name);
+							}else
+							if(inputInfoFunction)(*inputInfoFunction)("%sFailed to register property name '%s'.\n",M_ERROR_PREFIX,string(prevToken->prev->text)+1);
 						}
 					}else
 					if(prevToken->type==TT_VARIABLE){
+						outputChar('B');
+						char* _variableName=_getSignificantTokenCharacters(prevToken);
+						if(_variableName){
+							outputChar('D');
+							// if we're able to resolve this variable to a text we can push it as a text
+							Mvariable* variable=getVariable(getExecutionEnvironment(),_variableName,false);
+							if(variable){
+								outputChar('F');
+								Mstring* _valueText=owned_string(_getValueText(variable->_value,true),owner);
+								if(_valueText){
+									outputChar('H');
+									bool localvariablepushed=push_localvariable(string(_valueText),pNewToken->envid);
+									if(localvariablepushed){
+										outputChar('J');
+										if(inputInfoFunction)(*inputInfoFunction)("Local variable '%s' registered.\n",_lastlocalvariable->_name);
+									}else
+									if(inputInfoFunction)(*inputInfoFunction)("%sFailed to register property name '%s'.\n",M_ERROR_PREFIX,string(_valueText));
+									FREE_STRING(_valueText,owner);
+								}else
+								if(inputInfoFunction)(*inputInfoFunction)("%sUnable to determine the text variable '%s' represents.\n",M_ERROR_PREFIX,_variableName);
+							}else
+							if(inputInfoFunction)(*inputInfoFunction)("%sUnknown variable name '%s'.\n",M_ERROR_PREFIX,_variableName);
+							free(_variableName); // unfortunately not managed so only usable for local stuff
+						}else
+						if(inputInfoFunction)(*inputInfoFunction)("%sNo variable name.\n",M_ERROR_PREFIX);
 					}
-				}else{
-					if(inputInfoFunction)(*inputInfoFunction)("Property value token!\n");
-				}
+				}else
+				if(inputInfoFunction)(*inputInfoFunction)("Property value token!\n");
 			}
 		}
 		/////if(amDebugging())inputInfo("E8");
@@ -12167,7 +12196,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(!reoutputTokenFunction)outputWarning("No reoutput token function!");
 	if(!updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");
 	if(!outputCommandInfoFunction)outputWarning("No output command info function!");
-	
+
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return NULL; // let's force starting with a default decimal context
 	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);

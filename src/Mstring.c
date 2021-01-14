@@ -368,6 +368,7 @@ char* _stringstart(const Mstring* const str,size_t length){
     // MDH@17APR2020 inserting ->_chars
     str->_chars->chars[str->length]='\0'; // mark the end of the string
     char* _result=strdup(str->_chars->chars); // create a copy of the entire string // MDH@02MAY2020 TODO should we return an Mchars* instead???????
+    // MDH@14JAN2021: can't actually do this because in that case we wouldn't know how many characters to free??????? yes we can do that but it's unmanaged so you simply need to call free() on the returned pointer!!!!
     if(_result)if(length>0&&length<str->length)_result[length]='\0'; // 'cut off' the part we don't want!!
     return _result;
 }
