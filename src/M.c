@@ -55,7 +55,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.5"; // MDH@05DEC2020: this is were Mexpression is renamed to Mtoken
-char const * const M_BUILD="8";char const * const M_DATE="25 February 2021"; // updating while(), for(), introducing with(), end(), fixing setValue (Menvironment module)
+char const * const M_BUILD="9";char const * const M_DATE="25 February 2021"; // using getSubcommandValue() on the first do and for function arguments which should evaluate to a map containing the local variables to use in the remaining arguments
+//char const * const M_BUILD="8";char const * const M_DATE="24 February 2021"; // 
 //char const * const M_BUILD="7";char const * const M_DATE="28 December 2020"; // updating while(), for(), introducing with(), end(), fixing setValue (Menvironment module)
 //char const * const M_BUILD="6";char const * const M_DATE="23 December 2020"; // updating while(), for(), introducing with(), end(), fixing setValue (Menvironment module)
 //char const * const M_BUILD="5";char const * const M_DATE="15 December 2020"; // adding a VT_DATE for handling dates (see Mdate.c/h)

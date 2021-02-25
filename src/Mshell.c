@@ -379,28 +379,10 @@ static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
 	// MDH@30APR2019: let's delegate to FREE_TOKEN()
 	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;FREE_TOKEN(_token,owner_token);}return _prevToken;
 }
-// keep track of the state of entering a command
-// MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
-// MDH@28FEB2020: we NO longer NULL Mcommand* (we can't because that would require Mcommand**) BUT that would only be required 
-//                I suppose this also means that we do not need to return true or false anymore, any caller can check for a last token itself (i.e. an empty command!!!!)
-//                now returning the new last command token
-Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command){
-	// NOTE we can still remove the pointer although you cannot use it anymore (except for testing) because free_token would have released the associated memory!!!
-	if(command&&command->_lastToken){
-		command->_lastToken=freeToken(command->_lastToken,Msubowner(owner_command,1)); // MDH@28FEB2020: used to be removeLastUserInputCommandToken
-		if(command->_lastToken)command->_lastToken->next=NULL;
-		else command->_firstToken=NULL; // MDH@20FEB2020 ADDITION: it makes sense to NULL _firstToken if _lastToken is NULL
-	}
-	return(command?command->_lastToken:NULL);
-}
 
-int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report){
-
-	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return 0;}
-
-	Mtoken* lastCommandToken=command->_lastToken;
-	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
+// MDH@25FEB2021: a helper function that can be called both for testing the validity of a command or a part of a command given the first and last token
+//                taken as is from the original isValidCommandIndicator() (see below)
+int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType* expressionTypesToIgnore,bool report){
 
 	if(!lastCommandToken){if(report)outputError("Empty command");return 0;}
 	
@@ -440,6 +422,14 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 		if(amVerbose())
 			if(report)
 				output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
+		TokenType expressionTypeToIgnore=TT_EXPRESSION;
+		if(expressionTypesToIgnore){
+			int expressionTypeToIgnoreIndex=0;
+			while(expressionTypesToIgnore[expressionTypeToIgnoreIndex]!=expressionToken->type&&expressionTypesToIgnore[expressionTypeToIgnoreIndex]!=TT_EXPRESSION)expressionTypeToIgnoreIndex++;
+			expressionTypeToIgnore=expressionTypesToIgnore[expressionTypeToIgnoreIndex];
+		}
+		// if we're not supposed to ignore this expression type, check it
+		if(expressionTypeToIgnore==TT_EXPRESSION)
 		switch(expressionToken->type){
 			case TT_LIST:{if(report)outputError("Missing end of list");return -3;}
 			case TT_FUNCTION_CALL:{if(report)outputError("Missing end of function call");return -4;}
@@ -482,7 +472,29 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return -12;}
 	
 	return 1;
+}
 
+// keep track of the state of entering a command
+// MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
+// MDH@28FEB2020: we NO longer NULL Mcommand* (we can't because that would require Mcommand**) BUT that would only be required 
+//                I suppose this also means that we do not need to return true or false anymore, any caller can check for a last token itself (i.e. an empty command!!!!)
+//                now returning the new last command token
+Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command){
+	// NOTE we can still remove the pointer although you cannot use it anymore (except for testing) because free_token would have released the associated memory!!!
+	if(command&&command->_lastToken){
+		command->_lastToken=freeToken(command->_lastToken,Msubowner(owner_command,1)); // MDH@28FEB2020: used to be removeLastUserInputCommandToken
+		if(command->_lastToken)command->_lastToken->next=NULL;
+		else command->_firstToken=NULL; // MDH@20FEB2020 ADDITION: it makes sense to NULL _firstToken if _lastToken is NULL
+	}
+	return(command?command->_lastToken:NULL);
+}
+int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report){
+	// 1. if no command nothing evaluated TODO don't call when this is the case though
+	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return 0;}
+	Mtoken* lastCommandToken=command->_lastToken;
+	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
+	// MDH@25FEB2021: inspecting the last command token now delegated to isAValidLastCommandTokenIndicator()!
+	return isAValidLastCommandTokenIndicator(lastCommandToken,NULL,report);
 }
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
 Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char commandType){
@@ -1588,6 +1600,48 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 
 }
 
+// MDH@25FEB2021: how about allowing the evaluation of a part of a subcommand (in its own evaluation environment), called by Mevalfunction() as well as the tokenizer for evaluating special function call arguments (that initialize local variables)
+static Mstring* getSubcommandText(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,Mstring const * const defaultSubcommandText){
+	if(defaultSubcommandText)return defaultSubcommandText;
+	Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _subcommandText=owned_string(_getString(string(firstSubcommandToken->text)),owner);
+	if(!_subcommandText)return NULL;
+	Mtoken* subcommandToken=firstSubcommandToken->next;
+	while(subcommandToken){
+		if(!string_append(_subcommandText,string(subcommandToken->text)))break; // failure
+		if(subcommandToken==lastSubcommandToken)break;
+		subcommandToken=subcommandToken->next;
+	}
+	return disowned_string(_subcommandText,owner);
+}
+Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,int* expressionTypesToIgnore,Mstring const * const commandText,char* source){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _subcommandValue=NULL;
+	if(firstSubcommandToken&&lastSubcommandToken){
+		Mstring* _commandText=NULL;
+		Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
+		if(_evalEnvironment){
+			_evalEnvironment->_name=owned_chars(_getChars(source),Msubowner(owner,1));
+			if(pushExecutionEnvironment(disowned_environment(_evalEnvironment,owner))){
+				// similar to getCommandValue() except starting at the given token instead (and without the verbose output)
+				int8_t aValidSubcommandIndicator=isAValidLastCommandTokenIndicator(lastSubcommandToken,expressionTypesToIgnore,false); // TODO we might need to make command immutable because I suppose we do not want it to be changed
+				if(aValidSubcommandIndicator>0){ // a valid command
+					_evalEnvironment->expressionToken=firstSubcommandToken; // prepare the current environment for executing the command
+					_subcommandValue=getValueOfExpression(source,'e',(TokenType[]){},0); // NOTE could've used getExecutionEnvironment()->_name->chars but we know it would be eval!!
+				}else
+					output("%sSubcommand '%s' invalid (error indicator code %i)!\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)),aValidSubcommandIndicator);
+				// replacing: _subcommandValue=getCommandValue(_evalCommand,owner,'e');
+				popExecutionEnvironment(); // pop the eval environment we successfully pushed
+			}else{
+				free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
+				output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
+			}
+		}else
+			output("%sFailed to evaluate '%s'.\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
+		if(!commandText&&_commandText)free_string(_commandText);
+	}
+	return _subcommandValue;
+}
+
 // MDH@25OCT2020: tokenization consist of converting a text to a command so an immutable commandText is provided to be converted into a command
 //                NOTE that the text is tokenized within the current execution environment whatever that may be at this moment
 Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOwner(__LINE__);
@@ -1633,6 +1687,9 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		///*
 		Mcommand* _evalCommand=owned_command(_getTextCommand(string(_evalValueText)),owner);
 		if(_evalCommand){
+			// MDH@25FEB2021: delegate to getSubcommandValue, which accepts a first and last command token, and the command text (TODO which we could make it construct itself)
+			_evalValue=getSubcommandValue(_evalCommand->_firstToken->next,_evalCommand->_lastToken,NULL,_evalValueText,"eval");
+			/* replacing (and embedded (somewhat adapted) now in getSubcommandValue):
 			if(_evalCommand->_lastToken){
 				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
 				if(_evalEnvironment){
@@ -1647,6 +1704,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				}else
 					output("%sFailed to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}
+			*/
 			FREE_COMMAND(_evalCommand,owner);
 		}
 		//*/
@@ -1938,7 +1996,9 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 								// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
 								//                what we would do on ) 
 								if(pNewToken->argument==0){
-
+									// MDH@25FEB2021:  we can now evaluate the command from the first token in the first argument to this special function representing the local variable map of this special function
+									Mvalue* localVariablesMapValue=getSubcommandValue(pNewToken->expr->next,prevToken,(TokenType[]){TT_FUNCTION_CALL,TT_EXPRESSION},NULL,"local variables");
+									outputValue("Local variables map:",localVariablesMapValue,"'.\n");
 								}
 							}else
 							if(amVerboseDebugging())
