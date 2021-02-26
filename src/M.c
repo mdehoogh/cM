@@ -3089,7 +3089,8 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
 		int8_t variableExistsIndicator=0; // assuming invalid
 		if(lastCommandToken->argument!=1){
-			if(!existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid)){
+			// MDH@25FEB2021: A HA I was looking for this!!!
+			if(!existsAsLocalVariable(_identifierName,lastCommandToken->envid)&&!existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid)){
 				// MDH@12MAR2020: if containsVariable() returns -2 this only happens with a property reference that is invalid in which case the token should be considered an error
 				//                I suppose we should then change the token type to TT_ERROR in which case the type won't change from NEW_VARIABLE to VARIABLE or vice versa
 				variableExistsIndicator=containsVariable(NULL,_identifierName,-1);

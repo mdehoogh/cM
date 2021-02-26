@@ -249,7 +249,8 @@ bool registerVariables(Menvironment * environment,Mallocationowner owner_environ
 						output("%sFailed to initialize local variable '%s'.\n",M_ERROR_PREFIX,variableName);
 						return false;
 					}
-					output("'%s' registered!\n",variableName);
+					if(amVerboseDebugging())
+						output("'%s' registered!\n",variableName);
 				// }
 			}
 		}
@@ -712,7 +713,8 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 						// evaluate the first argument inside the do environment (we have to because we're executing the command in the current environment as well)
 						Mlistelement* tokenValueListelement=doList->_first;
 						Mvalue* expressionValue;
-						outputValue("First do function call argument: '",tokenValueListelement->_value,"'.\n");
+						if(amVerboseDebugging())
+							outputValue("First do function call argument: '",tokenValueListelement->_value,"'.\n");
 						Mvalue *tokenExpressionValue=tokenValueListelement->_value;
 						if(tokenExpressionValue){
 							expressionValue=NULL;
@@ -1198,8 +1200,10 @@ static size_t popLocalvariables(uint64_t envid){
 	_lastLocalvariables=localvariables;
 	return popped;
 }
-static bool existsAsLocalVariable(char* identifierName,uint64_t envid){
-	// if(!_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
+// TODO might become local again
+bool existsAsLocalVariable(char* identifierName,uint64_t envid){
+	// if(inputInfoFunction)(*inputInfoFunction)("Checking the existence of '%s' in environment '%llu'.\n",identifierName,envid);
+	if(!_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
 	Mlocalvariables* localvariables=_lastLocalvariables;
 	while(localvariables&&!isMapProperty(localvariables->mapValue->value._map,identifierName))localvariables=localvariables->_prev;
 	return(localvariables!=NULL);
@@ -1211,9 +1215,11 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	char* _identifierName=_getSignificantTokenCharacters(functionToken); // same as: =_stringstart(functionToken->text,getTokenSignificantCharacterCount(functionToken)); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
 	// MDH@11JAN2020 TODO: this isn't true per se, because we now allow using local variables immediately after initializing them 
+	/* MDH@25FEB2021 TODO not needed anymore??????
 	if(functionToken->argument==1)
 		functionToken->type=TT_NEW_VARIABLE;
 	else
+	*/
 	if(existsAsLocalVariable(_identifierName,functionToken->envid)||existsInCommand(command,_identifierName,functionToken->envid))
 		functionToken->type=TT_VARIABLE;
 	else{
@@ -1221,8 +1227,10 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 		if(variableExistsIndicator>0) // MDH@11MAR2020: containsVariable() now returns -2 (no name or environment), 0 means it is a function variable, 1 means a value variable but existing nevertheless
 			functionToken->type=TT_VARIABLE;
 		else
-		if(variableExistsIndicator<0)
+		if(variableExistsIndicator<0){
 			functionToken->type=TT_NEW_VARIABLE;
+			outputChar('*');
+		}
 		else // TODO what more can we do????
 			output("%sInvalid identifier name '%s'.",M_BUG_PREFIX,_identifierName);
 	}
@@ -5271,7 +5279,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					FREE_STRING(_environmentName,owner);
 					break; // NO retrieves the undefined value subsequently!!
 				}
-				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
+				if(amVerboseDebugging())
+					if(expressionToken->argument!=1&&expressionToken->envid)
+						output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
 				// MDH@25MAR2020 allow indexing of new variables as well!!!! removing: if(expressionToken->type==TT_VARIABLE)
 				canbeindexedtheoretically=true;
