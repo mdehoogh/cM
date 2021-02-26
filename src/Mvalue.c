@@ -2481,6 +2481,18 @@ long long isValueNull(Mvalue* value){
 long long isArrayUndefined(Marray* array){return(array?M_FALSE:M_TRUE);}
 long long isListUndefined(Mlist* list){return(list?M_FALSE:M_TRUE);}
 long long isMapUndefined(Mmap* map){return(map?M_FALSE:M_TRUE);}
+// MDH@25FEB2021
+bool isMapProperty(Mmap* map,char* propertyName){
+    if(map&&propertyName){
+        Mmapelement* mapelement=map->_first;
+        while(mapelement){
+            if(!strcmp(mapelement->_variable->_name->chars,propertyName))return true; // found
+            mapelement=mapelement->_next;
+        }
+    }
+    return false;
+}
+
 // MDH@18JUL2019: we consider certain non-null values as undefined, this is to fill the gap between non-null values that represent missings
 //                TODO is a map or list undefined when empty???????
 long long isValueUndefined(Mvalue* value){

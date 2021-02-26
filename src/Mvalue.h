@@ -209,7 +209,7 @@ Mmap* _getStringStringMap(char* name1,char* name2);
 Mmap* _getFloatFloatMap(char* name1,char* name2);
 Mlist* _getMapAttributes(Mmap const * const _map);
 long long isMapUndefined(Mmap* map);
-
+bool isMapProperty(Mmap* map,char* propertyName); // MDH@25FEB2021: check if a property exists in a map!
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
 
 typedef struct Mexpressionlistelement{

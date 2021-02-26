@@ -382,7 +382,7 @@ static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
 
 // MDH@25FEB2021: a helper function that can be called both for testing the validity of a command or a part of a command given the first and last token
 //                taken as is from the original isValidCommandIndicator() (see below)
-int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType* expressionTypesToIgnore,bool report){
+int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
 
 	if(!lastCommandToken){if(report)outputError("Empty command");return 0;}
 	
@@ -422,14 +422,16 @@ int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,T
 		if(amVerbose())
 			if(report)
 				output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
+		/*
 		TokenType expressionTypeToIgnore=TT_EXPRESSION;
 		if(expressionTypesToIgnore){
 			int expressionTypeToIgnoreIndex=0;
 			while(expressionTypesToIgnore[expressionTypeToIgnoreIndex]!=expressionToken->type&&expressionTypesToIgnore[expressionTypeToIgnoreIndex]!=TT_EXPRESSION)expressionTypeToIgnoreIndex++;
 			expressionTypeToIgnore=expressionTypesToIgnore[expressionTypeToIgnoreIndex];
 		}
+		*/
 		// if we're not supposed to ignore this expression type, check it
-		if(expressionTypeToIgnore==TT_EXPRESSION)
+		if(expressionToken->type!=expressionTokenTypeToIgnore)
 		switch(expressionToken->type){
 			case TT_LIST:{if(report)outputError("Missing end of list");return -3;}
 			case TT_FUNCTION_CALL:{if(report)outputError("Missing end of function call");return -4;}
@@ -494,7 +496,7 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 	Mtoken* lastCommandToken=command->_lastToken;
 	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
 	// MDH@25FEB2021: inspecting the last command token now delegated to isAValidLastCommandTokenIndicator()!
-	return isAValidLastCommandTokenIndicator(lastCommandToken,NULL,report);
+	return isAValidLastCommandTokenIndicator(lastCommandToken,TT_EXPRESSION,report);
 }
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
 Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char commandType){
@@ -1614,26 +1616,30 @@ static Mstring* getSubcommandText(Mtoken const * const firstSubcommandToken,Mtok
 	}
 	return disowned_string(_subcommandText,owner);
 }
-Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,int* expressionTypesToIgnore,Mstring const * const commandText,char* source){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,TokenType expressionTypeToIgnore,TokenType endTokenTypes[],uint8_t endTokenTypeCount,Mstring const * const commandText,char* source){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _subcommandValue=NULL;
 	if(firstSubcommandToken&&lastSubcommandToken){
 		Mstring* _commandText=NULL;
+		if(amVerboseDebugging()){
+			_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText);
+			output("Evaluating subcommand '%s'.\n",string(_commandText));
+		}
 		Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
 		if(_evalEnvironment){
 			_evalEnvironment->_name=owned_chars(_getChars(source),Msubowner(owner,1));
 			if(pushExecutionEnvironment(disowned_environment(_evalEnvironment,owner))){
 				// similar to getCommandValue() except starting at the given token instead (and without the verbose output)
-				int8_t aValidSubcommandIndicator=isAValidLastCommandTokenIndicator(lastSubcommandToken,expressionTypesToIgnore,false); // TODO we might need to make command immutable because I suppose we do not want it to be changed
+				int8_t aValidSubcommandIndicator=isAValidLastCommandTokenIndicator(lastSubcommandToken,expressionTypeToIgnore,false); // TODO we might need to make command immutable because I suppose we do not want it to be changed
 				if(aValidSubcommandIndicator>0){ // a valid command
 					_evalEnvironment->expressionToken=firstSubcommandToken; // prepare the current environment for executing the command
-					_subcommandValue=getValueOfExpression(source,'e',(TokenType[]){},0); // NOTE could've used getExecutionEnvironment()->_name->chars but we know it would be eval!!
+					_subcommandValue=getValueOfExpression(source,'e',endTokenTypes,endTokenTypeCount); // NOTE could've used getExecutionEnvironment()->_name->chars but we know it would be eval!!
 				}else
-					output("%sSubcommand '%s' invalid (error indicator code %i)!\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)),aValidSubcommandIndicator);
+					output("%sSubcommand '%s' invalid (error indicator code %i)!\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)),aValidSubcommandIndicator);
 				// replacing: _subcommandValue=getCommandValue(_evalCommand,owner,'e');
 				popExecutionEnvironment(); // pop the eval environment we successfully pushed
 			}else{
 				free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
-				output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
+				output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)));
 			}
 		}else
 			output("%sFailed to evaluate '%s'.\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
@@ -1688,7 +1694,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		Mcommand* _evalCommand=owned_command(_getTextCommand(string(_evalValueText)),owner);
 		if(_evalCommand){
 			// MDH@25FEB2021: delegate to getSubcommandValue, which accepts a first and last command token, and the command text (TODO which we could make it construct itself)
-			_evalValue=getSubcommandValue(_evalCommand->_firstToken->next,_evalCommand->_lastToken,NULL,_evalValueText,"eval");
+			_evalValue=getSubcommandValue(_evalCommand->_firstToken->next,_evalCommand->_lastToken,TT_EXPRESSION,NULL,0,_evalValueText,"eval");
 			/* replacing (and embedded (somewhat adapted) now in getSubcommandValue):
 			if(_evalCommand->_lastToken){
 				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
@@ -1784,57 +1790,55 @@ void free_command(Mcommand* _command){
 // MDH@11JAN2021: if we want to recognize local variables in do, for with, and function commands, we will need to be able to remember the map properties of the first argument to these function calls
 //                given that such a variable should be active as soon as the value has been entered (i.e. on the comma following it), there will be one active at any time depending on the envid
 // MDH@14JAN2021 NOTE: essentially the property names of a local variable map (first argument in do's and forwith's)
-typedef struct Mlocalvariable{
-	char* _name;
+// MDH@25FEB2021: because we now evaluate any special function first argument, we may decide to register this map during the processing of the rest of the command to check whether a variable used exists
+//                which means that there will be exactly one local variable map per (active) special function call so essentially we keep a stack of these local variables
+//                NOTE we don't have to bother about the stored localvariablesMapValue because it will be garbage collected after the command is executed and therefore this reference is to be considered a weak reference
+typedef struct Mlocalvariables{
+	Mvalue* mapValue;
 	uint64_t envid;
-	struct Mlocalvariable* _prev;
-}Mlocalvariable;
-Mlocalvariable *_lastlocalvariable=NULL;Mallocationowner owner_localvariables=(Mallocationowner){MI_SHELL,__LINE__,1};
-static bool push_localvariable(char* name,uint64_t envid){
-	if(!name)return false;
-	Mlocalvariable* _localvariable=CALLOC_1(sizeof(Mlocalvariable),'L',owner_localvariables);
-	if(!_localvariable){if(inputInfoFunction)(*inputInfoFunction)("%sFailed to create local variable '%s'.\n",M_ERROR_PREFIX,name);return false;}
-	_localvariable->_name=OWNED(_strdup(name),Msubowner(owner_localvariables,1));
-	if(!_localvariable->_name){if(inputInfoFunction)(*inputInfoFunction)("%sFailed to store local variable '%s'.n",M_ERROR_PREFIX,name);FREE_DISOWNED_1(_localvariable,'L',owner_localvariables);return false;}
-	_localvariable->envid=envid;
-	_localvariable->_prev=_lastlocalvariable;
-	_lastlocalvariable=_localvariable;
+	struct Mlocalvariables* _prev;
+}Mlocalvariables;
+Mlocalvariables *_lastLocalvariables=NULL;Mallocationowner owner_localvariables=(Mallocationowner){MI_SHELL,__LINE__,1};
+static bool pushLocalvariables(Mvalue* localvariablesMapValue,uint64_t envid){
+	Mlocalvariables* _localvariables=CALLOC_1(sizeof(Mlocalvariables),'L',owner_localvariables);
+	if(!_localvariables){if(inputErrorFunction)(*inputErrorFunction)("Failed to store the local variables.\n");return false;}
+	_localvariables->mapValue=localvariablesMapValue;
+	_localvariables->envid=envid;
+	_localvariables->_prev=_lastLocalvariables;
+	_lastLocalvariables=_localvariables;
 	return true;
 }
-static void free_localvariable(Mlocalvariable* _localvariable){
-	if(!_localvariable)return;
-	if(_localvariable->_prev)free_localvariable(_localvariable->_prev);
-	if(_localvariable->_name)FREE_DISOWNED(_localvariable->_name,strlen(_localvariable->_name)+1,-'"',owner_localvariables);
-	FREE_DISOWNED_1(_localvariable,'L',owner_localvariables);
+static void freeLocalvariables(Mlocalvariables* _localvariables){
+	if(!_localvariables)return;
+	if(_localvariables->_prev)freeLocalvariables(_localvariables->_prev);
+	FREE_DISOWNED_1(_localvariables,'L',owner_localvariables);
 }
-static void initialize_localvariables(){
-	if(_lastlocalvariable){free_localvariable(_lastlocalvariable);_lastlocalvariable=NULL;}
+static void initializeLocalvariables(){
+	if(_lastLocalvariables){freeLocalvariables(_lastLocalvariables);_lastLocalvariables=NULL;}
 }
 // pop the local variables at the end of the special function call
-static size_t pop_localvariables(uint64_t envid){
+static size_t popLocalvariables(uint64_t envid){
 	size_t popped=0;
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
-	Mlocalvariable *prevlocalvariable,*localvariable=_lastlocalvariable;
-	while(localvariable){
-		if(localvariable->envid!=envid)break;
-		prevlocalvariable=localvariable->_prev; // remember the predecessor (to check next)
-		// free all of localvariable (first the name then itself)
-		if(localvariable->_name){
-			if(report)
-				output("Releasing local variable '%s'.\n",localvariable->_name);
-			FREE_DISOWNED(localvariable->_name,strlen(localvariable->_name)+1,-'"',owner_localvariables);
-		}
-		FREE_DISOWNED_1(localvariable,'L',owner_localvariables);
+	Mlocalvariables *prevlocalvariables,*localvariables=_lastLocalvariables;
+	while(localvariables){
+		if(localvariables->envid!=envid)break;
+		prevlocalvariables=localvariables->_prev; // remember the predecessor (to check next)
+		FREE_DISOWNED_1(localvariables,'L',owner_localvariables);
 		popped++;
-		localvariable=prevlocalvariable;
+		localvariables=prevlocalvariables;
 	}
-	_lastlocalvariable=localvariable;
+	_lastLocalvariables=localvariables;
 	return popped;
 }
-static bool existsInFunctionCall(char* identifierName,uint64_t envid){
-	Mlocalvariable* localvariable=_lastlocalvariable;
-	while(localvariable&&(strcmp(identifierName,localvariable->_name)&&localvariable->envid!=envid))localvariable=localvariable->_prev;
-	return(localvariable!=NULL);
+static bool existsAsLocalVariable(char* identifierName,uint64_t envid){
+	if(!_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
+	Mlocalvariables* localvariables=_lastLocalvariables;
+	while(1){
+		if(isMapProperty(localvariables->mapValue->value._map,identifierName))return true;
+		localvariables=localvariables->_prev;
+	}
+	return false;
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
@@ -1992,17 +1996,36 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 							//                there's different behaviour for the different arguments
 							if(pNewToken->expr->argument>0){
 								pNewToken->argument=pNewToken->argument-1;
-								if(amVerboseDebugging())inputInfo("New function call argument!");
+								if(amVerboseDebugging())
+									if(inputInfoFunction)(*inputInfoFunction)("Local variables argument!");
 								// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
 								//                what we would do on ) 
 								if(pNewToken->argument==0){
+									// outputChar('A');
 									// MDH@25FEB2021:  we can now evaluate the command from the first token in the first argument to this special function representing the local variable map of this special function
-									Mvalue* localVariablesMapValue=getSubcommandValue(pNewToken->expr->next,prevToken,(TokenType[]){TT_FUNCTION_CALL,TT_EXPRESSION},NULL,"local variables");
-									outputValue("Local variables map:",localVariablesMapValue,"'.\n");
+									Mvalue* localVariablesMapValue=getSubcommandValue(pNewToken->expr->next,prevToken,TT_FUNCTION_CALL,(TokenType[]){TT_EXPRESSION},1,NULL,"local variables");
+									// outputChar('B');
+									if(!localVariablesMapValue||localVariablesMapValue->type==VT_MAP){
+										// outputChar('C');
+										if(amVerboseDebugging())
+											if(inputInfoFunction)(*inputInfoFunction)("Local variables map identified!");
+											//outputValue("Local variables map:",localVariablesMapValue,"'.\n");
+										if(!pushLocalvariables(localVariablesMapValue,pNewToken->envid)){
+											// outputChar('D');
+											newTokenType=TT_ERROR; // TODO I suppose we could have a separate TT_BUG token type perhaps?????
+											if(inputErrorFunction)(*inputErrorFunction)("Failed to register local variables!");
+										}
+										// outputChar('E');
+									}else{ // it's not a map which it should be
+										// outputChar('F');
+										newTokenType=TT_ERROR; 
+										if(inputErrorFunction)(*inputErrorFunction)("Local variables argument does not evaluate to a map!");
+									}
+									// outputChar('G');
 								}
 							}else
 							if(amVerboseDebugging())
-								inputInfo("Non-local variable function call argument");
+								if(inputInfoFunction)(*inputInfoFunction)("Non-local variable function call argument");
 						}else
 						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP){
 							newTokenType=TT_ERROR;
@@ -2018,6 +2041,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			// MDH@11JAN2021: at every colon that defines the value of a local variable (to a do(), forw() or function() call, we remember the name of the property and register it when we encounter a comma)
 			if(newTokenType==TT_MAP_VALUE){
 				// outputChar('A');
+				/* MDH@25FEB2021: no need to do the following anymore because we managed to evaluate this argument as a whole at the comma (TT_LIST_ELEMENT) following it
 				if(pNewToken->argument==1){
 					outputChar('A');
 					if(inputInfoFunction)(*inputInfoFunction)("Property value token in first special function argument!\n");
@@ -2047,7 +2071,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 								Mstring* _valueText=owned_string(_getValueText(variable->_value,true),owner);
 								if(_valueText){
 									outputChar('H');
-									bool localvariablepushed=push_localvariable(string(_valueText),pNewToken->envid);
+									bool localvariablepushed=pushLocalvariable(string(_valueText),pNewToken->envid);
 									if(localvariablepushed){
 										outputChar('J');
 										if(inputInfoFunction)(*inputInfoFunction)("Local variable '%s' registered.\n",_lastlocalvariable->_name);
@@ -2064,6 +2088,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 					}
 				}else
 				if(inputInfoFunction)(*inputInfoFunction)("Property value token!\n");
+				*/
 			}
 		}
 		/////if(amDebugging())inputInfo("E8");
@@ -2073,8 +2098,9 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		if(!pNewToken->text){
 			pNewToken->type=TT_ERROR; 
 			if(inputErrorFunction)(*inputErrorFunction)("Failed to initialize the new token.");
-		}
-		if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New token text initialized."); // TODOhow about 
+		}else
+		if(amVerboseDebugging())
+			if(inputInfoFunction)(*inputInfoFunction)("New token text initialized."); // TODOhow about 
 		/////if(amDebugging())inputInfo("E9");
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
@@ -8625,7 +8651,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
 				_formulaelement->_operator=owned_string(_getSignificantTokenText(expressionToken),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
-				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
+				if(!_formulaelement->_operator){output("%sFailed to copy operator '%s'.\n",M_ERROR_PREFIX,string(expressionToken->text));break;}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
 				while(expressionToken->next&&expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
@@ -8647,7 +8673,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				formulaElementCount++;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
-			if(amVerboseDebugging())outputInfo("No further formula elements!");
+			if(amVerboseDebugging())
+				outputInfo("No further formula elements!");
 		}
 
 		// evaluate the formula
