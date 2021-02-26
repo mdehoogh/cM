@@ -65,7 +65,8 @@ bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner
     assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
     // replace the current execution environment with the new one
     assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
-    if(amVerboseDebugging())outputExecutionEnvironmentName("New execution environment '","'.\n");
+    if(amVerboseDebugging())
+        outputExecutionEnvironmentName("New execution environment '","'.\n");
     return true;
 }/* NOT VALIDATED */
 void popExecutionEnvironment(){
@@ -78,7 +79,8 @@ void popExecutionEnvironment(){
     // OOPS the following is wrong because only the garbage collector is allowed to free values: free_value(_executionEnvironmentValue); // MDH@03FEB2020 replacing: free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     // MDH@03FEB2020 by assigning to _executionEnvironmentValue the reference count to the environment is incremented again so it will not be 'garbage collected'!!!!
     assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
-    if(amVerbose())outputExecutionEnvironmentName("Returned to execution environment '","'.\n");
+    if(amVerboseDebugging())
+        outputExecutionEnvironmentName("Returned to execution environment '","'.\n");
 }/* NOT VALIDATED */
 Mvalue* getEnvironment(){
     return _executionEnvironmentValue;

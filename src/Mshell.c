@@ -228,37 +228,42 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 
 const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,0b1000000,0b11111111};
 
-// MDH@22OCT2020: in order to be able to use any number of function arguments we now allow moving the list of variables that does not have a name to be placed in the variable that starts with _
-//                it's up to the argument map creator to put all arguments that are not expected in the function and put them in the '' argument
-bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap,char const * const defaultVariableName){
-	if(amVerbose())
-		outputMap("Execution environment variable map: ",_variableMap,".\n");
-	Mmapelement* variableMapelement=(_variableMap?_variableMap->_first:NULL);
+// MDH@25FEB2021: in certain cases we need to register local variables
+bool registerVariables(Menvironment * environment,Mallocationowner owner_environment,Mmap const * const variableMap,char const * const defaultVariableName){
+	if(!environment)return false;
+	Mmapelement* variableMapelement=(variableMap?variableMap->_first:NULL);
 	Mvariable* variableMapelementVariable;
 	while(variableMapelement){
 		variableMapelementVariable=variableMapelement->_variable;
 		if(variableMapelementVariable&&variableMapelementVariable->_name){
 			char *variableName=variableMapelementVariable->_name->chars;
 			if(variableName){
-				if(strlen(variableName)==0&&defaultVariableName)variableName=defaultVariableName; // use the default variable name if the name of the variable is empty
-				if(strlen(variableName)>0){
+				if(strlen(variableName)==0)if(defaultVariableName)variableName=defaultVariableName; // use the default variable name if the name of the variable is empty
+				// if(strlen(variableName)>0){
 					// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
-					if(!addVariable(_executionEnvironment,owner_executionEnvironment,variableName,variableMapelementVariable->valuetype,false)){
+					if(!addVariable(environment,owner_environment,variableName,variableMapelementVariable->valuetype,false)){
 						output("%sFailed to add variable '%s' as local variable.\n",M_ERROR_PREFIX,variableName);
 						return false;
 					}
-					if(!setValue(_executionEnvironment,variableName,variableMapelementVariable->_value)){
+					if(!setValue(environment,variableName,variableMapelementVariable->_value)){
 						output("%sFailed to initialize local variable '%s'.\n",M_ERROR_PREFIX,variableName);
 						return false;
 					}
-				}
+					output("'%s' registered!\n",variableName);
+				// }
 			}
 		}
 		variableMapelement=variableMapelement->_next;
 	}
-	if(amVerbose())
-		outputInfo("Execution environment initialized.");
 	return true;
+}
+
+// MDH@22OCT2020: in order to be able to use any number of function arguments we now allow moving the list of variables that does not have a name to be placed in the variable that starts with _
+//                it's up to the argument map creator to put all arguments that are not expected in the function and put them in the '' argument
+bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap,char const * const defaultVariableName){
+	if(amVerboseDebugging())
+		outputMap("Execution environment variable map: ",_variableMap,".\n");
+	return registerVariables(_executionEnvironment,owner_executionEnvironment,_variableMap,defaultVariableName);
 }
 /*
 \brief returns the environment for executing the the function called \p functionName
@@ -271,7 +276,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=owned_environment(_getNewEnvironment(),owner); // free asap
 	if(_functionExecutionEnvironment){
-		if(amVerbose())
+		if(amVerboseDebugging())
 			outputInfo("Registering the name of the function execution environment");
 		_functionExecutionEnvironment->_name=owned_chars(_getChars(functionName),Msubowner(owner,1)); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
@@ -282,12 +287,12 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		*/
 		// 2. make the definition environment the parent of the function execution environment
 		assignValue(&_functionExecutionEnvironment->_parent,_function->_definitionEnvironmentValue); // MDH@03FEB2020 replacing: _functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
-		if(amVerbose())
+		if(amVerboseDebugging())
 			outputInfo("Parent of function execution environment set to the function definition environment");
 		// 3. create the argument map fields as variables in the function execution environment
 		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,owner,_argumentMap,M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME);
 		if(functionExecutionEnvironmentInitialized){
-			if(amVerbose())
+			if(amVerboseDebugging())
 				outputInfo("Function execution environment initialized");
 			// add the function itself variable $_ so a function can call itself without knowing the name is is stored under or passed elsewhere
 			if(!addVariable(_functionExecutionEnvironment,owner,"$_",VT_FUNCTION,true)||!setValue(_functionExecutionEnvironment,"$_",_getValueOfFunction(_function))){
@@ -313,7 +318,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		// ASSERT function execution environment NOT initialized
 		FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 	}
-	return false;
+	return NULL;
 }
 
 /* moved back to M.c
@@ -686,6 +691,8 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 	if(_doTokenValue&&_doTokenValue->type==VT_LIST){
 		Mlist* doList=_doTokenValue->value._list;
 		if(doList&&doList->_first){ // something to do
+			// essentially all arguments are not evaluated
+			// CAREFUL if we fail to create the environment so _doVariableMap was not bound to it, we have to free it with free_map explicitly
 			Menvironment* _doEnvironment=owned_environment(__environment(),owner);
 			if(_doEnvironment){
 				_doEnvironment->_name=owned_chars(_getChars("do"),Msubowner(owner,1));
@@ -701,8 +708,33 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 					//                        which should be able to take over membership
 					//                        which means you have to disown the environment!!!!
 					if(pushExecutionEnvironment(disowned_environment(_doEnvironment,owner))){ // _doEnvironment bound!!!
+						// NOTE luckily we know who is owning the environment now (as it is now wrapped inside a value), so we can still register the variables (see below)
+						// evaluate the first argument inside the do environment (we have to because we're executing the command in the current environment as well)
 						Mlistelement* tokenValueListelement=doList->_first;
-						Mvalue *tokenExpressionValue,*expressionValue=NULL;
+						Mvalue* expressionValue;
+						outputValue("First do function call argument: '",tokenValueListelement->_value,"'.\n");
+						Mvalue *tokenExpressionValue=tokenValueListelement->_value;
+						if(tokenExpressionValue){
+							expressionValue=NULL;
+							if(tokenExpressionValue->type==VT_TOKEN){
+								// execute it in the do environment
+								_doEnvironment->expressionToken=tokenExpressionValue->value._token;
+								expressionValue=getValueOfExpression("do",'d',(TokenType[]){},0); // evaluate the expression
+								if(expressionValue){
+									if(expressionValue->type==VT_MAP){
+										if(!registerVariables(_doEnvironment,getValueDataOwner(),expressionValue->value._map,NULL))
+											outputError("Failed to initialize the do function call environment!");
+									}else
+										outputWarning("Local variables of do function call not defined in a map!\n");
+								}
+							}else
+							if(tokenExpressionValue->type==VT_MAP)
+								if(!registerVariables(_doEnvironment,getValueDataOwner(),tokenExpressionValue->value._map,NULL))
+									outputError("Failed to initialize the do function call environment!");
+						}
+						// now ready to process the 'body'
+						tokenValueListelement=tokenValueListelement->_next; // skip the local variable map
+						expressionValue=NULL; // to store the last evaluated argument value to be used as result when $ was not set
 						while(tokenValueListelement){
 							tokenExpressionValue=tokenValueListelement->_value;
 							if(tokenExpressionValue&&tokenExpressionValue->type==VT_TOKEN){ // some token to interpret
@@ -1122,6 +1154,57 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
     return 2;
 }/* VALIDATED */
 
+// MDH@11JAN2021: if we want to recognize local variables in do, for with, and function commands, we will need to be able to remember the map properties of the first argument to these function calls
+//                given that such a variable should be active as soon as the value has been entered (i.e. on the comma following it), there will be one active at any time depending on the envid
+// MDH@14JAN2021 NOTE: essentially the property names of a local variable map (first argument in do's and forwith's)
+// MDH@25FEB2021: because we now evaluate any special function first argument, we may decide to register this map during the processing of the rest of the command to check whether a variable used exists
+//                which means that there will be exactly one local variable map per (active) special function call so essentially we keep a stack of these local variables
+//                NOTE we don't have to bother about the stored localvariablesMapValue because it will be garbage collected after the command is executed and therefore this reference is to be considered a weak reference
+typedef struct Mlocalvariables{
+	Mvalue* mapValue;
+	uint64_t envid;
+	struct Mlocalvariables* _prev;
+}Mlocalvariables;
+Mlocalvariables *_lastLocalvariables=NULL;Mallocationowner owner_localvariables=(Mallocationowner){MI_SHELL,__LINE__,1};
+static bool pushLocalvariables(Mvalue* localvariablesMapValue,uint64_t envid){
+	Mlocalvariables* _localvariables=CALLOC_1(sizeof(Mlocalvariables),'L',owner_localvariables);
+	if(!_localvariables){if(inputErrorFunction)(*inputErrorFunction)("Failed to store the local variables.\n");return false;}
+	_localvariables->mapValue=localvariablesMapValue;
+	_localvariables->envid=envid;
+	_localvariables->_prev=_lastLocalvariables;
+	_lastLocalvariables=_localvariables;
+	return true;
+}
+static void freeLocalvariables(Mlocalvariables* _localvariables){
+	if(!_localvariables)return;
+	if(_localvariables->_prev)freeLocalvariables(_localvariables->_prev);
+	FREE_DISOWNED_1(_localvariables,'L',owner_localvariables);
+}
+static void initializeLocalvariables(){
+	if(_lastLocalvariables){freeLocalvariables(_lastLocalvariables);_lastLocalvariables=NULL;}
+}
+// pop the local variables at the end of the special function call
+static size_t popLocalvariables(uint64_t envid){
+	size_t popped=0;
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
+	Mlocalvariables *prevlocalvariables,*localvariables=_lastLocalvariables;
+	while(localvariables){
+		if(localvariables->envid!=envid)break;
+		prevlocalvariables=localvariables->_prev; // remember the predecessor (to check next)
+		FREE_DISOWNED_1(localvariables,'L',owner_localvariables);
+		popped++;
+		localvariables=prevlocalvariables;
+	}
+	_lastLocalvariables=localvariables;
+	return popped;
+}
+static bool existsAsLocalVariable(char* identifierName,uint64_t envid){
+	// if(!_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
+	Mlocalvariables* localvariables=_lastLocalvariables;
+	while(localvariables&&!isMapProperty(localvariables->mapValue->value._map,identifierName))localvariables=localvariables->_prev;
+	return(localvariables!=NULL);
+}
+
 // MDH@11MAR2020: Ok, need to be careful here
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	Mtoken* functionToken=command->_lastToken;
@@ -1131,7 +1214,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	if(functionToken->argument==1)
 		functionToken->type=TT_NEW_VARIABLE;
 	else
-	if(existsInCommand(command,_identifierName,functionToken->envid))
+	if(existsAsLocalVariable(_identifierName,functionToken->envid)||existsInCommand(command,_identifierName,functionToken->envid))
 		functionToken->type=TT_VARIABLE;
 	else{
 		int8_t variableExistsIndicator=containsVariable(NULL,_identifierName,-1);
@@ -1785,60 +1868,6 @@ void free_command(Mcommand* _command){
 	if(!_command)return;
 	if(_command->_firstToken)free_token(_command->_firstToken); //Msubowner(owner_command,1)); // will free ALL connected tokens!!!
 	FREE_1(_command,'K');
-}
-
-// MDH@11JAN2021: if we want to recognize local variables in do, for with, and function commands, we will need to be able to remember the map properties of the first argument to these function calls
-//                given that such a variable should be active as soon as the value has been entered (i.e. on the comma following it), there will be one active at any time depending on the envid
-// MDH@14JAN2021 NOTE: essentially the property names of a local variable map (first argument in do's and forwith's)
-// MDH@25FEB2021: because we now evaluate any special function first argument, we may decide to register this map during the processing of the rest of the command to check whether a variable used exists
-//                which means that there will be exactly one local variable map per (active) special function call so essentially we keep a stack of these local variables
-//                NOTE we don't have to bother about the stored localvariablesMapValue because it will be garbage collected after the command is executed and therefore this reference is to be considered a weak reference
-typedef struct Mlocalvariables{
-	Mvalue* mapValue;
-	uint64_t envid;
-	struct Mlocalvariables* _prev;
-}Mlocalvariables;
-Mlocalvariables *_lastLocalvariables=NULL;Mallocationowner owner_localvariables=(Mallocationowner){MI_SHELL,__LINE__,1};
-static bool pushLocalvariables(Mvalue* localvariablesMapValue,uint64_t envid){
-	Mlocalvariables* _localvariables=CALLOC_1(sizeof(Mlocalvariables),'L',owner_localvariables);
-	if(!_localvariables){if(inputErrorFunction)(*inputErrorFunction)("Failed to store the local variables.\n");return false;}
-	_localvariables->mapValue=localvariablesMapValue;
-	_localvariables->envid=envid;
-	_localvariables->_prev=_lastLocalvariables;
-	_lastLocalvariables=_localvariables;
-	return true;
-}
-static void freeLocalvariables(Mlocalvariables* _localvariables){
-	if(!_localvariables)return;
-	if(_localvariables->_prev)freeLocalvariables(_localvariables->_prev);
-	FREE_DISOWNED_1(_localvariables,'L',owner_localvariables);
-}
-static void initializeLocalvariables(){
-	if(_lastLocalvariables){freeLocalvariables(_lastLocalvariables);_lastLocalvariables=NULL;}
-}
-// pop the local variables at the end of the special function call
-static size_t popLocalvariables(uint64_t envid){
-	size_t popped=0;
-	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
-	Mlocalvariables *prevlocalvariables,*localvariables=_lastLocalvariables;
-	while(localvariables){
-		if(localvariables->envid!=envid)break;
-		prevlocalvariables=localvariables->_prev; // remember the predecessor (to check next)
-		FREE_DISOWNED_1(localvariables,'L',owner_localvariables);
-		popped++;
-		localvariables=prevlocalvariables;
-	}
-	_lastLocalvariables=localvariables;
-	return popped;
-}
-static bool existsAsLocalVariable(char* identifierName,uint64_t envid){
-	if(!_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
-	Mlocalvariables* localvariables=_lastLocalvariables;
-	while(1){
-		if(isMapProperty(localvariables->mapValue->value._map,identifierName))return true;
-		localvariables=localvariables->_prev;
-	}
-	return false;
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token

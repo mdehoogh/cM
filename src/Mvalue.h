@@ -263,6 +263,7 @@ bool incrementReferenceCount(Mvalue * const _value);
 // MDH@28MAY2020: because every value is owned by the same owner i.e. 'the value owner' which is one level down _valueList there's no need to call free_value with an owner
 //                technically this means that a value once created does (and should) never change ownership as opposed to locally created stuff not bound to a global variable
 Mallocationowner getValueOwner();
+Mallocationowner getValueDataOwner(); // MDH@25FEB2021
 // MDH@28MAY2020 better not to let the outside free values ever (except this module's garbage collector of course): void free_value(Mvalue* _value/*,Mallocationowner owner*/);
 //////////Mstring* appendld(Mstring* mstr,long double ld);
 Mvalue* getFirstScalarValue(Mvalue* value);
@@ -473,6 +474,7 @@ typedef struct Menvironment{
 }Menvironment;
 
 Menvironment* __environment(); // creates a new (empty) environment
+Menvironment* _getEnvironment(Mmap* _variableMap); // MDH@25FEB2021: initialize a new environment with a certain variable map
 Menvironment* _getNewEnvironment(); // MDH@25OCT2020: create environment with a nameless variable
 
 void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/);

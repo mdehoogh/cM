@@ -315,6 +315,7 @@ static unsigned long long valueCount=0; // MDH@16JUN2020: keeping track of the t
 static Mallocationowner owner_valueList=(Mallocationowner){MI_VALUE,__LINE__,1},owner_valueListelement=(Mallocationowner){MI_VALUE,__LINE__,1,1},owner_value=(Mallocationowner){MI_VALUE,__LINE__,1,2},owner_value_data=(Mallocationowner){MI_VALUE,__LINE__,1,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
 Mallocationowner getValueOwner(){return owner_value;}
+Mallocationowner getValueDataOwner(){return owner_value_data;}
 Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* _value=NULL;
     if(!_valueList){
@@ -1971,7 +1972,7 @@ size_t outputValue(char const * const prefix,Mvalue const * const value,char con
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(value){
-        // output("%u",value->type); // DEBUG
+        // output("(%s)%u",TOKENTYPE_STRING[value->type],value->type); // DEBUG
         Mstring* _valueText=owned_string(_getValueText(value,false),owner); // free asap
         if(_valueText){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
     }else
@@ -3011,6 +3012,15 @@ Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
     Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
     if(!_environment){outputError("Failed to create an environment");return NULL;}
     _environment->_variableMap=CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
+    if(!_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
+    return disowned_environment(_environment,owner);
+}/* VALIDATED */
+// MDH@25FEB2021: on occasion it's useful to be able to initialize a new environment with a variable map somehow
+//                NOTE _variableMap essentially needs to be a disowned map, otherwise we cannot take over membership
+Menvironment* _getEnvironment(Mmap* _variableMap){Mallocationowner owner=getOwner(__LINE__);
+    Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
+    if(!_environment){outputError("Failed to create an environment");return NULL;}
+    _environment->_variableMap=(_variableMap?owned_map(_variableMap,Msubowner(owner,1)):CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)));
     if(!_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
     return disowned_environment(_environment,owner);
 }/* VALIDATED */
