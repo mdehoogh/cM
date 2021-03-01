@@ -36,10 +36,10 @@ Mcommand* _getNewCommand(bool withFirstToken);
 
 // MDH@20FEB2020: the function definition so we can plug in our own inputInfo and inputError functions
 typedef void InputResponseFunction(char const * const fmt,...);
-typedef size_t OutputTokenFunction(Mtoken* token);
-typedef void ReoutputTokenFunction(Mtoken* token);
+typedef size_t OutputTokenFunction(Mtoken const * const token);
+typedef void ReoutputTokenFunction(Mtoken const * const token);
 typedef void UpdateLastTokenAutocompletionTextFunction(bool onlyWhenItDoesNotEndTheSuggestedText);
-typedef void OutputCommandInfoFunction(Mcommand* command);
+typedef void OutputCommandInfoFunction(Mcommand const * const command);
 typedef bool InputCharReadFunction(char* _c);
 /*
 void setInputInfoFunction(InputResponseFunction* _inputResponseFunction);
@@ -111,6 +111,8 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue);
 
 Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value);
 Mvalue* Mstats(Mvalue* _sequenceValue);
+
+void outputCommandInfo(Mcommand const * const _command);
 
 // and finally obtaining a root environment
 // in general initializing the shell with the callbacks and the M setting characters

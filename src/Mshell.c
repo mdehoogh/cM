@@ -342,7 +342,7 @@ void setOutputCommandInfoFunction(OutputCommandInfoFunction* _outputCommandInfoF
 static InputCharReadFunction* inputCharReadFunction=NULL;
 
 // MDH@04MAR2020: the default version outputs the command the same way as within a session except without the colors
-static void outputCommandInfo(Mcommand* command){
+void outputCommandInfo(Mcommand const * const command){
 	if(!command||!command->_lastToken)return;
 	// MDH@12AUG2019: identifiers first
 	Mtoken* identifierToken=command->_lastToken->prevIdentifier;
@@ -506,9 +506,9 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 }
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
 Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char commandType){
-	if(amVerboseDebugging())
-		if(outputCommandInfoFunction)outputCommandInfoFunction(command); // MDH@04MAR2020: using the given output command info function
-	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,owner_command,amVerbose());
+	// if(amVerboseDebugging())
+		if(outputCommandInfoFunction)(*outputCommandInfoFunction)(command); // MDH@04MAR2020: using the given output command info function
+	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,owner_command,amVerboseDebugging());
 	if(aValidCommandIndicator<=0)return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerboseDebugging())
@@ -817,7 +817,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 						}
 					}
 					if(forEnvironmentInitialized){
-						_forEnvironment->_variableMap->immutable=true; // MDH@10NOV2019: lock the variable map
+						// _forEnvironment->_variableMap->immutable=true; // MDH@10NOV2019: lock the variable map
 						Mvalue *_forBodyValue=NULL,*_forIncrementValue=NULL;
 						while(true){
 							/*
@@ -1644,7 +1644,9 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 							break;
 						case TT_LISTELEMENT:
 							if(lastCommandToken->expr&&lastCommandToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
-								if(lastCommandToken->argument==-1)lastCommandToken->argument=1;
+								// MDH@01MAR2021 removal: if we do this the argument following would be considered containing local variables again, which we do not want to happen
+								//               TODO what should we do here then???????
+								// if(lastCommandToken->argument==-1)lastCommandToken->argument=1;
 								/* replacing:
 								// not any comma is a function call argument separator!!!
 								if(pushInitialization(",")){
@@ -2056,7 +2058,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 									}else{ // it's not a map which it should be
 										// outputChar('F');
 										newTokenType=TT_ERROR; 
-										if(inputErrorFunction)(*inputErrorFunction)("Local variables argument does not evaluate to a map!");
+										if(inputInfoFunction)(*inputInfoFunction)("%sLocal variables argument does not evaluate to a map!",M_WARNING_PREFIX);
 									}
 									// outputChar('G');
 								}
@@ -5042,7 +5044,8 @@ bool isOneCharacterTokenType(uint8_t tokenType){
 	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
 }
 
-static size_t outputToken(Mtoken* _token){
+// MDH@01MAR2021: TODO check if this one should be here or in M.c
+static size_t outputToken(Mtoken const * const _token){
 	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
 	if(numberOfCharactersToOutput>0){
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
