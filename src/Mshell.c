@@ -2005,11 +2005,19 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				// every , that ends a function call argument should decrement the argument value
 			}else{ // not a function identifier	
 				/////if(amDebugging())inputInfo("E4");		
-				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE&&prevToken->type!=TT_END_OF_FUNCTION_CALL) // not behind a variable identifier or end of function call
+				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE&&prevToken->type!=TT_END_OF_FUNCTION_CALL){ // not behind a variable identifier or end of function call
 					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);
 					pNewToken->prevIdentifier=prevToken->prevIdentifier;
-				else // behind a variable identifier or end of function call
-					pNewToken->prevIdentifier=prevToken;
+				}else{ // behind a variable identifier or end of function call
+					// MDH@01MAR2021: it's essential to skip local variables (because otherwise they would be treated as existing outside the special function call)
+					//                TODO should we not also not use TT_NEW_VARIABLEs????????
+					char* _identifierName=_getSignificantTokenCharacters(prevToken); // free asap
+					if(prevToken->type!=TT_VARIABLE||!existsAsLocalVariable(_identifierName,prevToken->envid))
+						pNewToken->prevIdentifier=prevToken;
+					else
+						pNewToken->prevIdentifier=prevToken->prevIdentifier;
+					free(_identifierName);
+				}
 				/////if(amDebugging())inputInfo("E5");
 				// what to do with the argument if a function call ends???????
 				// the function name of the function call should contain the right argument value TODO check this!!!!!!!!
