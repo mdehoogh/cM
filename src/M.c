@@ -170,6 +170,7 @@ static void outputTokenColor(Mtoken* _token){
 	///////printf("[%d]",_userInputCommand->_lastToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
 }
+/*
 // I guess we could allow the user to specify another eps value through the QEPS command line argument!!!
 static void outputCommandInfo(Mcommand* command){
 	if(!command||!command->_lastToken)return;
@@ -203,18 +204,10 @@ static void outputCommandInfo(Mcommand* command){
 			output("\t%s\n","Not part of another expression!");
 		if(token->prevIdentifier)
 			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
-		/* removing:
-		if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
-			Mtoken* specialFunctionCallToken=getSpecialFunctionCallToken(token);
-			if(specialFunctionCallToken){
-				output("%s\t%u\n"," local to",specialFunctionCallToken->offset);
-			}
-		}
-		*/
 		token=token->next;
 	}
 }
-
+*/
 Mstring* _getTimestamp(char const * const format){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _timestamp=owned_string(__string(),owner);
 	if(_timestamp){
@@ -1355,7 +1348,7 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 // MDH@24SEP2020: every function that outputs text on the command line should receive a Mcursormovement reference to be passed along to outputCommandLineText...
 //                NOTE let's allow passing in NULL for _cursormovement which is valid when the result of outputToken is not used (as is often the case)
 // MDH@15OCT2020: because output
-static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
+static void outputToken(Mtoken const * const _token,Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
 	if(!_token)return;
 	// MDH@24SEP2020: the following ASSERT still holds except that _cursormovement->position should actually hold the same value
 	// ASSERT assuming _token->position actually contains the number of command characters on the current command line in front of this token
@@ -1460,7 +1453,7 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 }
 // MDH@30APR2019: when a function returns to a variable and the other way round
 // MDH@26JUN2020: TODO has to be reviewed!!!
-static void reoutputToken(Mtoken* _token){
+static void reoutputToken(Mtoken const * const _token){
 	// outputChar('X');
 	size_t tokenCharacterCount=(_token&&_token->text?string_length(_token->text):0);
 	if(tokenCharacterCount==0)return; // shouldn't happen though
@@ -2244,7 +2237,7 @@ size_t outputCommand(Mcommand * const command){
 }
 
 // MDH@24SEP2020: not expecting the shell to output a token on a session command line, so outputTokenText replaces outputToken (which is now declared differently)
-size_t outputTokenText(Mtoken* _token){if(_token){outputTokenColor(_token);return output("%s",string(_token->text));}return 0;}
+size_t outputTokenText(Mtoken const * const _token){if(_token){outputTokenColor(_token);return output("%s",string(_token->text));}return 0;}
 
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
 uint32_t commandPages=0; // the total number of command pages
@@ -4014,7 +4007,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
 	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
-	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,NULL)){ // ascertain to have an shell environment!!!
 		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);
@@ -4936,8 +4929,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand&&_userInputCommand->_firstToken){ // technically something to evaluate
-					if(amVerboseDebugging())
-						outputCommandInfo(_userInputCommand);
+					// if(amVerboseDebugging())
+						outputCommandInfo(_userInputCommand); // now defined in Mshell.c/h
 					// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 					Mvalue* userInputCommandResultValue=NULL;
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
