@@ -1454,7 +1454,7 @@ static void outputToken(Mtoken const * const _token,Mcursormovement* _cursormove
 // MDH@30APR2019: when a function returns to a variable and the other way round
 // MDH@26JUN2020: TODO has to be reviewed!!!
 static void reoutputToken(Mtoken const * const _token){
-	// outputChar('X');
+	// DEBUG outputChar('X');
 	size_t tokenCharacterCount=(_token&&_token->text?string_length(_token->text):0);
 	if(tokenCharacterCount==0)return; // shouldn't happen though
 	// MDH@31OCT2019: this is particularly hard if the token is written over several lines
@@ -1759,8 +1759,10 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
 												else
 													inputError("%sFailed to undo failing to mark the last character as erroneous.",M_BUG_PREFIX);
-											}else
+											}else{
 												reoutputToken(_errorToken);
+												// DEBUG outputChar('W');
+											}
 										}else
 											inputError("The supposed reference can never become an existing variable reference.");
 										// if we failed to create the error token, we have to append the removed character again (should be no problem because Mstring does not reduce the memory when deleting characters from the end)
@@ -3056,6 +3058,8 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
 			setTokenType(lastCommandToken,TT_FUNCTION/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
 			reoutputToken(lastCommandToken);
+			// MDH@20OCT2021 this is when an identifier is identified as a function!!!!
+			// DEBUG: outputChar('V');
 			// insert an opening parenthesis for the function call
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: if(endOfInput&&amMatchingparentheses())setLastTokenAutocompletionText("(");else deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019: either force the feedforward text to match an opening parenthesis or nothing TODO does endOfInput matter?????
 			/* MDH@20SEP2019 replacing:
@@ -3068,6 +3072,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			// MDH@11MAR2020: ok, here we have an issue: 
 			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
 			reoutputToken(lastCommandToken);
+			// outputChar('U');
 			inputInfo("'%s' considered to be an existing variable.",_identifierName);
 			//////////outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
@@ -3101,6 +3106,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 							if(propertyName){
 								setTokenType(lastCommandToken,TT_ERROR);
 								reoutputToken(lastCommandToken);
+								// DEBUG outputChar('Z');
 								inputInfo("Invalid property '%s'.",propertyName);
 							}else
 								inputInfo("Missing environment or variable name (%s)!",_identifierName);
@@ -3127,8 +3133,10 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(variableExistsIndicator<0){ // apparently does NOT exist
 				// inputInfo("'%s' not an existing variable.",_identifierName);
-				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
+				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);
+				if(endOfInput)updateLastTokenAutocompletionText(false);
 				reoutputToken(lastCommandToken);
+				// DEBUG outputChar('Y');
 				// suggested characters should make = show (probably already present in the behind cursor text)
 				// MDH@23SEP2019 take care of by setLastTokenType, so removed: setLastTokenAutocompletionText("="); // MDH@20SEP2019 replacing: if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(feedforwardText,0)!='=')string_insert_char(feedforwardText,0,'=');
 			}
@@ -3137,6 +3145,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			if(variableExistsIndicator>0){ // now an existing variable
 				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
 				reoutputToken(lastCommandToken);
+				// DEBUG outputChar('X');
 				///// MDH@23SEP2019 removed: deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			}
 		}
@@ -3178,7 +3187,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 	// MDH@20SEP2019: the following is about removing the feed forward characters that were added when a certain token started but as you can see 
 	//                it is all about feed forward associated with the start of a token, so removing the associated feed forward can also be done at the moment the token is actually removed
 	//                so for now we remove the following block and simply write the behind cursor text
-	////////writeSuggestedText(true);
+	////////////writeSuggestedText(true);
 	/* replacing:
 	// MDH@14AUG2019: how about removing any matching character?????
 	if(string_length(getFeedforwardCharacters())){ // MDH@20SEP2019: will reconstruct feedforwardText if need be
@@ -3230,7 +3239,8 @@ char removedTokenCharacter(bool endOfInput){
 			_userInputCommand->_lastToken=_userInputCommand->_lastToken->prev;
 		}
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: should be called whenever _userInputCommand->_lastToken changes...
-		if(_userInputCommand->_lastToken)tokenCharacterRemoved=string_removed_char(_userInputCommand->_lastToken->text,tokenCharacterPosition-1);
+		if(_userInputCommand->_lastToken)
+			tokenCharacterRemoved=string_removed_char(_userInputCommand->_lastToken->text,tokenCharacterPosition-1);
 #ifdef __DEBUG__
 			outputChar(tokenCharacterRemoved);
 #endif
@@ -4929,7 +4939,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand&&_userInputCommand->_firstToken){ // technically something to evaluate
-					// if(amVerboseDebugging())
+					if(amVerboseDebugging())
 						outputCommandInfo(_userInputCommand); // now defined in Mshell.c/h
 					// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 					Mvalue* userInputCommandResultValue=NULL;

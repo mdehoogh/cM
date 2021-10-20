@@ -1229,7 +1229,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 		else
 		if(variableExistsIndicator<0){
 			functionToken->type=TT_NEW_VARIABLE;
-			outputChar('*');
+			// MDH@20OCT2021 doing this fucks up the reoutputToken(): outputChar('*');
 		}
 		else // TODO what more can we do????
 			output("%sInvalid identifier name '%s'.",M_BUG_PREFIX,_identifierName);
@@ -9741,7 +9741,7 @@ static void outputSortStatistics(){
 }
 // delegate asmallerthan to smallerthan() which returns a long long instead of an int
 // asmallerthan will receive pointers to an Mvalue*
-static int alargerthan(void* aValue,void* bValue){
+static int alargerthan(const void* aValue,const void* bValue){
 	long long result=largerthan(*((Mvalue**)aValue),*((Mvalue**)bValue));
 	return(result<=0?-1:1);
 }
