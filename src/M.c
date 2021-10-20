@@ -55,7 +55,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.5"; // MDH@05DEC2020: this is were Mexpression is renamed to Mtoken
-char const * const M_BUILD="9";char const * const M_DATE="25 February 2021"; // using getSubcommandValue() on the first do and for function arguments which should evaluate to a map containing the local variables to use in the remaining arguments
+char const * const M_BUILD="10";char const * const M_DATE="20 October 2021"; // using getSubcommandValue() on the first do and for function arguments which should evaluate to a map containing the local variables to use in the remaining arguments
+//char const * const M_BUILD="9";char const * const M_DATE="25 February 2021"; // using getSubcommandValue() on the first do and for function arguments which should evaluate to a map containing the local variables to use in the remaining arguments
 //char const * const M_BUILD="8";char const * const M_DATE="24 February 2021"; // 
 //char const * const M_BUILD="7";char const * const M_DATE="28 December 2020"; // updating while(), for(), introducing with(), end(), fixing setValue (Menvironment module)
 //char const * const M_BUILD="6";char const * const M_DATE="23 December 2020"; // updating while(), for(), introducing with(), end(), fixing setValue (Menvironment module)
@@ -2560,7 +2561,8 @@ void backToPrompt(){
 	// MDH@31OCT2019: with a clearScreenFromCursor() following it suffices to first move to the initial prompt line
 	size_t linesfreed=free_userinputline();
 	while(linesfreed>0){linesfreed--;oneLineUp();}
-	toStartOfLine();moveCursorRight(promptLength); // should now be at the right position for clearing
+	toStartOfLine();
+	moveCursorRight(promptLength); // should now be at the right position for clearing
 	/* replacing:
 	uint16_t cp=getUserInputLength();
 	while(cp--)backspace(); // MDH@24APR2019 replacing: while(getUserInputLength()>0){getUserInputLength()--;backspace();}
@@ -3152,7 +3154,8 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 
 // MDH@14AUG2019: cancelCommand() takes care of removing everything in the current command
 void cancelCommand(){ // in response to Ctrl-C or backspace on the first character
-	if(amVerbose())inputInfo("Cancelling the command.");
+	if(amVerboseDebugging())inputInfo("Cancelling the command.");
+	// TODO perhaps every cancelCommand() needs this: deleteUserInputCommand(); // MDH@20OCT2021: BUG FIX setCommandIndex(0) worked fine using this, but cancelCommand() needs it as well
 	// MDH@31OCT2019: with a command now possibly covering multiple lines we have to do a little more than we did before but we can put that in backToPrompt()
 	backToPrompt();
 	clearScreenFromCursor(); // inserting doing this otherwise (in the case of backspace) we would apparently still see the behind cursor text
@@ -3161,7 +3164,7 @@ void cancelCommand(){ // in response to Ctrl-C or backspace on the first charact
 	if(_manualFeedforwardText){FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;}
 	deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	// it's a good idea to inform the user that the command was cleared
-	if(amVerbose())inputInfo("Command cleared!");
+	if(amVerboseDebugging())inputInfo("Command cleared!");
 }
 void updateOnTokenCharacterRemoved(char removedCharacter){
 	// adapt screen
@@ -4405,10 +4408,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					if(_userInputCommand->_firstToken){
 						/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
 						// MDH@03SEP2019: what to do when Ctrl-C is called on a previous command????? i.e. when _userInputCommand->_firstToken points to a previous command, I'd say that we should return to the current command
-						if(commandIndex)
-							setCommandIndex(0);
-						else
+						if(commandIndex==0){
+							deleteUserInputCommand();
 							cancelCommand();
+						}else
+							setCommandIndex(0);
 					} else
 						beep();
 				}else
