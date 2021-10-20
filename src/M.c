@@ -3155,7 +3155,8 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 // MDH@14AUG2019: cancelCommand() takes care of removing everything in the current command
 void cancelCommand(){ // in response to Ctrl-C or backspace on the first character
 	if(amVerboseDebugging())inputInfo("Cancelling the command.");
-	// TODO perhaps every cancelCommand() needs this: deleteUserInputCommand(); // MDH@20OCT2021: BUG FIX setCommandIndex(0) worked fine using this, but cancelCommand() needs it as well
+	// TODO perhaps every cancelCommand() needs this: 
+	deleteUserInputCommand(); // MDH@20OCT2021: BUG FIX setCommandIndex(0) worked fine using this, but cancelCommand() needs it as well
 	// MDH@31OCT2019: with a command now possibly covering multiple lines we have to do a little more than we did before but we can put that in backToPrompt()
 	backToPrompt();
 	clearScreenFromCursor(); // inserting doing this otherwise (in the case of backspace) we would apparently still see the behind cursor text
@@ -3288,9 +3289,9 @@ bool removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 	// MDH@18JUN2020: I've adapted copyUserInputCommand() in such a way that if it fails _userInputCommand will NOT be replaced so it will not become NULL (i.e. it will remain as it was), so the following test will always evaluate to TRUE
 	if(_userInputCommand){ // we still have a command being evaluated (NOTE that removedTokenCharacter() can actually set _userInputCommand->_firstToken to NULL)
 		if(_userInputCommand->_lastToken==_userInputCommand->_firstToken&&string_length(_userInputCommand->_firstToken->text)==0){
-			if(amVerboseDebugging())inputInfo("%s","Cancelling the command.");
+			// MDH@20OCT2021 already in cancelCommand(): if(amVerboseDebugging())inputInfo("%s","Cancelling the command.");
 			cancelCommand();
-			if(amVerboseDebugging())inputInfo("%s","Command cancelled.");
+			// MDH@20OCT2021 already in cancelCommand(): if(amVerboseDebugging())inputInfo("%s","Command cancelled.");
 			/* replacing:
 			if(string_length(feedforwardText))inputInfo("Use Ctrl-C to clear the text suggestion as well.");else cancelCommand();
 			*/
@@ -4409,7 +4410,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
 						// MDH@03SEP2019: what to do when Ctrl-C is called on a previous command????? i.e. when _userInputCommand->_firstToken points to a previous command, I'd say that we should return to the current command
 						if(commandIndex==0){
-							deleteUserInputCommand();
+							// MDH@20OCT2021 moved over to cancelCommand() as we probably need to do that every cancelCommand(): deleteUserInputCommand();
 							cancelCommand();
 						}else
 							setCommandIndex(0);
