@@ -15,6 +15,8 @@
 
 #include "Msession.h"
 
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_SESSION,id};}
+
 extern long long M_LL_INVALID;
 
 static struct termios orig_termios;
@@ -28,10 +30,41 @@ void disableRawmode(){
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
 }
 
-void endOfUserInput(){
+// MDH@23OCT2021: moved over from M.c as we need it in endOfInput() below
+Mstring* _getTimestamp(char const * const format){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _timestamp=owned_string(__string(),owner);
+	if(_timestamp){
+		Mstring* p=string_setlength(_timestamp,50/*,owner*/);
+		if(p){
+	    	time_t now=time(NULL);
+			struct tm * nowlocal=localtime(&now);
+			p=string_setlength(p,strftime(p->_chars->chars,50,(format?format:"%Y-%m-%d %H:%M:%S"),nowlocal)/*,owner*/);
+		}
+		if(!p){FREE_STRING(_timestamp,owner);_timestamp=NULL;}
+	}
+	return disowned_string(_timestamp,owner);
+}
+
+Mstring* _timestampedOutputFilename=NULL;
+size_t outputFilenamePrefixLength,outputFilenameSuffixLength;
+
+void endOfUserInput(){Mallocationowner owner=getOwner(__LINE__);
 	// return to the 'right' colors
 	resetOutputColor();
 	setOutputFilename(NULL); // MDH@13MAR2020: will close the current output file (if any), so it will contain all required information
+	if(_timestampedOutputFilename){
+		//output("\nTimestamped output filename: '%s'.",string(_timestampedOutputFilename));
+		char outputFilename[outputFilenamePrefixLength+outputFilenameSuffixLength+1];
+		outputFilename[0]='\0';
+		char* _outputFilenamePrefix=_stringstart(_timestampedOutputFilename,outputFilenamePrefixLength);
+		strcat(outputFilename,_outputFilenamePrefix);
+		strcat(outputFilename,string_remainder(_timestampedOutputFilename,string_length(_timestampedOutputFilename)-outputFilenameSuffixLength));
+		if(rename(outputFilename,string(_timestampedOutputFilename))==-1)
+			output("\nERROR: Failed to timestamp output file '%s'.",outputFilename);
+		else
+			output("\nOutput file '%s' renamed to '%s'.",outputFilename,string(_timestampedOutputFilename));
+		free(_outputFilenamePrefix); // ESSENTIAL
+	}
 	output("\n\n%s\n\n","Thanks for using M.");
 	disableRawmode();
 }
@@ -169,7 +202,10 @@ int getNumberOfWindowTextColumns(){return windowCols;}
 
 int getCurrentNumberOfWindowTextColumns(){windowSizeDetermined();return windowCols;}
 
-bool sessionInitialized(){
+bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix){
+	_timestampedOutputFilename=owned_string(_getTimestamp(".%Y%m%d.%H%M%S"),getOwner(__LINE__));
+  if(_timestampedOutputFilename&&string_prepend(_timestampedOutputFilename,outputfilenamePrefix))outputFilenamePrefixLength=strlen(outputfilenamePrefix);
+	if(_timestampedOutputFilename&&string_append(_timestampedOutputFilename,outputfilenameSuffix))outputFilenameSuffixLength=strlen(outputfilenameSuffix);
 	initDisplay();
     // interfaces with initDisplay() TODO perhaps initialize settings here for a common interactive session???
 	return windowSizeDetermined();

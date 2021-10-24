@@ -208,19 +208,6 @@ static void outputCommandInfo(Mcommand* command){
 	}
 }
 */
-Mstring* _getTimestamp(char const * const format){Mallocationowner owner=getOwner(__LINE__);
-	Mstring* _timestamp=owned_string(__string(),owner);
-	if(_timestamp){
-		Mstring* p=string_setlength(_timestamp,50/*,owner*/);
-		if(p){
-	    	time_t now=time(NULL);
-			struct tm * nowlocal=localtime(&now);
-			p=string_setlength(p,strftime(p->_chars->chars,50,(format?format:"%Y-%m-%d %H:%M:%S"),nowlocal)/*,owner*/);
-		}
-		if(!p){FREE_STRING(_timestamp,owner);_timestamp=NULL;}
-	}
-	return disowned_string(_timestamp,owner);
-}
 
 void writeTimestamp(FILE* _file){if(!_file)return;Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _timestamp=owned_string(_getTimestamp(NULL),owner);
@@ -2367,7 +2354,10 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 		outputCommandLineText(string(_manualFeedforwardText)+_cursormovement->written,_cursormovement,getManualFeedforwardTextColor(),-1); // MDH@23SEP2020 NOTE: remember numberOfManualFeedforwardCharactersWritten is a (position/characters written) ULL
 		// replacing:setColor(getManualFeedforwardTextColor());numberOfManualFeedforwardCharactersWritten+=output("%s",string(_manualFeedforwardText)+manualFeedforwardCharactersWrittenSoFar);
 		string_setlength(_manualFeedforwardText,_cursormovement->written); // in case not all characters were actually written
-		if(!string_append(_suggestedText,string(_manualFeedforwardText)))_cursormovement->written=0;
+		if(!string_append(_suggestedText,string(_manualFeedforwardText)))
+			_cursormovement->written=0;
+		else
+			string_append_char(_suggestedText,'#');
 	}
 }
 void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement){
@@ -2375,8 +2365,14 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
 	size_t numberOfIdentifierContinuationCharactersWritten=(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0);
 	// MDH@04OCT2019: append it to the suggested text
-	if(numberOfIdentifierContinuationCharactersWritten>0&&!string_append(_suggestedText,_identifierContinuationCharacters))numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
-	if(numberOfIdentifierContinuationCharactersWritten>0)outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
+	if(numberOfIdentifierContinuationCharactersWritten>0){
+		if(!string_append(_suggestedText,_identifierContinuationCharacters))
+			numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
+		else
+			string_append_char(_suggestedText,'#');
+	}
+	if(numberOfIdentifierContinuationCharactersWritten>0)
+		outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
 		// replacing: {setColor(getIdentifierContinuationTextColor());output("%s",_identifierContinuationCharacters);
 		// replacing: {size_t numberOfIdentifierContinuationCharactersToWrite=numberOfIdentifierContinuationCharactersWritten;while(numberOfIdentifierContinuationCharactersToWrite){outputChar(' ');numberOfIdentifierContinuationCharactersToWrite--;}
 	// return numberOfIdentifierContinuationCharactersWritten; // one less character written than the computed length!!!
@@ -2384,14 +2380,26 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
 void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 	if(!_cursormovement)return;
 	unsigned long long numberOfImmediateFeedforwardCharactersWritten=(_immediateFeedforwardText?string_length(_immediateFeedforwardText):0);
-	if(numberOfImmediateFeedforwardCharactersWritten>0)if(!string_append(_suggestedText,string(_immediateFeedforwardText)))numberOfImmediateFeedforwardCharactersWritten=0; // append to suggested text
-	if(numberOfImmediateFeedforwardCharactersWritten>0)outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+	if(numberOfImmediateFeedforwardCharactersWritten>0){
+		if(!string_append(_suggestedText,string(_immediateFeedforwardText)))
+			numberOfImmediateFeedforwardCharactersWritten=0; // append to suggested text
+		else
+			string_append_char(_suggestedText,'#');
+	}
+	if(numberOfImmediateFeedforwardCharactersWritten>0)
+		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
 }
 void outputAutocompletionCharacters(Mcursormovement* _cursormovement){
 	if(!_cursormovement)return;
 	unsigned long long numberOfAutocompletionCharactersWritten=(_autoCompletionText?string_length(_autoCompletionText):0);
-	if(numberOfAutocompletionCharactersWritten>0)if(!string_append(_suggestedText,string(_autoCompletionText)))numberOfAutocompletionCharactersWritten=0; // append to suggested text
-	if(numberOfAutocompletionCharactersWritten>0)outputCommandLineText(string(_autoCompletionText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
+	if(numberOfAutocompletionCharactersWritten>0){
+		if(!string_append(_suggestedText,string(_autoCompletionText)))
+			numberOfAutocompletionCharactersWritten=0; // append to suggested text
+		else
+			string_append_char(_suggestedText,'#');
+	}
+	if(numberOfAutocompletionCharactersWritten>0)
+		outputCommandLineText(string(_autoCompletionText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
 }
 /* replacing:
 // MDH@22SEP2020: when suggested text is output on the command input line we need to embed prompt length blanks
@@ -3472,8 +3480,11 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 
 	// MDH@22OCT2021 TODO check if we should always update the suggested text constituent parts even if endOfInput is false (as it would be with Tab)
 	if(aSuggestedCharacter){
-		if(!removeFirstSuggestedCharacter(inputChar))
-			result=false; // inputError("Failed to consume suggested character '%c'.");
+		if(!removeFirstSuggestedCharacter(inputChar)){
+			result=false;
+			//inputError("Failed to consume suggested character '%c'.");
+		}else
+			inputInfo("First suggested character '%c' removed!",inputChar);
 	}
 
 	// MDH@24APR2019 obsolete: getUserInputLength()++; // increment the current cursor position
@@ -3929,7 +3940,8 @@ bool interactiveSessionInitialized(){
 bool preparedForUserInput(){
 	//enableRawMode();
 	// disable output buffering on printf (as in raw input mode it would not write at all)
-	bool result=sessionInitialized();
+	// MDH@23OCT2021: initialize the session passing in the prefix and suffix of the output filename
+	bool result=sessionInitialized("M",".log");
 	if(result)
 		output("Window dimensions: %dx%d.\n",getNumberOfWindowTextColumns(),getNumberOfWindowTextLines());
 	else
@@ -4144,9 +4156,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// let's mark the allocations BEFORE we start looping
 
 	// MDH@13MAR2020: echo all requested output to the log file as well, I suppose we should use a timestamp in the name, so we get a different log for each session
-	Mstring* _outputFilename=owned_string(_getTimestamp("%Y-%m-%d.%H:%M:%S"),owner);
+	// MDH@23OCT2021: always logging to M.log (for easy access by user simultaneously)
+	Mstring* _outputFilename=owned_string(__string(),owner); // MDH@23OCT2021 replacing: _getTimestamp("%Y-%m-%d.%H:%M:%S"),owner);
 	if(_outputFilename){
-		if(string_prepend(_outputFilename,"M.")&&string_append(_outputFilename,".log")){
+		if(string_prepend(_outputFilename,"M")&&string_append(_outputFilename,".log")){
 			if(setOutputFilename(string(_outputFilename))){
 				dontEchoToOutputFile(); // turn off what setOutputFilename turned on
 				Mstring* _sessionStartTimestamp=owned_string(_getTimestamp(NULL),owner);
@@ -4679,6 +4692,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 											// MDH@22OCT2021: changed false to true NOW because theoretically it is true now, and so should be marked as true
 											//                this is to prevent from adding the matching parenthesis again!!!!
 											if(commandCharacterAccepted(c,&suggestedInputCharType,true,true)){
+												//string_removed_char(_suggestedText,0); // TEST
 												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
 												if(inputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
 												// MDH@22OCT2021: the consumed suggested character has already been removed by commandCharacterAccepted(), so no need to do that here anymore

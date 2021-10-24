@@ -19,6 +19,8 @@ bool inputCharReadNonBlocking(char* inputChar,UpdateFunction updateFunction); //
 // MDH@27FEB2020 moved over to Mmessage.h: int kbhit(); // check whether keyboard hit
 //int getch();
 
+Mstring* _getTimestamp(char const * const format); // MDH@23OCT2021: moved over here
+
 /////////char getInputChar();
 void endOfUserInput();
 
