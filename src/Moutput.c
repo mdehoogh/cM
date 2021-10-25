@@ -14,6 +14,19 @@ static FILE* outputFile=NULL;
 
 static bool echo_to_output_file=false;
 
+// MDH@25OCT2021: it's better to be able to use a format for printing
+size_t logToOutputFile(const char* fmt,...){
+	size_t result=0;
+	if(outputFile){
+	  va_list args;
+  	va_start(args,fmt);
+  	result=vfprintf(outputFile,fmt,args); // MDH@13MAR2020: echo to the output file if the flag tells us to
+  	fflush(outputFile);
+  	va_end(args);	
+	}
+	return result;
+}
+
 // MDH@28FEB2019: most conveniently to be able to output to the console through a single method that will allow a format string, and any number of arguments
 //                TODO delegate all functions that output to the output device to this function
 // MDH@08OCT2019: it's convenient to know how many characters are actually written
@@ -24,11 +37,11 @@ size_t output(const char *fmt,...){
     fflush(stdout); // MDH@16NOV2020: let's ascertain to see it on any crash
     va_end(args);
     if(echo_to_output_file){
-        va_list args;
-        va_start(args,fmt);
-        vfprintf(outputFile,fmt,args); // MDH@13MAR2020: echo to the output file if the flag tells us to
-        fflush(outputFile);
-        va_end(args);
+      va_list args;
+      va_start(args,fmt);
+      vfprintf(outputFile,fmt,args); // MDH@13MAR2020: echo to the output file if the flag tells us to
+      fflush(outputFile);
+      va_end(args);
     }
     return(result<0?0:result);
 } // NOTE use vprintf here, NOT printf!!!!
@@ -45,8 +58,9 @@ bool setOutputFilename(char const * const outputFilename){
     }
     return echo_to_output_file;
 }
+// MDH@25OCT2021: now delegating to logToOutputFile which accepts a format specification and variable number of arguments
 size_t outputToFile(char const * const prefix,char const * const str,char const * const suffix){
-    return(outputFile?fprintf(outputFile,"%s%s%s",(prefix?prefix:""),(str?str:""),(suffix?suffix:"")):0);
+    return logToOutputFile("%s%s%s",(prefix?prefix:""),(str?str:""),(suffix?suffix:""));
 }
 
 // convenience methods delegating to output() so all output (to stdout by default) goes through function output()
