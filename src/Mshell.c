@@ -687,6 +687,9 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 // MDH@05AUG2019: the do function allows for executing a single command in its own environment, so all variables created are local
 //                the problem is that we want to allow the user to enter a list of token things i.e. an infinite list of arguments instead of having to wrap the single argument in a list itself
 //                this is solvable if we convert the list of arguments to a single Mvalue wrapping the entire list of arguments before calling Mdofunction
+// MDH@23OCT2021: I had a marvelous idea i.e. to simply return the environment do creates
+//                as we can wrap it in a value, this way it can be retained by assigning it
+//                and therefore become an 'object' that can be accessed (and have 'methods')
 Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	if(_doTokenValue&&_doTokenValue->type==VT_LIST){
@@ -709,6 +712,7 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 					//                        which should be able to take over membership
 					//                        which means you have to disown the environment!!!!
 					if(pushExecutionEnvironment(disowned_environment(_doEnvironment,owner))){ // _doEnvironment bound!!!
+						// MDH@25OCT2021: _doEnvironment is now wrapped in a value but for now we do not have access to it
 						// NOTE luckily we know who is owning the environment now (as it is now wrapped inside a value), so we can still register the variables (see below)
 						// evaluate the first argument inside the do environment (we have to because we're executing the command in the current environment as well)
 						Mlistelement* tokenValueListelement=doList->_first;
@@ -753,9 +757,12 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 							// move over to the next expression to evaluate...
 							tokenValueListelement=tokenValueListelement->_next;
 						}
+						_result=popExecutionEnvironment();
+						/* MDH@25OCT2021: replacing
 						Mvalue* doResultValue=getValue(_doEnvironment,"$");
 						_result=(doResultValue?doResultValue:expressionValue);
 						popExecutionEnvironment(); // pop the do environment we successfully pushed
+						*/
 					}else // _doEnvironment disowned, but not bound
 						free_environment(_doEnvironment);
 				}else{ // _doEnvironment bound to this function, so both disowned and free

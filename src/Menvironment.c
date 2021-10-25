@@ -69,18 +69,22 @@ bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner
         outputExecutionEnvironmentName("New execution environment '","'.\n");
     return true;
 }/* NOT VALIDATED */
-void popExecutionEnvironment(){
+// MDH@25OCT2021: the brilliant idea I had two days ago will return the value that wraps the popped environment
+//                so it can be used as 'object'
+Mvalue* popExecutionEnvironment(){
     Menvironment* _executionEnvironment=getExecutionEnvironment();
-    if(!_executionEnvironment){outputBug("No environment left to pop!");return;} // nothing to pop
+    if(!_executionEnvironment){outputBug("No environment left to pop!");return NULL;} // nothing to pop
     // NOTE only execution environments that have a parent can be popped!!!
     // MDH@03FEB2020: freeing the current execution environment value will NULL the execution field (i.e. releasing the reference to the environment it points to), so by remembering it here, we can use it AFTER the free_value call
     Mvalue* _nextExecutionEnvironmentValue=_executionEnvironment->execution; 
-    if(!_nextExecutionEnvironmentValue){outputBug("Can't pop the top-most environment!");return;}
+    if(!_nextExecutionEnvironmentValue){outputBug("Can't pop the top-most environment!");return NULL;}
     // OOPS the following is wrong because only the garbage collector is allowed to free values: free_value(_executionEnvironmentValue); // MDH@03FEB2020 replacing: free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     // MDH@03FEB2020 by assigning to _executionEnvironmentValue the reference count to the environment is incremented again so it will not be 'garbage collected'!!!!
-    assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
+    Mvalue* _result=_executionEnvironmentValue; // i.e. what getEnvironment() would return!!!
+		assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
     if(amVerboseDebugging())
         outputExecutionEnvironmentName("Returned to execution environment '","'.\n");
+		return _result;
 }/* NOT VALIDATED */
 Mvalue* getEnvironment(){
     return _executionEnvironmentValue;

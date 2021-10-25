@@ -9,7 +9,7 @@
 
 // definitions of Mfunction and Menvironment moved over to the end of Mvalue.h as we use it there as well
 bool pushExecutionEnvironment(Menvironment* _environment);
-void popExecutionEnvironment(); // should never go wrong (a bug is reported if there's no environment to pop though)
+Mvalue* popExecutionEnvironment(); // should never go wrong (a bug is reported if there's no environment to pop though)
 Menvironment* getExecutionEnvironment(); // the current environment
 Mallocationowner getOwnerExecutionEnvironment(); // MDH@31MAY2020
 Mstring* _getExecutionEnvironmentName();
