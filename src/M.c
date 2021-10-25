@@ -1024,7 +1024,7 @@ size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharac
 void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _promptTimestamp=owned_string(_getTimestamp(NULL),owner); // should return a disowned timestamp, so we do not need to obtain ownership that we need to detach on calling free_string
 	if(!_promptTimestamp)return;
-	outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
+	//outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
 	FREE_STRING(_promptTimestamp,owner);
 }
 
@@ -2157,11 +2157,15 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
 	if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show
-	
+	/*
 	Mstring* _showResultTimestamp=owned_string(_getTimestamp(NULL),owner);
-	if(_showResultTimestamp){outputToFile("@",string(_showResultTimestamp),":\n");FREE_STRING(_showResultTimestamp,owner);}else outputError("Failed to obtain a timestamp");
-	
+	if(_showResultTimestamp){
+		outputToFile("@",string(_showResultTimestamp),":\n");
+		FREE_STRING(_showResultTimestamp,owner);
+	}else
+		outputError("Failed to obtain a timestamp");
 	echoToOutputFile();
+	*/
 
 	// output the commandText
 	if(_commandText){output("%s",string(_commandText));FREE_STRING(_commandText,owner);}else output("%sFailed to obtain the command result text",M_ERROR_PREFIX);
@@ -2171,12 +2175,15 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	clock_t before_writing=clock();size_t written=outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);long long elapsed_writing=(clock()-before_writing)/M_CLOCKS_PER_MS;
 	
 	newline(); // outputValueColored() doesn't do that!!
-	
+	/*
 	Mstring* _doneShowingResultTimestamp=owned_string(_getTimestamp(NULL),owner);
-	if(_doneShowingResultTimestamp){outputToFile(">",string(_doneShowingResultTimestamp),"\n");FREE_STRING(_doneShowingResultTimestamp,owner);}else outputError("Failed to obtain a timestamp");
-	
+	if(_doneShowingResultTimestamp){
+		outputToFile(">",string(_doneShowingResultTimestamp),"\n");
+		FREE_STRING(_doneShowingResultTimestamp,owner);}
+	else
+		outputError("Failed to obtain a timestamp");
 	dontEchoToOutputFile();
-
+	*/
 	if(elapsed_writing>0)output("The writing took %lld ms.\n",elapsed_writing);
 
 	///// outputValueColored() does do this (and should): resetOutputColor();
@@ -2565,6 +2572,7 @@ void showSuggestedText(){
 
 	toUserInputCursorPosition(-cursormovement.lines);
 
+	logToOutputFile("\t\t\tSuggested text: '%s'\n",string(_suggestedText));
 	/* replacing:
 	numberOfSuggestedCharactersWritten=cursormovement.written+cursormovement.skipped;
 
@@ -4289,7 +4297,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
 				////outputChar('A');
-				if(!_manualFeedforwardText||string_length(_manualFeedforwardText)==0)updateImmediateFeedforwardTextOfUserInputCommand();
+				if(!_manualFeedforwardText||string_length(_manualFeedforwardText)==0)
+					updateImmediateFeedforwardTextOfUserInputCommand();
 				////outputChar('B');
 				// MDH@03OCT2019: some feed forward texts are also current token specific, therefore we need to sync the feed forward texts
 				//                TODO perhaps we should distinguish between feed forward and auto completion (as with the brackets)
@@ -4317,6 +4326,12 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			// hide the suggested text again before processing the character read
 			if(inputMode==IM_COMMAND){
 				hideSuggestedText();
+				/*
+				Mstring* _commandText=owned_string(_getCommandText(false),owner);
+				logToOutputFile("\nCommand: '%s'\n",string(_commandText));
+				FREE_STRING(_commandText,owner);
+				*/
+				logToOutputFile("\tInput character: '%c'\n",inputChar);
 			}
 
 			////////inputChar=getInputChar();
@@ -4336,7 +4351,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				if(!amVerboseDebugging())outputStatus(inputChar,inputCharType);
 			}
 			*/
-			////////printf("(%d)",inputCharType);
+			logToOutputFile("\t\tInput char type: (%d)\n",inputCharType);
 
 			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE getUserInputLength() is only defined in the other two modes)
 			// MDH@16APR2019: I want to use the Enter key (ASCII 13) to switch to the next mode, because the associated input character type is n which will ALWAYS break
