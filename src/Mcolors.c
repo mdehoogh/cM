@@ -60,9 +60,10 @@ const char* RESULT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
 const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the info color
 
 // MDH@26SEP2019: distinguishing between identifier continuation text and feed forward text (behind the cursor)
-const char* FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARKER_GREY};
-const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019
-const char* MANUAL_FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={GREY,GREY}; // MDH@07OCT2019
+const char* FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN};
+const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,DARK_YELLOW}; //{LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019
+const char* MANUAL_FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY}; // MDH@07OCT2019
+const char* AUTO_COMPLETION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,DARK_RED}; // MDH@27OCT2021
 // operator token colors (all the same)
 const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
 
@@ -78,6 +79,7 @@ const char* getErrorColor(){return ERROR_COLORS[colorscheme];}
 const char* getFeedForwardTextColor(){return FEED_FORWARD_TEXT_COLORS[colorscheme];}
 const char* getManualFeedforwardTextColor(){return MANUAL_FEED_FORWARD_TEXT_COLORS[colorscheme];}
 const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for generated feed forward text
+const char* getAutoCompletionTextColor(){return AUTO_COMPLETION_TEXT_COLORS[colorscheme];} // MDH@27OCT2021: special color for generated auto completion text
 const char* getCommentColor(){return COMMENT_COLORS[colorscheme];}
 const char* getOperatorTokenColor(uint8_t opid){return OPERATOR_TOKEN_COLORS[opid][colorscheme];}
 const char* getValueTokenColor(uint8_t tokentypeid){return VALUE_TOKEN_COLORS[tokentypeid][colorscheme];}
