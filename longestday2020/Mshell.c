@@ -1786,13 +1786,17 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 	}
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
 	long long numberOfRequestedDecimals=getValueInteger(value);
-	if(numberOfRequestedDecimals==M_LL_INVALID){
-		output("%s",M_ERROR_PREFIX);
-		outputValue("Argument '",value,"' to the pi() function should denote a valid small integer, which it does not.\n");
-		return NULL;
-	}
 	if(numberOfRequestedDecimals<6){
-		output("%sNumber of requested decimals to compute pi (%lld) should at least equal 6, which it does not.\n",M_ERROR_PREFIX,numberOfRequestedDecimals);
+		output("%s",M_ERROR_PREFIX);
+		outputValue("Argument '",value,"' to the pi() function should ");
+		if(numberOfRequestedDecimals==M_LL_INVALID)
+			output("denote a valid small integer");
+		else
+		if(numberOfRequestedDecimals<=0)
+			output("denote a positive integer");		
+		else
+			output("at least equal 6");	
+		output(", which it does not!\n");
 		return NULL;
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
