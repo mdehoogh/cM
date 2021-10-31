@@ -980,13 +980,15 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 	mpd_ssize_t decimalprecision=mpd_context->prec;
 	if(decimalprecision<=0){outputError("Cannot approximate pi: no decimal context available");return NULL;}
 
+	//output("Decimal precision: %lld.\n",decimalprecision);
+
 	Mdecimal* _decimal=NULL; // the result
 
 	// if pi already exists in the given decimal context return it, but we need to wrap a copy in the decimal
 	if(!decimalcontext->pi){
 
-		//if(amVerbose())
-		output("Computing %lld digits of pi.\n",decimalprecision); // MDH@17JUN2020: this includes the digit in front of the period (i.e. 3)
+		if(amVerbose())
+			output("Computing %lld digits of pi.\n",decimalprecision); // MDH@17JUN2020: this includes the digit in front of the period (i.e. 3)
 
 		// initialize the variables we need for the iterations
 #ifdef __ADEBUG__

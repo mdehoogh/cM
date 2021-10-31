@@ -1205,8 +1205,8 @@ Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocat
     }
     _value->value._list=(disowned_list?owned_list(_list,owner_value_data):_list); // MDH@09JUN2020: _value is to take over ownership of _list
     _value->type=VT_LIST;
-    if(amVerboseDebugging())
-        output("%s list wrapped.\n",(disowned_list?"disowned":"owned"));
+    if(amVerbose())
+        output("%s list wrapped.\n",(disowned_list?"Disowned":"Owned"));
     return _value;
 }/* VALIDATED */
 

@@ -2430,7 +2430,7 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 	// _value should be a positive integer defining the required precision
 	if(amVerboseDebugging())output("Computing pi using decimals.\n");
 	// MDH@18JUN2020: if a list of values
-	if(value->type==VT_LIST&&isValueUndefined(computesinetableValue)){
+	if(value&&value->type==VT_LIST&&isValueUndefined(computesinetableValue)){
 		Mlist* _piList=owned_list(__list("pi"),owner);
 		Mlistelement* listelement=value->value._list->_first;
 		while(listelement){
@@ -2440,7 +2440,11 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 		return _getValueOfList(disowned_list(_piList,owner));
 	}
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
-	long long numberOfRequestedDecimals=getValueInteger(value);
+	long long numberOfRequestedDecimals=getDP();
+	if(value)numberOfRequestedDecimals=getValueInteger(value);
+	else 
+	if(!amVerbose())
+		output("No decimal precision specified! Will use the current default decimal precision (%lld)!\n",numberOfRequestedDecimals);
 	if(numberOfRequestedDecimals<6){
 		output("%s",M_ERROR_PREFIX);
 		outputValue("Argument '",value,"' to the pi() function should ");
