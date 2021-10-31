@@ -2498,49 +2498,56 @@ void writeSuggestedText(bool updateUserInputCommandIdentifierContinuationText){
 //                NOTE that _suggestedText itself is not consumed and would therefore need to be updated afterwards to sync it again
 //                NOTE that consumption of suggested characters only happens one at a time with right arrow and by token with tab
 bool removeFirstSuggestedCharacter(char suggestedChar){
-	bool result=false;
+	bool result=true;
 	if(_manualFeedforwardText&&string_length(_manualFeedforwardText)>0){
 		char c=string_char(_manualFeedforwardText,0);
-		if(suggestedChar!=c)
+		if(suggestedChar!=c){
+			result=false;
 			inputError("First manual feed forward character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		else
-		if(suggestedChar!=string_removed_char(_manualFeedforwardText,0))
+		}else
+		if(suggestedChar!=string_removed_char(_manualFeedforwardText,0)){
+			result=false;
 			inputError("Failed to remove the first manual feed forward character '%c'.",c);
-		else
-			result=true;
+		}
 	}else
 	if(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0){
 		char c=_identifierContinuationCharacters[0];
-		if(suggestedChar!=c)
+		if(suggestedChar!=c){
+			result=false;
 			inputError("First identifier continuation character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		else
-		if(!deleteFirstIdentifierContinuationCharacter())
+		}else
+		if(!deleteFirstIdentifierContinuationCharacter()){
+			result=false;
 			inputError("Failed to remove the first identifier continuation character '%c'!",c);
-		else
-			result=true;
+		}
 	}else
 	if(_immediateFeedforwardText&&string_length(_immediateFeedforwardText)>0){
 		char c=string_char(_immediateFeedforwardText,0);
-		if(suggestedChar!=c)
+		if(suggestedChar!=c){
+			result=false;
 			inputError("First immediate feed forward character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		else
-		if(suggestedChar!=string_removed_char(_immediateFeedforwardText,0))
+		}else
+		if(suggestedChar!=string_removed_char(_immediateFeedforwardText,0)){
+			result=false;
 			inputError("Failed to remove the first immediate feed forward character '%c'.",c);
-		else
-			result=true;
+		}
 	}else
 	if(_autoCompletionText&&string_length(_autoCompletionText)>0){
 		// BUG FIX: _autoCompletionText is like _suggestedText a composed text i.e. it is the concatenation of all token auto completion texts
 		//          therefore you need to remove the first of the characters in the token auto completion texts instead
 		// NOTE this is actually the only place where deleteFirstAutocompletionCharacter is called!!!!!
 		char c=string_char(_autoCompletionText,0);
-		if(suggestedChar!=c)
+		if(suggestedChar!=c){
+			result=false;
 			inputError("First auto completion character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		else
-		if(!deleteFirstAutocompletionCharacter(suggestedChar,true)) // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
+		}else
+		if(!deleteFirstAutocompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
+			result=false;
 			inputError("Failed to remove the consumed auto completion character '%c'.",c);
-		else
-			result=true;
+		}
+	}else{
+		result=false;
+		inputError("Suggested character '%c' not recognized!",suggestedChar);
 	}
 	return result;
 }
@@ -3400,9 +3407,10 @@ static void newCommandLine(bool newline){
 //                the aSuggestedCharacter flag tells commandCharacterAccepted() that the input character came from feedforwardText (the feed forward), so it will in that case not alter feedforwardText (by removing the same character that was entered)
 // MDH@26JUN2020: should now also keep track of the total number of command characters on the current user input line (numberOfLineCommandCharacters)
 // MDH@19OCT2020: we are going to return not just true (1) or false (0) but a value that tells a little more (e.g. whether or not a new token was started)
-const uint8_t NEW_TOKEN_CHARACTER=2;
-const uint8_t FINISHING_TOKEN_CHARACTER=4;
-uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
+const int8_t NEW_TOKEN_CHARACTER=2;
+const int8_t FINISHING_TOKEN_CHARACTER=4;
+// non-positive values indicate errors
+int8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
 	/////outputChar('1');
@@ -3442,7 +3450,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	// MDH@28OCT2019: all the code that deals with updating the tokens 
 	//                NOTE passing in the address of _userInputCommand->_lastToken, so it can be changed!!!!
 	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(_userInputCommand,inputChar,inputCharacterType,endOfInput);
-	if(!newLastCommandToEvaluateToken)return 0;
+	if(!newLastCommandToEvaluateToken)return -1;
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
 		result|=NEW_TOKEN_CHARACTER;
 		_userInputCommand->_lastToken=owned_token(newLastCommandToEvaluateToken,Msubowner(owner_userInputCommand,1)); // MDH@28MAY2020: take over ownership of the new last command token
@@ -3493,7 +3501,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	if(aSuggestedCharacter){
 		inputInfo("Consuming first suggested character '%c'.",inputChar);
 		if(!removeFirstSuggestedCharacter(inputChar)){
-			result=false;
+			result=-2;
 			//inputError("Failed to consume suggested character '%c'.",inputChar);
 		}else
 			inputInfo("First suggested character '%c' removed!",inputChar);
@@ -4462,7 +4470,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						while(*inputChars){
 							inputChar=*inputChars;
 							inputCharType=INPUTCHARACTERTYPES[inputChar];
-							if(!commandCharacterAccepted(inputChar,&inputCharType,true,false))break;
+							if(commandCharacterAccepted(inputChar,&inputCharType,true,false)<=0)break;
 							inputChars++;
 						}
 					}else
@@ -4566,7 +4574,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						// MDH@19OCT2020: is there a way somehow to consume characters until the token is finished or a new token starts??????????
 						//                in essence at least a single character needs to be accepted
 						size_t numberOfSuggestedCharactersConsumed=0;
-						uint8_t characterAccepted=0;
+						int8_t characterAccepted=0;
 						while(numberOfSuggestedCharactersConsumed<numberOfCharactersToConsume){
 							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersConsumed);
 							if(!newInputChar){
@@ -4587,9 +4595,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							// TODO shouldn't endOfInput equal true instead of false????
 							// NOTE with endOfInput defined as false, true doesn't have any effect unless I change that!!!
 							characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):1);
-							if(characterAccepted==0) // the character was not accepted
+							if(characterAccepted<=0){ // the character was not accepted
 								inputCharType=switchToControlMode("Failed to accept a suggested character.");
-							else
+							}else
 							if(characterAccepted>1&&numberOfSuggestedCharactersConsumed>0)
 								inputCharType=switchToControlMode("Not all suggested characters accepted.");
 							// if some error occurred we're no longer in command mode anymore
@@ -4715,7 +4723,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 											// MDH@21SEP2020: it is a suggested character isn't it????? didn't help changing false to true!!!!
 											// MDH@22OCT2021: changed false to true NOW because theoretically it is true now, and so should be marked as true
 											//                this is to prevent from adding the matching parenthesis again!!!!
-											if(commandCharacterAccepted(c,&suggestedInputCharType,true,true)){
+											if(commandCharacterAccepted(c,&suggestedInputCharType,true,true)>0){
 												//string_removed_char(_suggestedText,0); // TEST
 												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
 												if(inputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
@@ -4839,12 +4847,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						
 						//inputInfo("Consuming the first suggested character!");
 						///// no need for this!!! char firstSuggestedCharacterInputType=INPUTCHARACTERTYPES[firstSuggestedCharacter];
-						if(!commandCharacterAccepted(inputChar,&inputCharType,true,true))
+						int8_t result=commandCharacterAccepted(inputChar,&inputCharType,true,true);
+						if(result<=0){
+							if(result!=-2)
+								inputError("Invalid result (%i) of processing the first accepted character!\n",result);
 						/* replacing:
 						char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed(inputChar,true);
 						if(!firstSuggestedCharacterConsumed)
 						*/
-							inputCharType=switchToControlMode("Failed to accept the matching first suggested character.");
+							//inputCharType=switchToControlMode("Failed to accept the matching first suggested character.");
+						}
 						// MDH@22OCT2021: no need to do the following anymore because commandCharacterAccepted() takes care of removing the consumed suggested character: 
 						// else deleteFirstSuggestedCharacter(firstSuggestedCharacterConsumed,false);
 					}else{
@@ -4853,7 +4865,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						//                OOPS a backtick inside a string is also recognized as such which shouldn't happen
 						//                ALSO because the backtick will be visible it's probably better to insert an empty token for it of type TT_NEWLINE or something like that
 						//                it's probably best to check whether to accept a backtick here???? NOTE we could have backticks in commands read from files as well????
-						if(commandCharacterAccepted(inputChar,&inputCharType,true,false)){
+						if(commandCharacterAccepted(inputChar,&inputCharType,true,false)>0){
 							// outputChar('X');
 							if(inputCharType==' '){ // a newline request (whenever M_NEWLINE_CHARACTER is input at a functional position)
 								newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true);
