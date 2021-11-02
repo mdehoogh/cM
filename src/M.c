@@ -512,6 +512,22 @@ char getFirstIdentifierContinuationCharacter(){
 	inputInfo("%s","Determining the first identifier continuation character!");
 	return(_identifierContinuationCharacters?_identifierContinuationCharacters[0]:'\0');
 }
+char firstIdentifierContinuationCharacterRemoved(){
+	char identifierContinuationCharacterToRemove=(_identifierContinuationCharacters?_identifierContinuationCharacters[0]:'\0');
+	if(identifierContinuationCharacterToRemove!='\0'){ // something to remove i.e. the length is at least 1
+		if(strlen(_identifierContinuationCharacters)>1){ // something left over
+			char* newIdentifierContinuationText=strdup(_identifierContinuationCharacters+1); // get dynamic copy of remainder, ignore if we fail!!!
+			if(newIdentifierContinuationText){ // the part to replace created!!
+				free(_identifierContinuationCharacters);
+				_identifierContinuationCharacters=newIdentifierContinuationText;
+			}else // failure
+				identifierContinuationCharacterToRemove='\0';
+		}else
+			_identifierContinuationCharacters[0]='\0';
+	}
+	return identifierContinuationCharacterToRemove;
+}
+/* replacing:
 bool deleteFirstIdentifierContinuationCharacter(){
 	if(!_identifierContinuationCharacters)return false;
 	// not undefined or empty...
@@ -520,6 +536,7 @@ bool deleteFirstIdentifierContinuationCharacter(){
 	_identifierContinuationCharacters=newIdentifierContinuationText; // NOTE if we failed to copy the remainder, we get NULL now
 	return true;
 }
+*/
 char* _identifierContinuationOptionalCharacters=NULL; // the set of characters expected next of existing identifiers
 // MDH@26SEP2019: we create a separate method that will determine the last token identifier continuation text and continuation characters
 void deleteIdentifierContinuation(){
@@ -805,6 +822,7 @@ void removeFirstFeedforwardCharacterFromLastTokenWhenMatching(char inputChar){
 	_autocompletiontext->_text=_leftover;
 }
 */
+/* MDH@02NOV2021: for now we return to calling firstAutocompletionCharacterRemoved instead of delete..., and taking the first character of _autocompletionText instead of actually calling the following function
 // MDH@30SEP2019: here the problem is that if we remove the first feed forward character we loose the token reference that generated it
 //                so we might split up this functionality in two parts: 1. get the first feed forward character 2. remove it either by consuming it or delete if it disappears completely
 //                alternatively we can simply remove the character but not remove the feed forward text when it becomes empty, that way we can still consume the feed forward text
@@ -873,10 +891,12 @@ bool deleteFirstAutocompletionCharacter(char firstAutocompletionCharacter,bool c
 		inputError("No first suggested character to remove.");
 	return false;
 }
+*/
 // MDH@30SEP2019: TODO still using the following for true feed forward deletes but should in due course be replaced by using the above two methods
-char getFirstAutocompletionCharacterRemoved(){
-	if(amVerbose())inputInfo("%s","Determining the first feed forward character!");
-	char firstAutocompletionCharacterRemoved='\0';
+// MDH@02NOV2021: apparently NOT replacing firstAutocompletionCharacterRemoved()!!!!
+char firstAutocompletionCharacterRemoved(){
+	if(amVerboseDebugging())inputInfo("Determining the first auto completion character!");
+	char autocompletionCharacterRemoved='\0';
 	// find first feed forward text with text (so skipping all without text)
 	Mtokenautocompletiontext *prevtokenautocompletiontext=NULL,*tokenautocompletiontext=_firstTokenautocompletiontext;
 	while(tokenautocompletiontext&&(!tokenautocompletiontext->_text||tokenautocompletiontext->_text->chars[0]=='\0'))
@@ -886,9 +906,9 @@ char getFirstAutocompletionCharacterRemoved(){
 		if(p){
 			size_t l=strlen(p->chars); // the number of autocompletion characters
 			if(l>0){ // there is a first autocompletion character
-				firstAutocompletionCharacterRemoved=p->chars[0];
+				autocompletionCharacterRemoved=p->chars[0];
 				deleteAutocompletionText(); // ESSENTIAL otherwise it wouldn't update the feed forward text when it needs to (when writing the behind cursor text!!)
-				if(amVerbose())inputInfo("First feed forward character '%c'.",firstAutocompletionCharacterRemoved);
+				if(amVerboseDebugging())inputInfo("First auto completion character '%c'.",autocompletionCharacterRemoved);
 				// replace the current text by what's behind the first character (if any)
 				tokenautocompletiontext->_text=(l>1?owned_chars(_getChars(p->chars+1),Msubowner(owner_tokenAutoCompletionTexts,1)):NULL);
 				FREECHARS(p,owner_tokenAutoCompletionTexts); // free the currently used dynamic memory still pointed to by p // MDH@11JUN2020: i.e. freeChars called on the disowned Mchars*
@@ -900,12 +920,12 @@ char getFirstAutocompletionCharacterRemoved(){
 					if(prevtokenautocompletiontext)prevtokenautocompletiontext->_next=nexttokenautocompletiontext;else _firstTokenautocompletiontext=nexttokenautocompletiontext;
 				}
 			}else
-				inputError("%s","No feed forward characters!");
+				inputError("No auto completion characters!");
 		}else
-			inputError("%s","No feed forward text!");
+			inputError("No auto completion text!");
 	}else
-		inputError("%s","No feed forward found!");	
-	return firstAutocompletionCharacterRemoved;
+		inputError("No auto completion text found!");	
+	return autocompletionCharacterRemoved;
 }
 /*
 // a character can be 'anonymously' prepended to the feed forward text
@@ -2497,61 +2517,86 @@ void writeSuggestedText(bool updateUserInputCommandIdentifierContinuationText){
 // MDH@22OCT2021: central point where a consumed suggested character (from _suggestedText) is removed from one of the constituent parts
 //                NOTE that _suggestedText itself is not consumed and would therefore need to be updated afterwards to sync it again
 //                NOTE that consumption of suggested characters only happens one at a time with right arrow and by token with tab
-bool removeFirstSuggestedCharacter(char suggestedChar){
+bool removeFirstSuggestedCharacter(char inputChar){
 	bool result=true;
 	if(_manualFeedforwardText&&string_length(_manualFeedforwardText)>0){
-		char c=string_char(_manualFeedforwardText,0);
-		if(suggestedChar!=c){
+		char firstManualFeedForwardCharacter=string_char(_manualFeedforwardText,0);
+		if(inputChar!='\0'&&inputChar!=firstManualFeedForwardCharacter){
 			result=false;
-			inputError("First manual feed forward character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		}else
-		if(suggestedChar!=string_removed_char(_manualFeedforwardText,0)){
-			result=false;
-			inputError("Failed to remove the first manual feed forward character '%c'.",c);
+			logToOutputFile("%sFirst manual feed forward character '%c' does not match the consumed suggested character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter,inputChar);
+		}else{
+			char manualFeedForwardCharacterRemoved=string_removed_char(_manualFeedforwardText,0);
+			if(manualFeedForwardCharacterRemoved=='\0'||(manualFeedForwardCharacterRemoved!=inputChar&&inputChar!='\0')){
+				result=false;
+				logToOutputFile("%sFailed to remove the first manual feed forward character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter);
+			}
 		}
 	}else
 	if(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0){
-		char c=_identifierContinuationCharacters[0];
-		if(suggestedChar!=c){
+		char firstIdentifierContinuationCharacter=_identifierContinuationCharacters[0];
+		if(inputChar!='\0'&&inputChar!=firstIdentifierContinuationCharacter){
 			result=false;
-			inputError("First identifier continuation character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		}else
-		if(!deleteFirstIdentifierContinuationCharacter()){
-			result=false;
-			inputError("Failed to remove the first identifier continuation character '%c'!",c);
+			inputError("First identifier continuation character '%c' does not match the consumed suggested character '%c'.",firstIdentifierContinuationCharacter,inputChar);
+		}else{
+			// MDH@02NOV2021: here we replaced delete... by firstIdentifierContinuationCharacterRemoved() similar to what we do with the other feed forward constituent parts
+			char identifierContinuationCharacterRemoved=firstIdentifierContinuationCharacterRemoved();
+			if(identifierContinuationCharacterRemoved=='\0'||(firstIdentifierContinuationCharacter!=inputChar&&inputChar!='\0')){
+				result=false;
+				logToOutputFile("%sFailed to remove the first identifier continuation character '%c'!",firstIdentifierContinuationCharacter);
+			}
 		}
 	}else
 	if(_immediateFeedforwardText&&string_length(_immediateFeedforwardText)>0){
-		char c=string_char(_immediateFeedforwardText,0);
-		if(suggestedChar!=c){
+		char firstImmediateFeedforwardCharacter=string_char(_immediateFeedforwardText,0);
+		if(inputChar!='\0'&&inputChar!=firstImmediateFeedforwardCharacter){
 			result=false;
-			inputError("First immediate feed forward character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		}else
-		if(suggestedChar!=string_removed_char(_immediateFeedforwardText,0)){
-			result=false;
-			inputError("Failed to remove the first immediate feed forward character '%c'.",c);
+			logToOutputFile("%sFirst immediate feed forward character '%c' does not match the input character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter,inputChar);
+		}else{
+			char immediateFeedforwardCharacterRemoved=string_removed_char(_immediateFeedforwardText,0);
+			if(immediateFeedforwardCharacterRemoved=='\0'||(inputChar!='\0'&&immediateFeedforwardCharacterRemoved!=inputChar)){
+				result=false;
+				logToOutputFile("%sFailed to remove the first immediate feed forward character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter);
+			}
 		}
 	}else
 	if(_autoCompletionText&&string_length(_autoCompletionText)>0){
 		// BUG FIX: _autoCompletionText is like _suggestedText a composed text i.e. it is the concatenation of all token auto completion texts
 		//          therefore you need to remove the first of the characters in the token auto completion texts instead
 		// NOTE this is actually the only place where deleteFirstAutocompletionCharacter is called!!!!!
-		char c=string_char(_autoCompletionText,0);
-		if(suggestedChar!=c){
+		char firstAutoCompletionCharacter=string_char(_autoCompletionText,0); // NOTE __not__ using getFirstAutocompletionCharacter anymore!!!!
+		if(inputChar!='\0'&&inputChar!=firstAutoCompletionCharacter){
 			result=false;
-			inputError("First auto completion character '%c' does not match the consumed suggested character '%c'.",c,suggestedChar);
-		}else
-		if(!deleteFirstAutocompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
-			result=false;
-			inputError("Failed to remove the consumed auto completion character '%c'.",c);
+			logToOutputFile("First auto completion character '%c' does not match the consumed suggested character '%c'.",firstAutoCompletionCharacter,inputChar);
+		}else{
+			char autocompletionCharacterRemoved=firstAutocompletionCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
+			if(autocompletionCharacterRemoved=='\0'||(inputChar!='\0'&&autocompletionCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutocompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
+				result=false;
+				logToOutputFile("%sFailed to remove the first auto completion character '%c'.",firstAutoCompletionCharacter);
+			}
 		}
 	}else{
 		result=false;
-		inputError("Suggested character '%c' not recognized!",suggestedChar);
+		if(inputChar!='\0')
+			logToOutputFile("%sSuggested input character '%c' not consumed!",M_ERROR_PREFIX,inputChar);
+		else
+			logToOutputFile("%sFailed to find (and consume) the first suggested character!",M_ERROR_PREFIX);
 	}
 	return result;
 }
-
+/*
+// MDH@02NOV2021: consuming a suggested character depends on the current input character and the suggested text
+//                if we fail to remove the matching 
+void consumeFirstSuggestedCharacter(char inputChar){
+	// should only fail when the first suggested character matches inputChar, and failing to remove that character
+	if(inputChar){
+		if(inputChar==getFirstSuggestedCharacter()&&!removeFirstSuggestedCharacter(inputChar))
+			inputError("%sFailed to consume suggested character '%c'. See the log file for details!",M_BUG_PREFIX,inputChar);
+	}else{ // typically the result of arrow right
+		if(!removeFirstSuggestedCharacter('\0'))
+			logToOutputFile("%sFailed to consume the first suggested character. See the log file for details!");
+	}
+}
+*/
 // MDH@01OCT2019: it's better to show the suggested text JIT i.e. just before asking the user for input
 //                this is also better because at that moment we know the user should be seeing it
 unsigned long long numberOfSuggestedCharactersWritten=0; // MDH@23SEP2020: basically storing both line position and number of characters written but corrected in showSuggestedText
@@ -3409,7 +3454,7 @@ static void newCommandLine(bool newline){
 // MDH@19OCT2020: we are going to return not just true (1) or false (0) but a value that tells a little more (e.g. whether or not a new token was started)
 const uint8_t NEW_TOKEN_CHARACTER=2;
 const uint8_t FINISHING_TOKEN_CHARACTER=4;
-const uint8_t REMOVE_SUGGESTED_CHARACTER_FAILURE=64;
+// obsolete: const uint8_t REMOVE_SUGGESTED_CHARACTER_FAILURE=64;
 const uint8_t NO_USER_INPUT_ERROR=128;
 // upper bits indicate errors, 
 uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
@@ -3427,7 +3472,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	if(!_userInputCommand){inputError("%sNo user input command.",M_BUG_PREFIX);return NO_USER_INPUT_ERROR;}
 	
 	uint8_t result=1;
-
+	/* MDH@02NOV2021: aSuggestedCharacter already represents whether or not the first sugggested character was consumed in the process!!!
 	if(aSuggestedCharacter){
 		inputInfo("Consuming first suggested character '%c'.",inputChar);
 		if(!removeFirstSuggestedCharacter(inputChar)){
@@ -3436,7 +3481,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		}else
 			inputInfo("First suggested character '%c' removed!",inputChar);
 	}
-
+	*/
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	/////outputChar('3');
 	// MDH@21SEP2020: clearInfo() is also responsible for the problem with right arrow because the result is that the character is output one line down with every right arrow
@@ -3642,6 +3687,7 @@ char getFirstSuggestedCharacter(/*bool autogenerated*/){
 	// MDH@27OCT2021: somehow the following does not seem to work, and it makes perfect sense to use the first character of _suggestedText (if any) NOTE the first character could be the end of text character '\0' which is allowed
 	// replacing: return(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0?getFirstIdentifierContinuationCharacter():getFirstAutocompletionCharacter(autogenerated));
 }
+
 /* only called once
 // MDH@01OCT2019: I created consumeFirstSuggestedCharacter() today to consume the first suggested character but initially called commandCharacterAccepted with endOfInput flag equal to false
 //                I suppose that was wrong because there's exactly one character being accepted and that's also the end of input character 
@@ -4505,7 +4551,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						///////writeSuggestedText(false);
 					}else
 					if(_firstTokenautocompletiontext){ // replacing: string_length(feedforwardText)){ // something to delete
-						if(!getFirstAutocompletionCharacterRemoved())
+						if(firstAutocompletionCharacterRemoved()=='\0')
 							inputCharType=switchToControlMode("Failed to remove the first character in the suggested text.");
 					}else // no first feed forward text (and character)!
 						beep();
@@ -4552,7 +4598,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					/* replacing:
 					if(_firstTokenautocompletiontext){
 						char newInputChar;
-						while((newInputChar=getFirstAutocompletionCharacterRemoved())){
+						while((newInputChar==firstAutocompletionCharacterRemoved())){
 							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],false,true)){
 								beep();
 								inputCharType=switchToControlMode("Failed to accept a suggested character.");
@@ -4573,6 +4619,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// MDH@07OCT2019: manual feed forward text (as a whole) takes precedence
 					size_t numberOfCharactersToConsume=string_length(_suggestedText);
 					if(numberOfCharactersToConsume>0){
+						// TODO needs to be reviewed in that we should continue adding suggested characters as long as we are able to actually consume them
 						// if there are manual feed forward characters it can start with a number of identifier continuation characters to consume as a whole using Tab
 						size_t numberOfManualFeedforwardCharacters=(_manualFeedforwardText?string_length(_manualFeedforwardText):0);
 						size_t numberOfIdentifierContinuationCharacters=(numberOfManualFeedforwardCharacters?numberOfIdentifierContinuationManualFeedforwardCharacters:(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0));
@@ -4589,7 +4636,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						int8_t characterAccepted=0;
 						while(numberOfSuggestedCharactersConsumed<numberOfCharactersToConsume){
 							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersConsumed);
-							if(!newInputChar){
+							if(newInputChar=='\0'){
 								inputCharType=switchToControlMode("Suggested characters vanishing somehow.");
 								break;
 							}
@@ -4609,9 +4656,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):0);
 							if((characterAccepted&NO_USER_INPUT_ERROR)!=0) // the character was not accepted
 								inputCharType=switchToControlMode("No user input.");
+							/* MDH@02NOV2021: no longer used
 							else
 							if((characterAccepted&REMOVE_SUGGESTED_CHARACTER_FAILURE)!=0) // the character was not accepted
 								inputCharType=switchToControlMode("Failed to accept a suggested character.");
+							*/
 							else
 							if(characterAccepted==0&&numberOfSuggestedCharactersConsumed>0)
 								inputCharType=switchToControlMode("Not all suggested characters accepted.");
@@ -4684,7 +4733,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 													//                HOWEVER what should happen if the user types another character thus changing what's in front of the
 													//                manual feed forward?????
 													if(string_length(_immediateFeedforwardText)==0){ // MDH@20SEP2019 replacing: string_length(feedforwardText)){
-														if(!getFirstAutocompletionCharacterRemoved()) // MDH@20SEP2019 replacing: string_removed_char(feedforwardText,0))
+														if(firstAutocompletionCharacterRemoved()=='\0') // MDH@20SEP2019 replacing: string_removed_char(feedforwardText,0))
 															inputCharType=switchToControlMode("Failed to delete the first character of the suggested text.");	
 													}else{ // remove the immediate feed forward text
 														string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
@@ -4738,7 +4787,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 											// MDH@21SEP2020: it is a suggested character isn't it????? didn't help changing false to true!!!!
 											// MDH@22OCT2021: changed false to true NOW because theoretically it is true now, and so should be marked as true
 											//                this is to prevent from adding the matching parenthesis again!!!!
-											if((commandCharacterAccepted(c,&suggestedInputCharType,true,true)&REMOVE_SUGGESTED_CHARACTER_FAILURE)==0){
+											// MDH@02NOV2021: not being able to consume the first suggested character is a bug and reported as such, but should not prevent further command character acceptation
+											bool firstSuggestedCharacterConsumed=removeFirstSuggestedCharacter('\0');
+											if(!firstSuggestedCharacterConsumed)
+												inputError("%sFailed to consume the first suggested character '%c'. See the log file for details!",M_BUG_PREFIX,c);
+											if((commandCharacterAccepted(c,&suggestedInputCharType,true,firstSuggestedCharacterConsumed)&NO_USER_INPUT_ERROR)==0){
 												//string_removed_char(_suggestedText,0); // TEST
 												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
 												if(inputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
@@ -4753,13 +4806,13 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 												}else
 												if(!_identifierContinuationCharacters||strlen(_identifierContinuationCharacters)==0){
 													if(string_length(_immediateFeedforwardText)==0){
-														if(!getFirstAutocompletionCharacterRemoved())
+														if(firstAutocompletionCharacterRemoved()=='\0')
 															inputCharType=switchToControlMode("Failed to remove the accepted first auto completion character.");
 													}
 												}
 												*/												
 											}else
-												inputCharType=switchToControlMode("First suggested character not accepted.");
+												inputCharType=switchToControlMode("No user input.");
 										}else
 											inputCharType=switchToControlMode("First suggested character vanished.");
 									}else
@@ -4858,25 +4911,30 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// MDH@01OCT2019: if the input character matches the first non-anonymous i.e. autogenerated feed forward character same functionality as right arrow (except now we know the character entered)
 					char firstSuggestedCharacter=getFirstSuggestedCharacter(/*true*/);
 					if(inputChar==firstSuggestedCharacter){
-						logToOutputFile("\t\tThe input character matches the first suggested character '%c'.\n",firstSuggestedCharacter);
+						//if(amVerboseDebugging())
+							logToOutputFile("\t\tInput character '%c' matches the first suggested character.\n",inputChar);
 						
 						//inputInfo("Consuming the first suggested character!");
 						///// no need for this!!! char firstSuggestedCharacterInputType=INPUTCHARACTERTYPES[firstSuggestedCharacter];
-						int8_t result=commandCharacterAccepted(inputChar,&inputCharType,true,true);
+						bool firstSuggestedCharacterConsumed=removeFirstSuggestedCharacter(inputChar);
+						if(!firstSuggestedCharacterConsumed)inputError("%sFailed to consume the first suggested character '%c'. See the log for details!",M_BUG_PREFIX,inputChar);
+						int8_t result=commandCharacterAccepted(inputChar,&inputCharType,true,firstSuggestedCharacterConsumed);
 						if(result&NO_USER_INPUT_ERROR)
-								inputError("No user input!");
+							inputError("No user input!");
+						/* MDH@02NOV2021: can't happen anymore	
 						if(result&REMOVE_SUGGESTED_CHARACTER_FAILURE){
-								inputError("Failed to remove the first accepted character!");
-						/* replacing:
-						char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed(inputChar,true);
-						if(!firstSuggestedCharacterConsumed)
-						*/
+							inputError("Failed to remove the first accepted character!");
+						// replacing:
+						// char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed(inputChar,true);
+						//if(!firstSuggestedCharacterConsumed)
 							//inputCharType=switchToControlMode("Failed to accept the matching first suggested character.");
 						}
+						*/
 						// MDH@22OCT2021: no need to do the following anymore because commandCharacterAccepted() takes care of removing the consumed suggested character: 
 						// else deleteFirstSuggestedCharacter(firstSuggestedCharacterConsumed,false);
 					}else{
-						logToOutputFile("\t\tFirst suggested character '%c' doesn't match.\n",(firstSuggestedCharacter?firstSuggestedCharacter:'-'));
+						//if(amVerboseDebugging())
+							logToOutputFile("\t\tInput character '%c' does not match the first suggested character '%c'.\n",inputChar,(firstSuggestedCharacter?firstSuggestedCharacter:'-'));
 						// MDH@31OCT2019: when the accepted character is the backslash in whitespace we should continue with the command on the next line
 						//                OOPS a backtick inside a string is also recognized as such which shouldn't happen
 						//                ALSO because the backtick will be visible it's probably better to insert an empty token for it of type TT_NEWLINE or something like that
@@ -4892,7 +4950,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						if(inputCharType!='`') // not a new line request character
 							inputCharType=switchToControlMode(_userInputCommand->_firstToken?"Failed to accept the character.":"Failed to create a new command.");
 						else
-							inputError("New line request character not allowed here");
+							inputError("New line request character not allowed here!");
 					}
 					/*
 					// we need to have a token (to append the input character to) which initializes to _userInputCommand->_firstToken
@@ -4962,7 +5020,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					if(bc){
 						while(bc--){
 							char newInputChar=string_removed_char(_suggestedText,0);
-							if(!newInputChar){
+							if(newInputChar=='\0'){
 								///////writeSuggestedText(true);
 								inputCharType=switchToControlMode("Failed to accept all suggested characters.");
 								break;
