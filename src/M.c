@@ -793,7 +793,7 @@ bool deleteTokenAutocompletionText(Mtoken* token){
 	return true;
 }
 
-char getImmediateFeedforwardCharacterOfUserInputCommand(){
+char getUserInputCommandImmediateFeedforwardCharacter(){
 	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
 	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
 	if(token)
@@ -979,24 +979,24 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 */
 // MDH@03OCT2019: it's essential to differentiate between current token dependent feed forward and other feed forward
 //                deleteLastTokenImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken stops being the current token or when the type of the current token changes
-//                updateImmediateFeedforwardTextOfUserInputCommand() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
+//                updateUserInputCommandImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
 // MDH@04OCT2019: deciding to keep the immediate feed forward text separate from the other feed forward texts, that way it is easier to merge the identifier continuation and feed forward texts
 Mstring* _immediateFeedforwardText=NULL;Mallocationowner owner_immediateFeedforwardText=(Mallocationowner){MI_MAIN,__LINE__,1};
 bool immediateFeedforwardToBeUpdated=false;
-bool updateImmediateFeedforwardTextOfUserInputCommand(){
+bool updateUserInputCommandImmediateFeedforwardText(){
 	if(!_immediateFeedforwardText)return false; // should have one
-	char lastTokenImmediateFeedforwardCharacter=getImmediateFeedforwardCharacterOfUserInputCommand();
+	char lastTokenImmediateFeedforwardCharacter=getUserInputCommandImmediateFeedforwardCharacter();
 	return(!lastTokenImmediateFeedforwardCharacter||!string_append_char(_immediateFeedforwardText,lastTokenImmediateFeedforwardCharacter));
 }
 /* replacing:
 // \brief prepends the immediate feed forward character of the current token (if any), returns true on success, false otherwise
-bool updateImmediateFeedforwardTextOfUserInputCommand(){
+bool updateUserInputCommandImmediateFeedforwardText(){
 	// MDH@03OCT2019: getAutocompletionTextOfCharacterPrepended was adjusted to return true when the character passed to it equals '\0'!!
 	//                however TODO currently the prepending is anonymous, whereas this prepending should NOT be done anonymous, otherwise we can't delete it later on
 	// get rid of any current immediate feed forward text
 	if(immediateFeedforwardToken&&!deleteAutocompletionTextOfToken(immediateFeedforwardToken))return false;
 	immediateFeedforwardToken=NULL;
-	char lastTokenImmediateFeedforwardCharacter=getImmediateFeedforwardCharacterOfUserInputCommand(_userInputCommand->_lastToken);
+	char lastTokenImmediateFeedforwardCharacter=getUserInputCommandImmediateFeedforwardCharacter(_userInputCommand->_lastToken);
 	if(!lastTokenImmediateFeedforwardCharacter)return true;
 	// try to prepend the character
 	Mtokenautocompletiontext* lastTokenImmediateFeedforwardtext=getAutocompletionTextOfCharacterPrepended(lastTokenImmediateFeedforwardCharacter,true); // second argument forces always prepending this character!!
@@ -1022,7 +1022,7 @@ Mtoken* setLastUserInputCommandToken(Mtoken* newLastCommandToken){
 	// MDH@04OCT2019: a little less efficient to move it to the input loop but more reliable!!!
 	//// removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the last token immediate feed forward text.");
 	if(_userInputCommand)_userInputCommand->_lastToken=newLastCommandToken;else inputError("BUG: No user input command");
-	//// removing: if(!updateImmediateFeedforwardTextOfUserInputCommand())inputError("Failed to add the last token immediate feed forward text.");
+	//// removing: if(!updateUserInputCommandImmediateFeedforwardText())inputError("Failed to add the last token immediate feed forward text.");
 	userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(_userInputCommand);
 }
 */
@@ -2982,7 +2982,7 @@ void setTokenType(Mtoken* token,TokenType tokenType){
 		if(tokenType!=token->type){
 			// MDH@04OCT2019 moved to input loop removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the current token immediate feed forward text.");
 			token->type=tokenType;
-			// MDH@04OCT2019 moved to input loop removing: if(!updateImmediateFeedforwardTextOfUserInputCommand())inputError("Failed to add the current token immediate feed forward text.");
+			// MDH@04OCT2019 moved to input loop removing: if(!updateUserInputCommandImmediateFeedforwardText())inputError("Failed to add the current token immediate feed forward text.");
 		}
 	}
 	///////// MDH@29OCT2019 probably don't need this here anymore: if(endOfInput)updateLastTokenAutocompletionText();
@@ -3624,9 +3624,11 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 			/////if(amVerboseDebugging())inputInfo("M");
 		}
 		*/
+		// MDH@16NOV2021: NOT all feed forward characters actually have an associated ending, also when removing such a token, the associated end should be removed??????
+		//                therefore deciding to ALWAYS update the last token autocompletion text
 		// MDH@22OCT2021: with aSuggestedCharacter equal to true puts the responsibility of removing this suggested character from the appropriate constituent part of the suggested text
 		//                NOTE that 
-		if(aSuggestedCharacter){
+		///////if(aSuggestedCharacter){
 			////// see above!!!! if(!removeFirstSuggestedCharacter(inputChar))result=false; // inputError("Failed to consume suggested character '%c'.");
 			/* replacing:
 			if(_identifierContinuationCharacters){
@@ -3639,8 +3641,8 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 					; // i.e. we're NOT switching to control mode or returning false
 			}
 			*/
-		}
-		else // MDH@22OCT2021: I think if we're consuming a suggested character there's no need to append the last token auto completion text (as it would already be there)
+		///////}
+		///////else // MDH@22OCT2021: I think if we're consuming a suggested character there's no need to append the last token auto completion text (as it would already be there)
 		updateLastTokenAutocompletionText(/*acceptedFirstSuggestedCharacterDeleted*/false); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
 		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amVerboseDebugging())inputInfo("N");
@@ -4372,7 +4374,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
 				////outputChar('A');
 				if(!_manualFeedforwardText||string_length(_manualFeedforwardText)==0)
-					updateImmediateFeedforwardTextOfUserInputCommand();
+					updateUserInputCommandImmediateFeedforwardText();
 				////outputChar('B');
 				// MDH@03OCT2019: some feed forward texts are also current token specific, therefore we need to sync the feed forward texts
 				//                TODO perhaps we should distinguish between feed forward and auto completion (as with the brackets)
@@ -4687,6 +4689,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								// MDH@21OCT2020: this is a very good point because apparently when the last consumed character is ( it's appending ) which is NOT always required
 								//                I suppose that's technically only the case when there's no ) in the remainder of the suggested text left
 								//                essentially the last token auto completion text could be present in the suggested text to start with
+								// MDH@16NOV2021: this will ascertain to append new auto completion characters e.g. when ( or [ or { is tabbed
 								updateLastTokenAutocompletionText(true); // TODO do we need the following????
 								// we might end up behind some character that produces auto completion stuff like [ or {
 							}else
@@ -4795,6 +4798,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 												//string_removed_char(_suggestedText,0); // TEST
 												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
 												if(inputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
+												updateLastTokenAutocompletionText(true); // MDH@16NOV2021: WILL THIS HELP????? yes, but sometimes we get too many		
 												// MDH@22OCT2021: the consumed suggested character has already been removed by commandCharacterAccepted(), so no need to do that here anymore
 												//                BUT we do need to adapt _suggestedText unless it's redetermined from the adapted constituent parts
 												/*
