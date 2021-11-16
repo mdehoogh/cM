@@ -1713,9 +1713,10 @@ bool isBinaryOperatorTokenType(uint8_t tokenType){
 
 // removeLastToken() removes the last user input command token, delegating the actual removal to removeLastCommandToken now defined in Mshell.h/c
 bool removeLastUserInputCommandToken(){
-	if(!_userInputCommand||!_userInputCommand->_lastToken)return false;
+	Mtoken* tokenToRemove=(_userInputCommand?_userInputCommand->_lastToken:NULL);
+	if(!tokenToRemove)return false; // there's no last token to remove
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
-	deleteTokenAutocompletionText(_userInputCommand->_lastToken);
+	deleteTokenAutocompletionText(tokenToRemove);
 	removedLastCommandToken(_userInputCommand,owner_userInputCommand); // NOT using the result (which would be the new last command token)
 	return true;
 }
