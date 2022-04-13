@@ -312,7 +312,10 @@ void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner own
 static Mlist* _valueList=NULL;
 static unsigned long long valueCount=0; // MDH@16JUN2020: keeping track of the total number of values
 // MDH@28MAY2020: in one go we can set the owner of the value list, the owner of every element in the value list, the owner of each value in every element of the value list and finally that of any data bound to the value
-static Mallocationowner owner_valueList=(Mallocationowner){MI_VALUE,__LINE__,1},owner_valueListelement=(Mallocationowner){MI_VALUE,__LINE__,1,1},owner_value=(Mallocationowner){MI_VALUE,__LINE__,1,2},owner_value_data=(Mallocationowner){MI_VALUE,__LINE__,1,3};
+static Mallocationowner owner_valueList=(Mallocationowner){MI_VALUE,__LINE__,1};
+static Mallocationowner owner_valueListelement=(Mallocationowner){MI_VALUE,__LINE__,1,1};
+static Mallocationowner owner_value=(Mallocationowner){MI_VALUE,__LINE__,1,2};
+static Mallocationowner owner_value_data=(Mallocationowner){MI_VALUE,__LINE__,1,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
 Mallocationowner getValueOwner(){return owner_value;}
 Mallocationowner getValueDataOwner(){return owner_value_data;}
@@ -1185,7 +1188,7 @@ Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallo
     }
     _value->value._array=(disowned_array?owned_array(_array,owner_value_data):_array); // MDH@22NOV2020: _value is to take over ownership of _list
     // if the array is disowned (so should any values in it be, so we should take over ownership)
-    if(disowned_array)if(_array->values)OWNED(_array->values,Msubowner(owner_value_data,1)); // TODO check this
+    ///////// MDH@13APR2022 doing this resulted in a bug (see _getValueOfList below which didn't have this to start with): if(disowned_array)if(_array->values)OWNED(_array->values,Msubowner(owner_value_data,1)); // TODO check this
     _value->type=VT_ARRAY;
     if(amVerboseDebugging())
         output("%s array wrapped.\n",(disowned_array?"disowned":"owned"));
