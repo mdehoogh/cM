@@ -1,3 +1,6 @@
+// MDH@13APR2022: for use with CMake defining the major and minor version (and patch)
+#include "MConfig.h"
+ 
 // remove the line below when not in debug mode
 /////#define __DEBUG__
 #include <stdint.h>
@@ -54,8 +57,14 @@ extern const long long M_ARRAY_ELEMENTS_AT_END;
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
+char const * const M_VERSION="v" M_VERSION_MAJOR "." M_VERSION_MINOR "." M_VERSION_PATCH;
+char const * const M_BUILD=M_VERSION_BUILD;
+char const * const M_DATE=M_VERSION_DATE;
+char const * const M_TIMESTAMP=M_BUILD_TIMESTAMP;
+/* replacing: 
 char const * const M_VERSION="0.1.5"; // MDH@05DEC2020: this is were Mexpression is renamed to Mtoken
 char const * const M_BUILD="10";char const * const M_DATE="20 October 2021"; // using getSubcommandValue() on the first do and for function arguments which should evaluate to a map containing the local variables to use in the remaining arguments
+*/
 //char const * const M_BUILD="9";char const * const M_DATE="25 February 2021"; // using getSubcommandValue() on the first do and for function arguments which should evaluate to a map containing the local variables to use in the remaining arguments
 //char const * const M_BUILD="8";char const * const M_DATE="24 February 2021"; // 
 //char const * const M_BUILD="7";char const * const M_DATE="28 December 2020"; // updating while(), for(), introducing with(), end(), fixing setValue (Menvironment module)
@@ -4198,7 +4207,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	resetOutputColor(); // just in case
 	outputInfo("Welcome to M.");
 	newline();
-	output("Version: %s - Build: %s - Date: %s.\n",M_VERSION,M_BUILD,M_DATE);
+	output("Version: %s - Build: %s - Date: %s - Build at: %s.\n",M_VERSION,M_BUILD,M_DATE,M_TIMESTAMP);
 	newline();
 	displayFlags();
 	newline();

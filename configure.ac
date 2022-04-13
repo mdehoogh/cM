@@ -1,8 +1,12 @@
-AC_INIT([M],[0.1.3,[m.p.a.j.dehoogh@tudelft.nl],[https://github.com/mdehoogh/cM.git]])
+AC_INIT([M],[0.1.5],[marcdehoogh@gmail.com])
+
 AC_CONFIG_SRCDIR([src/M.c])
 
 #PACKAGE=M
-#VERSION=0.1.3
+#VERSION=0.1.5
+
+AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_FILES([Makefile])
 
 # MDH@23OCT2019: we do not want to overwrite src/Makefile.in (because I adjusted it)
 #                NO we can change Makefile.in after autoconf creates it!!!
@@ -22,4 +26,4 @@ AC_CONFIG_SUBDIRS([mpdecimal-2.4.2])
 
 #AC_OUTPUT(Makefile src/Makefile)
 # by not making src we will have to execute Mcompile instead (I think)
-AC_OUTPUT([Makefile])
+AC_OUTPUT

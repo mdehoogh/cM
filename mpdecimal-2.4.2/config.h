@@ -17,11 +17,11 @@
 /* Define if gcc has the ipa-pure-const bug. */
 /* #undef HAVE_IPA_PURE_CONST_BUG */
 
-/* Define to 1 if you have the <memory.h> header file. */
-#define HAVE_MEMORY_H 1
-
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
+
+/* Define to 1 if you have the <stdio.h> header file. */
+/* #undef HAVE_STDIO_H */
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #define HAVE_STDLIB_H 1
@@ -68,7 +68,9 @@
 /* The size of `__uint128_t', as computed by sizeof. */
 #define SIZEOF___UINT128_T 16
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 #define STDC_HEADERS 1
 
 /* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
