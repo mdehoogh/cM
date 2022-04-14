@@ -956,7 +956,7 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){Mal
             mpd_qset_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context,&status); // NOTE here we have to pass in the default decimal context
             if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_textDecimal,owner);
-				output("%sFailed to parse a decimal (error status: %" PRIu32 ").\n",M_ERROR_PREFIX,status);
+				output("%sFailed to parse decimal '%s' (error status: %" PRIu32 ").\n",M_ERROR_PREFIX,decimalText,status);
 				return NULL;
 			} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
         }else

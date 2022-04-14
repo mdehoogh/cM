@@ -4017,7 +4017,10 @@ FunctionBodyRequest* __functionbodyrequest(char const * const functionName){Mall
 			}
 		}
 	}
-	return DISOWNED(_functionBodyRequest,owner);
+	_functionBodyRequest=DISOWNED(_functionBodyRequest,owner);
+	if(!Misdisowned(_functionBodyRequest))output("ERROR: Function body request not disowned!");
+	if(Misowned(_functionBodyRequest))output("\nERROR: Function body request still owned!");
+	return _functionBodyRequest;
 }
 void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocationowner owner_functionBodyRequest){
 	if(!_functionBodyRequest)return;
@@ -4025,7 +4028,8 @@ void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocat
 	FREE_DISOWNED_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
-static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest=(Mallocationowner){MI_SHELL,__LINE__,1};
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
+Mallocationowner owner_functionBodyRequest=(Mallocationowner){MI_SHELL,__LINE__,1};
 static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
 	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
 	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName->chars))functionBodyRequest=functionBodyRequest->_next;

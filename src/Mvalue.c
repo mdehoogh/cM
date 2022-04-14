@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <locale.h>
 
 #include "Mvalue.h"
 
@@ -313,9 +314,9 @@ static Mlist* _valueList=NULL;
 static unsigned long long valueCount=0; // MDH@16JUN2020: keeping track of the total number of values
 // MDH@28MAY2020: in one go we can set the owner of the value list, the owner of every element in the value list, the owner of each value in every element of the value list and finally that of any data bound to the value
 static Mallocationowner owner_valueList=(Mallocationowner){MI_VALUE,__LINE__,1};
-static Mallocationowner owner_valueListelement=(Mallocationowner){MI_VALUE,__LINE__,1,1};
-static Mallocationowner owner_value=(Mallocationowner){MI_VALUE,__LINE__,1,2};
-static Mallocationowner owner_value_data=(Mallocationowner){MI_VALUE,__LINE__,1,3};
+static Mallocationowner owner_valueListelement=(Mallocationowner){MI_VALUE,__LINE__-1,1,1};
+static Mallocationowner owner_value=(Mallocationowner){MI_VALUE,__LINE__-2,1,2};
+static Mallocationowner owner_value_data=(Mallocationowner){MI_VALUE,__LINE__-3,1,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
 Mallocationowner getValueOwner(){return owner_value;}
 Mallocationowner getValueDataOwner(){return owner_value_data;}
@@ -1829,18 +1830,18 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
         ////outputChar('+');
 		////output("TYPE: %d\n",_value->type);
 		switch(_value->type){
-            case VT_UNDEFINED:valueText=owned_string(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
+      case VT_UNDEFINED:valueText=owned_string(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
 			case VT_INTEGER:valueText=owned_string(_getIntegerText(_value->value._integer),owner);break;
 			case VT_TIME:valueText=owned_string(_getTimeText(_value->value._time),owner);break; // MDH@08DEC2020: simply?
-            case VT_BIGINTEGER:valueText=owned_string(_getBigintegerText(_value->value._biginteger),owner);break; // how many characters do we need????
-            case VT_DECIMAL:valueText=owned_string(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
-            case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
+			case VT_BIGINTEGER:valueText=owned_string(_getBigintegerText(_value->value._biginteger),owner);break; // how many characters do we need????
+  		case VT_DECIMAL:valueText=owned_string(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
+    	case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
 			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
 			case VT_TEXT:valueText=owned_string(_getStringText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
-            case VT_ARRAY:valueText=owned_string(_getArrayText(_value->value._array,M_ARRAY_ELEMENTS_AT_START,M_ARRAY_ELEMENTS_AT_END),owner);break;
+			case VT_ARRAY:valueText=owned_string(_getArrayText(_value->value._array,M_ARRAY_ELEMENTS_AT_START,M_ARRAY_ELEMENTS_AT_END),owner);break;
 			case VT_LIST:valueText=owned_string(_getListText(_value->value._list,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END),owner);break;
-            case VT_TOKEN:
+			case VT_TOKEN:
                 { // can't just show the single token because we could have following ones
                     valueText=owned_string(__string(),owner);
                     if(valueText){
@@ -2286,7 +2287,10 @@ Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__
     Mdecimal* _valueTextDecimal=NULL;
     if(value){
         if(value->type!=VT_DECIMAL){
+					// MDH@14APR2022: we're in trouble if we're not using the C locale in turning the given value into a text
+					char* locale=setlocale(LC_ALL,NULL);setlocale(LC_ALL,"C"); // replace the current locale
     	    Mstring* _valueText=owned_string(_getValueText(value,true),owner); // TODO will there be any brackets around a repeating part of a 
+					setlocale(LC_ALL,locale);
 	        if(_valueText){
                 _valueTextDecimal=owned_decimal(_getTextDecimal(string(_valueText),0),owner);
                 FREE_STRING(_valueText,owner);
