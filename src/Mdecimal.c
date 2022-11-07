@@ -192,7 +192,7 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
 }/* VALIDATED */
 // MDH@26DEC2020: get JSON representation of decimal
 Mstring* _getDecimalJSON(Mdecimal const * const _decimal){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _decimalJSON;
+  Mstring* _decimalJSON;
 	if(_decimal&&_decimal->mpd){
 		_decimalJSON=owned_string(__string(),owner);
     	if(_decimalJSON){
@@ -283,126 +283,126 @@ static void free_bigintegerListelement(MbigintegerListelement* _bile,Mallocation
 
 // MDH@17JUN2019: convert a decimal (back) to a rational
 Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner owner=getOwner(__LINE__);
-    Mrational* _rational=NULL;
-    if(decimal){
-        // get the decimal text in fixed point format if it is not repeating, otherwise we always get in in fixed point but then without the closing ]
-        Mstring* _decimalText=owned_string(_getDecimalText(decimal,decimal->repeating>0),owner); // replacing: mpd_to_sci(_decimal->mpd,0);
-        if(_decimalText){
-            char* decimalText=string(_decimalText); // a pointer to the chars array in _decimalString, so you can't free _decimalText until being finished with decimalText
-            if(amVerbose())output("Decimal text to parse to rational: '%s'.\n",decimalText);
-            if(decimal->repeating){
-                // we have _decimal->repeating characters at the end of _decimalText that are repeated
-                // having a decimal part (behind decimal period) is obligatory
-                char* periodText=strchr(decimalText,'.');
-                if(periodText){
-                    ////////output("Period text: '%s'.\n",periodText);
-                    bool neg=false;if(decimalText[0]=='-'){decimalText++;neg=true;} // 'cut off' and remember the sign
-                    // 1. determine the start of the repeating digits (which is marked by [)
-                    char* repeatingText=strchr(decimalText,'['); // replacing: _decimalText+(strlen(_decimalText)-_decimal->repeating); // using pointer arithmetic
-                    *repeatingText='\0'; // we don't need the [ for parsing
-                    repeatingText++;
-                    ////////output("Repeating text: '%s'.\n",repeatingText);
-                    // 2. extract the big integer representing the repeating digits (which will be the third part of the numerator)
-                    // locally used dynamic variables
-                    Mbiginteger *_num3=owned_biginteger(__biginteger(),owner),*_bi10=owned_biginteger(_getBiginteger(10),owner),*_den2=owned_biginteger(_getBiginteger(10),owner),*_den1=owned_biginteger(_getBiginteger(1),owner);
-                    ////////output("Temporary dynamic variables created.\n");
-                    if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(MP_INT_POINTER(_num3),repeatingText,10)==MP_OKAY){
-                        if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
-                        for(int i=decimal->repeating;i>1;i--)if(mp_mul(MP_INT_POINTER(_den2),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den2))!=MP_OKAY){
-							outputError("Failed to multiply the second rational denominator part by 10");
-							FREE_BIGINTEGER(_den2,owner);
-							_den2=NULL;
-							break;
-						}
-                        if(_den2&&mp_decr(MP_INT_POINTER(_den2))==MP_OKAY){ // _den2 computed (as 9999....9)
-                            // let's determine the denominator
-                            Mbiginteger* _den=NULL;
-                            int numberOfNonRepeatingDecimalDigits=(int)(repeatingText-periodText-2); // compute the number of non repeating decimals
-                            ///////////////////mp_int* _den1=_getBiginteger(1);
-                            if(numberOfNonRepeatingDecimalDigits>0){
-                                while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))
-									if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
-									{outputError("Failed to multiply the first rational denominator part by 10");FREE_BIGINTEGER(_den1,owner);_den1=NULL;}
-                                if(_den1){
-                                    _den=owned_biginteger(__biginteger(),owner);
-                                    if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY){
-										FREE_BIGINTEGER(_den,owner);
-										_den=NULL;
-									}else 
-									if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
-                                }
-                            }else
-                                _den=owned_biginteger(_getBigintegerCopy(_den2),owner);
-                            if(_den){ // denominator computed successfully, either to be bound or freed in this block
-                                *periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
-                                periodText++; // point periodText to the first digit behind the decimal period
-                                if(amVerbose())output("Behind period text: '%s'.\n",periodText);
-                                
-                                // the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
-                                Mbiginteger* _num=owned_biginteger(_getBigintegerCopy(_num3),owner); // initialize _num to the repeating digits integer
-                                // add the fixed part of the decimal digits (treated as integer)
-                                if(_num&&strlen(periodText)){ // something between the period and the repeating digits
-                                    Mbiginteger* _num2=owned_biginteger(__biginteger(),owner); // _num2 is freed below, so that's good
-                                    if(mp_read_radix(MP_INT_POINTER(_num2),periodText,10)!=MP_OKAY||mp_mul(MP_INT_POINTER(_num2),MP_INT_POINTER(_den2),MP_INT_POINTER(_num2))!=MP_OKAY||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num2),MP_INT_POINTER(_num))!=MP_OKAY){
-										FREE_BIGINTEGER(_num,owner);
-										_num=NULL;
-									}else 
-                                    if(amVerbose())outputBiginteger("Non-repeating digits numerator part: '",_num2,"'.\n");
-                                    FREE_BIGINTEGER(_num2,owner);
-                                }
-                                if(_num){ // so far so good
-                                    // _num to be bound or freed in this block!!!
-                                    // add the part in front of the period multiplied by _den1 but it could be zero of course
-                                    Mbiginteger* _num1=owned_biginteger(__biginteger(),owner); // _mul1 freed below (which is reachable)
-                                    if(mp_read_radix(MP_INT_POINTER(_num1),decimalText,10)==MP_OKAY){
-                                        // of course the integer part could well be zero!!!!
-                                        if(!isBigintegerZero(_num1)){
-                                            if(mp_mul(MP_INT_POINTER(_num1),MP_INT_POINTER(_den),MP_INT_POINTER(_num1))!=MP_OKAY
-												||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){
-													FREE_BIGINTEGER(_num,owner);
-													_num=NULL;
-											}else
-											if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
-                                        }
-                                    }else{
-										FREE_BIGINTEGER(_num,owner);
-										_num=NULL;
+	Mrational* _rational=NULL;
+	if(decimal){
+		// get the decimal text in fixed point format if it is not repeating, otherwise we always get in in fixed point but then without the closing ]
+		Mstring* _decimalText=owned_string(_getDecimalText(decimal,decimal->repeating>0),owner); // replacing: mpd_to_sci(_decimal->mpd,0);
+		if(_decimalText){
+			char* decimalText=string(_decimalText); // a pointer to the chars array in _decimalString, so you can't free _decimalText until being finished with decimalText
+			if(amVerbose())output("Decimal text to parse to rational: '%s'.\n",decimalText);
+				if(decimal->repeating){
+					// we have _decimal->repeating characters at the end of _decimalText that are repeated
+					// having a decimal part (behind decimal period) is obligatory
+					char* periodText=strchr(decimalText,'.');
+					if(periodText){
+						////////output("Period text: '%s'.\n",periodText);
+						bool neg=false;if(decimalText[0]=='-'){decimalText++;neg=true;} // 'cut off' and remember the sign
+						// 1. determine the start of the repeating digits (which is marked by [)
+						char* repeatingText=strchr(decimalText,'['); // replacing: _decimalText+(strlen(_decimalText)-_decimal->repeating); // using pointer arithmetic
+						*repeatingText='\0'; // we don't need the [ for parsing
+						repeatingText++;
+						////////output("Repeating text: '%s'.\n",repeatingText);
+						// 2. extract the big integer representing the repeating digits (which will be the third part of the numerator)
+						// locally used dynamic variables
+						Mbiginteger *_num3=owned_biginteger(__biginteger(),owner),*_bi10=owned_biginteger(_getBiginteger(10),owner),*_den2=owned_biginteger(_getBiginteger(10),owner),*_den1=owned_biginteger(_getBiginteger(1),owner);
+						////////output("Temporary dynamic variables created.\n");
+						if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(MP_INT_POINTER(_num3),repeatingText,10)==MP_OKAY){
+							if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
+							for(int i=decimal->repeating;i>1;i--)if(mp_mul(MP_INT_POINTER(_den2),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den2))!=MP_OKAY){
+								outputError("Failed to multiply the second rational denominator part by 10");
+								FREE_BIGINTEGER(_den2,owner);
+								_den2=NULL;
+								break;
+							}
+							if(_den2&&mp_decr(MP_INT_POINTER(_den2))==MP_OKAY){ // _den2 computed (as 9999....9)
+								// let's determine the denominator
+								Mbiginteger* _den=NULL;
+								int numberOfNonRepeatingDecimalDigits=(int)(repeatingText-periodText-2); // compute the number of non repeating decimals
+								///////////////////mp_int* _den1=_getBiginteger(1);
+								if(numberOfNonRepeatingDecimalDigits>0){
+									while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))
+										if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
+										{outputError("Failed to multiply the first rational denominator part by 10");FREE_BIGINTEGER(_den1,owner);_den1=NULL;}
+									if(_den1){
+										_den=owned_biginteger(__biginteger(),owner);
+										if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY){
+											FREE_BIGINTEGER(_den,owner);
+											_den=NULL;
+										}else 
+										if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
 									}
-                                    FREE_BIGINTEGER(_num1,owner);    
-                                }
-                                // negate the numerator if the decimal is negative
-                                if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){FREE_BIGINTEGER(_num,owner);_num=NULL;}
-                                if(_num){
+                }else
+									_den=owned_biginteger(_getBigintegerCopy(_den2),owner);
+									if(_den){ // denominator computed successfully, either to be bound or freed in this block
+										*periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
+										periodText++; // point periodText to the first digit behind the decimal period
+										if(amVerbose())output("Behind period text: '%s'.\n",periodText);
+											
+										// the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
+										Mbiginteger* _num=owned_biginteger(_getBigintegerCopy(_num3),owner); // initialize _num to the repeating digits integer
+										// add the fixed part of the decimal digits (treated as integer)
+										if(_num&&strlen(periodText)){ // something between the period and the repeating digits
+											Mbiginteger* _num2=owned_biginteger(__biginteger(),owner); // _num2 is freed below, so that's good
+											if(mp_read_radix(MP_INT_POINTER(_num2),periodText,10)!=MP_OKAY||mp_mul(MP_INT_POINTER(_num2),MP_INT_POINTER(_den2),MP_INT_POINTER(_num2))!=MP_OKAY||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num2),MP_INT_POINTER(_num))!=MP_OKAY){
+												FREE_BIGINTEGER(_num,owner);
+												_num=NULL;
+											}else 
+											if(amVerbose())outputBiginteger("Non-repeating digits numerator part: '",_num2,"'.\n");
+											FREE_BIGINTEGER(_num2,owner);
+										}
+										if(_num){ // so far so good
+											// _num to be bound or freed in this block!!!
+											// add the part in front of the period multiplied by _den1 but it could be zero of course
+											Mbiginteger* _num1=owned_biginteger(__biginteger(),owner); // _mul1 freed below (which is reachable)
+											if(mp_read_radix(MP_INT_POINTER(_num1),decimalText,10)==MP_OKAY){
+													// of course the integer part could well be zero!!!!
+													if(!isBigintegerZero(_num1)){
+															if(mp_mul(MP_INT_POINTER(_num1),MP_INT_POINTER(_den),MP_INT_POINTER(_num1))!=MP_OKAY
+											||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){
+												FREE_BIGINTEGER(_num,owner);
+												_num=NULL;
+										}else
+										if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
+                  }
+                }else{
+									FREE_BIGINTEGER(_num,owner);
+									_num=NULL;
+								}
+								FREE_BIGINTEGER(_num1,owner);    
+							}
+							// negate the numerator if the decimal is negative
+							if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){FREE_BIGINTEGER(_num,owner);_num=NULL;}
+							if(_num){
 									_rational=owned_rational(_getRational(_num,_den,M_LD_NAN,true),owner);
 									FREE_BIGINTEGER(_num,owner);
 								}
-                                // if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
+								// if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
 								FREE_BIGINTEGER(_den,owner);
-                            }
-                        }else
-                            outputError("Failed to compute the second denominator multiplier");
-                    }else
-                        outputError("Failed to construct the integer containing the repeating digits");
-                    FREE_BIGINTEGER(_num3,owner);
-                    FREE_BIGINTEGER(_bi10,owner);
-                    FREE_BIGINTEGER(_den2,owner);
-                    FREE_BIGINTEGER(_den1,owner);
-                }else{
-                    if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
-                    Mbiginteger* _num=owned_biginteger(__biginteger(),owner);
-                    if(_num){
-                        if(mp_read_radix(MP_INT_POINTER(_num),decimalText,10)==MP_OKAY)
+							}
+						}else
+							outputError("Failed to compute the second denominator multiplier");
+					}else
+						outputError("Failed to construct the integer containing the repeating digits");
+					FREE_BIGINTEGER(_num3,owner);
+					FREE_BIGINTEGER(_bi10,owner);
+					FREE_BIGINTEGER(_den2,owner);
+					FREE_BIGINTEGER(_den1,owner);
+				}else{
+						if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
+						Mbiginteger* _num=owned_biginteger(__biginteger(),owner);
+					if(_num){
+						if(mp_read_radix(MP_INT_POINTER(_num),decimalText,10)==MP_OKAY)
 							_rational=owned_rational(_getRational(_num,NULL,M_LD_NAN,false/*,false*/),owner);
-                        FREE_BIGINTEGER(_num,owner); // MDH@26MAY2020: always now
-                    }
-                }
-            }else // we can go through the text????
-                _rational=owned_rational(_getDecimalTextRational(decimalText),owner);
-            FREE_STRING(_decimalText,owner); // OOPS use FREE_STRING() not free()!
-        }else
-            outputError("Failed to convert the decimal to text");
-    }
-    return disowned_rational(_rational,owner);
+						FREE_BIGINTEGER(_num,owner); // MDH@26MAY2020: always now
+					}
+				}
+			}else // we can go through the text????
+				_rational=owned_rational(_getDecimalTextRational(decimalText),owner);
+			FREE_STRING(_decimalText,owner); // OOPS use FREE_STRING() not free()!
+		}else
+			outputError("Failed to convert the decimal to text");
+	}
+	return disowned_rational(_rational,owner);
 }/* VALIDATED */
 
 // MDH@08OCT2019: TODO do we have this already somewhere else??????

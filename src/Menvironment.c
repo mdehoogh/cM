@@ -36,190 +36,191 @@ extern const char * const M_LOCALE_SETTINGS_VARIABLE_NAME; // MDH@05DEC2020
 // MDH@03FEB2020: now wrapped inside a value
 static Mvalue* _executionEnvironmentValue=NULL;
 Menvironment* getExecutionEnvironment(){
-    return getValueEnvironment(_executionEnvironmentValue);
+	return getValueEnvironment(_executionEnvironmentValue);
 } // convenience method for obtaining the current execution environment from its wrapper
 // MDH@31MAY2020: the execution environment hangs inside a value
 Mallocationowner getOwnerExecutionEnvironment(){return Msubowner(getValueOwner(),1);}
 
 Mstring* _getExecutionEnvironmentName(){
-    return _getEnvironmentName(getExecutionEnvironment());
+	return _getEnvironmentName(getExecutionEnvironment());
 }
 void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
-    if(!_environmentName)return;
-    if(prefix)output("%s",prefix);
-    output("%s",string(_environmentName));
-    if(suffix)output("%s",suffix);
-    FREE_STRING(_environmentName,owner);
+	Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
+	if(!_environmentName)return;
+	if(prefix)output("%s",prefix);
+	output("%s",string(_environmentName));
+	if(suffix)output("%s",suffix);
+	FREE_STRING(_environmentName,owner);
 }
 // MDH@14JUN2020: _environment is supposedly disowned when doing this so _getValueOfEnvironment() can take over ownership
 // MDH@21OCT2020: which is a serious problem as it isn't (at least not for function execution environments) but fixed that just now
 bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
-    // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
-    // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
-    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment(_environment):NULL); // TODO check whether _environment passed in needs to be disowned or not (I think better not!!!)
-    if(!_environmentValue)return false;
-    // MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
-    if(!_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one
-    // keep a reference to the current execution environment (value) that we may return to if the execution environment is popped off
-    assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
-    // replace the current execution environment with the new one
-    assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
-    if(amVerboseDebugging())
-        outputExecutionEnvironmentName("New execution environment '","'.\n");
-    return true;
+	// MDH@28MAY2020: check if we actually obtain ownership of _environment at all
+	// MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
+	Mvalue* _environmentValue=(_environment?_getValueOfEnvironment(_environment):NULL); // TODO check whether _environment passed in needs to be disowned or not (I think better not!!!)
+	if(!_environmentValue)return false;
+	// MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
+	if(!_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one
+	// keep a reference to the current execution environment (value) that we may return to if the execution environment is popped off
+	assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
+	// replace the current execution environment with the new one
+	assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
+	if(amVerboseDebugging())
+		outputExecutionEnvironmentName("New execution environment '","'.\n");
+	return true;
 }/* NOT VALIDATED */
 // MDH@25OCT2021: the brilliant idea I had two days ago will return the value that wraps the popped environment
 //                so it can be used as 'object'
 Mvalue* popExecutionEnvironment(){
-    Menvironment* _executionEnvironment=getExecutionEnvironment();
-    if(!_executionEnvironment){outputBug("No environment left to pop!");return NULL;} // nothing to pop
-    // NOTE only execution environments that have a parent can be popped!!!
-    // MDH@03FEB2020: freeing the current execution environment value will NULL the execution field (i.e. releasing the reference to the environment it points to), so by remembering it here, we can use it AFTER the free_value call
-    Mvalue* _nextExecutionEnvironmentValue=_executionEnvironment->execution; 
-    if(!_nextExecutionEnvironmentValue){outputBug("Can't pop the top-most environment!");return NULL;}
-    // OOPS the following is wrong because only the garbage collector is allowed to free values: free_value(_executionEnvironmentValue); // MDH@03FEB2020 replacing: free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
-    // MDH@03FEB2020 by assigning to _executionEnvironmentValue the reference count to the environment is incremented again so it will not be 'garbage collected'!!!!
-    Mvalue* _result=_executionEnvironmentValue; // i.e. what getEnvironment() would return!!!
-		assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
-    if(amVerboseDebugging())
-        outputExecutionEnvironmentName("Returned to execution environment '","'.\n");
-		return _result;
+	Menvironment* _executionEnvironment=getExecutionEnvironment();
+	if(!_executionEnvironment){outputBug("No environment left to pop!");return NULL;} // nothing to pop
+	// NOTE only execution environments that have a parent can be popped!!!
+	// MDH@03FEB2020: freeing the current execution environment value will NULL the execution field (i.e. releasing the reference to the environment it points to), so by remembering it here, we can use it AFTER the free_value call
+	Mvalue* _nextExecutionEnvironmentValue=_executionEnvironment->execution; 
+	if(!_nextExecutionEnvironmentValue){outputBug("Can't pop the top-most environment!");return NULL;}
+	// OOPS the following is wrong because only the garbage collector is allowed to free values: free_value(_executionEnvironmentValue); // MDH@03FEB2020 replacing: free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
+	// MDH@03FEB2020 by assigning to _executionEnvironmentValue the reference count to the environment is incremented again so it will not be 'garbage collected'!!!!
+	Mvalue* _result=_executionEnvironmentValue; // i.e. what getEnvironment() would return!!!
+	assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
+	if(amVerboseDebugging())
+		outputExecutionEnvironmentName("Returned to execution environment '","'.\n");
+	return _result;
 }/* NOT VALIDATED */
 Mvalue* getEnvironment(){
-    return _executionEnvironmentValue;
+	return _executionEnvironmentValue;
 }/* VALIDATED */
 
 Mtoken* getEnvironmentExpressionToken(){
-    // MDH@22JUL2019: let's allow breaking here
-    ////////if(kbhit())return NULL;
-    Menvironment* executionEnvironment=getExecutionEnvironment();
-    return(executionEnvironment?executionEnvironment->expressionToken:NULL);
+	// MDH@22JUL2019: let's allow breaking here
+	////////if(kbhit())return NULL;
+	Menvironment* executionEnvironment=getExecutionEnvironment();
+	return(executionEnvironment?executionEnvironment->expressionToken:NULL);
 }/* VALIDATED */
 Mtoken* nextEnvironmentExpressionToken(){
-    Menvironment* _executionEnvironment=getValueEnvironment(_executionEnvironmentValue);
-    if(!_executionEnvironment)return NULL;
-    if(_executionEnvironment->expressionToken)_executionEnvironment->expressionToken=_executionEnvironment->expressionToken->next;
-    return _executionEnvironment->expressionToken;
+	Menvironment* _executionEnvironment=getValueEnvironment(_executionEnvironmentValue);
+	if(!_executionEnvironment)return NULL;
+	if(_executionEnvironment->expressionToken)_executionEnvironment->expressionToken=_executionEnvironment->expressionToken->next;
+	return _executionEnvironment->expressionToken;
 }/* VALIDATED */
 
 // read access to the elements defined in an environment
 uint32_t getNumberOfVariables(Menvironment const * const _environment){
-    if(!_environment||!_environment->_variableMap)return 0;
-    // MDH@20JUL2019: now returning the sum of the variables in the parent plus those in the environment itself!!
-    return getNumberOfVariables(getValueEnvironment(_environment->_parent))+_environment->_variableMap->numberOfElements;
+	if(!_environment||!_environment->_variableMap)return 0;
+	// MDH@20JUL2019: now returning the sum of the variables in the parent plus those in the environment itself!!
+	return getNumberOfVariables(getValueEnvironment(_environment->_parent))+_environment->_variableMap->numberOfElements;
 }/* VALIDATED */
 
 // the names of the variables may be requested
+// TODO check whether to use (Mstring*)OWNED or owned_string
 Mstring* _getVariableNames(Menvironment const * const _environment,const char* const sep){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _variableNames=NULL;
-    if(_environment&&sep){
-        _variableNames=(Mstring*)OWNED(__string(),owner);
-        if(_variableNames){
-            Mstring* p=_variableNames;
-            // first append the names of the variables in the parent
-            if(_environment->_parent){
-                Mstring* _parentVariableNames=(Mstring*)OWNED(_getVariableNames(getValueEnvironment(_environment->_parent),sep),owner); // free asap
-                if(_parentVariableNames){
-                    p=string_append(p,string(_parentVariableNames));
-                    FREE_STRING(_parentVariableNames,owner); // we can do this because string_append copies the characters
-                }
-            }
-            // we'll be appending the names of the variables in the environment itself
-            if(_environment->_variableMap){
-                Mmapelement* _variableMapelement=_environment->_variableMap->_first;
-                while(p&&_variableMapelement){
-                    if(_variableMapelement->_variable){
-                        if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
-                        p=string_append(p,_variableMapelement->_variable->_name->chars);
-                    }
-                    _variableMapelement=_variableMapelement->_next;
-                }
-            }
-            if(!p){FREE_STRING(_variableNames,owner);_variableNames=NULL;}
-        }
-    }
-    return DISOWNED(_variableNames,owner);
+	Mstring* _variableNames=NULL;
+	if(_environment&&sep){
+		_variableNames=owned_string(__string(),owner);
+		if(_variableNames){
+			Mstring* p=_variableNames;
+			// first append the names of the variables in the parent
+			if(_environment->_parent){
+				Mstring* _parentVariableNames=owned_string(_getVariableNames(getValueEnvironment(_environment->_parent),sep),owner); // free asap
+				if(_parentVariableNames){
+					p=string_append(p,string(_parentVariableNames));
+					FREE_STRING(_parentVariableNames,owner); // we can do this because string_append copies the characters
+				}
+			}
+			// we'll be appending the names of the variables in the environment itself
+			if(_environment->_variableMap){
+				Mmapelement* _variableMapelement=_environment->_variableMap->_first;
+				while(p&&_variableMapelement){
+					if(_variableMapelement->_variable){
+						if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
+						p=string_append(p,_variableMapelement->_variable->_name->chars);
+					}
+					_variableMapelement=_variableMapelement->_next;
+				}
+			}
+			if(!p){FREE_STRING(_variableNames,owner);_variableNames=NULL;}
+		}
+	}
+	return disowned_string(_variableNames,owner);
 }/* VALIDATED */
 
 // MDH@14NOV2019: what if someone asks for a list of variable names???
 //                how about prefixing the name of the variable with the name of the environment it is part of???
 Mlist* _getVariableNamesList(Menvironment* environment){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _variableNamesList=NULL;
-    if(environment){
-        _variableNamesList=owned_list(_getListOfType(VT_TEXT),owner);
-        if(_variableNamesList){
-            if(environment->_variableMap){
-                if(amVerbose())output("Creating the list of variable names of '%s'.\n",environment->_name);
-                Mmapelement* variableMapelement=environment->_variableMap->_first;
-                while(variableMapelement){
-                    if(variableMapelement->_variable){
-                        Mstring* variableNameText=owned_string(_getString("'"),owner);
-                        if(variableNameText){
-                            if(string_append(variableNameText,variableMapelement->_variable->_name->chars))
-                                appendedToList(_variableNamesList,owner,_getTextValue(string(variableNameText)),M_LL_INVALID);
-                            FREE_STRING(variableNameText,owner);
-                        }
-                    }
-                    variableMapelement=variableMapelement->_next;
-                }
-            }
-        }
-    }
-    return disowned_list(_variableNamesList,owner);
+	Mlist* _variableNamesList=NULL;
+	if(environment){
+		_variableNamesList=owned_list(_getListOfType(VT_TEXT),owner);
+		if(_variableNamesList){
+			if(environment->_variableMap){
+				if(amVerbose())output("Creating the list of variable names of '%s'.\n",environment->_name);
+				Mmapelement* variableMapelement=environment->_variableMap->_first;
+				while(variableMapelement){
+					if(variableMapelement->_variable){
+						Mstring* variableNameText=owned_string(_getString("'"),owner);
+						if(variableNameText){
+							if(string_append(variableNameText,variableMapelement->_variable->_name->chars))
+									appendedToList(_variableNamesList,owner,_getTextValue(string(variableNameText)),M_LL_INVALID);
+							FREE_STRING(variableNameText,owner);
+						}
+					}
+					variableMapelement=variableMapelement->_next;
+				}
+			}
+		}
+	}
+	return disowned_list(_variableNamesList,owner);
 }
 Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationowner owner=getOwner(__LINE__);
-    // how about returning for each environment that is active an attribute in a map?
-    // first get the map of the parent
-    Mmap* _variableNamesMap=(environment?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
-    if(_variableNamesMap){
-        // storing the local variables in a list that we're going to store in an attribute with name ''
-        Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment));
-        if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,owner,"",_localVariableNamesListValue)){
-            /// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
-            output("%sFailed to register the local variable names of '%s'.\n",M_ERROR_PREFIX,environment->_name);
-        }
-        if(environment->_parent){
-            // determine the variable names map of the parent environment and wrap it
-            Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(getValueEnvironment(environment->_parent)));
-            // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
-            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,owner,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
-                /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
-                output("%sFailed to register the variable names of the parent of '%s'.\n",M_ERROR_PREFIX,environment->_name);
-            }
-        }
-    }
-    return disowned_map(_variableNamesMap,owner);
+	// how about returning for each environment that is active an attribute in a map?
+	// first get the map of the parent
+	Mmap* _variableNamesMap=(environment?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
+	if(_variableNamesMap){
+		// storing the local variables in a list that we're going to store in an attribute with name ''
+		Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment));
+		if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,owner,"",_localVariableNamesListValue)){
+			/// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
+			output("%sFailed to register the local variable names of '%s'.\n",M_ERROR_PREFIX,environment->_name);
+		}
+		if(environment->_parent){
+			// determine the variable names map of the parent environment and wrap it
+			Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(getValueEnvironment(environment->_parent)));
+			// if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
+			if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,owner,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
+				/// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
+				output("%sFailed to register the variable names of the parent of '%s'.\n",M_ERROR_PREFIX,environment->_name);
+			}
+		}
+	}
+	return disowned_map(_variableNamesMap,owner);
 }
 // MDH@25NOV2019: if we ask for the table, we receive a list with first element containing the column names
 Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner owner_columnNamesList){Mallocationowner owner=getOwner(__LINE__);
-    if(columnNamesList){
-        Mlist* _table=owned_list(_getListOfType(VT_LIST),owner);
-        if(_table){
-            _table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
-            // wrap the column names list in a value
-            // oops this is going to be a nuisance as the list would be copied wouldn't it????????
-            //      NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
-            //      
-            Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
-            if(columnNamesListValue){
-                outputValue("Column names values table: '",columnNamesListValue,"'.\n");
-                if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
-                    while(numberOfRows>0){
-                        numberOfRows--;
-                        Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED));
-                        if(!_rowValue)break;
-                        if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0)break;
-                    }
-                    return disowned_list(_table,owner);
-                }
-            }
-        }
-        // in essence the values in the list have their counts incremented when being added to it
-        // and only by decrementing their counts in free_list() do the elements go free
-        //  TODO do we need this???? if(owner_columnNamesList.level==0)FREE_LIST(columnNamesList,owner_columnNamesList);
-    }
-    return NULL;
+	if(columnNamesList){
+		Mlist* _table=owned_list(_getListOfType(VT_LIST),owner);
+		if(_table){
+			_table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
+			// wrap the column names list in a value
+			// oops this is going to be a nuisance as the list would be copied wouldn't it????????
+			//      NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
+			//      
+			Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
+			if(columnNamesListValue){
+				outputValue("Column names values table: '",columnNamesListValue,"'.\n");
+				if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
+					while(numberOfRows>0){
+						numberOfRows--;
+						Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED));
+						if(!_rowValue)break;
+						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0)break;
+					}
+					return disowned_list(_table,owner);
+				}
+			}
+		}
+		// in essence the values in the list have their counts incremented when being added to it
+		// and only by decrementing their counts in free_list() do the elements go free
+		//  TODO do we need this???? if(owner_columnNamesList.level==0)FREE_LIST(columnNamesList,owner_columnNamesList);
+	}
+	return NULL;
 }
 // MDH@25NOV2019: the first example of a list which is constructed as a table is the the values() table
 void outputTable(Mlist* table){Mallocationowner owner=getOwner(__LINE__);
@@ -241,7 +242,7 @@ void outputTable(Mlist* table){Mallocationowner owner=getOwner(__LINE__);
                             newline(); // start a new line before outputting the table!!!
                             while(headerrowListelement){
                                 if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table header loop!");break;}
-                                Mstring* _columnNameText=(Mstring*)OWNED(_getValueText(headerrowListelement->_value,true),owner);
+                                Mstring* _columnNameText=owned_string(_getValueText(headerrowListelement->_value,true),owner);
                                 if(_columnNameText){
                                     columnLengths[columnIndex]=output("%s",string(_columnNameText));
                                     FREE_STRING(_columnNameText,owner);
@@ -262,7 +263,7 @@ void outputTable(Mlist* table){Mallocationowner owner=getOwner(__LINE__);
                                         Mlistelement* rowListelement=tablerowValueList->_first;
                                         while(rowListelement){
                                             if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table data row loop!");break;}
-                                            Mstring* _cellText=(Mstring*)OWNED(_getValueText(rowListelement->_value,true),owner);
+                                            Mstring* _cellText=owned_string(_getValueText(rowListelement->_value,true),owner);
                                             cellLength=(_cellText?output("%s",string(_cellText)):0);
                                             while(++cellLength<=columnLengths[columnIndex])outputChar(' ');
                                             FREE_STRING(_cellText,owner);
@@ -1000,105 +1001,105 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 }/* VALIDATED */
 
 long long appendToListVariable(Menvironment const * const _environment,const char* const name,const Mvalue* const _value){
-    if(!_environment||!name){outputError("No environment or variable name specified");return 0;}
-    Mvariable* variable=getVariable(_environment,name,amVerbose());
-    if(variable){
-        Mvalue* variableValue=variable->_value; // OOPS shouldn't assign to _value (that's the parameter name DUMMY)
-        if(variableValue&&variableValue->type==VT_LIST){ // yes a list we can append to
-            // we should prevent circular references
-            if(variableValue!=_value){
-                long long index=appendedToList(variableValue->value._list,Msubowner(getValueOwner(),1),_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
-                if(index>0)return index;
-                output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",M_ERROR_PREFIX,name,(_value?_value->type:-1));
-            }else
-                outputError("Circular reference not allowed");
-        }else
-            output("%sCannot append the value to variable '%s': it's value is not a list!\n",M_ERROR_PREFIX,name);
-    }else
-        output("%sCannot append the value to list variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
-    return 0;
+	if(!_environment||!name){outputError("No environment or variable name specified");return 0;}
+	Mvariable* variable=getVariable(_environment,name,amVerbose());
+	if(variable){
+		Mvalue* variableValue=variable->_value; // OOPS shouldn't assign to _value (that's the parameter name DUMMY)
+		if(variableValue&&variableValue->type==VT_LIST){ // yes a list we can append to
+			// we should prevent circular references
+			if(variableValue!=_value){
+				long long index=appendedToList(variableValue->value._list,Msubowner(getValueOwner(),1),_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
+				if(index>0)return index;
+				output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",M_ERROR_PREFIX,name,(_value?_value->type:-1));
+			}else
+				outputError("Circular reference not allowed");
+		}else
+			output("%sCannot append the value to variable '%s': it's value is not a list!\n",M_ERROR_PREFIX,name);
+	}else
+		output("%sCannot append the value to list variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
+	return 0;
 }/* VALIDATED */
 
 Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name){
-    if(!_environment||!name){outputError("No environment or name specified");return NULL;}
-    Mvariable* variable=getVariable(_environment,name,false);
-    if(!variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
-    return variable->_value;
+	if(!_environment||!name){outputError("No environment or name specified");return NULL;}
+	Mvariable* variable=getVariable(_environment,name,false);
+	if(!variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
+	return variable->_value;
 }/* VALIDATED */
 
 // MDH@26MAR2020: sometimes we need the address of the value pointer (in the variable)
 Mvalue** getValueHolder(Menvironment const * const _environment,char /*const*/ * const name){
-    if(!_environment||!name){outputError("No environment or name specified");return NULL;}
-    Mvariable* variable=getVariable(_environment,name,false);
-    if(!variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
-    return &(variable->_value);
+	if(!_environment||!name){outputError("No environment or name specified");return NULL;}
+	Mvariable* variable=getVariable(_environment,name,false);
+	if(!variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
+	return &(variable->_value);
 }/* VALIDATED */
 
 // FUNCTION STUFF
 // the names of the variables may be requested
 Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _functionNames=NULL;
-    if(_environment&&sep){
-        _functionNames=(Mstring*)OWNED(__string(),owner);
-        if(_functionNames){
-            Mstring* p=_functionNames;
-            // first append the names of the variables in the parent
-            if(_environment->_parent){
-                Mstring* _parentFunctionNames=(Mstring*)OWNED(_getFunctionNames(getValueEnvironment(_environment->_parent),sep),owner);
-                if(_parentFunctionNames){
-                    p=string_append(p,string(_parentFunctionNames));
-                    FREE_STRING(_parentFunctionNames,owner); // we can do this because string_append copies the characters that string() points to!!
-                }
-            }
-            // we'll be appending the names of the variables in the environment itself
-            if(p&&_environment->_functionMap){
-                Mfunctionmapelement* functionmapelement=_environment->_functionMap->_first;
-                while(p&&functionmapelement){
-                    if(functionmapelement->_function){
-                        if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
-                        p=string_append(p,string(functionmapelement->_name)); //////_function->_name));
-                    }
-                    functionmapelement=functionmapelement->_next;
-                }
-            }
-            if(!p){FREE_STRING(_functionNames,owner);_functionNames=NULL;}
-        }
-    }
-    return DISOWNED(_functionNames,owner);
+	Mstring* _functionNames=NULL;
+	if(_environment&&sep){
+		_functionNames=owned_string(__string(),owner);
+		if(_functionNames){
+			Mstring* p=_functionNames;
+			// first append the names of the variables in the parent
+			if(_environment->_parent){
+				Mstring* _parentFunctionNames=owned_string(_getFunctionNames(getValueEnvironment(_environment->_parent),sep),owner);
+				if(_parentFunctionNames){
+					p=string_append(p,string(_parentFunctionNames));
+					FREE_STRING(_parentFunctionNames,owner); // we can do this because string_append copies the characters that string() points to!!
+				}
+			}
+			// we'll be appending the names of the variables in the environment itself
+			if(p&&_environment->_functionMap){
+				Mfunctionmapelement* functionmapelement=_environment->_functionMap->_first;
+				while(p&&functionmapelement){
+					if(functionmapelement->_function){
+						if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
+						p=string_append(p,string(functionmapelement->_name)); //////_function->_name));
+					}
+					functionmapelement=functionmapelement->_next;
+				}
+			}
+			if(!p){FREE_STRING(_functionNames,owner);_functionNames=NULL;}
+		}
+	}
+	return disowned_string(_functionNames,owner);
 }/* VALIDATED */
 
 // MDH@04MAR2020: getFunction() is used to determine if some identifier name represents a function, which can now also be a variable which value is a(n anonymous) function
 Mfunction* getFunction(Menvironment const * const _environment,const char* const functionName){
-    if(_environment&&functionName&&strlen(functionName)){
-        Mfunctionmap* functionmap=_environment->_functionMap;
-        if(functionmap){
-            Mfunctionmapelement* functionmapelement=functionmap->_first;
-            // we need string() on the function name as function name is an Mstring*
-            while(functionmapelement){
-                // MDH@10JUL2019: _name moved to the map element instead of in the function
-                if(functionmapelement->_function&&!strcmp(string(functionmapelement->_name),functionName)){
-                    //////////printf("\nFunction '%s' matches '%s'.",string(_functionmapelement->_function->_name),functionName);
-                    return functionmapelement->_function;
-                }
-                functionmapelement=functionmapelement->_next;
-            }
-        }
-        // MDH@04MAR2020: could now also be an anonymous function stored as variable value
-        Mmap* variableMap=_environment->_variableMap;
-        if(variableMap){
-            Mmapelement* variablemapelement=variableMap->_first;
-            Mvariable* variable;
-            while(variablemapelement){
-                variable=variablemapelement->_variable;
-                if(variable&&!strcmp(variable->_name->chars,functionName)&&variable->_value&&variable->_value->type==VT_FUNCTION)
-                    return variable->_value->value._function;
-                variablemapelement=variablemapelement->_next;
-            }
-        }
-        // might exist in the parent environment
-        if(_environment->_parent)return getFunction(getValueEnvironment(_environment->_parent),functionName);
-    }
-    return NULL;
+	if(_environment&&functionName&&strlen(functionName)){
+		Mfunctionmap* functionmap=_environment->_functionMap;
+		if(functionmap){
+			Mfunctionmapelement* functionmapelement=functionmap->_first;
+			// we need string() on the function name as function name is an Mstring*
+			while(functionmapelement){
+				// MDH@10JUL2019: _name moved to the map element instead of in the function
+				if(functionmapelement->_function&&!strcmp(string(functionmapelement->_name),functionName)){
+						//////////printf("\nFunction '%s' matches '%s'.",string(_functionmapelement->_function->_name),functionName);
+					return functionmapelement->_function;
+				}
+				functionmapelement=functionmapelement->_next;
+			}
+		}
+		// MDH@04MAR2020: could now also be an anonymous function stored as variable value
+		Mmap* variableMap=_environment->_variableMap;
+		if(variableMap){
+			Mmapelement* variablemapelement=variableMap->_first;
+			Mvariable* variable;
+			while(variablemapelement){
+				variable=variablemapelement->_variable;
+				if(variable&&!strcmp(variable->_name->chars,functionName)&&variable->_value&&variable->_value->type==VT_FUNCTION)
+					return variable->_value->value._function;
+				variablemapelement=variablemapelement->_next;
+			}
+		}
+		// might exist in the parent environment
+		if(_environment->_parent)return getFunction(getValueEnvironment(_environment->_parent),functionName);
+	}
+	return NULL;
 }/* VALIDATED */
 /*
 Muserfunction* getUserfunction(const Menvironment* const _environment,const char* const userfunctionName){
@@ -1232,85 +1233,85 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
 // MDH@03FEB2020: now wrapping the environment in the parameter list in a value
 //                a new function is always created on the currently executing environment
 Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner_environment,const char* const name){Mallocationowner owner=getOwner(__LINE__);
-    if(!name||strlen(name)==0)return NULL;
-    Mfunction* _function=NULL;
-    if(_environment){
-        _function=getFunction(_environment,name); // check for a function with the given name in the given environment
-        if(!_function&&_environment->_functionMap){ // does not exist yet, and is registrable
-            if(amVerbose())
-                output("Registering function '%s'",name);
-            ///////////_function->type=functionType;
-            /* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
-            // MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
-            assignValue(&_function->_definitionEnvironmentValue,_environmentValue?_environmentValue:_executionEnvironmentValue); // MDH@03FEB2020 replacing: _function->_definitionEnvironment=_environment; // TODO why would we need this?????
-            */
-            Mstring* _functionName=(Mstring*)OWNED(__string(),owner);
-            if(_functionName){
-                if(amVerbose())outputChar('.'); // 1
-                Mstring* p=_functionName;
-                p=string_append(p,name);
-                if(p){
-                    if(amVerbose())outputChar('.'); // 2
-                    _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner); // create the function
-                    if(_function){
-                        if(amVerbose())outputChar('.'); // 3
-                        Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
-                        if(_functionmapelement){
-                            if(amVerbose())outputChar('.'); // 4
-                            _functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
-                            _functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
-                            SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
-                            if(amVerbose())outputChar('.'); // 5
-                            Mfunctionmap* _functionmap=_environment->_functionMap;
-                            Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
-                            if(_lastFunctionmapelement){
-                                _lastFunctionmapelement->_next=_functionmapelement;
-                                _functionmap->_last=_functionmapelement;
-                            }else
-                                _functionmap->_first=_functionmapelement;
-                            _functionmap->_last=_functionmapelement;
-                            _functionmap->numberOfFunctions++;
-                            if(amVerbose())outputChar('.'); // 6
-                            ///////_function->_name=_functionName; // success!!!!!
-                        }else{ // failure
-                            p=NULL;
-                            output("%sFailed to create the function map element of '%s'.",M_ERROR_PREFIX,name);
-                        }
-                    }else{
-                        p=NULL;
-                        output("%sFailed to create function '%s'.",M_ERROR_PREFIX,name);
-                    }
-                    if(!p){
-                        if(amVerbose())outputChar('!');
-                        FREE_STRING(_functionName,owner);
-                        _functionName=NULL;
-                        if(amVerbose())outputChar('!');
-                    }
-                    // try to append it to the functionMap, if we succeed store _functioName in ->_name
-                }else
-                    output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
-                // if we fail to register the name and/or the function with the environment free the function!!
-                if(!_functionName){
-                    if(_function){
-                        if(amVerbose())outputChar('!');
-                        FREE_FUNCTION(_function,owner);_function=NULL;
-                        if(amVerbose())outputChar('!');
-                    }
-                }else
-                if(amVerbose())
-                    output("%s"," done"); // 7
-            }else
-                output("%sFailed to create the function name to store '%s' in.",M_ERROR_PREFIX,name);
-            // if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
-        }else
-        if(!_function)
-            output("%sNo function map in the environment to store '%s' in.",M_ERROR_PREFIX,name);
-    }else
-        output("%sNo environment to search for function '%s'.",M_ERROR_PREFIX,name);
-    if(_function)
-        if(amVerbose())
-            output("%s",".\n");
-    return _function;
+	if(!name||strlen(name)==0)return NULL;
+	Mfunction* _function=NULL;
+	if(_environment){
+		_function=getFunction(_environment,name); // check for a function with the given name in the given environment
+		if(!_function&&_environment->_functionMap){ // does not exist yet, and is registrable
+			if(amVerbose())
+				output("Registering function '%s'",name);
+			///////////_function->type=functionType;
+			/* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
+			// MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
+			assignValue(&_function->_definitionEnvironmentValue,_environmentValue?_environmentValue:_executionEnvironmentValue); // MDH@03FEB2020 replacing: _function->_definitionEnvironment=_environment; // TODO why would we need this?????
+			*/
+			Mstring* _functionName=owned_string(__string(),owner);
+			if(_functionName){
+				if(amVerbose())outputChar('.'); // 1
+				Mstring* p=_functionName;
+				p=string_append(p,name);
+				if(p){
+					if(amVerbose())outputChar('.'); // 2
+					_function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner); // create the function
+					if(_function){
+						if(amVerbose())outputChar('.'); // 3
+						Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
+						if(_functionmapelement){
+							if(amVerbose())outputChar('.'); // 4
+							_functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
+							_functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
+							SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
+							if(amVerbose())outputChar('.'); // 5
+							Mfunctionmap* _functionmap=_environment->_functionMap;
+							Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
+							if(_lastFunctionmapelement){
+								_lastFunctionmapelement->_next=_functionmapelement;
+								_functionmap->_last=_functionmapelement;
+							}else
+								_functionmap->_first=_functionmapelement;
+							_functionmap->_last=_functionmapelement;
+							_functionmap->numberOfFunctions++;
+							if(amVerbose())outputChar('.'); // 6
+							///////_function->_name=_functionName; // success!!!!!
+						}else{ // failure
+							p=NULL;
+							output("%sFailed to create the function map element of '%s'.",M_ERROR_PREFIX,name);
+						}
+					}else{
+						p=NULL;
+						output("%sFailed to create function '%s'.",M_ERROR_PREFIX,name);
+					}
+					if(!p){
+						if(amVerbose())outputChar('!');
+						FREE_STRING(_functionName,owner);
+						_functionName=NULL;
+						if(amVerbose())outputChar('!');
+					}
+					// try to append it to the functionMap, if we succeed store _functioName in ->_name
+				}else
+					output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
+					// if we fail to register the name and/or the function with the environment free the function!!
+				if(!_functionName){
+					if(_function){
+						if(amVerbose())outputChar('!');
+							FREE_FUNCTION(_function,owner);_function=NULL;
+							if(amVerbose())outputChar('!');
+					}
+				}else
+				if(amVerbose())
+					output("%s"," done"); // 7
+			}else
+				output("%sFailed to create the function name to store '%s' in.",M_ERROR_PREFIX,name);
+			// if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
+		}else
+		if(!_function)
+				output("%sNo function map in the environment to store '%s' in.",M_ERROR_PREFIX,name);
+	}else
+		output("%sNo environment to search for function '%s'.",M_ERROR_PREFIX,name);
+	if(_function)
+		if(amVerbose())
+			output("%s",".\n");
+	return _function;
 }/* VALIDATED */
 
 // END FUNCTION STUFF

@@ -649,9 +649,9 @@ Mstring* appendld(Mstring* const ms,long double ld){return string_append_ld(ms,l
 
 Mstring* _getLongLongText(long long ll){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
-    if(!_s)return NULL;
-    Mstring* p=appendll(_s,ll);
-    if(!p){FREE_STRING(_s,owner);return NULL;}
+	if(!_s)return NULL;
+	Mstring* p=appendll(_s,ll);
+	if(!p){FREE_STRING(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return disowned_string(_s,owner);
 }
@@ -659,13 +659,13 @@ Mstring* _getLongLongText(long long ll){Mallocationowner owner=getOwner(__LINE__
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
-    if(!_s)return NULL;
-    Mstring* p=_s;
-    if(amVerboseDebugging())
-        p=string_append_char(p,'i');
-    if(p&&_integer)
-        p=appendll(p,_integer->ll); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
-    if(!p){FREE_STRING(_s,owner);return NULL;}
+	if(!_s)return NULL;
+	Mstring* p=_s;
+	if(amVerboseDebugging())
+			p=string_append_char(p,'i');
+	if(p&&_integer)
+			p=appendll(p,_integer->ll); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
+	if(!p){FREE_STRING(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return disowned_string(_s,owner);
 }/* VALIDATED */
@@ -673,146 +673,146 @@ Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__L
 extern char** Mtimezonenames;
 Mstring* _getTimeText(Mtime* _time){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
-    if(!_s)return NULL;
-    Mstring* p=_s;
-    if(amVerboseDebugging())
-        p=string_append_char(p,'i');
-    if(p&&_time){
-        if(_time->t>=0){
-            long long lltime=_time->t;
-            if(_time->tzsec!=INT16_MIN)lltime-=_time->tzsec;
-            p=appendll(p,lltime); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
-            // MDH@14DEC2020: with the timezone name index now stored in _time->tznindex we're in trouble, because methods to change the timezone are not registered until Mtime.c/h
-            //                essentially the difference is between an Unix time that is a local time (with associated timezone name) and a non-local time (essentially the epoch time)
-            if(_time->tznindex!=0){
-                p=string_append_char(p,'@');
-                p=string_append(p,Mtimezonenames[abs(_time->tznindex)-1]);
-            }
-        }
-    }
-    if(!p){FREE_STRING(_s,owner);return NULL;}
+	if(!_s)return NULL;
+	Mstring* p=_s;
+	if(amVerboseDebugging())
+		p=string_append_char(p,'i');
+	if(p&&_time){
+		if(_time->t>=0){
+			long long lltime=_time->t;
+			if(_time->tzsec!=INT16_MIN)lltime-=_time->tzsec;
+			p=appendll(p,lltime); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
+			// MDH@14DEC2020: with the timezone name index now stored in _time->tznindex we're in trouble, because methods to change the timezone are not registered until Mtime.c/h
+			//                essentially the difference is between an Unix time that is a local time (with associated timezone name) and a non-local time (essentially the epoch time)
+			if(_time->tznindex!=0){
+				p=string_append_char(p,'@');
+				p=string_append(p,Mtimezonenames[abs(_time->tznindex)-1]);
+			}
+		}
+	}
+	if(!p){FREE_STRING(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return disowned_string(_s,owner);
 }
 /* replaced by getValueInteger()
 long long getInteger(Mvalue* _value){
-    if(_value)
-    switch(_value->type){
-        case VT_INTEGER:return _value->value._integer->ll;
-        case VT_BIGINTEGER:
+	if(_value)
+	switch(_value->type){
+		case VT_INTEGER:return _value->value._integer->ll;
+		case VT_BIGINTEGER:
 			if(mp_cmp(_value->value._biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_value->value._biginteger,getBigintegerLLMax())!=MP_GT)
-                return mp_get_i64(_value->value._biginteger);
-            break;
-		case VT_FLOAT:return double2long(_value->value._float->ld);
-		case VT_STRING:return _strtoll(_value->value._string->_c,M_LL_INVALID);
-		default:break;
-    }
-    return M_LL_INVALID;
+				return mp_get_i64(_value->value._biginteger);
+			break;
+	case VT_FLOAT:return double2long(_value->value._float->ld);
+	case VT_STRING:return _strtoll(_value->value._string->_c,M_LL_INVALID);
+	default:break;
+	}
+	return M_LL_INVALID;
 }
 */
 
 // BigInteger stuff
 // MDH@09APR2020: certain functions only know the mp_int* and not the big integer
 static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _mpintText=owned_string(__string(),owner);
-    ////outputChar('A');
-    if(_mpintText){
-        /// output("Initial big integer text length: %zu.\n",_bigintegerText->length);
-        ///outputChar('B');
-        if(_mpint){
-            // determine the required size
+	Mstring* _mpintText=owned_string(__string(),owner);
+	////outputChar('A');
+	if(_mpintText){
+		/// output("Initial big integer text length: %zu.\n",_bigintegerText->length);
+		///outputChar('B');
+		if(_mpint){
+			// determine the required size
 // MDH@13MAR2020: this is unfortunate because I would have wanted to solve everything with tommath.h
 #ifdef M_MP_DEVELOP
-            size_t arepsize=0; // MDH@13MAR2020: changing type int to size_t (which is larger), so that we should be able to use it with libtommath-develop
+			size_t arepsize=0; // MDH@13MAR2020: changing type int to size_t (which is larger), so that we should be able to use it with libtommath-develop
 #else
-            int arepsize=0;
+			int arepsize=0;
 #endif
-            ///outputChar('C');
-            clock_t then=0;
-            // if(amVerboseDebugging())then=clock(); // DEBUG
-            ///////if(amVerbose())outputInfo("Determining a big integer text representation.");
-            // output("Big integer text length: %zu.\n",_bigintegerText->length);
-            // output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
-            if(mp_radix_size(_mpint,10,&arepsize)==MP_OKAY){
+			///outputChar('C');
+			clock_t then=0;
+			// if(amVerboseDebugging())then=clock(); // DEBUG
+			///////if(amVerbose())outputInfo("Determining a big integer text representation.");
+			// output("Big integer text length: %zu.\n",_bigintegerText->length);
+			// output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
+			if(mp_radix_size(_mpint,10,&arepsize)==MP_OKAY){
 #ifdef M_MP_DEVELOP
-                // if(arepsize>0)output("Length of big integer text representation: %zu.\n",arepsize-1);
-                if(arepsize<=SIZE_MAX){
+				// if(arepsize>0)output("Length of big integer text representation: %zu.\n",arepsize-1);
+				if(arepsize<=SIZE_MAX){
 #else
-                // if(arepsize>0)output("Length of big integer text representation: %d.\n",arepsize-1);
-                if(arepsize<=INT_MAX){
+				// if(arepsize>0)output("Length of big integer text representation: %d.\n",arepsize-1);
+				if(arepsize<=INT_MAX){
 #endif
-                // output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
-                // outputChar('D');
-                // if(amVerbose()&&amDebugging())
-                    // outputChar('E');
-                    // MDH@13MAR2020: arepsize actually includes the '\0' character at the end of any text representation which means that the text itself is one byte shorter
-                    //                however string_synclength() didn't like the length being set to arepsize-1 I suppose because there would be no '\0' at that position in the text
-                    //                as mp_toradix would write
-                    uint8_t failure=0;
-                    if(string_setlength(_mpintText,arepsize)){
-                        if(mp_toradix(_mpint,_mpintText->_chars->chars,10)==MP_OKAY){ // MDH@17APR2020: TODO we should NOT actually use the internal structure of Mstring here!!
-                            if(string_synclength(_mpintText)){
-                                size_t trailingZeroCount=string_trailing(_mpintText,'0');
-                                if(trailingZeroCount>=3){
-                                    if(string_shorten(_mpintText,trailingZeroCount)){ // 'remove' the trailing zeroes
-                                        if(string_append_char(_mpintText,'e')){
-                                            if(!string_append_ll(_mpintText,trailingZeroCount))
-                                                failure=6;
-                                        }else
-                                            failure=5;
-                                    }else
-                                        failure=4;
-                                }
-                            }else
-                                failure=3;
-                        }else
-                            failure=2;
-                    }else
-                        failure=1;
-                    if(failure>0){
-                        FREE_STRING(_mpintText,owner);_mpintText=NULL;
-                        switch(failure){
-                            case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",M_ERROR_PREFIX,arepsize);break;
-                            case 2:outputError("Failed to determine the big integer representation");break;
-                            case 3:outputError("Failed to sync the length of the big integer representation");break;
-                            case 4:outputError("Failed to remove the trailing zeroes from the big integer representation.");break;
-                            case 5:outputError("Failed to append 'e' to the big integer representation.");break;
-                            case 6:outputError("Failed to append the exponent part to the big integer representation.");break;
-                        }
-                    }
-                }else
-                    output("%sCan't store more than %u characters in a string.\n",M_ERROR_PREFIX,SIZE_MAX);
-            }else
-                outputError("Couldn't determine the size of a big integer");
-            if(then)output("Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
-        }else
-            outputError("No big integer to represent");
-    }else
-        output("%sFailed to create a text for storing the representation of a big integer.\n",M_ERROR_PREFIX);
-    ///outputChar('H');
-    return disowned_string(_mpintText,owner);
+					// output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
+					// outputChar('D');
+					// if(amVerbose()&&amDebugging())
+					// outputChar('E');
+					// MDH@13MAR2020: arepsize actually includes the '\0' character at the end of any text representation which means that the text itself is one byte shorter
+					//                however string_synclength() didn't like the length being set to arepsize-1 I suppose because there would be no '\0' at that position in the text
+					//                as mp_toradix would write
+					uint8_t failure=0;
+					if(string_setlength(_mpintText,arepsize)){
+						if(mp_toradix(_mpint,_mpintText->_chars->chars,10)==MP_OKAY){ // MDH@17APR2020: TODO we should NOT actually use the internal structure of Mstring here!!
+							if(string_synclength(_mpintText)){
+								size_t trailingZeroCount=string_trailing(_mpintText,'0');
+								if(trailingZeroCount>=3){
+									if(string_shorten(_mpintText,trailingZeroCount)){ // 'remove' the trailing zeroes
+										if(string_append_char(_mpintText,'e')){
+											if(!string_append_ll(_mpintText,trailingZeroCount))
+												failure=6;
+										}else
+											failure=5;
+									}else
+										failure=4;
+								}
+							}else
+								failure=3;
+						}else
+							failure=2;
+					}else
+						failure=1;
+					if(failure>0){
+						FREE_STRING(_mpintText,owner);_mpintText=NULL;
+						switch(failure){
+							case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",M_ERROR_PREFIX,arepsize);break;
+							case 2:outputError("Failed to determine the big integer representation");break;
+							case 3:outputError("Failed to sync the length of the big integer representation");break;
+							case 4:outputError("Failed to remove the trailing zeroes from the big integer representation.");break;
+							case 5:outputError("Failed to append 'e' to the big integer representation.");break;
+							case 6:outputError("Failed to append the exponent part to the big integer representation.");break;
+						}
+					}
+				}else
+					output("%sCan't store more than %u characters in a string.\n",M_ERROR_PREFIX,SIZE_MAX);
+			}else
+				outputError("Couldn't determine the size of a big integer");
+			if(then)output("Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
+		}else
+				outputError("No big integer to represent");
+	}else
+		output("%sFailed to create a text for storing the representation of a big integer.\n",M_ERROR_PREFIX);
+	///outputChar('H');
+	return disowned_string(_mpintText,owner);
 }
 Mstring* _getBigintegerText(const Mbiginteger* _biginteger){//Mallocationowner owner=getOwner(__LINE__);
-    return(_biginteger?_getMpintText(MP_INT_POINTER(_biginteger)):__string());
+	return(_biginteger?_getMpintText(MP_INT_POINTER(_biginteger)):__string());
 }
 
 Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;Mallocationowner owner_biLLextreme=(Mallocationowner){MI_EXECUTION,__LINE__,1};
 // MDH@11JUN2020: if we return something that is owned instead of something that is disowned we prevent external freeing (i.e. unwarned that is)
 Mbiginteger* getBigintegerLLMin(){//Mallocationowner owner=getOwner(__LINE__);
-    if(!_biLLMin){
-        if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the smallest small integer.");
-        _biLLMin=owned_biginteger(_getBiginteger(M_LL_MIN),owner_biLLextreme);
-        if(amVerboseDebugging())outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
-    }
-    return _biLLMin;
+	if(!_biLLMin){
+		if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the smallest small integer.");
+		_biLLMin=owned_biginteger(_getBiginteger(M_LL_MIN),owner_biLLextreme);
+		if(amVerboseDebugging())outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
+	}
+	return _biLLMin;
 }/* VALIDATED */
 Mbiginteger* getBigintegerLLMax(){
-    if(!_biLLMax){
-        if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the largest small integer.");
-        _biLLMax=owned_biginteger(_getBiginteger(M_LL_MAX),owner_biLLextreme);
-        if(amVerboseDebugging())outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
-    }
-    return _biLLMax;
+	if(!_biLLMax){
+		if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the largest small integer.");
+		_biLLMax=owned_biginteger(_getBiginteger(M_LL_MAX),owner_biLLextreme);
+		if(amVerboseDebugging())outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
+	}
+	return _biLLMax;
 }/* VALIDATED */
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
@@ -828,15 +828,15 @@ do {                                                    \
 typedef unsigned __int128 uint128_t;
 const uint128_t ONE128=1;
 void mp_set_u128(Mbiginteger* a,uint128_t b){
-    int i=0;
-    while(b!=0u){
-        a->dp[i++]=((mp_digit)b&MP_MASK);
-        if(128<=MP_DIGIT_BIT)break;
-        b>>=((128<=MP_DIGIT_BIT)?0:MP_DIGIT_BIT);
-    }
-    a->used=i;
-    a->sign=MP_ZPOS;
-    MP_ZERO_DIGITS(a->dp+a->used,a->alloc-a->used);
+	int i=0;
+	while(b!=0u){
+		a->dp[i++]=((mp_digit)b&MP_MASK);
+		if(128<=MP_DIGIT_BIT)break;
+		b>>=((128<=MP_DIGIT_BIT)?0:MP_DIGIT_BIT);
+	}
+	a->used=i;
+	a->sign=MP_ZPOS;
+	MP_ZERO_DIGITS(a->dp+a->used,a->alloc-a->used);
 }
 */
 
@@ -844,116 +844,116 @@ void mp_set_u128(Mbiginteger* a,uint128_t b){
 // for dealing with long double to big integer conversion
 // MDH@17JUN2019: although a typically is of type Mbiginteger, for a function that starts with mp_ we can use the primitive type mp_int instead of the alias Mbiginteger
 mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
-    if(!a)return MP_ERR;
-    int32_t exp=(exponent&0x7FFF); // cut off the sign
-    if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
-    if(exp!=0){
-        mp_set_u64(a,mantisse);
-        exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
-        if(exp!=0){
-            mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
-            if(err!=MP_OKAY)return err;
-        }
-        if(exponent>>15&&mp_iszero(a)==MP_NO)a->sign=MP_NEG;
-    }else // all zeros in exponent
-        mp_zero(a);
-    return MP_OKAY;
+	if(!a)return MP_ERR;
+	int32_t exp=(exponent&0x7FFF); // cut off the sign
+	if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
+	if(exp!=0){
+		mp_set_u64(a,mantisse);
+		exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
+		if(exp!=0){
+			mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
+			if(err!=MP_OKAY)return err;
+		}
+		if(exponent>>15&&mp_iszero(a)==MP_NO)a->sign=MP_NEG;
+	}else // all zeros in exponent
+		mp_zero(a);
+	return MP_OKAY;
 }/* VALIDATED */
 mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){Mallocationowner owner=getOwner(__LINE__);
-    if(!a)return MP_ERR;
-    int32_t exp=(exponent&0x7FFF); // cut off the sign
-    if(exp!=0){
-        mp_set_u64(a,mantisse);
-        if(amVerbose()){
-            Mstring* _mantisseBigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020: ask _getMpintText(), replacing _getBigintegerText()
-            output("Value after setting the fraction: %s.\n",string(_mantisseBigIntegerText));
-            FREE_STRING(_mantisseBigIntegerText,owner);
-        }
-        if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.\n",exp,mantisse);
-        if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
-        exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
-        //////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
-        if(amVerbose())output("Power of two exponent: %d.\n",exp);  
-        if(exp!=0){
-            mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
-            if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
-        }
-        if(amVerbose()){
-            Mstring* _bigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020
-            output("Value after applying the exponent: %s.\n",string(_bigIntegerText));
-            FREE_STRING(_bigIntegerText,owner);
-        }
-        if(exponent>>15){ // negative
-            // take over the sign from the long double (bit 15 in the signandexponent part)
-            if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
-                a->sign=MP_NEG;
-                if(amVerbose())output("Sign part of real used to set the sign of the big integer.\n");
-            }else
-                if(amVerbose())output("No need to set the sign on a big integer equal to zero.\n");           
-        }
-    }else // all zeros in exponent
-        mp_zero(a);
-    return MP_OKAY;
+	if(!a)return MP_ERR;
+	int32_t exp=(exponent&0x7FFF); // cut off the sign
+	if(exp!=0){
+		mp_set_u64(a,mantisse);
+		if(amVerbose()){
+			Mstring* _mantisseBigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020: ask _getMpintText(), replacing _getBigintegerText()
+			output("Value after setting the fraction: %s.\n",string(_mantisseBigIntegerText));
+			FREE_STRING(_mantisseBigIntegerText,owner);
+		}
+		if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.\n",exp,mantisse);
+		if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
+		exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
+		//////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
+		if(amVerbose())output("Power of two exponent: %d.\n",exp);  
+		if(exp!=0){
+			mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
+			if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
+		}
+		if(amVerbose()){
+			Mstring* _bigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020
+			output("Value after applying the exponent: %s.\n",string(_bigIntegerText));
+			FREE_STRING(_bigIntegerText,owner);
+		}
+		if(exponent>>15){ // negative
+			// take over the sign from the long double (bit 15 in the signandexponent part)
+			if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
+				a->sign=MP_NEG;
+				if(amVerbose())output("Sign part of real used to set the sign of the big integer.\n");
+			}else
+				if(amVerbose())output("No need to set the sign on a big integer equal to zero.\n");           
+		}
+	}else // all zeros in exponent
+		mp_zero(a);
+	return MP_OKAY;
 }/* VALIDATED */
 mp_err mp_set_longdouble(Mbiginteger *a, long double b){
-    // always assume 10-byte long double (extended precision)
-    uint64_t mantisse;
-    uint16_t exponent; // including bit 63
-    extractMantisseAndExponent(b,&mantisse,&exponent);
-    // determine the sign, and the 15-bit power of two exponent
-    ////////return mp_set_me_verbose(a,mantisse,exponent); 
-    return (amVerbose()?mp_set_me_verbose(MP_INT_POINTER(a),mantisse,exponent):mp_set_me(MP_INT_POINTER(a),mantisse,exponent));
-    /*
-    if(sizeof(long double)==16){
-        int exp;
-        mp_err err;
-        union {
-            long double dbl;
-            uint128_t bits;
-        } cast;
-        cast.dbl=b;
-        exp=(int)((unsigned)(cast.bits>>112)&0x7FFFu); // get rid of mantisse and sign
-        uint128_t frac=(cast.bits&((ONE128<<112)-1uLL))|(ONE128<<112);
-        if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
-        exp-=16383+112;
-        mp_set_u128(a,frac);
-        err=(exp<0)?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a);
-        if(err!=MP_OKAY)return err;
-        if(((cast.bits>>127)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
-        return MP_OKAY;
-    }
-    if(sizeof(long double)==10){
-        uint64_t frac;
-        int exp;
-        mp_err err;
-        union {
-            long double dbl;
-            ldintparts ldints;
-        } cast;
-        cast.dbl=b;
-        if((cast.ldints.mantisse>>63)==0){ // a normalized number
-            exp=(int)((unsigned)(cast.ldints.signandexponent)&0x7FFFu);
-            if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
-            exp-=16383+63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers    
-            frac=(cast.ldints.mantisse<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
-            mp_set_u64(a,frac);
-            if(amVerbose())output("Fraction part %16x used to initialize the big integer.",frac);
-            err=(exp<0?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a));
-            if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
-            // take over the sign from the long double (bit 15 in the signandexponent part)
-            if(((cast.ldints.signandexponent>>15)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
-            if(amVerbose())output("Sign part of real used to set the sign of the big integer.");
-        }else // a denormalized number, which all map to zero!!
-            mp_zero(a); // NOTE it probably is already zero!!
-        return MP_OKAY;
-    }else
-    if(sizeof(long double)==8){
-        if(amVerbose())output("NOTE: Long double has same size as a double!");
-        return mp_set_double(a,(double)b);
-    }
-     if(amVerbose())output("The size of a long double is %u.",sizeof(long double));
-    return MP_VAL;
-   */
+	// always assume 10-byte long double (extended precision)
+	uint64_t mantisse;
+	uint16_t exponent; // including bit 63
+	extractMantisseAndExponent(b,&mantisse,&exponent);
+	// determine the sign, and the 15-bit power of two exponent
+	////////return mp_set_me_verbose(a,mantisse,exponent); 
+	return (amVerbose()?mp_set_me_verbose(MP_INT_POINTER(a),mantisse,exponent):mp_set_me(MP_INT_POINTER(a),mantisse,exponent));
+	/*
+	if(sizeof(long double)==16){
+		int exp;
+		mp_err err;
+		union {
+			long double dbl;
+			uint128_t bits;
+		} cast;
+		cast.dbl=b;
+		exp=(int)((unsigned)(cast.bits>>112)&0x7FFFu); // get rid of mantisse and sign
+		uint128_t frac=(cast.bits&((ONE128<<112)-1uLL))|(ONE128<<112);
+		if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
+		exp-=16383+112;
+		mp_set_u128(a,frac);
+		err=(exp<0)?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a);
+		if(err!=MP_OKAY)return err;
+		if(((cast.bits>>127)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
+		return MP_OKAY;
+	}
+	if(sizeof(long double)==10){
+		uint64_t frac;
+		int exp;
+		mp_err err;
+		union {
+			long double dbl;
+			ldintparts ldints;
+		} cast;
+		cast.dbl=b;
+		if((cast.ldints.mantisse>>63)==0){ // a normalized number
+			exp=(int)((unsigned)(cast.ldints.signandexponent)&0x7FFFu);
+			if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
+			exp-=16383+63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers    
+			frac=(cast.ldints.mantisse<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
+			mp_set_u64(a,frac);
+			if(amVerbose())output("Fraction part %16x used to initialize the big integer.",frac);
+			err=(exp<0?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a));
+			if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
+			// take over the sign from the long double (bit 15 in the signandexponent part)
+			if(((cast.ldints.signandexponent>>15)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
+			if(amVerbose())output("Sign part of real used to set the sign of the big integer.");
+		}else // a denormalized number, which all map to zero!!
+			mp_zero(a); // NOTE it probably is already zero!!
+		return MP_OKAY;
+	}else
+	if(sizeof(long double)==8){
+		if(amVerbose())output("NOTE: Long double has same size as a double!");
+		return mp_set_double(a,(double)b);
+	}
+	if(amVerbose())output("The size of a long double is %u.",sizeof(long double));
+	return MP_VAL;
+	*/
 }/* VALIDATED */
 // MDH@07JUN2019: based on mp_get_double in libtommath:
 /*
@@ -972,159 +972,159 @@ double mp_get_double(const Mbiginteger *a)
 */
 long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
 long double mp_get_long_double(Mbiginteger const * const a){
-    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
-    mp_int* mpi_a=MP_INT_POINTER(a); // MDH@09APR2020: get the mp_int pointer from the big integer
-    if(!mpi_a)return M_LD_NAN; // if a undefined, return NaN
-    int i=mpi_a->used;
-    if(i==0)return 0.0; // if a zero, return 0
-    --i; // 0 if only one big integer digit, otherwise positive
-    if(i&&!M_LD_DIGIT_MULTIPLIER){ // if we need the digit multiplier, get it
-        M_LD_DIGIT_MULTIPLIER=1.0;
-        int j=MP_DIGIT_BIT;
-        while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
-    }
-    long double d=(long double)mpi_a->dp[i]; // initialize d to the most significant big integer digit
-    if(report)
-        output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",MP_INT_POINTER(a)->dp[i],LDBL_DIG,d,i);
-    while(--i>=0){
-        if(report)
-            output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
-        d*=M_LD_DIGIT_MULTIPLIER;
-        if(report)
-            output("Result of multiplying by '%Lf': '%.*Lf'.\n",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
-        d+=(long double)mpi_a->dp[i];
-        if(report)
-            output("Result of adding '%lld': '%.*Lf'.\n",mpi_a->dp[i],LDBL_DIG,d);
-    }
-    if(mpi_a->sign==MP_NEG&&!ldIsNaN(d))d=-d;
-    if(report)
-        output("Conversion of big integer to long double '%.*Lf' done!\n",LDBL_DIG,d);
-    return d;
-    // replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
+	mp_int* mpi_a=MP_INT_POINTER(a); // MDH@09APR2020: get the mp_int pointer from the big integer
+	if(!mpi_a)return M_LD_NAN; // if a undefined, return NaN
+	int i=mpi_a->used;
+	if(i==0)return 0.0; // if a zero, return 0
+	--i; // 0 if only one big integer digit, otherwise positive
+	if(i&&!M_LD_DIGIT_MULTIPLIER){ // if we need the digit multiplier, get it
+		M_LD_DIGIT_MULTIPLIER=1.0;
+		int j=MP_DIGIT_BIT;
+		while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
+	}
+	long double d=(long double)mpi_a->dp[i]; // initialize d to the most significant big integer digit
+	if(report)
+		output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",MP_INT_POINTER(a)->dp[i],LDBL_DIG,d,i);
+	while(--i>=0){
+		if(report)
+				output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
+		d*=M_LD_DIGIT_MULTIPLIER;
+		if(report)
+			output("Result of multiplying by '%Lf': '%.*Lf'.\n",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
+		d+=(long double)mpi_a->dp[i];
+		if(report)
+			output("Result of adding '%lld': '%.*Lf'.\n",mpi_a->dp[i],LDBL_DIG,d);
+	}
+	if(mpi_a->sign==MP_NEG&&!ldIsNaN(d))d=-d;
+	if(report)
+		output("Conversion of big integer to long double '%.*Lf' done!\n",LDBL_DIG,d);
+	return d;
+	// replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
 }/* VALIDATED */
 
 // part of implementing _getRealText (so not present in the header)
 
 // 'shifting' a double means either doubling or halving a number of times
 long double ldShift(long double ld,long long shift){
-    long double result=(shift==M_LL_INVALID?M_LD_NAN:ld); // initialize the result to what we received, unless the shift value is invalid
-    // if something to shift by, and we can expect a change to the result go ahead...
-    if(shift!=0&&!ldIsNaN(result)&&!ldIsZero(result)&&!ldIsInf(result)){ // something to operate on (that allows doubling/halving), as well as something to shift by
-        if(shift>0){
-            while(--shift>=0)result*=2; // keep doubling
-        }else{
-            while(++shift<=0)result/=2; // keep halving
-        }
-    }
-    return result;
+	long double result=(shift==M_LL_INVALID?M_LD_NAN:ld); // initialize the result to what we received, unless the shift value is invalid
+	// if something to shift by, and we can expect a change to the result go ahead...
+	if(shift!=0&&!ldIsNaN(result)&&!ldIsZero(result)&&!ldIsInf(result)){ // something to operate on (that allows doubling/halving), as well as something to shift by
+		if(shift>0){
+			while(--shift>=0)result*=2; // keep doubling
+		}else{
+			while(++shift<=0)result/=2; // keep halving
+		}
+	}
+	return result;
 }/* VALIDATED */
 
 long long getLongDoubleSign(long double ld){
-    if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
-    if(ldIsPositive(ld))return M_POSITIVE;
-    if(ldIsNegative(ld))return M_NEGATIVE;
-    return M_ZERO;
+	if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
+	if(ldIsPositive(ld))return M_POSITIVE;
+	if(ldIsNegative(ld))return M_NEGATIVE;
+	return M_ZERO;
 }/* VALIDATED */
 
 long long double2long(long double ld){
-    if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
-    // TODO perhaps there are some other 
-    if(ldIsZero(ld))return 0;
-    long double tld=truncl(ld); // extract the integer part i.e. floor towards zero (which is called truncate)
-    if(tld<M_LL_MIN||tld>M_LL_MAX)return M_LL_INVALID; // out of range
-    return(long long)tld;
+	if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
+	// TODO perhaps there are some other 
+	if(ldIsZero(ld))return 0;
+	long double tld=truncl(ld); // extract the integer part i.e. floor towards zero (which is called truncate)
+	if(tld<M_LL_MIN||tld>M_LL_MAX)return M_LL_INVALID; // out of range
+	return(long long)tld;
 }/* VALIDATED */
 
 // STRINGIFY FUNCTIONS
 Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__);
-    if(!_float)return NULL;
+	if(!_float)return NULL;
 	Mstring* _floatText=owned_string(__string(),owner);
-    if(_floatText){
-        Mstring* p=_floatText;
-        if(amVerboseDebugging())
-            p=string_append_char(p,'r');
-        if(p){
-            switch(fpclassify(_float->ld)){
-                case FP_NAN:p=string_append(p,M_NAN);break;
-                case FP_INFINITE:p=string_append(p,M_INF);break;
-                default:p=appendld(p,_float->ld);break;
-            }
-        }
-        if(!p){FREE_STRING(_floatText,owner);return NULL;}
-    }
+	if(_floatText){
+		Mstring* p=_floatText;
+		if(amVerboseDebugging())
+			p=string_append_char(p,'r');
+		if(p){
+			switch(fpclassify(_float->ld)){
+				case FP_NAN:p=string_append(p,M_NAN);break;
+				case FP_INFINITE:p=string_append(p,M_INF);break;
+				default:p=appendld(p,_float->ld);break;
+			}
+		}
+		if(!p){FREE_STRING(_floatText,owner);return NULL;}
+	}
 	return disowned_string(_floatText,owner);
 }/* VALIDATED */
 
 char hexdigit(char c){
-    if(c>=97&&c<=102)return hexdigit(c-32);
-    if(c>=65&&c<=70)return c-55;
-    if(c>=48&&c<=57)return c-48;
-    return '\0';
+	if(c>=97&&c<=102)return hexdigit(c-32);
+	if(c>=65&&c<=70)return c-55;
+	if(c>=48&&c<=57)return c-48;
+	return '\0';
 }
 Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _stringText=owned_string(__string(),owner);
-    if(_stringText){
-        Mstring* p=_stringText;
-        if(amVerboseDebugging())
-            p=string_append_char(p,'s');
-        if(p){
-            // MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
-            if(dequoted){
-                char c;
-                size_t lastindex=strlen(_text->_c);
-                if(lastindex>0){
-                    lastindex--;
-                    for(size_t index=0;index<=lastindex;index++){
-                        c=_text->_c[index];
-                        if(index<lastindex&&c=='\\'){
-                            c=_text->_c[++index];
-                            switch(c){
-                                case 'a':p=string_append_char(p,0x07);break;
-                                case 'b':p=string_append_char(p,0x08);break;
-                                case 'e':p=string_append_char(p,0x1B);break;
-                                case 'f':p=string_append_char(p,0x0C);break;
-                                case 'n':p=string_append_char(p,0x0A);break;
-                                case 'r':p=string_append_char(p,0x0D);break;
-                                case 't':p=string_append_char(p,0x09);break;
-                                case 'v':p=string_append_char(p,0x0B);break;
-                                case '\\':p=string_append_char(p,0x5C);break;
-                                case '\'':p=string_append_char(p,0x27);break;
-                                case '"':p=string_append_char(p,0x22);break;
-                                case '?':p=string_append_char(p,0x3F);break;
-                                case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
-                                    { // octal representations can't have 8 or 9 in it
-                                        char oct=(c-48);
-                                        // check successive characters if they are octal digits
-                                        while(index+1<=lastindex){
-                                            c=_text->_c[index+1];
-                                            if(c<48||c>55)break; // not an octal digit
-                                            oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
-                                            index++;
-                                        }
-                                        p=string_append_char(p,oct);
-                                        // replacing: _p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));
-                                    }
-                                    break; // assume octal
-                                case 8:case 9:break; // this would be invalid
-                                case 'x':case 'X':
-                                    {
-                                        if(index+2<=lastindex){p=string_append_char(p,(hexdigit(_text->_c[index+1])<<4)+hexdigit(_text->_c[index+2]));}
-                                        index+=2;
-                                    }
-                                    break; // TODO for now skip, so still left to do
-                            }
-                        }else
-                            p=string_append_char(p,c);
-                    }
-                }
-            }else{
-                p=string_append_char(p,_text->presuffix);
-                p=string_append(p,_text->_c);
-                p=string_append_char(p,_text->presuffix);
-            }
-        }
-        if(!p){FREE_STRING(_stringText,owner);return NULL;}
-    }
+	if(_stringText){
+		Mstring* p=_stringText;
+		if(amVerboseDebugging())
+			p=string_append_char(p,'s');
+		if(p){
+			// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
+			if(dequoted){
+				char c;
+				size_t lastindex=strlen(_text->_c);
+				if(lastindex>0){
+					lastindex--;
+					for(size_t index=0;index<=lastindex;index++){
+						c=_text->_c[index];
+						if(index<lastindex&&c=='\\'){
+							c=_text->_c[++index];
+							switch(c){
+								case 'a':p=string_append_char(p,0x07);break;
+								case 'b':p=string_append_char(p,0x08);break;
+								case 'e':p=string_append_char(p,0x1B);break;
+								case 'f':p=string_append_char(p,0x0C);break;
+								case 'n':p=string_append_char(p,0x0A);break;
+								case 'r':p=string_append_char(p,0x0D);break;
+								case 't':p=string_append_char(p,0x09);break;
+								case 'v':p=string_append_char(p,0x0B);break;
+								case '\\':p=string_append_char(p,0x5C);break;
+								case '\'':p=string_append_char(p,0x27);break;
+								case '"':p=string_append_char(p,0x22);break;
+								case '?':p=string_append_char(p,0x3F);break;
+								case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
+									{ // octal representations can't have 8 or 9 in it
+										char oct=(c-48);
+										// check successive characters if they are octal digits
+										while(index+1<=lastindex){
+											c=_text->_c[index+1];
+											if(c<48||c>55)break; // not an octal digit
+											oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
+											index++;
+										}
+										p=string_append_char(p,oct);
+										// replacing: _p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));
+									}
+									break; // assume octal
+								case 8:case 9:break; // this would be invalid
+								case 'x':case 'X':
+									{
+											if(index+2<=lastindex){p=string_append_char(p,(hexdigit(_text->_c[index+1])<<4)+hexdigit(_text->_c[index+2]));}
+											index+=2;
+									}
+									break; // TODO for now skip, so still left to do
+							}
+						}else
+							p=string_append_char(p,c);
+					}
+				}
+			}else{
+				p=string_append_char(p,_text->presuffix);
+				p=string_append(p,_text->_c);
+				p=string_append_char(p,_text->presuffix);
+			}
+		}
+		if(!p){FREE_STRING(_stringText,owner);return NULL;}
+	}
 	return disowned_string(_stringText,owner);
 }/* VALIDATED */
 
@@ -1132,168 +1132,168 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Malloc
 // the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
 // we can solve that by returning a new undefined value text instance every time
 Mstring* _getUndefinedValueText(){//Mallocationowner owner=getOwner(__LINE__);
-    return _getString(M_UNDEFINED_VALUE_TEXT); // just wrapping UNDEFINED_VALUETEXT again...
-    /* replacing:
-    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
-    return string_copy(_UNDEFINED_VALUETEXT);
-    */
+	return _getString(M_UNDEFINED_VALUE_TEXT); // just wrapping UNDEFINED_VALUETEXT again...
+	/* replacing:
+	if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
+	return string_copy(_UNDEFINED_VALUETEXT);
+	*/
 }/* VALIDATED */
 
 size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
-    size_t written=0;
-    if(prefix)written=output("%s",prefix);
-    if(_biginteger){
-        Mstring* _bigintegerText=owned_string(_getBigintegerText(_biginteger),owner);
-        if(_bigintegerText){
-            written+=output("%s",string(_bigintegerText));
-            FREE_STRING(_bigintegerText,owner);
-        }else
-            written+=output("no big integer text representation");
-    }else
-        written+=outputChar('?');
-    if(postfix)written+=output("%s",postfix);
-    return written;
+	size_t written=0;
+	if(prefix)written=output("%s",prefix);
+	if(_biginteger){
+		Mstring* _bigintegerText=owned_string(_getBigintegerText(_biginteger),owner);
+		if(_bigintegerText){
+			written+=output("%s",string(_bigintegerText));
+			FREE_STRING(_bigintegerText,owner);
+		}else
+				written+=output("no big integer text representation");
+	}else
+			written+=outputChar('?');
+	if(postfix)written+=output("%s",postfix);
+	return written;
 }/* VALIDATED */
 size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
-    size_t written=0;
-    if(prefix)written=output("%s",prefix);
-    if(_decimal!=NULL){
-        Mstring* _decimalText=owned_string(_getDecimalText(_decimal,false),owner);
-        if(_decimalText){
-            written+=output("%s",string(_decimalText));
-            FREE_STRING(_decimalText,owner);
-        }else
-            written+=output("no decimal text representation");
-    }else
-        written+=outputChar('?');
-    if(postfix)written+=output("%s",postfix);
-    return written;
+	size_t written=0;
+	if(prefix)written=output("%s",prefix);
+	if(_decimal!=NULL){
+		Mstring* _decimalText=owned_string(_getDecimalText(_decimal,false),owner);
+		if(_decimalText){
+			written+=output("%s",string(_decimalText));
+			FREE_STRING(_decimalText,owner);
+		}else
+			written+=output("no decimal text representation");
+	}else
+		written+=outputChar('?');
+	if(postfix)written+=output("%s",postfix);
+	return written;
 }/* VALIDATED */
 
 // conversion from big integer to the long long it contains (when in range)
 long long biginteger2long(const Mbiginteger* const _biginteger){
 	return(_biginteger&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT
-                        &&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT?mp_get_i64(MP_INT_POINTER(_biginteger)):M_LL_INVALID);
+		&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT?mp_get_i64(MP_INT_POINTER(_biginteger)):M_LL_INVALID);
 }/* VALIDATED */
 bool strIsZero(char* str){
-    size_t l=strlen(str);
-    //// NOTE do not accept integer literal postfixes when checking for 1: if(l>0&&str[l-1]=='i'||str[l-1]=='I'||str[l-1]=='q'||str[l-1]=='r')l-=1; // skip any accepted integer postfix!!
-    // if l already is zero str[0] will equal '\0' which (see below) is not considered a zero integer!!!!
-    while(l>0){l--;if(str[l]!='0')break;} // stop as soon as the character does not match '0' (any sign is only allowed at position 0)
-    return(!l?false:str[l]=='-'||str[l]=='+'||str[l]=='0');
+	size_t l=strlen(str);
+	//// NOTE do not accept integer literal postfixes when checking for 1: if(l>0&&str[l-1]=='i'||str[l-1]=='I'||str[l-1]=='q'||str[l-1]=='r')l-=1; // skip any accepted integer postfix!!
+	// if l already is zero str[0] will equal '\0' which (see below) is not considered a zero integer!!!!
+	while(l>0){l--;if(str[l]!='0')break;} // stop as soon as the character does not match '0' (any sign is only allowed at position 0)
+	return(!l?false:str[l]=='-'||str[l]=='+'||str[l]=='0');
 }/* VALIDATED */
 
 /* moved to Mdecimal.h/c
 bool isDecimalZero(Mdecimal* _decimal){
-    if(!_decimal)return false;
-    Mstring* _decimalText=_getDecimalText(_decimal,true); // free asap
-    ///////output("Is decimal '%s' zero?",string(_decimalText));
-    FREE_STRING(_decimalText); // freed
-    bool result=(_decimal->mpd?mpd_iszero(_decimal->mpd)==MP_YES:false); // TODO apparently 0 means true, something else means false
-    //////output(" %s.\n",(result?"YES":"NO"));
-    return result;
+	if(!_decimal)return false;
+	Mstring* _decimalText=_getDecimalText(_decimal,true); // free asap
+	///////output("Is decimal '%s' zero?",string(_decimalText));
+	FREE_STRING(_decimalText); // freed
+	bool result=(_decimal->mpd?mpd_iszero(_decimal->mpd)==MP_YES:false); // TODO apparently 0 means true, something else means false
+	//////output(" %s.\n",(result?"YES":"NO"));
+	return result;
 }// VALIDATED 
 */
 
 // MDH@28SEP2020: file access
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
-    if(!_file)return NULL;
-    if(_file->_stat)DISOWNED(_file->_stat,owner_file);
-    if(_file->_name)DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
-    return DISOWNED(_file,owner_file);
+	if(!_file)return NULL;
+	if(_file->_stat)DISOWNED(_file->_stat,owner_file);
+	if(_file->_name)DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
+	return DISOWNED(_file,owner_file);
 }
 Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){
-    if(!_file)return NULL;
-    if(_file->_stat)OWNED(_file->_stat,Msubowner(owner_file,1));
-    return OWNED(_file,owner_file);
+	if(!_file)return NULL;
+	if(_file->_stat)OWNED(_file->_stat,Msubowner(owner_file,1));
+	return OWNED(_file,owner_file);
 }
 Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
-    Mfile* _file=CALLOC_1(sizeof(struct Mfile),'F',owner);
-    _file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
-    return disowned_file(_file,owner);
+	Mfile* _file=CALLOC_1(sizeof(struct Mfile),'F',owner);
+	_file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
+	return disowned_file(_file,owner);
 }
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
 bool closeFile(Mfile* _file){
-    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
-    if(!_file){outputWarning("No file to close");return false;} // nothing to close
-    assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
-    if(!_file->_f){output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));return true;} // already closed
-    if(report)
-        output("Closing '%s'.\n",string(_file->_name));
-    if(fclose(_file->_f)==0){
-        _file->_f=NULL;
-        if(report)
-            output("'%s' closed.\n",string(_file->_name));
-        return true;
-    }
-    output("%sFailed to close '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
-    return false;
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
+	if(!_file){outputWarning("No file to close");return false;} // nothing to close
+	assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
+	if(!_file->_f){output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));return true;} // already closed
+	if(report)
+		output("Closing '%s'.\n",string(_file->_name));
+	if(fclose(_file->_f)==0){
+		_file->_f=NULL;
+		if(report)
+			output("'%s' closed.\n",string(_file->_name));
+		return true;
+	}
+	output("%sFailed to close '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+	return false;
 }
 void free_file(Mfile* _file){
-    if(_file){
-        if(_file->_f)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
-        if(_file->_stat)FREE_1(_file->_stat,'f');
-        if(_file->_name)FREE_1(_file->_name,'S');
-        FREE_1(_file,'F');
-    }
+	if(_file){
+		if(_file->_f)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
+		if(_file->_stat)FREE_1(_file->_stat,'f');
+		if(_file->_name)FREE_1(_file->_name,'S');
+		FREE_1(_file,'F');
+	}
 }
 // opening a file might mean that afterwards the file exists, and we then should update _file->_stat accordingly!!!
 void openFile(Mfile* _file,char* mode){
-    bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
-    // only open when defined and currently not open
-    if(_file&&mode){ // valid input
-        if(!_file->_f){ // not opened yet
-            if(!_file->_stat||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
-                assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
-                _file->_f=fopen(string(_file->_name),mode);
-                if(_file->_f){ // now opened
-                    if(report)
-                        output("'%s' opened!\n",string(_file->_name));
-                    _file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
-                    // update stat (even if already set, because the file existed to start with)
-                    if(stat(string(_file->_name),_file->_stat)!=0){
-                        FREE_1(_file->_stat,'f');
-                        _file->_stat=NULL;
-                        output("%sFailed to update the stats of '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
-                    }else
-                    if(report)
-                        output("Stats of '%s' updated.\n",string(_file->_name));
-                }else
-                    output("%sFailed to open '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
-            }
-        }else
-            output("%s'%s' already open!\n",M_WARNING_PREFIX,string(_file->_name));
-    }
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
+	// only open when defined and currently not open
+	if(_file&&mode){ // valid input
+		if(!_file->_f){ // not opened yet
+			if(!_file->_stat||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
+				assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
+				_file->_f=fopen(string(_file->_name),mode);
+				if(_file->_f){ // now opened
+					if(report)
+						output("'%s' opened!\n",string(_file->_name));
+					_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
+					// update stat (even if already set, because the file existed to start with)
+					if(stat(string(_file->_name),_file->_stat)!=0){
+						FREE_1(_file->_stat,'f');
+						_file->_stat=NULL;
+						output("%sFailed to update the stats of '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+					}else
+					if(report)
+						output("Stats of '%s' updated.\n",string(_file->_name));
+				}else
+					output("%sFailed to open '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+			}
+		}else
+			output("%s'%s' already open!\n",M_WARNING_PREFIX,string(_file->_name));
+	}
 }
 
 // MDH@08DEC2020: and not times
 Mtime* owned_time(Mtime* _time,Mallocationowner owner_time){
-    if(!_time)return NULL;
-    return OWNED(_time,owner_time);
+	if(!_time)return NULL;
+	return OWNED(_time,owner_time);
 }
 Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time){
-    if(!_time)return NULL;
-    return DISOWNED(_time,owner_time);
+	if(!_time)return NULL;
+	return DISOWNED(_time,owner_time);
 }
 // __time() returns an time initialized as zero UTC (because tznindex and tzsec will be zero)
 Mtime* __time(){Mallocationowner owner=getOwner(__LINE__);
-    Mtime* _time=CALLOC_1(sizeof(struct Mtime),'T',owner);
-    return disowned_time(_time,owner);
+	Mtime* _time=CALLOC_1(sizeof(struct Mtime),'T',owner);
+	return disowned_time(_time,owner);
 }
 // NOTE _getTime() will return a result even if the tzsec and tznindex are an incorrect combination!!!
 Mtime* _getTime(char const * const source,time_t t,int16_t tzsec,int16_t tznindex){Mallocationowner owner=getOwner(__LINE__);
-    Mtime* _time=owned_time(__time(),owner);
-    if(!_time)return NULL;
-    _time->t=t;
-    _time->tzsec=tzsec; // store the timezone seconds deviation
-    _time->tznindex=tznindex;
-    return disowned_time(_time,owner);
+	Mtime* _time=owned_time(__time(),owner);
+	if(!_time)return NULL;
+	_time->t=t;
+	_time->tzsec=tzsec; // store the timezone seconds deviation
+	_time->tznindex=tznindex;
+	return disowned_time(_time,owner);
 }
 void free_time(Mtime* _time){
-    if(_time){
-        FREE_1(_time,'T');
-    }
+	if(_time){
+		FREE_1(_time,'T');
+	}
 }
 long long getTimeLongLong(Mtime* _time){
-    return(_time?_time->t-(_time->tzsec==INT16_MIN?0:_time->tzsec):M_LL_INVALID);
+	return(_time?_time->t-(_time->tzsec==INT16_MIN?0:_time->tzsec):M_LL_INVALID);
 }

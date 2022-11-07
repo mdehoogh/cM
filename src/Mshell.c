@@ -4352,7 +4352,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																				outputMap("Value holder map: ",valueholderMap,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																			if(indexorattributenameListelementValue){
-																				Mstring* _attributenameText=_getValueText(indexorattributenameListelementValue,true);
+																				// MDH@07NOV2022 BUG FIX: _getValueText returns a disowned text, of which I should take ownership immediately
+																				Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner);
 																				if(_attributenameText){
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																					if(!newValueholder){
