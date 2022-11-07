@@ -5,6 +5,7 @@
 
 #include "Mmessage.h"
 
+/// the ID of this module
 static int32_t const MODULE_ID=(2<<4);
 
 // the texts to be used in certain message types
@@ -13,6 +14,11 @@ extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char* const M_BUG_PREFIX;
 
+/**
+ * @brief outputs parameter info prefixed with M_INFO_PREFIX, appending a period when not present in info
+ * 
+ * @param info the info text to output
+ */
 void outputInfo(char const * const info){
     size_t l=(info?strlen(info):0);
     if(l==0)return;
@@ -21,6 +27,11 @@ void outputInfo(char const * const info){
     newline();
 }
 
+/**
+ * @brief outputs parameter warning prefixed with M_WARNING_PREFIX, appending a period when not present in info
+ * 
+ * @param warning the warning text to output
+ */
 void outputWarning(char const * const warning){
     size_t l=(warning?strlen(warning):0);
     if(l==0)return;
@@ -30,6 +41,11 @@ void outputWarning(char const * const warning){
     newline();
 }
 
+/**
+ * @brief outputs parameter error prefixed with M_ERROR_PREFIX, appending a period if not present in parameter error
+ * 
+ * @param error the error text to output
+ */
 void outputError(char const * const error){
     size_t l=(error?strlen(error):0);
     if(l==0)return;
@@ -40,13 +56,29 @@ void outputError(char const * const error){
     // replacing: if(error)output("%s%s.\n",M_ERROR_PREFIX,error);
 }
 
+/**
+ * @brief outputs parameter memoryerror prefixed by a memory error text
+ * 
+ * @param memoryerror the memory error text
+ */
 void outputMemoryError(char const * const memoryerror){
     if(memoryerror)output("%s%s. Probable cause: out of memory!\n",M_ERROR_PREFIX,memoryerror);
 }
 
 // MDH@05NOV2019: might come in handy to be able to report bugs
+/**
+ * @brief outputs parameter error as error and text as is
+ * 
+ * @param error the error text
+ * @param text text to output after the error text
+ */
 void outputErrorAndText(char const * const error,char const * const text){if(error)output("%s%s",M_ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
+/**
+ * @brief outputs parameter bug prefixed by M_BUG_PREFIX, postfixing a period if not present in parameter bug
+ * 
+ * @param bug the bug text
+ */
 void outputBug(char const * const bug){
     size_t l=(bug?strlen(bug):0);
     if(l==0)return;
@@ -57,6 +89,11 @@ void outputBug(char const * const bug){
 } 
 
 // for now placing kbhit() here
+/**
+ * @brief checks the console for a recent keystroke
+ * 
+ * @return int nonzero when there is a key in the keyboard buffer
+ */
 int kbhit(){
     struct timeval tv={0L,0L};
     fd_set fds;
