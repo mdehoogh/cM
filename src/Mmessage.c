@@ -15,7 +15,7 @@ extern const char* const M_WARNING_PREFIX;
 extern const char* const M_BUG_PREFIX;
 
 /**
- * @brief outputs parameter info prefixed with M_INFO_PREFIX, appending a period when not present in info
+ * @brief outputs \p info prefixed with M_INFO_PREFIX, appending a period when not present in info
  * 
  * @param info the info text to output
  */
@@ -28,7 +28,7 @@ void outputInfo(char const * const info){
 }
 
 /**
- * @brief outputs parameter warning prefixed with M_WARNING_PREFIX, appending a period when not present in info
+ * @brief outputs \p warning prefixed with M_WARNING_PREFIX, appending a period when not present in info
  * 
  * @param warning the warning text to output
  */
@@ -42,7 +42,7 @@ void outputWarning(char const * const warning){
 }
 
 /**
- * @brief outputs parameter error prefixed with M_ERROR_PREFIX, appending a period if not present in parameter error
+ * @brief outputs \p error prefixed with M_ERROR_PREFIX, appending a period if not present in \p error
  * 
  * @param error the error text to output
  */
@@ -57,7 +57,7 @@ void outputError(char const * const error){
 }
 
 /**
- * @brief outputs parameter memoryerror prefixed by a memory error text
+ * @brief outputs \p memoryerror prefixed by a memory error text
  * 
  * @param memoryerror the memory error text
  */
@@ -67,7 +67,7 @@ void outputMemoryError(char const * const memoryerror){
 
 // MDH@05NOV2019: might come in handy to be able to report bugs
 /**
- * @brief outputs parameter error as error and text as is
+ * @brief outputs \p error as error and \p text as is
  * 
  * @param error the error text
  * @param text text to output after the error text
@@ -75,7 +75,7 @@ void outputMemoryError(char const * const memoryerror){
 void outputErrorAndText(char const * const error,char const * const text){if(error)output("%s%s",M_ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
 /**
- * @brief outputs parameter bug prefixed by M_BUG_PREFIX, postfixing a period if not present in parameter bug
+ * @brief outputs \p bug prefixed by M_BUG_PREFIX, postfixing a period if not present in \p bug
  * 
  * @param bug the bug text
  */

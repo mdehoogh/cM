@@ -17,7 +17,7 @@ static bool echo_to_output_file=false;
 
 // MDH@25OCT2021: it's better to be able to use a format for printing
 /**
- * @brief utility function to log parameters formatted by the format string
+ * @brief utility function to log all arguments as present in format string \p fmt
  * 
  * @param fmt the format string
  * @param ... the arguments into the format string
@@ -39,10 +39,10 @@ size_t logToOutputFile(const char* fmt,...){
 //                TODO delegate all functions that output to the output device to this function
 // MDH@08OCT2019: it's convenient to know how many characters are actually written
 /**
- * @brief outputs the parameters formatted by the format string to stdout
+ * @brief outputs the parameters formatted by \p fmt to stdout
  * 
  * @param fmt the format string
- * @param ... the arguments to the format string
+ * @param ... the list of arguments to \p fmt
  * @return size_t the number of characters outputted
  */
 size_t output(const char *fmt,...){
@@ -62,11 +62,11 @@ size_t output(const char *fmt,...){
 } // NOTE use vprintf here, NOT printf!!!!
 
 /**
- * @brief changes the name of the file to echo whatever's output
+ * @brief changes the name of the file to which console output is echoed to \p outputFilename
  * 
  * @param outputFilename the name of the output file
- * @return true when the output file was successfully opened (echo_to_output_file will be set to true)
- * @return false when the output file was not successfully opened (echo_to_output_file will be set to false)
+ * @return true when \p outputFilename was successfully opened (echo_to_output_file will be set to true)
+ * @return false when \p outputFilename was not successfully opened (echo_to_output_file will be set to false)
  */
 bool setOutputFilename(char const * const outputFilename){
 	// close any current output file
@@ -82,7 +82,7 @@ bool setOutputFilename(char const * const outputFilename){
 }
 // MDH@25OCT2021: now delegating to logToOutputFile which accepts a format specification and variable number of arguments
 /**
- * @brief writes prefix, str, and suffix to the output file
+ * @brief writes \p prefix, \p str, and \p suffix to the output file
  * 
  * @param prefix the first text to output
  * @param str the second text to output
@@ -95,7 +95,7 @@ size_t outputToFile(char const * const prefix,char const * const str,char const 
 
 // convenience methods delegating to output() so all output (to stdout by default) goes through function output()
 /**
- * @brief outputs the single character c
+ * @brief outputs single character \p c
  * 
  * @param c the character to output
  * @return size_t the number of characters written
@@ -114,7 +114,7 @@ size_t newline(){return outputChar('\n');}
 
 // all output to the display has to go through output!!
 /**
- * @brief outputs argument s as control text
+ * @brief outputs \p s as control text
  * 
  * @param s the text to output as control text
  */
