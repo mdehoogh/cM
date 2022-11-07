@@ -2813,9 +2813,9 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 	// how about extracting the mantisse and the exponent as well
 	uint64_t mantisse;uint16_t exponent;extractMantisseAndExponent(ld,&mantisse,&exponent);
 	// let's return the binary representation of exponent and mantisse with single quotes around it!!
-	Mstring* _mantisseText=OWNED(_getUint64BinaryText(mantisse,'\''),owner);
+	Mstring* _mantisseText=owned_string(_getUint64BinaryText(mantisse,'\''),owner);
 	if(_mantisseText){appendedToMap(_dmap,owner,"m",_getTextValue(string(_mantisseText)));FREE_STRING(_mantisseText,owner);}
-	Mstring* _exponentText=OWNED(_getUint16BinaryText(exponent,'\''),owner);
+	Mstring* _exponentText=owned_string(_getUint16BinaryText(exponent,'\''),owner);
 	if(_exponentText){appendedToMap(_dmap,owner,"e",_getTextValue(string(_exponentText)));FREE_STRING(_exponentText,owner);}
 	/* replacing:
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
@@ -5305,7 +5305,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				if(amVerboseDebugging())
 					output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),getOwnerExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
-					Mstring* _environmentName=(Mstring*)OWNED(_getExecutionEnvironmentName(),owner);
+					Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					FREE_STRING(_environmentName,owner);
 					break; // NO retrieves the undefined value subsequently!!
