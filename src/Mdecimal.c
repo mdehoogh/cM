@@ -2050,7 +2050,8 @@ void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle/*,Malloca
 #define FREE_MPD_RELATIVE_ANGLE(_mpd_relative_angle,owner_mpd_relative_angle) free_mpd_relative_angle(disowned_mpd_relative_angle(_mpd_relative_angle,owner_mpd_relative_angle))
 
 // MDH@11SEP2019: we can do much faster and better now we have the predefinedsines in Mdecimalcontext's
-mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * const decimalcontext,mpd_t const * const angle){Mallocationowner owner=getOwner(__LINE__);
+// MDH@08NOV2022: seems to get called only in _dsine() and only in this module, so I made it static
+static mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * const decimalcontext,mpd_t const * const angle){Mallocationowner owner=getOwner(__LINE__);
 	if(angle&&decimalcontext&&decimalcontext->predefinedsinedeltaangle){
 		Mdecimal* _intermediateResult=(amVerboseDebugging()?owned_decimal(__decimal(decimalcontext->mpd_context,0,0),owner):NULL);
 		if(_intermediateResult){
@@ -2065,7 +2066,8 @@ mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * c
 				mpd_qdivmod(_predefinedAngleIndex,_deltaAngle,angle,decimalcontext->predefinedsinedeltaangle,decimalcontext->mpd_context,&status);
 				uint64_t predefinedAngleIndex=mpd_qget_u64(_predefinedAngleIndex,&status);
 				if(predefinedAngleIndex<=256){
-					if(_intermediateResult)output("Predefined angle index %" PRIu32 ".\n",predefinedAngleIndex);
+					if(_intermediateResult)
+						output("Predefined angle index %" PRIu32 ".\n",predefinedAngleIndex);
 					_relativeAngle->negative=false;
 					_relativeAngle->_delta_angle=__mpd(decimalcontext->mpd_context,0);
 					if(_relativeAngle->_delta_angle){
@@ -2170,7 +2172,8 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext const * const decimalcon
 }
 
 // MDH@12SEP2019: instead of first determining the rotations to do, and then doing them, we can immediately perform the rotation
-mpd_t* _getCORDICsinorcos(Mdecimalcontext const * const decimalcontext,mpd_t const * const x,bool sin){Mallocationowner owner=getOwner(__LINE__);
+// MDH@08NOV2022: we can make this function static as it's only called in this module
+static mpd_t* _getCORDICsinorcos(Mdecimalcontext const * const decimalcontext,mpd_t const * const x,bool sin){Mallocationowner owner=getOwner(__LINE__);
 	// I guess an iterative procedure is better than a recursive procedure, because in a recursive procedure we have to keep passing the mpd_context...
 	// this means I can't get down but then the problem is that I can't do the rotations until I find all the constituent angles
 	// yes of course how many CORDIC angles do we have??????
@@ -2534,6 +2537,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			// MDH@08NOV2022 NOTE: calling pi_decimal() will force the computation of the predefined sines!!!!
 			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
 				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
@@ -2562,11 +2566,10 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
-					if(amVerbose()){
+					if(amVerbose())
 						outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
-					}
 					if((status&0xEFBF)!=0){
-						outputError("Failed to compute the sine of a decimal");
+						outputError("Failed to compute the quadrant of a decimal in computing its sine");
 						report_mpd_status(status);
 					}else{
 						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
@@ -2593,24 +2596,26 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the sine of a decimal");
+							outputError("Failed to compute the sine of a decimal in another quadrant");
 							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
 							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
 							// looking up should return the nearest sincos element in the table
-							mpd_t* _CORDICsine=_getCORDICsinorcos(decimalcontext,x->mpd,true);
-							if(_CORDICsine){
-								Mdecimal* _decimal=(amVerbose()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
-								if(_decimal){
-									_decimal->mpd=_CORDICsine;
-									outputDecimal("CORDIC sine: '",_decimal,"'.\n");
-									_decimal->mpd=NULL; // so it won't get freed by free_decimal()
-									FREE_DECIMAL(_decimal,owner);
+							//if(amVerbose()){
+								mpd_t* _CORDICsine=_getCORDICsinorcos(decimalcontext,x->mpd,true);
+								if(_CORDICsine){
+									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
+									if(_decimal){
+										_decimal->mpd=_CORDICsine;
+										outputDecimal("CORDIC sine: '",_decimal,"'.\n");
+										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+										FREE_DECIMAL(_decimal,owner);
+									}else
+										outputError("Failed to create a decimal for showing the CORDIC sine");
+									free_mpd(_CORDICsine);
 								}else
-								if(amVerbose())
-									outputError("Failed to create a decimal for showing the CORDIC sine");
-								free_mpd(_CORDICsine);
-							}
+									outputError("Failed to compute the CORDIC sine!");
+							//}
 							/*
 							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x->mpd);
 							if(_relativeAngle){
@@ -2667,6 +2672,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 								outputError("Failed to compute the relative angle");
 							*/
 							// MDH@11SEP2019: the following is preferred because we have precomputed 257 equidistant angle sines between 0 and pi/2
+							// MDH@08NOV2022 TODO shouldn't _getPredefinedSinesRelativeAngle receive something below pi/2?????? which would be _xsin???
 							mpd_relative_angle_t* _predefinedSinesRelativeAngle=owned_mpd_relative_angle(_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd),owner);
 							if(_predefinedSinesRelativeAngle){
 								if(amVerbose()){
@@ -2780,6 +2786,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			// MDH@08NOV2022 NOTE: calling pi_decimal() will force the computation of the predefined sines!!!!
 			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
 				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
@@ -2909,6 +2916,7 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			// MDH@08NOV2022 NOTE: calling pi_decimal() will force the computation of the predefined sines!!!! (although I would expect this to have happened already computing pi(x) by the user)
 			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
 				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);

@@ -24,5 +24,6 @@
         "tuple": "c",
         "type_traits": "c",
         "__node_handle": "c"
-    }
+		},
+		"cmake.configureOnOpen": false
 }
