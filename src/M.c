@@ -2290,6 +2290,51 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 	resetOutputColor();
 	output("%s","Select the last digit of the command to use, or the up/down key to show the next/previous page.");
 	output("%c%c%c%c",' ','>','>',' '); // TODO what kind of prompting do we want to do???
+	/* MDH@09NOV2022: read the character NO the main input loop is doing that!!!
+	char c;
+	while(!inputCharRead(&c));
+	outputChar(c);newline();
+	switch(c){
+		case '\n': 
+			output("No command selected!");break;
+		case '\e': 
+			output("Escape character received!");
+			if(inputCharRead(&c)){
+			if(c==91){
+				if(inputCharRead(&c)){
+					if(c==51){
+						if(inputCharRead(&c)){
+							if(c==126){ // delete
+								beep();
+							}
+						}
+					}else
+					if(c==65){ // up arrow 
+						showNextCommandPage();
+					}else
+					if(c==66){ // down arrow
+						showPreviousCommandPage();
+					}else
+					if(c==67){ // right arrow
+							beep();
+					}else
+					if(c==68){ // left arrow
+							beep();
+					}
+				}
+			}
+			break;
+		case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':
+			// TODO what are we going to do????
+			break;
+		default:
+			output("Invalid input character! Try again!");
+			setCommandPage(commandPage);
+			break;
+		}
+	}
+	// going up and down is an issue
+	*/
 }
 void showNextCommandPage(){
 	if(commandPage<commandPages)
@@ -4062,7 +4107,8 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 			char c;while(!inputCharRead(&c))
 			;outputChar(c);newline();
 			if(c=='Y'||c=='y')result='x';
-		}else result='x';
+		}else // in a function body
+			result='x';
 	}else
 	if(sessionSettingCharacter=='X')result='x';else
 	if(sessionSettingCharacter=='s'||sessionSettingCharacter=='S')result=switchToShellMode(NULL);else
@@ -4071,9 +4117,9 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 		// we could call them a, b, c etc.
 		if(commandCount){
 			commandPages=1+(commandCount-1)/10;
-			showNextCommandPage(); // as soon as commandPage>0 we are paging...
+			setCommandPage(commandPages); // as soon as commandPage>0 we are paging...
 		}else
-			output("%s\n","No previous commands to show.");
+			output("%s\n","No commands to show.");
 	}else // unprocessed
 		result=-1;
 	return result;

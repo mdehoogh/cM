@@ -2530,6 +2530,13 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 */
 
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
+/**
+ * @brief computes the sine of decimal \p x
+ * 
+ * @param decimalcontext the decimal context to use
+ * @param x the argument to the computation of the sine
+ * @return Mdecimal* a pointer to the computed (decimal) sine 
+ */
 Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
 		// use the same decimal context as used by x
@@ -2542,9 +2549,11 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
 			if(mpd_context){
+				// if x==0, the result sine is 0 as well
 				if(isDecimalZero(x))
 					return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
 				uint32_t status=0;
+				// if x<0, we are to return the negation of the sine of the absolute value (stored in _absx)
 				mpd_t* _absx=NULL;
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
@@ -2553,7 +2562,10 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 					if(amVerbose())
 						outputInfo("Computing the sine of a negative decimal.");
 				}
+				// the result is stored in _sine
 				mpd_t* _sine=NULL;
+
+				// MDH@09NOV2022: normalization so _xmod will be in range [0,2*pi)
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
 				mpd_t *_xmod=__mpd(mpd_context,0),*_xtemp=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
 				if(_xtemp&&_xmod&&_xquadrant){
@@ -2596,12 +2608,13 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the sine of a decimal in another quadrant");
+							outputError("Failed to compute the sine of the (normalized) decimal that lies outside the first quadrant");
 							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
 							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
 							// looking up should return the nearest sincos element in the table
-							//if(amVerbose()){
+							// MDH@09NOV2022: computing the CORDIC sine is optional (and only computed when verbose is true) [and should also be included in computation of the cosine]
+							if(amVerbose()){
 								mpd_t* _CORDICsine=_getCORDICsinorcos(decimalcontext,x->mpd,true);
 								if(_CORDICsine){
 									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
@@ -2615,7 +2628,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 									free_mpd(_CORDICsine);
 								}else
 									outputError("Failed to compute the CORDIC sine!");
-							//}
+							}
 							/*
 							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x->mpd);
 							if(_relativeAngle){
@@ -2672,60 +2685,63 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 								outputError("Failed to compute the relative angle");
 							*/
 							// MDH@11SEP2019: the following is preferred because we have precomputed 257 equidistant angle sines between 0 and pi/2
-							// MDH@08NOV2022 TODO shouldn't _getPredefinedSinesRelativeAngle receive something below pi/2?????? which would be _xsin???
-							mpd_relative_angle_t* _predefinedSinesRelativeAngle=owned_mpd_relative_angle(_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd),owner);
-							if(_predefinedSinesRelativeAngle){
-								if(amVerbose()){
-									output("Predefined sines relative angle: ");
-									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
-									if(_decimal){
-										_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;
-										outputDecimal(NULL,_decimal,NULL);
-										outputChar(_predefinedSinesRelativeAngle->negative?'-':'+');
-										_decimal->mpd=_predefinedSinesRelativeAngle->_delta_angle;
-										outputDecimal(NULL,_decimal,NULL);
-										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
-										FREE_DECIMAL(_decimal,owner);
-									}else
-										outputChar('?');
-									outputInfo(".");
-								}
-								// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
-								// which consists of two terms that need to be added or subtracted
-								mpd_t *_term1=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_sine),*_term2=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_cosine);
-								if(_term1&&_term2){
-									Mdecimal* _decimal=(amVerbose()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
-									if(_decimal){
-										output("Predefined sines angle #%" PRIu32 ":",_predefinedSinesRelativeAngle->sincoselement->mult);
-										_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;outputDecimal("'",_decimal,"'");
-										_decimal->mpd=_term1;outputDecimal(" with cosine '",_decimal,"'");
-										_decimal->mpd=_term2;outputDecimal(" and sine '",_decimal,"'.\n");
-									}
-									// we still need the sine and cosine of the delta angle
-									// BUT in order to be able to compare the results we should I guess use the _dsinsquared 
-									mpd_t *_deltasin=__mpd(mpd_context,0),*_deltacos=__mpd(mpd_context,0);
-									if(_deltasin&&_deltacos){
-										mpd_t* _deltasinsquared=_dsinsquared(mpd_context,_predefinedSinesRelativeAngle->_delta_angle);
-										if(_deltasinsquared){
-											mpd_qsqrt(_deltasin,_deltasinsquared,mpd_context,&status);
-											mpd_qsub_u32(_deltasinsquared,_deltasinsquared,1,mpd_context,&status);mpd_set_positive(_deltasinsquared);
-											mpd_qsqrt(_deltacos,_deltasinsquared,mpd_context,&status);
-											// ready to 'rotate'
-											mpd_qmul(_term1,_term1,_deltacos,mpd_context,&status);
-											mpd_qmul(_term2,_term2,_deltasin,mpd_context,&status);
-											if(_decimal){_decimal->mpd=_term1;outputDecimal("First term: '",_decimal,"'.");_decimal->mpd=_term2;outputDecimal(" Second term: '",_decimal,"'.\n");_decimal->mpd=NULL;}
-											if(_predefinedSinesRelativeAngle->negative)mpd_qsub(_term1,_term1,_term2,mpd_context,&status);else mpd_qadd(_term1,_term1,_term2,mpd_context,&status);
-											if(_decimal){_decimal->mpd=_term1;outputDecimal("Predefined sines relative angle sine: ",_decimal,".\n");}
+							// MDH@09NOV2022: the following is NOT included in _dcosine so I suggest to remove it here (unless we understand what it is used for)
+							//                perhaps we should make it optional as well????????
+							if(amVerbose()){
+								mpd_relative_angle_t* _predefinedSinesRelativeAngle=owned_mpd_relative_angle(_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd),owner);
+								if(_predefinedSinesRelativeAngle){
+									//if(amVerbose()){
+										output("Predefined sines relative angle: ");
+										Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
+										if(_decimal){
+											_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;
+											outputDecimal(NULL,_decimal,NULL);
+											outputChar(_predefinedSinesRelativeAngle->negative?'-':'+');
+											_decimal->mpd=_predefinedSinesRelativeAngle->_delta_angle;
+											outputDecimal(NULL,_decimal,NULL);
+											_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+											FREE_DECIMAL(_decimal,owner);
+										}else
+											outputChar('?');
+										outputInfo(".");
+									//}
+									// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
+									// which consists of two terms that need to be added or subtracted
+									mpd_t *_term1=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_sine),*_term2=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_cosine);
+									if(_term1&&_term2){
+										Mdecimal* _decimal=(amVerbose()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
+										if(_decimal){
+											output("Predefined sines angle #%" PRIu32 ":",_predefinedSinesRelativeAngle->sincoselement->mult);
+											_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;outputDecimal("'",_decimal,"'");
+											_decimal->mpd=_term1;outputDecimal(" with cosine '",_decimal,"'");
+											_decimal->mpd=_term2;outputDecimal(" and sine '",_decimal,"'.\n");
 										}
-										free_mpd(_deltasinsquared);
+										// we still need the sine and cosine of the delta angle
+										// BUT in order to be able to compare the results we should I guess use the _dsinsquared 
+										mpd_t *_deltasin=__mpd(mpd_context,0),*_deltacos=__mpd(mpd_context,0);
+										if(_deltasin&&_deltacos){
+											mpd_t* _deltasinsquared=_dsinsquared(mpd_context,_predefinedSinesRelativeAngle->_delta_angle);
+											if(_deltasinsquared){
+												mpd_qsqrt(_deltasin,_deltasinsquared,mpd_context,&status);
+												mpd_qsub_u32(_deltasinsquared,_deltasinsquared,1,mpd_context,&status);mpd_set_positive(_deltasinsquared);
+												mpd_qsqrt(_deltacos,_deltasinsquared,mpd_context,&status);
+												// ready to 'rotate'
+												mpd_qmul(_term1,_term1,_deltacos,mpd_context,&status);
+												mpd_qmul(_term2,_term2,_deltasin,mpd_context,&status);
+												if(_decimal){_decimal->mpd=_term1;outputDecimal("First term: '",_decimal,"'.");_decimal->mpd=_term2;outputDecimal(" Second term: '",_decimal,"'.\n");_decimal->mpd=NULL;}
+												if(_predefinedSinesRelativeAngle->negative)mpd_qsub(_term1,_term1,_term2,mpd_context,&status);else mpd_qadd(_term1,_term1,_term2,mpd_context,&status);
+												if(_decimal){_decimal->mpd=_term1;outputDecimal("Predefined sines relative angle sine: ",_decimal,".\n");}
+											}
+											free_mpd(_deltasinsquared);
+										}
+										free_mpd(_deltasin);free_mpd(_deltacos);
+										if(_decimal){_decimal->mpd=NULL;FREE_DECIMAL(_decimal,owner);}
 									}
-									free_mpd(_deltasin);free_mpd(_deltacos);
-									if(_decimal){_decimal->mpd=NULL;FREE_DECIMAL(_decimal,owner);}
-								}
-								free_mpd(_term1);free_mpd(_term2);
-								FREE_MPD_RELATIVE_ANGLE(_predefinedSinesRelativeAngle,owner);
-							}else
-								outputError("Failed to compute the predefined sines relative angle");
+									free_mpd(_term1);free_mpd(_term2);
+									FREE_MPD_RELATIVE_ANGLE(_predefinedSinesRelativeAngle,owner);
+								}else
+									outputError("Failed to compute the difference argument with predefined sines");
+							}
 
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
 							_sine=_dsinsquared(mpd_context,(sin?_xmod:_xsin));
@@ -2734,7 +2750,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 							if(_sine)mpd_qfinalize(_sine,mpd_context,&status);else status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
 							// some extra work as we've received the sine squared
 							if((status&0xEFBF)!=0){
-								outputError("Failed to compute the cosine from the sine square approximation");
+								outputError("Failed to compute the sine from the sine square approximation");
 								free_mpd(_sine);
 								_sine=NULL;
 							}
@@ -2773,12 +2789,19 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 				if(_sine)return _getDecimal(_sine,mpd_context->prec,0,true); // TODO does it matter who disowns it?				
 			}
 		}else
-			outputError("No decimal context to compute the sine of a decimal in");
+			outputError("No decimal context to compute the sine of a decimal");
 	}else
 		outputError("No decimal to compute the sine of");
 	return NULL;
 }
 
+/**
+ * @brief computes the cosine of decimal \p x
+ * 
+ * @param decimalcontext the decimal context to use
+ * @param x the argument to the computation of the cosine
+ * @return Mdecimal* a pointer to the computed (decimal) cosine 
+ */
 Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
 		// use the same decimal context as used by x
@@ -2801,11 +2824,13 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0)
 					{free_mpd(_absx);_absx=NULL;}}
 					if(!_absx)
-					{outputError("Failed to negate the decimal to compute the cosine of");return NULL;}
+					{outputError("Failed to negate the decimal argument to the cosine function");return NULL;}
 					if(amVerbose())
 						outputInfo("Computing the cosine of a negative decimal.");
 				}
+				// _cosine is to store the result in
 				mpd_t* _cosine=NULL;
+				// normalisation: _xmod will lie in [0,2*pi)
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
 				mpd_t *_xmod=__mpd(mpd_context,0),*_xtemp=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
 				if(_xtemp&&_xmod&&_xquadrant){
@@ -2821,12 +2846,12 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
-					if(amVerbose())
-						outputDecimal("Quadrant of cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the cosine of a decimal");
 						report_mpd_status(status);
 					}else{
+						if(amVerbose())
+							outputDecimal("Quadrant (0, 1, 2 or 3) of the normalization of cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
 						bool cos=true; // whether to compute the sine or cosine (of the transformed angle)
 						mpd_t* _xcos=NULL;
 						if(xquadrant!=0){
@@ -2851,9 +2876,28 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the cosine of a decimal");
+							outputError("Failed to compute the cosine of a (normalized) decimal that does not lie in the first quadrant.");
 							report_mpd_status(status);
 						}else{
+							// MDH@09NOV2022 NOTE: computing the CORDIC cosine is optional (and only computed when verbose is true) [now also added to _dcosine]
+							if(amVerbose()){
+								mpd_t* _CORDICcosine=_getCORDICsinorcos(decimalcontext,x->mpd,false); // of course the last argument should be false (if we want the cosine!!!)
+								if(_CORDICcosine){
+									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
+									if(_decimal){
+										_decimal->mpd=_CORDICcosine;
+										outputDecimal("CORDIC cosine: '",_decimal,"'.\n");
+										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+										FREE_DECIMAL(_decimal,owner);
+									}else
+										outputError("Failed to create a decimal for showing the CORDIC cosine");
+									free_mpd(_CORDICcosine);
+								}else
+									outputError("Failed to compute the CORDIC cosine!");
+							}
+
+							// TODO here we could use the predefined sine function values to compute the result (as we do in _dsine)
+
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
 							_cosine=_dsinsquared(mpd_context,(cos?_xmod:_xcos));
 							// some extra work as we've received the sine squared

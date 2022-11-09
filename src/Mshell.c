@@ -5053,18 +5053,24 @@ long long getBigintegerInteger(Mbiginteger* biginteger){
 }
 
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
-	if(amVerboseDebugging()){
+	if(amVerboseDebugging())
+	{
 		output("Applying unary operator '%c'",operator);
 		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.\n",_value->type);}else output(".\n");
 	}
 	// delegating to the one argument functions that we have is best!!!
+	Mvalue* result=NULL;
 	switch(operator){
-		case '~':return Mbnot(_value);
-		case '!':return Mnot(_value);
-		case '-':return Mneg(_value);
-		case '+':return _value;
+		case '~':result=Mbnot(_value);break;
+		case '!':result=Mnot(_value);break;
+		case '-':result=Mneg(_value);break;
+		case '+':result=_value;break;
+		default:outputError("Unknown unary operator!");
 	}
-	return NULL;
+	/////if(!result)return NULL;
+	if(amVerboseDebugging())
+	{if(result){outputValue(" Result of applying the unary operator (",result,")");output(" of type %u.\n",result->type);}else output(".\n");}
+	return result;
 }
 
 bool isOneCharacterTokenType(uint8_t tokenType){
@@ -5590,35 +5596,51 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			while(l>0&&_valueReference){
 				unaryOperator=string_char(unaryOperators,--l);
 				referencedValue=getReferencedValue(_valueReference);
-				if(amVerboseDebugging()){output("Applying unary operators: '%c'",unaryOperator);outputValue(" to '",referencedValue,"'.\n");}
+				if(amVerboseDebugging())
+				{output("Applying unary operators: '%c'",unaryOperator);outputValue(" to '",referencedValue,"'.\n");}
 				/////////////decrementReferenceCount(_valueReference->_value);
 				_valueReference->_value=applyUnaryOperator(unaryOperator,referencedValue); // MDH@17NOV2019 replacing: _valueReference->_value);
 				// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 				// MDH@17NOV2019: applying a unary operator is dangerous because we may set the value BUT that's NOT enough
 				//                because if the name and/or item id remains it will be used again later on
-				if(_valueReference->_name){FREECHARS(_valueReference->_name,Msubowner(getValueOwner(),1));_valueReference->_name=NULL;}
+				///output("A\n");
+				if(_valueReference->_name){
+					///output("B\n");
+					// MDH@09NOV2022: apparently the following (now commented out at the end) caused a BUG I guess because _valueReference->_name is NOT owned by the value owner
+					FREECHARS(_valueReference->_name,Msubowner(owner,1)); // replacing: FREECHARS(_valueReference->_name,Msubowner(getValueOwner(),1));
+					_valueReference->_name=NULL;
+				}
+				///output("C\n");
 				if(_valueReference->_itemid){ // this is is a value wrapping a list of indices
+					///output("D\n");
 					// conform what would happen in free_valuereference!!! 
 					// TODO consider alternative creating a new value reference
 					//      which is probably better!!!!
 					assignValue(&_valueReference->_itemid,NULL);
+					///output("E\n");
 					/* which is identical to:
 					decrementReferenceCount(_valueReference->_itemid);
 					_valueReference->_itemid=NULL; // TODO should we do more here? I think not because it's a weak list????
 					*/
 				}
+				///output("F\n");
 			}
-			if(amVerboseDebugging())outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
+			if(amVerboseDebugging())
+				outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
 		}else
-		if(amVerboseDebugging())outputInfo("No unary operators to apply!");
+		if(amVerboseDebugging())
+			outputInfo("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=nextEnvironmentExpressionToken();
 
 	}
 
-	if(amVerboseDebugging()){
+	if(!_valueReference){outputError("No value reference!");return NULL;} // MDH@09NOV2022: just-in-case
+
+	if(amVerboseDebugging())
+	{
 		if(_valueReference->_value){
 			outputValue("Value result: '",_valueReference->_value,"'");
 			output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);
@@ -6783,7 +6805,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegreeBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _bigintegerRootValue=NULL;
 	if(rootArgumentValue&&rootDegreeBiginteger){
-		////if(amVerbose())
+		if(amVerbose())
 		{outputValue("Determining the root of ",rootArgumentValue,NULL);outputBiginteger(" with degree ",rootDegreeBiginteger,".\n");}
 		// TODO check for special values like 0 or 1 or negatives...
 		// computing with true decimals is fine, but with a decimal that is a rational approximation (i.e. with repeating) we're in trouble
@@ -6792,20 +6814,23 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 		Mdecimal* _rootArgumentDecimal=owned_decimal(_getValueDecimal(rootArgumentValue),owner);
 		if(_rootArgumentDecimal){
 			uint32_t status=0;
-			outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
+			if(amVerbose())
+				outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
 			// we need an mpd_context for use in the decimal computations!!
 			Mdecimalcontext* _decimalcontext=_getDecimalcontext(_rootArgumentDecimal->prec);
 			mpd_context_t* mpd_context=(_decimalcontext?_decimalcontext->mpd_context:get_default_mpd_context());
 			if(mpd_context){
 				Mdecimal* _rootDegreeDecimal=owned_decimal(_getBigintegerDecimal(rootDegreeBiginteger),owner);
 				if(_rootDegreeDecimal){
-					outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
+					if(amVerbose())
+						outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
 					// MDH@10OCT2019: to anticipate on root arguments smaller than 1 of which the root will be larger instead of smaller we use the square root as first approximation
 					// MDH@10OCT2019: because we are approaching the root from above, as soon as the next approximation is equal to or larger than the previous approximation we're done
 					//                this means not using the distance anymore because e.g. 2**(7/9) with decimal precision 20 failed to converge (resulted in toggling between two decimals that different by the final digit)
 					Mdecimal *_bigintegerRootDecimal=owned_decimal(__decimal(mpd_context,1,0),owner)
 					        ,*_nextBigintegerRootDecimal=owned_decimal(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
 					if(_bigintegerRootDecimal&&_nextBigintegerRootDecimal){
+						if(amVerbose())
 						outputInfo("Root computation result decimals created...");
 						uint32_t status=0;
 						// let's determine on which side of one the root argument is located!!!!
@@ -6814,23 +6839,28 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 						if(rootArgumentComparison>0)mpd_qsqrt(_bigintegerRootDecimal->mpd,_rootArgumentDecimal->mpd,mpd_context,&status);
 						// if the root argument does not equal one and we managed to initialize the root argument (to either 1 or the square root), we may continue
 						if(rootArgumentComparison&&!(status&0xEFBF)){
+							if(amVerbose())
 							outputDecimal("Root computation result decimals initialized to ",_bigintegerRootDecimal,".\n");
 							// TODO only when the root degree is larger than 2 do we do the iterative process
 							// 0. preparations: we need (root degree - 1 ) regularly
 							Mdecimal* _rootDegreeMinus1Decimal=owned_decimal(__decimal(mpd_context,0,0),owner); /////_getDecimalCopy(_rootDegreeDecimal);
 							if(_rootDegreeMinus1Decimal){
+								if(amVerbose())
 								outputInfo("Root computation helper decimal created...");
 								// can't I use getDecimalOne() here?????? apparently not!!
 								mpd_t* _decimalOne=__mpd(mpd_context,1);
 								mpd_qsub(_rootDegreeMinus1Decimal->mpd,_rootDegreeDecimal->mpd,_decimalOne,mpd_context,&status);
 								free_mpd(_decimalOne);
 								if((status&0xEFBF)==0){
+									if(amVerbose())
 									outputInfo("Root computation helper decimal initialized...");
 									// we need the root degree minus 1 as big integer as well
 									Mbiginteger* _rootDegreeMinus1Biginteger=owned_biginteger(_getBigintegerCopy(rootDegreeBiginteger),owner);
 									if(_rootDegreeMinus1Biginteger){
+										if(amVerbose())
 										outputInfo("Root computation helper big integer created...");
 										if(mp_decr(MP_INT_POINTER(_rootDegreeMinus1Biginteger))==MP_OKAY){
+											if(amVerbose())
 											outputInfo("Root computation helper big integer initialized...");
 											// we need a product, a quotient and an addition help decimal
 											/*
@@ -6842,6 +6872,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													,*_power=owned_decimal(__decimal(mpd_context,0,0),owner);
 											// initial value of the quotient denominator that we need for checking whether we're done and in the computation
 											if(/*_distance&&_prevdistance&&*/_product&&_quotient&&_productplusquotient&&_power){
+												if(amVerbose())
 												outputInfo("Root computation helper decimals created...");
 												// ready to rock 'n' roll, eh iterate
 												// NOTE iterating until the next value is the same wasn't working, it might be better to compute the power value itself and to compare with the root argument value, if match stop!!
@@ -6897,7 +6928,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													FREE_DECIMAL(_bigintegerRootDecimal,owner);
 												}else{
 													_bigintegerRootValue=_getValueOfDecimal(disowned_decimal(_bigintegerRootDecimal,owner));
-													if(amVerboseDebugging())
+													if(amVerbose())
 														outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
 												}
 											}else
@@ -6912,6 +6943,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 										}else
 											outputError("Failed to compute a helper big integer in computing a root decimal");
 										FREE_BIGINTEGER(_rootDegreeMinus1Biginteger,owner);
+										if(amVerbose())
 										outputInfo("Root computation helper big integer released...");
 									}else
 										outputError("Failed to copy the root degree in computing a root decimal");
@@ -6920,6 +6952,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 							}else
 								outputError("Failed to create a helper decimal in computing a root decimal");
 							FREE_DECIMAL(_rootDegreeMinus1Decimal,owner);
+							if(amVerbose())
 							outputInfo("Root computation helper decimal released...");
 						}else
 						if(rootArgumentComparison)
@@ -6929,6 +6962,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 					}
 					FREE_DECIMAL(_nextBigintegerRootDecimal,owner);
 					FREE_DECIMAL(_rootDegreeDecimal,owner);
+					if(amVerbose())
 					outputInfo("Root computation degree decimal released...");
 				}else{
 					output("%s",M_ERROR_PREFIX);
@@ -8651,6 +8685,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			
 			if(_formulaelement){
+				// MDH@09NOV2022 NOTE: this is actually the only place where _getValueReference is getting called and may be confused with _getValuereference TODO
 				_formulaelement->_operand=owned_valuereference(_getValueReference("operand",endTokenTypes,endTokenTypeCount),Msubowner(owner,1)); // MDH@08JUN2020: whatever we bind in the formula element needs to be subowned by it
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerboseDebugging())

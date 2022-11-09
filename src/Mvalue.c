@@ -288,12 +288,15 @@ void free_map(Mmap* _map/*,Mallocationowner owner*/){
 
 // MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
 Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
-    if(!_valuereference)return NULL;
+    if(!_valuereference){outputError("No value reference to disown!");return NULL;}
+		//output("%s disowning a value reference!",getAllocationOwnerText(owner_valuereference));
+		////output("Disowning value reference '%s'!\n",_valuereference->_name->chars);
     disowned_chars(_valuereference->_name,owner_valuereference);
     return DISOWNED(_valuereference,owner_valuereference);
 }
 Mvaluereference* owned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
     if(!_valuereference)return NULL;
+		////output("Owning value reference '%s'!\n",_valuereference->_name->chars);
     owned_chars(_valuereference->_name,owner_valuereference);
     return OWNED(_valuereference,owner_valuereference);
 }
