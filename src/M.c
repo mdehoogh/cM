@@ -243,13 +243,13 @@ void debugWrite(const char* fmt,...){
 		fputc('\n',debugfile); // start with a single empty line (separating the sessions)
 	}
 	if(debugfile){
-    	va_list args;
-    	va_start(args,fmt);
+		va_list args;
+		va_start(args,fmt);
 		writeTimestamp(debugfile);		
-    	vfprintf(debugfile,fmt,args);
-    	fputc('\n',debugfile);
-    	fflush(debugfile);
-    	va_end(args);
+		vfprintf(debugfile,fmt,args);
+		fputc('\n',debugfile);
+		fflush(debugfile);
+		va_end(args);
 	}
 }
 
@@ -487,19 +487,33 @@ static void inputError(const char* const fmt,...){
 // what the user consumed manually, and is supposed to remain continguous i.e. uninterrupted by other feed forward texts
 // it's possible that manual feed forward text is empty so it will block the identifier continuation text when that is the case!!
 Mstring* _manualFeedforwardText=NULL;Mallocationowner owner_manualFeedforwardText=(Mallocationowner){MI_MAIN,__LINE__,1};
+void deleteManualFeedforwardText(){
+	// ASSERT _manualFeedforwardText not NULL
+	FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
+}
 size_t numberOfIdentifierContinuationManualFeedforwardCharacters=0; // MDH@06OCT2019: determine the number of manual feed forward characterr matching the identifier continuation
+// the following two functions are called only once!!!
 bool manualFeedforwardCharacterPrepended(char c){
 	if(!c)return false;
-	if(!_manualFeedforwardText)_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);
-	return(_manualFeedforwardText&&string_insert_char(_manualFeedforwardText,0,c));
+	if(!_manualFeedforwardText){_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);if(!_manualFeedforwardText)return false;}
+	return(string_insert_char(_manualFeedforwardText,0,c)!=NULL);
 }
 bool prependedToManualFeedforwardText(char const * const characters){
 	if(!characters)return false;
-	if(!_manualFeedforwardText)_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);
-	return string_prepend(_manualFeedforwardText,characters);
+	if(!_manualFeedforwardText){_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);if(!_manualFeedforwardText)return false;}
+	return(string_prepend(_manualFeedforwardText,characters)!=NULL); // MDH@05DEC2022 preferably compare to NULL
 }
 char getFirstManualFeedforwardCharacterRemoved(){
-	return(_manualFeedforwardText?string_removed_char(_manualFeedforwardText,0):'\0');
+	// ASSERT _manualFeedforwardText should not be NULL
+	//if(_manualFeedforwardText){
+		char c=string_removed_char(_manualFeedforwardText,0);
+		if(c){
+			if(string_length(_manualFeedforwardText)==0)deleteManualFeedforwardText();
+			return c;
+		}
+	//}
+	return 0;
+	/* replacing: return(_manualFeedforwardText?string_removed_char(_manualFeedforwardText,0):'\0'); */
 }
 
 // identifier continuation stuff
@@ -804,19 +818,6 @@ bool deleteTokenAutoCompletionText(Mtoken* token){
 	return true;
 }
 
-char getUserInputCommandImmediateFeedforwardCharacter(){
-	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
-	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
-	if(token)
-	switch(token->type){
-		case TT_NEW_VARIABLE:case TT_BINARY_aErU:return '=';
-		case TT_DQSTRING:return '"';
-		case TT_FUNCTION:return '(';
-		case TT_SQSTRING:return '\'';
-		default:break;
-	}
-	return '\0';
-}
 /*
 void removeFirstFeedforwardCharacterFromLastTokenWhenMatching(char inputChar){
 	// find the last token's feed forward text (if any)
@@ -993,7 +994,22 @@ Mtokenautocompletiontext*  getAutoCompletionTextOfCharacterPrepended(char c,bool
 //                updateUserInputCommandImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
 // MDH@04OCT2019: deciding to keep the immediate feed forward text separate from the other feed forward texts, that way it is easier to merge the identifier continuation and feed forward texts
 Mstring* _immediateFeedforwardText=NULL;Mallocationowner owner_immediateFeedforwardText=(Mallocationowner){MI_MAIN,__LINE__,1};
-bool immediateFeedforwardToBeUpdated=false;
+void deleteImmediateFeedforwardText(){FREE_STRING(_immediateFeedforwardText,owner_immediateFeedforwardText);_immediateFeedforwardText=NULL;}
+// MDH@05DEC2022 TODO not used anymore?: bool immediateFeedforwardToBeUpdated=false;
+// MDH@05DEC2022 NOTE: called once when updating the immediate feed forward text
+char getUserInputCommandImmediateFeedforwardCharacter(){
+	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
+	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
+	if(token)
+	switch(token->type){
+		case TT_NEW_VARIABLE:case TT_BINARY_aErU:return '=';
+		case TT_DQSTRING:return '"';
+		case TT_FUNCTION:return '(';
+		case TT_SQSTRING:return '\'';
+		default:break;
+	}
+	return '\0';
+}
 bool updateUserInputCommandImmediateFeedforwardText(){
 	if(!_immediateFeedforwardText)return false; // should have one
 	char lastTokenImmediateFeedforwardCharacter=getUserInputCommandImmediateFeedforwardCharacter();
@@ -2448,6 +2464,9 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 	}
 }
 void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement){
+	if(_cursormovement&&_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)&&string_append(_suggestedText,_identifierContinuationCharacters))
+		outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
+	/* replacing:
 	if(!_cursormovement)return;
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
 	size_t numberOfIdentifierContinuationCharactersWritten=(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0);
@@ -2459,11 +2478,15 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
 	}
 	if(numberOfIdentifierContinuationCharactersWritten>0)
 		outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
+	*/
 		// replacing: {setColor(getIdentifierContinuationTextColor());output("%s",_identifierContinuationCharacters);
 		// replacing: {size_t numberOfIdentifierContinuationCharactersToWrite=numberOfIdentifierContinuationCharactersWritten;while(numberOfIdentifierContinuationCharactersToWrite){outputChar(' ');numberOfIdentifierContinuationCharactersToWrite--;}
 	// return numberOfIdentifierContinuationCharactersWritten; // one less character written than the computed length!!!
 }
 void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
+	if(_cursormovement/*&&_immediateFeedforwardText*/&&string_length(_immediateFeedforwardText)&&string_append(_suggestedText,string(_immediateFeedforwardText)))
+		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+	/* replacing:
 	if(!_cursormovement)return;
 	unsigned long long numberOfImmediateFeedforwardCharactersWritten=(_immediateFeedforwardText?string_length(_immediateFeedforwardText):0);
 	if(numberOfImmediateFeedforwardCharactersWritten>0){
@@ -2473,8 +2496,13 @@ void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 	}
 	if(numberOfImmediateFeedforwardCharactersWritten>0)
 		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+	*/
 }
 void outputAutoCompletionCharacters(Mcursormovement* _cursormovement){
+	// MDH@05DEC2022: implemented a little bit better
+	if(_cursormovement&&string_length(_autoCompletionText)&&string_append(_suggestedText,string(_autoCompletionText)))
+		outputCommandLineText(string(_autoCompletionText),_cursormovement,getAutoCompletionTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
+	/* replacing:
 	if(!_cursormovement)return;
 	unsigned long long numberOfAutoCompletionCharactersWritten=(_autoCompletionText?string_length(_autoCompletionText):0);
 	if(numberOfAutoCompletionCharactersWritten>0){
@@ -2483,7 +2511,8 @@ void outputAutoCompletionCharacters(Mcursormovement* _cursormovement){
 		// else string_append_char(_suggestedText,'#');
 	}
 	if(numberOfAutoCompletionCharactersWritten>0)
-		outputCommandLineText(string(_autoCompletionText),_cursormovement,getAutoCompletionTextColor()/*getFeedForwardTextColor()*/,-1);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
+		outputCommandLineText(string(_autoCompletionText),_cursormovement,getAutoCompletionTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
+	*/
 }
 /* replacing:
 // MDH@22SEP2020: when suggested text is output on the command input line we need to embed prompt length blanks
@@ -2576,7 +2605,7 @@ void writeSuggestedText(bool updateUserInputCommandIdentifierContinuationText){
 //                NOTE that consumption of suggested characters only happens one at a time with right arrow and by token with tab
 bool removeFirstSuggestedCharacter(char inputChar){
 	bool result=true;
-	if(_manualFeedforwardText&&string_length(_manualFeedforwardText)>0){
+	if(/*_manualFeedforwardText&&*/string_length(_manualFeedforwardText)>0){
 		char firstManualFeedForwardCharacter=string_char(_manualFeedforwardText,0);
 		if(inputChar!='\0'&&inputChar!=firstManualFeedForwardCharacter){
 			result=false;
@@ -2603,7 +2632,7 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			}
 		}
 	}else
-	if(_immediateFeedforwardText&&string_length(_immediateFeedforwardText)>0){
+	if(/*_immediateFeedforwardText&&*/string_length(_immediateFeedforwardText)>0){
 		char firstImmediateFeedforwardCharacter=string_char(_immediateFeedforwardText,0);
 		if(inputChar!='\0'&&inputChar!=firstImmediateFeedforwardCharacter){
 			result=false;
@@ -2616,7 +2645,7 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			}
 		}
 	}else
-	if(_autoCompletionText&&string_length(_autoCompletionText)>0){
+	if(/*_autoCompletionText&&*/string_length(_autoCompletionText)>0){
 		// BUG FIX: _autoCompletionText is like _suggestedText a composed text i.e. it is the concatenation of all token auto completion texts
 		//          therefore you need to remove the first of the characters in the token auto completion texts instead
 		// NOTE this is actually the only place where deleteFirstAutoCompletionCharacter is called!!!!!
@@ -2667,7 +2696,7 @@ void showSuggestedText(){
 	// 0. the current cursor position (in the command) is the number of line command characters
 	Mcursormovement cursormovement={numberOfLineCommandCharacters};
 
-	if(string_length(_manualFeedforwardText)>0)
+	if(/*_manualFeedforwardText&&*/string_length(_manualFeedforwardText))
 		outputManualFeedforwardCharacters(&cursormovement);
 	else
 		outputIdentifierContinuationTextCharacters(&cursormovement);
@@ -2681,6 +2710,7 @@ void showSuggestedText(){
 	//                in order to do so, I added lines field to Mcursormovement (replacing skipped) to contain the number of lines moved down
 
 	// (M_MODULE_DEBUGGING&MM_MAIN): output("[%zd]",(_userinputline?_userinputline->offset:0));
+	clearScreenFromCursor(); // MDH@05DEC2022: clear all earlier visible suggested text (if any)
 
 	toUserInputCursorPosition(-cursormovement.lines);
 
@@ -2908,13 +2938,14 @@ bool updateNumberOfLineCharacters(){
 		numberOfLineCommandCharacters=cursormovement.position; // also essential to end up with the right value for numberOfLineCommandCharacters!!!!!
 		*/
 		
-		clearScreenFromCursor(); // TODO can't harm but not certain about this
+		// MDH@05DEC2022 now in showSuggestedText!!: clearScreenFromCursor(); // TODO can't harm but not certain about this
 		/* MDH@07JUL2020 because we now allow the cursor on the last line position we do not need the following anymore:
 		// the cursor could end up on the last available position on the command line (i.e. when the last command line is full) where it is never supposed to be at
 		numberOfLineCommandCharacters=getUserInputLength()-(_userinputline?_userinputline->offset:0);
 		if(numberOfLineCommandCharacters+promptLength+1>=numberOfLineCharacters)showContinuedPrompt();
 		*/
 		showSuggestedText();
+
 	}else
 	if(inputMode==IM_SHELL){
 		if(!_shellCommand||string_length(_shellCommand)==0)return true;
@@ -3340,7 +3371,7 @@ void cancelCommand(){ // in response to Ctrl-C or backspace on the first charact
 	clearScreenFromCursor(); // inserting doing this otherwise (in the case of backspace) we would apparently still see the behind cursor text
 	clearCommand();
 	// by removing the behind cursor text, we ascertain that when the Enter key is pressed, we will switch to control mode, as otherwise we wouldn't, on the other hand, if _userInputCommand->_firstToken is NULL we should always switch to control mode (even if)
-	if(_manualFeedforwardText){FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;}
+	if(_manualFeedforwardText)deleteManualFeedforwardText();
 	deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	// it's a good idea to inform the user that the command was cleared
 	if(amVerboseDebugging())inputInfo("Command cleared!");
@@ -3740,12 +3771,13 @@ void switchToCommandMode(){
 	// ascertain to not have autocompletion text
 	deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 }
-
-char getFirstSuggestedCharacter(/*bool autogenerated*/){
-	return(_suggestedText?string_char(_suggestedText,0):'\0');
+/* MDH@05DEC2022: only called once, so no need for it anymore
+char getFirstSuggestedCharacter(){
+	return string_char(_suggestedText,0); // replacing for obvious reasons: (_suggestedText?string_char(_suggestedText,0):'\0');
 	// MDH@27OCT2021: somehow the following does not seem to work, and it makes perfect sense to use the first character of _suggestedText (if any) NOTE the first character could be the end of text character '\0' which is allowed
 	// replacing: return(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0?getFirstIdentifierContinuationCharacter():getFirstAutoCompletionCharacter(autogenerated));
 }
+*/
 
 /* only called once
 // MDH@01OCT2019: I created consumeFirstSuggestedCharacter() today to consume the first suggested character but initially called commandCharacterAccepted with endOfInput flag equal to false
@@ -3910,7 +3942,7 @@ Mvalue* Min(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _commandOutputValue=NULL;
 	Mstring* _commandText=owned_string(_getValueText(_commandValue,true),owner);
-	if(_commandText&&string_length(_commandText)){
+	if(/*_commandText&&*/string_length(_commandText)){
 		FILE *fp=popen(string(_commandText),"r");
 		if(fp){
 			Mlist* _commandOutputList=owned_list(_getListOfType(VT_TEXT),owner);	
@@ -4283,8 +4315,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	inputMode=IM_COMMAND; // TODO should this go into promptForUserInput()?
 
 	// TODO shouldn't we do this in initEnvironment? (or its alternative initM() yet to be created)
-	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);if(!_immediateFeedforwardText)outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
-	_suggestedText=owned_string(__string(),owner_suggestedText);if(!_suggestedText)outputError("Failed to allow suggested text");
+	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);
+	if(!_immediateFeedforwardText)outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
+
+	_suggestedText=owned_string(__string(),owner_suggestedText);
+	if(!_suggestedText)outputError("Failed to allow suggested text");
 	/* do not initialize _manualFeedforwardText because there's now a difference between manual feed forward being NULL or empty (not blocking vs blocking identifier continuation)
 	_manualFeedforwardText=__string();if(!_manualFeedforwardText)outputError("Failed to allow manual feed forward");
 	*/
@@ -4431,7 +4466,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
 				////outputChar('A');
-				if(!_manualFeedforwardText||string_length(_manualFeedforwardText)==0)
+				if(/*!_manualFeedforwardText||*/string_length(_manualFeedforwardText)==0)
 					updateUserInputCommandImmediateFeedforwardText();
 				////outputChar('B');
 				// MDH@03OCT2019: some feed forward texts are also current token specific, therefore we need to sync the feed forward texts
@@ -4600,9 +4635,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// MDH@20SEP2019: equivalent to removing ANY first character in the first feed forward text (if any)
 					// MDH@27SEP2019: removing the identifier continuation text takes precedence!!!
 					// MDH@07OCT2019: manual feed forward now comes first (in showing)
-					if(!_manualFeedforwardText&&string_length(_manualFeedforwardText)>0){
+					if(/*_manualFeedforwardText&&*/string_length(_manualFeedforwardText)){
 						// remove one character at a time (TODO might be confusing with the removal of the entire identifier continuation on Delete)
-						if(!getFirstManualFeedforwardCharacterRemoved())inputCharType=switchToControlMode("Failed to delete the first suggested character.");
+						if(!getFirstManualFeedforwardCharacterRemoved())
+							inputCharType=switchToControlMode("Failed to delete the first suggested character.");
 					}else
 					if(_identifierContinuationCharacters){
 						// MDH@30OCT2019: by blocking the subsequent update (the next time), we loose the identifier continuation automatically
@@ -4697,9 +4733,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						while(numberOfSuggestedCharactersConsumed<numberOfCharactersToConsume){
 							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersConsumed);
 							if(newInputChar=='\0'){
-								inputCharType=switchToControlMode("Suggested characters vanishing somehow.");
+								inputCharType=switchToControlMode("Suggested characters vanished somehow.");
 								break;
 							}
+							inputInfo("Consuming :'%c'.",newInputChar);
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							newInputCharType=INPUTCHARACTERTYPES[newInputChar];
@@ -4735,6 +4772,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							// MDH@08OCT2019: have to be careful here because identifier continuation characters might come out of the manual feed forward text
 							if(numberOfSuggestedCharactersConsumed>0){ // at least one character consumed
 								if(numberOfManualFeedforwardCharacters){ // some of the manual feed forward characters were consumed
+									// MDH@05DEC2022: let's turn this around
+									if(numberOfSuggestedCharactersConsumed>=string_length(_manualFeedforwardText)) // all manual feed forward characters were consumed
+										deleteManualFeedforwardText();
+									else // not all manual feed forward characters were consumed 
+										// remove numberOfSuggestedCharactersAccepted from the start of the manual feed forward text
+									if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersConsumed))
+										inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
+									/* replacing:
 									if(numberOfSuggestedCharactersConsumed>=string_length(_manualFeedforwardText)){ // all manual feed forward characters were consumed
 										FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
 									}else{ // not all manual feed forward characters were consumed 
@@ -4742,6 +4787,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersConsumed))
 											inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
 									}
+									*/
 								}else
 									deleteTokenautocompletiontexts();
 								// MDH@21OCT2020: this is a very good point because apparently when the last consumed character is ( it's appending ) which is NOT always required
@@ -4751,10 +4797,12 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								updateLastTokenAutoCompletionText(true); // TODO do we need the following????
 								// we might end up behind some character that produces auto completion stuff like [ or {
 							}else
-								inputCharType=switchToControlMode("No suggested characters accepted.");					
+								inputCharType=switchToControlMode("No suggested characters accepted.");
 						}
-					}else // no consumable text
+					}else{ // no consumable text
 						beep();
+						//inputCharType=switchToControlMode("No suggested characters to consume!");
+					}
 				}else
 				if(inputCharType=='m'){ // Esc character...
 					if(inputCharReadNonBlocking(&inputChar,NULL)){
@@ -4768,16 +4816,21 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 											/////////inputInfo("Delete");
 											// we should have suggested (identifier continuation or feed forward (autocompletion)) text
 											// MDH@07OCT2019: manual feed forward text goes first
-											if(_suggestedText&&string_length(_suggestedText)){ // there is suggested text with parts to delete
+											if(/*_suggestedText&&*/string_length(_suggestedText)){ // there is suggested text with parts to delete
 												clearScreenFromCursor(); // MDH@17OCT2020 bug fix: ascertaining not to keep seeing the last suggested character
 												// any identifier continuation characters precede manual feed forward text
-												if(string_length(_manualFeedforwardText)){
+												if(/*_manualFeedforwardText&&*/string_length(_manualFeedforwardText)){
+													// MDH@05DEC2022: moving deleting manualFeedforwardText to getFirstMgetFirstManualFeedforwardCharacterRemoved
+													if(!getFirstManualFeedforwardCharacterRemoved())
+														inputCharType=switchToControlMode("Failed to delete the first suggested character.");
+													/* replacing:
 													if(getFirstManualFeedforwardCharacterRemoved()){
-														if(string_length(_manualFeedforwardText)==0){FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;}
+														if(string_length(_manualFeedforwardText)==0)deleteManualFeedforwardText();
 													}else
 														inputCharType=switchToControlMode("Failed to delete the first suggested character.");
+														*/
 												}else
-												if(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0){
+												if(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)){
 													// if there's immediate feed forward token, there's no manual feed forward
 													// PROBLEM can't remove the identifier continuation characters as a whole because if I do it will be recreated
 													if(!prependedToManualFeedforwardText(_identifierContinuationCharacters+1))
@@ -4971,7 +5024,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//                we always need a command (being edited)
 					// MDH@01OCT2019: if the input character matches the first non-anonymous i.e. autogenerated feed forward character same functionality as right arrow (except now we know the character entered)
-					char firstSuggestedCharacter=getFirstSuggestedCharacter(/*true*/);
+					char firstSuggestedCharacter=string_char(_suggestedText,0); // MDH@05DEC2022 replacing: getFirstSuggestedCharacter(/*true*/);
 					if(inputChar==firstSuggestedCharacter){
 						//if(amVerboseDebugging())
 							logToOutputFile("\t\tInput character '%c' matches the first suggested character.\n",inputChar);
@@ -4979,10 +5032,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						//inputInfo("Consuming the first suggested character!");
 						///// no need for this!!! char firstSuggestedCharacterInputType=INPUTCHARACTERTYPES[firstSuggestedCharacter];
 						bool firstSuggestedCharacterConsumed=removeFirstSuggestedCharacter(inputChar);
-						if(!firstSuggestedCharacterConsumed)inputError("%sFailed to consume the first suggested character '%c'. See the log for details!",M_BUG_PREFIX,inputChar);
-						int8_t result=commandCharacterAccepted(inputChar,&inputCharType,true,firstSuggestedCharacterConsumed);
-						if(result&NO_USER_INPUT_ERROR)
-							inputError("No user input!");
+						// TODO perhaps we should do more?????? DONE let's not accept this happening
+						if(firstSuggestedCharacterConsumed){
+							int8_t result=commandCharacterAccepted(inputChar,&inputCharType,true,firstSuggestedCharacterConsumed);
+							if(result&NO_USER_INPUT_ERROR)
+								inputError("No user input!");
+						}else{
+							beep();
+							inputError("%sFailed to consume the first suggested character '%c'.",M_BUG_PREFIX,inputChar);
+							switchToControlMode("See the log for details.");
+						}
 						/* MDH@02NOV2021: can't happen anymore	
 						if(result&REMOVE_SUGGESTED_CHARACTER_FAILURE){
 							inputError("Failed to remove the first accepted character!");
@@ -5162,7 +5221,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		//                _manualFeedforwardText is only used in command and shell mode, not in control mode
 		//                perhaps it's better done at the prompt
 		//                TODO consider doing the same for feed forward texts?????
-		if(_manualFeedforwardText){FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;}
+		if(_manualFeedforwardText)deleteManualFeedforwardText(); //{FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;}
 
 		// if eXit input character(s) received...
 		if(inputCharType=='x'){
