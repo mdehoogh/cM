@@ -1105,7 +1105,7 @@ Mfunction* getFunction(Menvironment const * const _environment,char const * cons
 long long getNumberOfFunctionParameters(char const * const functionName){
 	// MDH@20DEC2022: we're going to need this to keep track of the expected number of function arguments
 	Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
-	return(function?function->_parameterMap->numberOfElements:-1);
+	return(function&&function->_parameterMap?function->_parameterMap->numberOfElements:-1);
 } 
 
 /*

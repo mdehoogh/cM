@@ -462,7 +462,7 @@ size_t toUserInputCursorPosition(long lines){
 }
 // MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
 static void inputInfo(const char* const fmt,...){
-	return;
+	// STUPID ME!!!!! return;
 	if(fmt&&strlen(fmt)){ // we have a format
 		// outputChar('X');
 		size_t linesMovedUp=toInfoInputLine();
@@ -1004,7 +1004,7 @@ void deleteImmediateFeedforwardText(){FREE_STRING(_immediateFeedforwardText,owne
 char getUserInputCommandImmediateFeedforwardCharacter(){
 	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
 	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
-	if(token)
+	if(token&&string_length(token->text)>0)
 	switch(token->type){
 		case TT_NEW_VARIABLE:case TT_BINARY_aErU:return '='; // start an assignment
 		case TT_DQSTRING:return '"'; // end a double quoted string literal
@@ -1012,12 +1012,10 @@ char getUserInputCommandImmediateFeedforwardCharacter(){
 		case TT_SQSTRING:return '\''; // end a single quoted string literal
 		default:{
 			// MDH@20DEC2022: can we deal with adding the end function call argument character? either , or ) here??????
-			if(token->expr&&token->expr->type==TT_FUNCTION_CALL&&token->type!=TT_END_OF_FUNCTION_CALL){ 
+			if(token->expr&&token->expr->type==TT_FUNCTION_CALL&&token->type!=TT_END_OF_FUNCTION_CALL&&token->expr->argument<=-4){ 
 				// we need to know more, if all the arguments are given we need to predict ), otherwise a , unless the current argument is not yet valid
 				//if(!isTokenUnfinished(token)){ // the token may be considered finished
-					// if there are still expected next arguments, we allow a comma
-					if(token->expr->argument<-3)return ','; 
-				//}
+				return(token->expr->argument==-4?')':',');
 			}
 			break;
 		}
@@ -1762,6 +1760,11 @@ bool removeLastUserInputCommandToken(){
 	if(!tokenToRemove)return false; // there's no last token to remove
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
 	deleteTokenAutoCompletionText(tokenToRemove);
+	// MDH@20DEC2022: if removing the comma in a function call arguments list, we need to increment the number of expected arguments again
+	if(tokenToRemove->type==TT_LISTELEMENT&&tokenToRemove->expr&&tokenToRemove->expr->type==TT_FUNCTION_CALL){
+		tokenToRemove->expr->argument-=1;
+		inputInfo("Number of expected arguments: %lld.",-tokenToRemove->expr->argument-3);
+	}
 	removedLastCommandToken(_userInputCommand,owner_userInputCommand); // NOT using the result (which would be the new last command token)
 	return true;
 }
@@ -4754,7 +4757,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								inputCharType=switchToControlMode("Suggested characters vanished somehow.");
 								break;
 							}
-							inputInfo("Consuming :'%c'.",newInputChar);
+							/////////////inputInfo("Consuming: '%c'.",newInputChar);
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							newInputCharType=INPUTCHARACTERTYPES[newInputChar];

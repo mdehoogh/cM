@@ -1987,14 +1987,14 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				// MDH@20DEC2022: we can change this to encode the number of arguments left to enter somehow in pNewToken->argument (for common non-special functions)
 				if(strcmp(_functionName,DOFUNCTION_NAME)&&strcmp(_functionName,FORWITHFUNCTION_NAME)){ // not a special function (like do and forw)
 					//  MDH@20DEC2022: used to assign -2 but now -3 minus the number of function arguments (so -2 would then be considered an unknown function)
-					long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);
-					if(numberOfExpectedArguments<0){ // undefined
-						pNewToken->argument=-2;
-						//pNewToken->type=TT_ERROR;
-						if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
-					}else{
-						pNewToken->argument=-3-numberOfExpectedArguments; 
-						if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments: %lld.",numberOfExpectedArguments);
+					long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);//outputChar('X');
+					pNewToken->argument=(numberOfExpectedArguments<0?-2:-numberOfExpectedArguments-3);
+					// informing the user
+					if(inputInfoFunction){
+						if(numberOfExpectedArguments>=0)
+							(*inputInfoFunction)("Number of expected arguments: %lld.",numberOfExpectedArguments);
+						else
+							(*inputInfoFunction)("Number of expected arguments unknown!");
 					}
 				}else
 					pNewToken->argument=1;
@@ -2093,9 +2093,9 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 									newTokenType=TT_ERROR;
 									if(inputErrorFunction)(*inputErrorFunction)("Another argument not allowed.");
 								}else{
-									pNewToken->expr->argument+=1;
+									pNewToken->expr->argument=pNewToken->expr->argument+1;
 									//if(amVerboseDebugging())
-									if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments: %lld.",pNewToken->expr->argument+3);
+									if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments: %lld.",-pNewToken->expr->argument-3);
 								}
 							}else{
 									if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
@@ -12401,13 +12401,13 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(!_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
 	if(!_outputCommandInfoFunction)outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
 
-	if(!inputInfoFunction)outputWarning("No input info function!");
-	if(!inputErrorFunction)outputWarning("No input error function!");
-	if(!inputCharReadFunction)outputWarning("No input char read function!");
-	if(!outputTokenFunction)outputWarning("No output token function!");
-	if(!reoutputTokenFunction)outputWarning("No reoutput token function!");
-	if(!updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");
-	if(!outputCommandInfoFunction)outputWarning("No output command info function!");
+	if(!inputInfoFunction)outputWarning("No input info function!");else outputInfo("Input info function set!");
+	if(!inputErrorFunction)outputWarning("No input error function!");else outputInfo("Input error function set!");
+	if(!inputCharReadFunction)outputWarning("No input char read function!");else outputInfo("Input char read function set!");
+	if(!outputTokenFunction)outputWarning("No output token function!");else outputInfo("Output token function set!");
+	if(!reoutputTokenFunction)outputWarning("No reoutput token function!");else outputInfo("Reoutput token function set!");
+	if(!updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");else outputInfo("Update last token auto completion text function set!");
+	if(!outputCommandInfoFunction)outputWarning("No output command info function!");else outputInfo("Output command info function set!");
 
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return NULL; // let's force starting with a default decimal context
