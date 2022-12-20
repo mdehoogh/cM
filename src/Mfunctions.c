@@ -445,25 +445,26 @@ static Mvalue* powll(long long ll1,long long ll2){
 		return(inverse?_getValueOfRational(_getRational(_getBiginteger(1LL),_getValueBiginteger(inverse),0,false)):NULL);
 	}
 	// ASSERT ll2 now always positive
-	Mbiginteger *_bi1=_getBiginteger(ll1);
-	Mbiginteger *_power=_getBiginteger(1LL),*_multiplier=_getBiginteger(0LL);
-	outputBiginteger("(",_multiplier,NULL);////outputBiginteger(",",_bi2,")");
-	long long powerof2=1;
+	Mbiginteger *_bi1=_getBiginteger(ll1),*_multiplier=_getBiginteger(ll1);
+	Mbiginteger *_power=_getBiginteger(1LL);
+	//////outputBiginteger("(",_multiplier,NULL);////outputBiginteger(",",_bi2,")");
+	//////long long powerof2=1;
 	// we can compute the power ourselves, by simply using the bits from ll2, and adding what we need to the result so far which we put in _power
 	// which means we have to keep track of the power of 2 to multiply ll1 with (to add to the sum so far)
 	while(ll2>0){
-		output(" %lld+%lld",ll2,powerof2);
+		//////output(" %lld",ll2);
 		/////outputBiginteger("+",_bi2,NULL);
 		if(ll2&1LL){
 			// TODO do error handling!!!!!
-			// multiply ll1 with the power of two in _bi2
+			/* multiply ll1 with the power of two in _bi2
 			if(mp_mul_2d(_bi1->_bi,powerof2,_multiplier->_bi)!=MP_OKAY){free_biginteger(_power);_power=NULL;break;}
 			outputBiginteger(">",_multiplier,NULL);
+			*/
 			// add addendum to _power
 			if(mp_mul(_power->_bi,_multiplier->_bi,_power->_bi)!=MP_OKAY){free_biginteger(_power);_power=NULL;break;}
-			outputBiginteger("=",_power,NULL);
+			/////////outputBiginteger("=",_power,NULL);
 		}
-		powerof2<<=1;
+		if(mp_sqr(_multiplier->_bi,_multiplier->_bi)!=MP_OKAY){free_biginteger(_power);_power=NULL;break;}
 		ll2>>=1; // half ll2
 	}
 	free_biginteger(_bi1);free_biginteger(_multiplier);
