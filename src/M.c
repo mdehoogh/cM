@@ -657,12 +657,13 @@ void updateAutoCompletionText(){
 		logToOutputFile("\t\tAuto completion text: '%s'.\n",string(_autoCompletionText));
 	}
 }
-
+/* MDH@20DEC2022: apparently not getting called anywhere anymore
 char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 	// some token types have an associated feed forward character!!!
 	switch(tokenType){
 		case TT_BINARY_aErU:return '=';
 		case TT_DQSTRING:return '"'; 
+		// MDH@20DEC2022: take out the function and function call token feed forward out here, which is now being taken care of in determining the immediate feed forward text!!!
 		case TT_FUNCTION:return '(';
 		case TT_FUNCTION_CALL:return ')';
 		case TT_LIST:return ']';
@@ -673,12 +674,13 @@ char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 	}
 	return '\0';
 }
-
+*/
 // MDH@24SEP2019: we do not always want to set the identifier continuation characters
 // MDH@03OCT2019: now excluding the last token immediate feed forward text because that is being taken care of whenever the last token (type) change
 //                because of this only the matching parentheses feed forward characters remain so TODO simplify this
 char* _getLastTokenAutoCompletionText(){// Mallocationowner owner=getOwner(__LINE__);
-	char* tokenAutoCompletionText=""; // on the stack
+	// MDH@20DEC2022: changed from "" to " ", as this is a bit dangerous since this way we get a 1-character string
+	char* tokenAutoCompletionText=" "; // on the stack (zero-terminated string)
 	if(amMatchingparentheses())
 	if(_userInputCommand&&_userInputCommand->_lastToken)
 	switch(_userInputCommand->_lastToken->type){
@@ -711,7 +713,7 @@ char* _getLastTokenAutoCompletionText(){// Mallocationowner owner=getOwner(__LIN
 		default:break;
 	}
 	// MDH@25MAY2020: by returning a dynamic duplicate the caller needs to free it
-	return strdup(tokenAutoCompletionText); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
+	return((*tokenAutoCompletionText)!=' '?strdup(tokenAutoCompletionText):NULL); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
 }
 /*
 Mtokenautocompletiontext* disowned_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext,Mallocationowner owner_autocompletiontext){
@@ -997,19 +999,35 @@ Mstring* _immediateFeedforwardText=NULL;Mallocationowner owner_immediateFeedforw
 void deleteImmediateFeedforwardText(){FREE_STRING(_immediateFeedforwardText,owner_immediateFeedforwardText);_immediateFeedforwardText=NULL;}
 // MDH@05DEC2022 TODO not used anymore?: bool immediateFeedforwardToBeUpdated=false;
 // MDH@05DEC2022 NOTE: called once when updating the immediate feed forward text
+// MDH@20DEC2022 NOTE: currently determines the single character that is most expected to end the current token, although the assignment operator (=) actually is a feed forward character on a new variable which does
+//                     not need to be new at all and could confuse the user
 char getUserInputCommandImmediateFeedforwardCharacter(){
 	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
 	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
 	if(token)
 	switch(token->type){
-		case TT_NEW_VARIABLE:case TT_BINARY_aErU:return '=';
-		case TT_DQSTRING:return '"';
-		case TT_FUNCTION:return '(';
-		case TT_SQSTRING:return '\'';
-		default:break;
+		case TT_NEW_VARIABLE:case TT_BINARY_aErU:return '='; // start an assignment
+		case TT_DQSTRING:return '"'; // end a double quoted string literal
+		case TT_FUNCTION:return '('; // start the function call
+		case TT_SQSTRING:return '\''; // end a single quoted string literal
+		default:{
+			// MDH@20DEC2022: can we deal with adding the end function call argument character? either , or ) here??????
+			if(token->expr&&token->expr->type==TT_FUNCTION_CALL&&token->type!=TT_END_OF_FUNCTION_CALL){ 
+				// we need to know more, if all the arguments are given we need to predict ), otherwise a , unless the current argument is not yet valid
+				//if(!isTokenUnfinished(token)){ // the token may be considered finished
+					// if there are still expected next arguments, we allow a comma
+					if(token->expr->argument<-3)return ','; 
+				//}
+			}
+			break;
+		}
 	}
 	return '\0';
 }
+// MDH@20DEC2022 NOTE:
+// this does NOT take care of the closing ) of a function call, although perhaps it should, we can definitely say that we're missing the , and ) that ends the current argument in a function call
+// so what we could do is use this type of feedforward text to take care of doing that, and remove it from the auto completion feedforward that inserts the closing parenthesis of a function call
+// the point being that if the argument is now valid we can always start the next argument
 bool updateUserInputCommandImmediateFeedforwardText(){
 	if(!_immediateFeedforwardText)return false; // should have one
 	char lastTokenImmediateFeedforwardCharacter=getUserInputCommandImmediateFeedforwardCharacter();

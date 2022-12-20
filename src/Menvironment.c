@@ -1069,7 +1069,7 @@ Mstring* _getFunctionNames(Menvironment const * const _environment,const char* c
 }/* VALIDATED */
 
 // MDH@04MAR2020: getFunction() is used to determine if some identifier name represents a function, which can now also be a variable which value is a(n anonymous) function
-Mfunction* getFunction(Menvironment const * const _environment,const char* const functionName){
+Mfunction* getFunction(Menvironment const * const _environment,char const * const functionName){
 	if(_environment&&functionName&&strlen(functionName)){
 		Mfunctionmap* functionmap=_environment->_functionMap;
 		if(functionmap){
@@ -1101,6 +1101,13 @@ Mfunction* getFunction(Menvironment const * const _environment,const char* const
 	}
 	return NULL;
 }/* VALIDATED */
+
+long long getNumberOfFunctionParameters(char const * const functionName){
+	// MDH@20DEC2022: we're going to need this to keep track of the expected number of function arguments
+	Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
+	return(function?function->_parameterMap->numberOfElements:-1);
+} 
+
 /*
 Muserfunction* getUserfunction(const Menvironment* const _environment,const char* const userfunctionName){
     if(_environment&&userfunctionName&&strlen(userfunctionName)){

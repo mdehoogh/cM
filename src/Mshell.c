@@ -1984,7 +1984,19 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
 
 				// MDH@28OCT2020: defining user functions is no longer 'special' in that the body should simply be a list of command texts and tokenized by Mdefinefunction and Manonymousfunction itself
-				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORWITHFUNCTION_NAME))
+				// MDH@20DEC2022: we can change this to encode the number of arguments left to enter somehow in pNewToken->argument (for common non-special functions)
+				if(strcmp(_functionName,DOFUNCTION_NAME)&&strcmp(_functionName,FORWITHFUNCTION_NAME)){ // not a special function (like do and forw)
+					//  MDH@20DEC2022: used to assign -2 but now -3 minus the number of function arguments (so -2 would then be considered an unknown function)
+					long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);
+					if(numberOfExpectedArguments<0){ // undefined
+						pNewToken->argument=-2;
+						//pNewToken->type=TT_ERROR;
+						if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
+					}else{
+						pNewToken->argument=-3-numberOfExpectedArguments; 
+						if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments: %lld.",numberOfExpectedArguments);
+					}
+				}else
 					pNewToken->argument=1;
 				/* replacing:
 				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
@@ -1992,8 +2004,6 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				else 
 				if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
 				*/
-				else 
-					pNewToken->argument=-2;
 
 				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
 				if(pNewToken->argument>0){ // a special function call // MDH@09MAR2020: added >0 TODO is that correct?
@@ -2005,7 +2015,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 						pNewToken->envid=(prevToken->envid+addendum+1); // ander will take care of removing what's too the left
 					}else{ // can't increment
 						pNewToken->type=TT_ERROR;
-						(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
+						if(inputErrorFunction)(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
 					}
 				}
 				free(_functionName);
@@ -2078,8 +2088,18 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 									// outputChar('G');
 								}
 							}else
-							if(amVerboseDebugging())
-								if(inputInfoFunction)(*inputInfoFunction)("Non-local variable function call argument");
+							if(pNewToken->expr->argument<-2){ // MDH@20DEC2022: a known number of expected arguments
+								if(pNewToken->expr->argument==-3){ // already reached the total number of expected arguments
+									newTokenType=TT_ERROR;
+									if(inputErrorFunction)(*inputErrorFunction)("Another argument not allowed.");
+								}else{
+									pNewToken->expr->argument+=1;
+									//if(amVerboseDebugging())
+									if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments: %lld.",pNewToken->expr->argument+3);
+								}
+							}else{
+									if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
+							}
 						}else
 						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP){
 							newTokenType=TT_ERROR;

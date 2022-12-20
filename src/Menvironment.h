@@ -85,17 +85,20 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string);
 */
 
 // functions
-Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep);
+Mstring* _getFunctionNames(Menvironment const * const _environment,char const * const sep);
 bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment);
 
 // helper function to return the function
-Mfunction* getFunction(Menvironment const * const _environment,const char* const functionName);
-Muserfunction* getUserfunction(Menvironment const * const _environment,const char* const userfunctionName);
+Mfunction* getFunction(Menvironment const * const _environment,char const * const functionName);
+Muserfunction* getUserfunction(Menvironment const * const _environment,char const * const userfunctionName);
 
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
-Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList,Mallocationowner owner_functionargumentmap);
+Mmap* _getFunctionArgumentMap(Mfunction const * const _function,Mlist const * const _argumentList,Mallocationowner owner_functionargumentmap);
 
 Mfunction* _getFunction(Menvironment* const _environment,Mallocationowner owner_environment,char const * const name); // creates the function if it does not exist yet
+
+// MDH@20DEC2022: we're going to need this to keep track of the expected number of function arguments
+long long getNumberOfFunctionParameters(char const * const functionName);
 
 bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction);
 bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
