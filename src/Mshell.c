@@ -12439,12 +12439,15 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputWarning("Failing to create the results list. The results will not be available through the M function!");
 	*/
 
-	if(amVerboseDebugging())output("Creating the root environment.\n"); // DEBUG
+	//if(amVerboseDebugging())
+		output("Creating the root M environment.\n"); // DEBUG
 	Menvironment* _Menvironment=owned_environment(_getNewEnvironment(),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
-		if(amVerbose())output("M environment created.\n");
+		//if(amVerbose())
+			output("M environment created.\n");
 		_Menvironment->_name=owned_chars(_getChars("M"),Msubowner(owner,1)); // TODO why make a dynamic copy???
-		if(amVerbose())output("M environment named.\n");
+		//if(amVerbose())
+			output("M environment named.\n");
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC_1(sizeof(Mfunctionmap),'W',Msubowner(owner,1));
 		if(environmentFunctionMap){

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "Mmessage.h"
 
@@ -64,7 +65,9 @@ typedef struct{
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
-long long addAllocation(signed char allocationType,Mallocationowner owner); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
+/* MDH@14JAN2023: probably not called from outside Malloc.*
+long long addAllocation(Mallocationtypeowner allocationtypeowner); //signed char allocationType,Mallocationowner owner); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
+*/
 // long long registerAllocation(char allocationType,size_t size,long long count);
 
 bool allocationRecordingInitialized();
