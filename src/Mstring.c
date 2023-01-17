@@ -331,10 +331,11 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
 			size_t l=str->length+1;
 			/////printf("{%hu-%d}",l,str->blocks);
 			if(l==getNumberOfChars(str)){
-				//////////////printf("Realloc string_append_char().\n");
+				printf("Realloc string_append_char()...");
 				// size_t sizeOfChars=getSizeOfChars(str);
 				Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
 				if(!new_chars)return NULL;
+				printf("resized!\n");
 				++(str->blocks);
 				str->_chars=new_chars;
 				/* replacing:

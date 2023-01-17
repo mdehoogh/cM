@@ -200,9 +200,10 @@ typedef struct{
 }Mallocationownertype;
 */
 struct{
-    long long l; // the number of allocation types stored
-    Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
-}allocations={0,NULL};
+	uint32_t nulled,removed; // MDH@17JAN2023: keep track of the number of NULLed pointers as well as the amount removed so far (that end up at the end of l allocated pointers)
+	long long l; // the number of allocation types stored
+	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
+}allocations={0,0,0,NULL};
 
 static long long getAllocationTypeIndex(signed char allocationType){
     long long allocationTypeIndex=numberOfAllocationTypes;
@@ -519,6 +520,50 @@ long long* _getAllocationCounts(){
     return NULL;
 }
 */
+// MDH@17JAN2023: every now and then we should shrink the allocations
+size_t nulledAllocationsRemoved(){
+	size_t removed=0;
+	if(allocations.nulled){ // there are nulled allocation pointers
+		// we need to keep track of the first and last position of a block of non null allocation pointers
+		// ok in the order of appeance
+		int32_t firstNonNullIndex,nextNullIndex; // the index of the last null pointer
+		int32_t	firstNullIndex=-1; // the index of the first null pointer
+		Mallocationtypeowner* owners=allocations._owners;
+		// when starting can't say whether we start with null pointers or non-null pointers
+		// we should skip all non null pointers at the start to ascertain firstNullIndex is truely on the first nulled pointer
+		while(++firstNullIndex<allocations.l&&owners[firstNullIndex]!=NULL);
+		while(firstNullIndex<allocations.l){ // there could still be non null pointers to move
+			// find the first non null index starting from the first position behind the nextNullIndex
+			firstNonNullIndex=firstNullIndex;
+			while(++firstNonNullIndex<allocations.l&&owners[firstNonNullIndex]==NULL);
+			if(firstNonNullIndex>=allocations.l)break; // only NULL pointers found
+			// ASSERT at least one non null pointer encountered
+			// we can now start moving immediately one by one
+			do{
+				owners[firstNullIndex]=owners[firstNonNullIndex];
+				owners[firstNonNullIndex]=NULL; // could be overwritten though at some point though (or not), but if we do not change allocations.l we have to prevent getting duplicate pointers!!!!!
+				removed++;
+				owners[firstNonNullIndex]->allocationIndex=firstNullIndex; // update the allocation index to match the new location index
+				firstNullIndex++;
+			}while(++firstNonNullIndex<allocations.l&&owners[firstNonNullIndex]!=NULL);
+			// ASSERT firstNonNullIndex has hit the first null pointer after the block of non null pointers we just moved!!!!
+			firstNullIndex=firstNonNullIndex;
+		}
+		if(removed){
+			// the number of removed null pointers needs to be subtracted from allocations.l
+			allocations.nulled-=removed;
+			// NOTE we're not changing l as it is associated with the number of allocated pointers in total
+			allocations.removed+=removed;
+			// we might realloc allocation._owners if we removed sufficient nulled pointers?????
+		}
+	}
+	return removed;
+}
+// when nulledAllocationPointers are removed
+void shrinkAllocations(){
+
+}
+
 Mallocationtype* _getAllocationTypes(){
     size_t allocationTypesSize=(_allocationTypes?numberOfAllocationTypes*sizeof(Mallocationtype):0);
     return(allocationTypesSize>0?memcpy(malloc(allocationTypesSize),_allocationTypes,allocationTypesSize):NULL);
@@ -953,141 +998,150 @@ void Mvfree(){
 */
 // MDH@20APR2020: unfortunately we need to know the size of what was allocated which is easy for fixed size allocation but problematic for variable size records
 //                unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
+// MDH@17JAN2023: Since there's now only one allocation owner record (pointed to in allocations), no need to compare them anymore!!!! but still to NULL the pointer (present in allocations!!!!!) by allocationIndex
 void Mfree(void const * const ptr,long long count,signed char allocationType,bool report/*,Mallocationowner owner*/){
-    if(!ptr||allocationType==0||count<=0)return;
-    Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
-    int32_t allocationIndex=_alloc->allocationIndex; // MDH@13NOV2020: best to get the allocation index asap
-    if(report)
-        tell("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
-    if(report)
-        tell("%p: of type '%c' owned by %s:%u(%s%u%s%s) being freed.\n",_alloc,abs(allocationType) // replacing: by %s:%u(%s%u%s%s).\n",_alloc
-        ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
-        // ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
-        );
-    // only disowned stuff can be freed!!!!!
-    if(_alloc->owner.disowned==0)
-        bug("\tAbout to free the still owned memory allocation %s:%u(%s%u%s%s)!"
-        ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
-        );
-    if(allocationIndex>=0&&allocationIndex<allocations.l){
-			// MDH@14JAN2023: since the allocations now store the pointer (i.e. _alloc), which is to be NULLed on freeing
-			//                we cannot check it anymore, but we can check whether it matches _alloc!!!!
-        // replacing: if(allocations._owners[allocationIndex]->owner.freed!=0)
-        if(allocations._owners[allocationIndex]!=_alloc)
-            bug("\tFreed before!");
-    }else
-        bug("\tInvalid allocation index %i.",allocationIndex);
-    /////info("Freeing type '%c' data",type);
-    // determine the amount of items to free which depends on the type size!!
-    // MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
-    size_t size=0; // MDH@20APR2020: we need to determine the size from what we stored with the allocation type
-    if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
-        long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
-        // assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
-        if(allocationTypeIndex>=0){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
-            size=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; // extract the (fixed) size
-            if(!unregisterAllocation(allocationTypeIndex,count,allocationType>0))
-                bug("\tFailed to free the dynamic memory of %llu allocation%s of type '%c' (%d) (size: %zd).",count,(count>1?"s":""),allocationType,allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
-            /* replacing what would no longer work:
-            _allocationTypes[allocationTypeIndex].count--;
-            // assuming this is a fixed size allocation type
-            size=_allocationTypes[allocationTypeIndex].allocationsizeunion.size;
-            _allocationTypes[allocationTypeIndex].freed+=size;
-            */
-            /* MDH@14APR2020 replacing:
-            allocationtypecountoffset=5*allocationTypeIndex;
-            if(allocationtypecountoffset>=0){ // success (and not the accumulative (zero) one!!!)
-                typesize=_allocationTypes[ // replacing: allocationcounts[allocationtypecountoffset]; // where the size is stored!!!
-                if(typesize>0)nitems=sizeof(*ptr)/typesize;
-            }
-            */
-        }else
-            bug("\tMemory of unknown type '%c' to be freed!",allocationType);
-    }
-    // MDH@14APR2020 NOTE: the following is about removing the allocation
+	if(!ptr||allocationType==0||count<=0)return;
+	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
+	int32_t allocationIndex=_alloc->allocationIndex; // MDH@13NOV2020: best to get the allocation index asap
+	if(report)
+		tell("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
+	if(report)
+		tell("%p: of type '%c' owned by %s:%u(%s%u%s%s) being freed.\n",_alloc,abs(allocationType) // replacing: by %s:%u(%s%u%s%s).\n",_alloc
+			,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
+			// ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
+		);
+	// only disowned stuff can be freed!!!!!
+	if(!_alloc->owner.disowned)
+		bug("\tAbout to free the still owned memory allocation %s:%u(%s%u%s%s)!"
+			,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
+		);
+	if(allocationIndex>=0&&allocationIndex<allocations.l){
+		// MDH@14JAN2023: since the allocations now store the pointer (i.e. _alloc), which is to be NULLed on freeing
+		//                we cannot check it anymore, but we can check whether it matches _alloc!!!!
+		// replacing: if(allocations._owners[allocationIndex]->owner.freed!=0)
+		if(allocations._owners[allocationIndex]!=_alloc)
+			bug("\tFreed before!");
+	}else{
+		bug("\tInvalid allocation index %i.",allocationIndex);
+		if(allocationIndex>0)allocationIndex=INT32_MIN; // MDH@17JAN2023: makes testing a little easier
+	}
+	/////info("Freeing type '%c' data",type);
+	// determine the amount of items to free which depends on the type size!!
+	// MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
+	size_t size=0; // MDH@20APR2020: we need to determine the size from what we stored with the allocation type
+	if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
+		long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
+		// assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
+		if(allocationTypeIndex>=0){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
+			size=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; // extract the (fixed) size
+			if(!unregisterAllocation(allocationTypeIndex,count,allocationType>0))
+					bug("\tFailed to free the dynamic memory of %llu allocation%s of type '%c' (%d) (size: %zd).",count,(count>1?"s":""),allocationType,allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
+			/* replacing what would no longer work:
+			_allocationTypes[allocationTypeIndex].count--;
+			// assuming this is a fixed size allocation type
+			size=_allocationTypes[allocationTypeIndex].allocationsizeunion.size;
+			_allocationTypes[allocationTypeIndex].freed+=size;
+			*/
+			/* MDH@14APR2020 replacing:
+			allocationtypecountoffset=5*allocationTypeIndex;
+			if(allocationtypecountoffset>=0){ // success (and not the accumulative (zero) one!!!)
+					typesize=_allocationTypes[ // replacing: allocationcounts[allocationtypecountoffset]; // where the size is stored!!!
+					if(typesize>0)nitems=sizeof(*ptr)/typesize;
+			}
+			*/
+		}else
+			bug("\tMemory of unknown type '%c' to be freed!",allocationType);
+	}
+	// MDH@14APR2020 NOTE: the following is about removing the allocation
 #ifndef __PRODUCTION__
-    if(_alloc->allocationType!=allocationType){
-        bug("\tAllocation type of dynamic memory '%c' (=%i) freed of size %zd does not match provided allocation type '%c' (=%i).",_alloc->allocationType,_alloc->allocationType,size,allocationType,allocationType);
-        dump(ptr,count*size,size);
-        free(_alloc);
-        return;
-    }
-    // if(_alloc->allocationIndex<=0)bug("No allocation index registered for allocation of type '%c'.\n",allocationType);
+	if(_alloc->allocationType!=allocationType){
+			bug("\tAllocation type of dynamic memory '%c' (=%i) freed of size %zd does not match provided allocation type '%c' (=%i).",_alloc->allocationType,_alloc->allocationType,size,allocationType,allocationType);
+			dump(ptr,count*size,size);
+			free(_alloc);
+			return;
+	}
+	// if(_alloc->allocationIndex<=0)bug("No allocation index registered for allocation of type '%c'.\n",allocationType);
 #endif
-    if(!allocations._owners)error("Allocation owners not recorded!\n");
-    if(allocations.l==0)warning("Nothing allocated to free.\n");
+	if(!allocations._owners)error("Allocation owners not recorded!\n");
+	if(allocations.l==0)warning("Nothing allocated to free.\n");
 #ifndef __PRODUCTION__
-    // MDH@04JUN2020: we can check ownership here BUT when a subowned allocation is freed by the superowner, which might have changed ownership the subowned allocation can still be freed as long as the levels match
-    if(allocationIndex>=0&&allocationIndex<allocations.l){
-			// MDH@14JAN2023: the same thing here, we can only comare _alloc with what's stored as owner reference
-			//                this means that we are no longer able to compare type and owner (type), only whether the pointers match
-			/* replacing:
-        if(allocations._owners[allocationIndex]->owner.freed){
-            allocations._owners[allocationIndex]->owner.freed=0;
-            bug("\tAllocation of dynamic memory '%c' (=%i) of size %zd was already marked as free.");
-        }
-        if(allocations._owners[allocationIndex]->allocationType!=allocationType){
-            bug("\tAllocation type of dynamic memory '%c' (=%i) (at index %i) does not match provided allocation type '%c' (=%i).",allocations._owners[allocationIndex]->allocationType,allocations._owners[allocationIndex]->allocationType,allocationIndex,allocationType,allocationType);
-            dump(ptr,size*count,size);
-        ///}else
-        ///if(allocations._owners[_alloc->allocationIndex].owner.level!=owner.level+1&&(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id||allocations._owners[_alloc->allocationIndex].owner.module!=owner.module)){
-        ///    Mallocationowner* _allocationowner=&(allocations._owners[_alloc->allocationIndex].owner);
-        ///    bug("\tAllocation owner of dynamic memory %s:%u(%s%u%s%s) (at index %i) does not match owner %s:%u(%s%u%s%s) trying to free the memory of type '%c' (=%i)."
-        ///    ,MODULE_NAMES[_allocationowner->module],_allocationowner->id,GLOBAL_FLAG_TEXTS[_allocationowner->global],_allocationowner->level,DISOWNED_FLAG_TEXTS[_allocationowner->disowned],FREED_FLAG_TEXTS[_allocationowner->freed]
-        ///    ,_alloc->allocationIndex
-        ///    ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
-        ///    ,allocationType,allocationType);
-        ///    dump(ptr,size*count,size);
-        }else{
-            // MDH@07JUN2020: it's going to suffice (see below) to set the freed flag once done (see the line below)
-            /// replacing:
-            ///// what we do here is the same as what Mdisown does!!!!
-            ///allocations._owners[_alloc->allocationIndex].type=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
-            ///allocations._owners[_alloc->allocationIndex].owner.id=0; // MDH@18MAY2020
-            ///allocations._owners[_alloc->allocationIndex].owner.module=0; // MDH@03JUN2020: TODO we might not want to do this
-            
-        }
-				*/
-    }else{
-        bug("\tRetrieved allocation position %llu out of range [0,%llu).",allocationIndex,allocations.l);
-        dump(ptr,size*count,size);
-    }
-#else
-    long long pos=allocations.l-1;
-    while(pos>0){
-        if(allocations._chars[pos]==allocationType){allocations._chars[pos]=' ';break;}
-        pos--;
-    }
-#endif
-    if(report)
-        output("Freeing '%p'...",_alloc);
-		// MDH@14JAN2023: 
-    free(_alloc);
-    if(report)
-        output(" done!\n");
-#ifndef __PRODUCTION__
-    // MDH@07JUN2020: if we get here we know free was sucessful and we should definitely mark the thing as freed
-    // we may safely assume that _alloc was freed but its good that to set the freed flag so we know that the pointer was freed actually but still know the type
-    // technically it might also be a good idea to have an additional flag that we can use to 
-    if(allocationIndex>=0&&allocationIndex<allocations.l){
-				// MDH@14JAN2023: can't do the following anymore since _alloc is already freed, technically we could set the freed flag though!!!!
-        allocations._owners[allocationIndex]->owner.freed=1; // MDH@13APR2020: can't use ' ' as that's used for a command
+	// MDH@04JUN2020: we can check ownership here BUT when a subowned allocation is freed by the superowner, which might have changed ownership the subowned allocation can still be freed as long as the levels match
+	if(allocationIndex>=0){
+		// MDH@14JAN2023: the same thing here, we can only comare _alloc with what's stored as owner reference
+		//                this means that we are no longer able to compare type and owner (type), only whether the pointers match
+		/* replacing:
+		if(allocations._owners[allocationIndex]->owner.freed){
+				allocations._owners[allocationIndex]->owner.freed=0;
+				bug("\tAllocation of dynamic memory '%c' (=%i) of size %zd was already marked as free.");
 		}
-		if(report)
-        printf("Allocation marked as free!\n");
+		if(allocations._owners[allocationIndex]->allocationType!=allocationType){
+				bug("\tAllocation type of dynamic memory '%c' (=%i) (at index %i) does not match provided allocation type '%c' (=%i).",allocations._owners[allocationIndex]->allocationType,allocations._owners[allocationIndex]->allocationType,allocationIndex,allocationType,allocationType);
+				dump(ptr,size*count,size);
+		///}else
+		///if(allocations._owners[_alloc->allocationIndex].owner.level!=owner.level+1&&(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id||allocations._owners[_alloc->allocationIndex].owner.module!=owner.module)){
+		///    Mallocationowner* _allocationowner=&(allocations._owners[_alloc->allocationIndex].owner);
+		///    bug("\tAllocation owner of dynamic memory %s:%u(%s%u%s%s) (at index %i) does not match owner %s:%u(%s%u%s%s) trying to free the memory of type '%c' (=%i)."
+		///    ,MODULE_NAMES[_allocationowner->module],_allocationowner->id,GLOBAL_FLAG_TEXTS[_allocationowner->global],_allocationowner->level,DISOWNED_FLAG_TEXTS[_allocationowner->disowned],FREED_FLAG_TEXTS[_allocationowner->freed]
+		///    ,_alloc->allocationIndex
+		///    ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
+		///    ,allocationType,allocationType);
+		///    dump(ptr,size*count,size);
+		}else{
+				// MDH@07JUN2020: it's going to suffice (see below) to set the freed flag once done (see the line below)
+				/// replacing:
+				///// what we do here is the same as what Mdisown does!!!!
+				///allocations._owners[_alloc->allocationIndex].type=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
+				///allocations._owners[_alloc->allocationIndex].owner.id=0; // MDH@18MAY2020
+				///allocations._owners[_alloc->allocationIndex].owner.module=0; // MDH@03JUN2020: TODO we might not want to do this
+				
+		}
+		*/
+	}else{
+		bug("\tRetrieved allocation position %llu out of range [0,%llu).",allocationIndex,allocations.l);
+		dump(ptr,size*count,size);
+	}
+#else
+	long long pos=allocations.l-1;
+	while(pos>0){
+		if(allocations._chars[pos]==allocationType){allocations._chars[pos]=' ';break;}
+		pos--;
+	}
 #endif
-    //////info("!");
-    // undo the allocation of the given type
-    /* MDH@14APR2020 removing:
-    ///////info("!");
-    // MDH@15NOV2019: if this is an existing type
-    if(nitems>0){ // we know both how many items AND where
-        _allocationcounts[allocationtypecountoffset+2]+=nitems; // increment the number of freed data type items
-        _allocationcounts[0]-=(nitems*typesize);
-        _allocationcounts[2]+=nitems; // another nitems freed!!
-    }
-    */
-    ////////info("!\n");
+	if(report)
+		output("Freeing '%p'...",_alloc);
+	// MDH@17JAN2023: we need to remove the reference in allocations
+	free(_alloc);
+	if(report)
+		output(" done!\n");
+#ifndef __PRODUCTION__
+	// MDH@07JUN2020: if we get here we know free was sucessful and we should definitely mark the thing as freed
+	// we may safely assume that _alloc was freed but its good that to set the freed flag so we know that the pointer was freed actually but still know the type
+	// technically it might also be a good idea to have an additional flag that we can use to 
+	if(allocationIndex>=0){
+		// MDH@14JAN2023: can't do the following anymore since _alloc is already freed, technically we could set the freed flag though!!!!
+		if(allocations._owners[allocationIndex]!=_alloc)
+			bug("Allocation #'%lld' pointer '%p' does not match the freed memory pointer '%p'.",allocationIndex,allocations._owners[allocationIndex],_alloc);
+		if(allocations._owners[allocationIndex]!=NULL){
+			allocations._owners[allocationIndex]=NULL;
+			allocations.nulled++;
+		}
+		// replacing:	allocations._owners[allocationIndex]->owner.freed=1; // MDH@13APR2020: can't use ' ' as that's used for a command
+	}
+	if(report)
+		printf("Allocation marked as free!\n");
+#endif
+	//////info("!");
+	// undo the allocation of the given type
+	/* MDH@14APR2020 removing:
+	///////info("!");
+	// MDH@15NOV2019: if this is an existing type
+	if(nitems>0){ // we know both how many items AND where
+			_allocationcounts[allocationtypecountoffset+2]+=nitems; // increment the number of freed data type items
+			_allocationcounts[0]-=(nitems*typesize);
+			_allocationcounts[2]+=nitems; // another nitems freed!!
+	}
+	*/
+	////////info("!\n");
 }
 
 // MDH@27NOV2019: now passing the number of items in as well, and the current number of items
@@ -1120,7 +1174,8 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
             allocationIndex=_alloc->allocationIndex;
             if(allocationIndex>=0&&allocationIndex<allocations.l){
                 if(allocations._owners[allocationIndex]->allocationType!=_alloc->allocationType){
-                    bug("Type '%c' of remembered allocation #%llu does not match the provided allocation type '%c'.",allocations._owners[allocationIndex]->allocationType,allocationIndex,_alloc->allocationType);
+                    bug("Type '%c' (%d) of remembered allocation #%llu does not match the provided allocation type '%c' (%d)."
+												,allocations._owners[allocationIndex]->allocationType,allocations._owners[allocationIndex]->allocationType,allocationIndex,_alloc->allocationType,_alloc->allocationType);
                     dump(ptr,freed,size);
                 }
                 // MDH@22APR2020 BUG FIX: do NOT clear the remembered allocation type unless the memory is freed!!!!
@@ -1140,7 +1195,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 #endif
             info("Variable-size allocation of type '%c'(=%i) resized from %zd to %zd!\n",allocationType,allocationType,freed,occupied);
             // newptr is allowed to be NULL if occupied equals 
-            if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)           
+            if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
 #ifndef __PRODUCTION__
                 unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false); // MDH@28APR2020
                 info("Number of dynamically allocated bytes: %zd.\n",occupied+sizeof(Malloc));
@@ -1148,6 +1203,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
                 long long allocationIndex=registerReallocation(allocationType,size,to_count,_alloc->allocationIndex);
                 if(allocationIndex>=0){ // success
                     info("New index of variable-size (re)allocation of type '%c': %lld\n",allocationIndex,allocationType);
+										((Malloc*)newptr)->allocationIndex=allocationIndex;
                     /* MDH@05JUN2020: no need for the following anymore
                     if(!_alloc){ // first time allocation (i.e. freed equals zero)
                         info("Storing allocation information...\n");

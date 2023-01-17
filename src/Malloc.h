@@ -85,6 +85,9 @@ Mallocationtype* _getAllocationTypes();
 
 bool resetAllocationManagement();
 
+size_t nulledAllocationsRemoved();
+void shrinkAllocations();
+
 long long getAllocationTypeOccupied(signed char allocationType,unsigned long long history);
 long long getAllocationTypeFreed(signed char allocationType,unsigned long long history);
 // MDH@11MAY2020: allow adding an allocation mark and dropping the oldest one
