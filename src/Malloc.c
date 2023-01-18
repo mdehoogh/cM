@@ -200,8 +200,9 @@ typedef struct{
 }Mallocationownertype;
 */
 struct{
-	uint32_t nulled,removed; // MDH@17JAN2023: keep track of the number of NULLed pointers as well as the amount removed so far (that end up at the end of l allocated pointers)
-	long long l; // the number of allocation types stored
+	size_t nulled; // MDH@17JAN2023: keep track of the number of NULLed pointers as well as the amount removed so far (that end up at the end of l allocated pointers)
+	size_t l; // the number of allocation types stored
+	size_t size; // the total number of available allocation pointers
 	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
 }allocations={0,0,0,NULL};
 
@@ -217,61 +218,61 @@ long long getNumberOfAllocationTypes(){return (_allocationTypes/* MDH@14APR2020:
 
 // MDH@21APR2020: getNewAllocationTypeIndex() changed to also check whether the provided allocationType already exists 
 static long long getNewAllocationTypeIndex(signed char allocationType,size_t size,long long count/*,bool fixedsize*/){
-    if(_allocationTypes){
-        long long newAllocationTypeIndex=getAllocationTypeIndex(allocationType);
-        if(newAllocationTypeIndex<0){ // doesn't exist yet
-            bool fixedsize=(allocationType>0);
-            info("New allocation type #%lld: '%c'(=%i) of %s size %zd!\n",numberOfAllocationTypes,allocationType,allocationType,(fixedsize?"variable":"fixed"),size);
-            Mallocationsize* _allocationTypeSizeHistogram=(fixedsize?NULL:calloc(1,sizeof(Mallocationsize)));
-            if(fixedsize||_allocationTypeSizeHistogram){
-                // how about allocating memory for the histogram beforehand?
-                void* newAllocationTypes=realloc(_allocationTypes,sizeof(Mallocationtype)*(numberOfAllocationTypes+1));
-                if(newAllocationTypes){   
-                    info("New allocation type record created.\n");
-                    newAllocationTypeIndex=numberOfAllocationTypes++; 
-                    info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
-                    // MDH@14APR2020: _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*5); // for every type we store 5 size_t values, one to keep the item count, and one to keep the size
-                    _allocationTypes=newAllocationTypes;
-                    _allocationTypes[newAllocationTypeIndex].type=allocationType;
-                    _allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size=size;
-                    // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
-                    updateAllocationTypeMarks(); // MDH@07MAY2020: to be called each time a new allocation type is added (i.e. when numberOfAllocationTypes is incremented!!!!!)
-                    /* replacing:
-                    // MDH@06MAY2020: essential to ascertain that occupied and freed are initialized to zero!!!!
-                    _allocationTypes[newAllocationTypeIndex].occupied=0;
-                    _allocationTypes[newAllocationTypeIndex].freed=0;
-                    */
-                    info("New allocation type '%c' registered!\n",allocationType);       
-                    if(!fixedsize){
-                        // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
-                        _allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=_allocationTypeSizeHistogram;
-                        // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
-                        _allocationTypes[newAllocationTypeIndex].count=-1; // MDH@04MAY2020: counting down to indicate variable-size allocations
-                        // this is a bit 'verwarrend' but count is the size of what's allocated, and it's always a single allocation (as stored in the count field)
-                        _allocationTypeSizeHistogram->class=count;
-                        _allocationTypeSizeHistogram->count=1;            
-                    }else
-                        _allocationTypes[newAllocationTypeIndex].count=count;
-                }else{
-                    if(!fixedsize)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
-                    error("Failed to register new allocation type '%c'.\n",allocationType);
-                }
-            }else
-                error("Failed to allocate memory for the histogram data of variable size type '%c'.\n",allocationType);
-            /* MDH@14APR2020:
-            // register the size and initialize the count to 0!!!
-            _allocationcounts[allocationtypeindex*5]=size; // storing the size in the second element of the pair
-            _allocationcounts[(allocationtypeindex*5)+1]=0; // number of allocations
-            _allocationcounts[(allocationtypeindex*5)+2]=0; // number of frees
-            _allocationcounts[(allocationtypeindex*5)+3]=0; // mark number of allocations
-            _allocationcounts[(allocationtypeindex*5)+4]=0; // mark number of frees
-            */
-        }
-        // if(newAllocationTypeIndex>=0)output("Final size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
-        return newAllocationTypeIndex;
-    }
-    error("No allocation types!");
-    return -1;
+	if(_allocationTypes){
+			long long newAllocationTypeIndex=getAllocationTypeIndex(allocationType);
+			if(newAllocationTypeIndex<0){ // doesn't exist yet
+					bool fixedsize=(allocationType>0);
+					info("New allocation type #%lld: '%c'(=%i) of %s size %zd!\n",numberOfAllocationTypes,allocationType,allocationType,(fixedsize?"variable":"fixed"),size);
+					Mallocationsize* _allocationTypeSizeHistogram=(fixedsize?NULL:calloc(1,sizeof(Mallocationsize)));
+					if(fixedsize||_allocationTypeSizeHistogram){
+							// how about allocating memory for the histogram beforehand?
+							void* newAllocationTypes=realloc(_allocationTypes,sizeof(Mallocationtype)*(numberOfAllocationTypes+1));
+							if(newAllocationTypes){   
+									info("New allocation type record created.\n");
+									newAllocationTypeIndex=numberOfAllocationTypes++; 
+									info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
+									// MDH@14APR2020: _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*5); // for every type we store 5 size_t values, one to keep the item count, and one to keep the size
+									_allocationTypes=newAllocationTypes;
+									_allocationTypes[newAllocationTypeIndex].type=allocationType;
+									_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size=size;
+									// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+									updateAllocationTypeMarks(); // MDH@07MAY2020: to be called each time a new allocation type is added (i.e. when numberOfAllocationTypes is incremented!!!!!)
+									/* replacing:
+									// MDH@06MAY2020: essential to ascertain that occupied and freed are initialized to zero!!!!
+									_allocationTypes[newAllocationTypeIndex].occupied=0;
+									_allocationTypes[newAllocationTypeIndex].freed=0;
+									*/
+									info("New allocation type '%c' registered!\n",allocationType);       
+									if(!fixedsize){
+											// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+											_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=_allocationTypeSizeHistogram;
+											// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+											_allocationTypes[newAllocationTypeIndex].count=-1; // MDH@04MAY2020: counting down to indicate variable-size allocations
+											// this is a bit 'verwarrend' but count is the size of what's allocated, and it's always a single allocation (as stored in the count field)
+											_allocationTypeSizeHistogram->class=count;
+											_allocationTypeSizeHistogram->count=1;            
+									}else
+											_allocationTypes[newAllocationTypeIndex].count=count;
+							}else{
+									if(!fixedsize)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
+									error("Failed to register new allocation type '%c'.\n",allocationType);
+							}
+					}else
+							error("Failed to allocate memory for the histogram data of variable size type '%c'.\n",allocationType);
+					/* MDH@14APR2020:
+					// register the size and initialize the count to 0!!!
+					_allocationcounts[allocationtypeindex*5]=size; // storing the size in the second element of the pair
+					_allocationcounts[(allocationtypeindex*5)+1]=0; // number of allocations
+					_allocationcounts[(allocationtypeindex*5)+2]=0; // number of frees
+					_allocationcounts[(allocationtypeindex*5)+3]=0; // mark number of allocations
+					_allocationcounts[(allocationtypeindex*5)+4]=0; // mark number of frees
+					*/
+			}
+			// if(newAllocationTypeIndex>=0)output("Final size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+			return newAllocationTypeIndex;
+	}
+	error("No allocation types!");
+	return -1;
 }
 
 // MDH@09APR2020: distinguish between adding an allocation (local) and adding an allocationtype (global)
@@ -279,120 +280,121 @@ static long long getNewAllocationTypeIndex(signed char allocationType,size_t siz
 // MDH@14JAN2023: there's NO need to actually store owner twice since we want to be able to check for memory leaks
 //                which require keeping all pointers
 long long addAllocation(Mallocationtypeowner allocationowner/*,signed char type,Mallocationowner owner*/){
-    // I suppose that the allocation might fail but we do NOT want to loose allocations._chars over it
-    // MDH@14APR2020: there's room for improvement here
-		assert(allocationowner!=NULL);
-    // if(count<=0)return -2; // invalid input
-    if(!allocations._owners)return -1; // no allocation characters
-    info("Remembering an allocation of type '%c'.\n"/*,count*/,allocationowner->allocationType);
-    // MDH@21APR2020: consuming count is easier I suppose
-    // removing: long long newl=allocations.l+count;
-    // while(--count>=0){ // replacing: newl>allocations.l
-        if(!(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
-            info("Expanding allocations.\n");
-            Malloc** newAllocationOwners=realloc(allocations._owners,(allocations.l+16)*sizeof(Malloc*));
-            if(!newAllocationOwners){error("Allocation could not be remembered.\n");return 0;} // realloc failure
-            allocations._owners=newAllocationOwners;
-        }
-        // MDH@14JAN2023 now passed in: Mallocationownertype allocationowner={owner,type};
-        allocations._owners[allocations.l]=allocationowner;
-        info("Allocation of type '%c' (=%i) owned by %s:%u(%s%u%s%s) remembered at position %llu.\n"
-						,allocationowner->allocationType,allocationowner->allocationType
-            ,MODULE_NAMES[allocationowner->owner.module]
-						,allocationowner->owner.id
-						,GLOBAL_FLAG_TEXTS[allocationowner->owner.global]
-						,allocationowner->owner.level,DISOWNED_FLAG_TEXTS[allocationowner->owner.disowned]
-						,FREED_FLAG_TEXTS[allocationowner->owner.freed]
-            ,allocations.l);
-    // }
-    return allocations.l++; // returning the position where the allocation is stored, and incrementing the length of the allocations unless we replace allocations.l by allocations.lastIndex
+	// I suppose that the allocation might fail but we do NOT want to loose allocations._chars over it
+	// MDH@14APR2020: there's room for improvement here
+	assert(allocationowner!=NULL);
+	// if(count<=0)return -2; // invalid input
+	if(!allocations._owners)return -1; // no allocation characters
+	info("Remembering an allocation of type '%c'.\n"/*,count*/,allocationowner->allocationType);
+	// MDH@21APR2020: consuming count is easier I suppose
+	// removing: long long newl=allocations.l+count;
+	// while(--count>=0){ // replacing: newl>allocations.l
+	if(allocations.l==allocations.size){ // MDH@18JAN2023 replacing: !(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
+			info("Expanding allocations.\n");
+			Malloc** newAllocationOwners=realloc(allocations._owners,(allocations.l+16)*sizeof(Malloc*));
+			if(!newAllocationOwners){error("Allocation could not be remembered.\n");return 0;} // realloc failure
+			allocations._owners=newAllocationOwners;
+			allocations.size=allocations.l+16;
+	}
+	// MDH@14JAN2023 now passed in: Mallocationownertype allocationowner={owner,type};
+	allocations._owners[allocations.l]=allocationowner;
+	info("Allocation of type '%c' (=%i) owned by %s:%u(%s%u%s%s) remembered at position %llu.\n"
+			,allocationowner->allocationType,allocationowner->allocationType
+			,MODULE_NAMES[allocationowner->owner.module]
+			,allocationowner->owner.id
+			,GLOBAL_FLAG_TEXTS[allocationowner->owner.global]
+			,allocationowner->owner.level,DISOWNED_FLAG_TEXTS[allocationowner->owner.disowned]
+			,FREED_FLAG_TEXTS[allocationowner->owner.freed]
+			,allocations.l);
+	// }
+	return allocations.l++; // returning the position where the allocation is stored, and incrementing the length of the allocations unless we replace allocations.l by allocations.lastIndex
 }
 
 static void incrementAllocationTypeOccupied(long long allocationTypeIndex,unsigned long long increment){
-    if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
-    if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
-    if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
-    unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
-    // output("Allocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationMarks[allocationTypeMarkIndex].occupied);
-    _allocationMarks[allocationTypeMarkIndex].occupied+=increment;
-    // output(" to %llu.\n",_allocationMarks[allocationTypeMarkIndex].occupied);
-    // replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+	if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
+	if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
+	if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
+	unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
+	// output("Allocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationMarks[allocationTypeMarkIndex].occupied);
+	_allocationMarks[allocationTypeMarkIndex].occupied+=increment;
+	// output(" to %llu.\n",_allocationMarks[allocationTypeMarkIndex].occupied);
+	// replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
 }
 static void incrementAllocationTypeFreed(long long allocationTypeIndex,unsigned long long increment){
-    if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
-    if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
-    if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
-    unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
-    // output("Deallocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationMarks[allocationTypeMarkIndex].freed);
-    _allocationMarks[allocationTypeMarkIndex].freed+=increment;
-    // output(" to %llu.\n",_allocationMarks[allocationTypeMarkIndex].freed);
-    // MDH@14MAY2020: if occupied is below freed something terribly wrong
-    if(_allocationMarks[allocationTypeMarkIndex].occupied<_allocationMarks[allocationTypeMarkIndex].freed)
-        bug("More memory freed than allocated for allocation type '%c'.",_allocationTypes[allocationTypeIndex].type);
-    // replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+	if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
+	if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
+	if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
+	unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
+	// output("Deallocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationMarks[allocationTypeMarkIndex].freed);
+	_allocationMarks[allocationTypeMarkIndex].freed+=increment;
+	// output(" to %llu.\n",_allocationMarks[allocationTypeMarkIndex].freed);
+	// MDH@14MAY2020: if occupied is below freed something terribly wrong
+	if(_allocationMarks[allocationTypeMarkIndex].occupied<_allocationMarks[allocationTypeMarkIndex].freed)
+			bug("More memory freed than allocated for allocation type '%c'.",_allocationTypes[allocationTypeIndex].type);
+	// replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
 }
 // MDH@14APR2020: addAllocationType renamed to registerAllocation
 // MDH@03MAY2020: it's preferable to distinguish between a fixed-size allocation (always new), and a variable-size
 //                (re)allocation possibly new (allocationIndex<0)
 static long long registerReallocation(signed char type/*,Mallocationowner owner*/,size_t size,long long count,long long allocationIndex){
-    if(type!=0&&size>0&&count>0){
-        // MDH@05JUN2020 if this is a true reallocation (as we assume it is, no need to use getNewAllocationTypeIndex,
-        long long allocationTypeIndex=getAllocationTypeIndex(type); // replacing: getNewAllocationTypeIndex(type,size,count/*,false*/);
-        if(allocationTypeIndex>=0){ // yes, we should already have at least one allocation type
-            // output("Current size of allocation type #%lld ('%c'): %zd.\n",allocationTypeIndex,_allocationTypes[allocationTypeIndex].type,_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
-            // MDH@26MAY2020 should NOT happen : if(allocationIndex<0)allocationIndex=addAllocation(type,owner); // if new, register the allocation
-            if(allocationIndex>=0){
-                //t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
-                // store in histogram
-                Mallocationsize* histogram=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes;
-                if(!histogram)_allocationTypes[allocationTypeIndex].count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
-                if(_allocationTypes[allocationTypeIndex].count>0)
-                    bug("Invalid histogram category count of type %c (%d): %lld.",type,type,_allocationTypes[allocationTypeIndex].count);
-                long long numberOfHistogramCategories=llabs(_allocationTypes[allocationTypeIndex].count); // MDH@03JUN2020: TODO why won't - work????
-                long long category=numberOfHistogramCategories; // MDH@04MAY2020: negate because we're counting backwards for variable-size allocations now
-                while(--category>=0&&histogram[category].class!=count)
-                ;
-                if(category<0){ // does not yet exist
-                    info("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",numberOfHistogramCategories+1,count,size,type);
-                    if(histogram)
-                        histogram=realloc(histogram,sizeof(Mallocationsize)*(numberOfHistogramCategories+1));
-                    else
-                        histogram=malloc(sizeof(Mallocationsize));
-                    if(!histogram)return -1;
-                    if(histogram){
-                        _allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
-                        category=numberOfHistogramCategories; // MDH@04MAY2020: the negative value of the count represents the number of histogram categories
-                        _allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
-                        histogram[category].count=0; // will be incremented below!!!!
-                        histogram[category].class=count;
-                        info("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",-_allocationTypes[allocationTypeIndex].count,count,type);
-                    }else
-                        allocationIndex=-1;
-                }
-                if(category<0){
-                    allocationIndex=-1;
-                    error("Failed to count %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
-                }else{
-                    histogram[category].count++;
-                    // MDH@04MAY2020: register the additional bytes (where class represents the number of units of what was reallocated and size the unit size)
-                    // output("Size of allocation type #%lld ('%c'): %zd.\n",allocationTypeIndex,_allocationTypes[allocationTypeIndex].type,_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
-                    unsigned long long increment=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; //histogram[category].class;
-                    // output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
-                    increment*=histogram[category].class;
-                    // output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
-                    incrementAllocationTypeOccupied(allocationTypeIndex,increment);
-                    // output("Occupied of allocation type #%lld ('%c'): %llu (incremented by %llu * %llu).\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,histogram[category],_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
-                }
-            }else{
-                error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
-                allocationIndex=-1;
-            }
-        }else{
-            error("Failed to register allocation of type '%c' and size %zd (error code: %lld).\n",type,size,allocationTypeIndex);
-            allocationIndex=-1;
-        }
-    }
-    return allocationIndex;
+if(type!=0&&size>0&&count>0){
+	// MDH@05JUN2020 if this is a true reallocation (as we assume it is, no need to use getNewAllocationTypeIndex,
+	long long allocationTypeIndex=getAllocationTypeIndex(type); // replacing: getNewAllocationTypeIndex(type,size,count/*,false*/);
+	if(allocationTypeIndex>=0){ // yes, we should already have at least one allocation type
+		// output("Current size of allocation type #%lld ('%c'): %zd.\n",allocationTypeIndex,_allocationTypes[allocationTypeIndex].type,_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
+		// MDH@26MAY2020 should NOT happen : if(allocationIndex<0)allocationIndex=addAllocation(type,owner); // if new, register the allocation
+		if(allocationIndex>=0){
+				//t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
+				// store in histogram
+				Mallocationsize* histogram=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes;
+				if(!histogram)_allocationTypes[allocationTypeIndex].count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
+				if(_allocationTypes[allocationTypeIndex].count>0)
+						bug("Invalid histogram category count of type %c (%d): %lld.",type,type,_allocationTypes[allocationTypeIndex].count);
+				long long numberOfHistogramCategories=llabs(_allocationTypes[allocationTypeIndex].count); // MDH@03JUN2020: TODO why won't - work????
+				long long category=numberOfHistogramCategories; // MDH@04MAY2020: negate because we're counting backwards for variable-size allocations now
+				while(--category>=0&&histogram[category].class!=count)
+				;
+				if(category<0){ // does not yet exist
+						info("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",numberOfHistogramCategories+1,count,size,type);
+						if(histogram)
+								histogram=realloc(histogram,sizeof(Mallocationsize)*(numberOfHistogramCategories+1));
+						else
+								histogram=malloc(sizeof(Mallocationsize));
+						if(!histogram)return -1;
+						if(histogram){
+								_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
+								category=numberOfHistogramCategories; // MDH@04MAY2020: the negative value of the count represents the number of histogram categories
+								_allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
+								histogram[category].count=0; // will be incremented below!!!!
+								histogram[category].class=count;
+								info("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",-_allocationTypes[allocationTypeIndex].count,count,type);
+						}else
+								allocationIndex=-1;
+				}
+				if(category>=0){
+					histogram[category].count++;
+					// MDH@04MAY2020: register the additional bytes (where class represents the number of units of what was reallocated and size the unit size)
+					// output("Size of allocation type #%lld ('%c'): %zd.\n",allocationTypeIndex,_allocationTypes[allocationTypeIndex].type,_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
+					unsigned long long increment=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; //histogram[category].class;
+					// output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
+					increment*=histogram[category].class;
+					// output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
+					incrementAllocationTypeOccupied(allocationTypeIndex,increment);
+					// output("Occupied of allocation type #%lld ('%c'): %llu (incremented by %llu * %llu).\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,histogram[category],_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+				}else{
+					allocationIndex=-1;
+					error("Failed to count %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
+				}
+			}else{
+				error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
+				allocationIndex=-1;
+			}
+		}else{
+				error("Failed to register allocation of type '%c' and size %zd (error code: %lld).\n",type,size,allocationTypeIndex);
+				allocationIndex=-1;
+		}
+	}
+	return allocationIndex;
 }
 // MDH@03MAY2020: now a fixed-size (always new) allocation 
 // MDH@26MAY2020: now also accepts variable-size allocations (when type is negative), wait a minute I think registerAllocation is still to be called for fixed size allocations (with type>0), and registerReallocation() for variable-sized (re)allocations
@@ -524,37 +526,50 @@ long long* _getAllocationCounts(){
 size_t nulledAllocationsRemoved(){
 	size_t removed=0;
 	if(allocations.nulled){ // there are nulled allocation pointers
+		printf("Removing %zu nulled allocation pointers out of %zu allocations.\n",allocations.nulled,allocations.l);
 		// we need to keep track of the first and last position of a block of non null allocation pointers
 		// ok in the order of appeance
-		int32_t firstNonNullIndex,nextNullIndex; // the index of the last null pointer
-		int32_t	firstNullIndex=-1; // the index of the first null pointer
+		long firstNonNullIndex,nextNullIndex; // the index of the last null pointer
+		long firstNullIndex=-1; // the index of the first null pointer
 		Mallocationtypeowner* owners=allocations._owners;
 		// when starting can't say whether we start with null pointers or non-null pointers
 		// we should skip all non null pointers at the start to ascertain firstNullIndex is truely on the first nulled pointer
 		while(++firstNullIndex<allocations.l&&owners[firstNullIndex]!=NULL);
+		size_t blocksMoved=0;
 		while(firstNullIndex<allocations.l){ // there could still be non null pointers to move
+			printf("\tDetecting block #%zu of allocations to move.\n",++blocksMoved);
+			printf("\t\tFirst null allocation index: %ld.\n",firstNullIndex);
 			// find the first non null index starting from the first position behind the nextNullIndex
 			firstNonNullIndex=firstNullIndex;
 			while(++firstNonNullIndex<allocations.l&&owners[firstNonNullIndex]==NULL);
 			if(firstNonNullIndex>=allocations.l)break; // only NULL pointers found
+			////////printf("\t\tFirst non null allocation index: %ld.\n",firstNonNullIndex);
 			// ASSERT at least one non null pointer encountered
 			// we can now start moving immediately one by one
+			removed=(firstNonNullIndex-firstNullIndex); // update removed to match the distance we're moving the non null block
+			printf("\t\tMoving non-null allocations starting at #%zu by %zu positions.\n",firstNonNullIndex,removed);
 			do{
+				printf("\t\t\tMoving allocation #%ld to #%ld.\n",firstNonNullIndex,firstNullIndex);
 				owners[firstNullIndex]=owners[firstNonNullIndex];
 				owners[firstNonNullIndex]=NULL; // could be overwritten though at some point though (or not), but if we do not change allocations.l we have to prevent getting duplicate pointers!!!!!
-				removed++;
-				owners[firstNonNullIndex]->allocationIndex=firstNullIndex; // update the allocation index to match the new location index
+				owners[firstNullIndex]->allocationIndex=firstNullIndex; // update the allocation index to match the new location index
 				firstNullIndex++;
 			}while(++firstNonNullIndex<allocations.l&&owners[firstNonNullIndex]!=NULL);
+			/* MDH@18JAN2023: since firstNullIndex points to the first not-written position this is where we should put the next non null!!!!
 			// ASSERT firstNonNullIndex has hit the first null pointer after the block of non null pointers we just moved!!!!
-			firstNullIndex=firstNonNullIndex;
+			firstNullIndex=firstNonNullIndex-removed; // since we've moved removed items in total, firstNullIndex is the first position behind the current first null position!!
+			printf("\tFirst new null index: %d.\n",firstNullIndex);
+			*/
 		}
 		if(removed){
+			//printf("\tNumber of removed nulled pointers: %d.\n",removed);
 			// the number of removed null pointers needs to be subtracted from allocations.l
 			allocations.nulled-=removed;
 			// NOTE we're not changing l as it is associated with the number of allocated pointers in total
-			allocations.removed+=removed;
+			allocations.l-=removed;
 			// we might realloc allocation._owners if we removed sufficient nulled pointers?????
+			printf("Number of allocations left after removing %zu nulled allocations: %zu.\n",allocations.nulled,allocations.l);
+			///////printf("Out of %zu allocations left to be nulled: %zu.\n",allocations.l,allocations.nulled);
 		}
 	}
 	return removed;
@@ -1149,88 +1164,92 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 //                and also for freeing (i.e. when occupied equals zero)
 // MDH@26MAY2020: rewrite assuming from_count and to_count are positive
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char allocationType/*,Mallocationowner owner*/){
-    // info("Size of Malloc: %zd, size of long long: %zd.\n",sizeof(Malloc),sizeof(long long));
-    void* newptr=ptr;
-
-    if(from_count>0&&to_count>0){ // not a (new) (de-)allocation
-
-        if(from_count!=to_count){ // a change in the number of allocation elements
-        
-            newptr=((char*)newptr)-sizeof(Malloc);
-            
-            size_t freed=size*from_count,occupied=size*to_count;
-
-            Malloc* _alloc=(Malloc*)newptr; // pointer to Malloc allocation registration appendix
-            long long allocationIndex=-1;
+	// info("Size of Malloc: %zd, size of long long: %zd.\n",sizeof(Malloc),sizeof(long long));
+	void* newptr=ptr;
+	// MDH@18JAN2023: adding size_t>0 as it should never be zero!!
+	if(ptr!=NULL&&from_count>0&&to_count>0&&size>0){ // not a (new) (de-)allocation
+		if(from_count!=to_count){ // a change in the number of allocation elements
+			// MDH@18JAN2023 FIX: do NOT assign to newptr here, otherwise it might return the wrong pointer if something goes wrong!
+			/// newptr=((char*)newptr)-sizeof(Malloc);
+			size_t freed=size*from_count,occupied=size*to_count;
+			Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@18JAN2023replacing: (Malloc*)allocptr; // pointer to Malloc allocation registration appendix
+			long long allocationIndex=-1;
 #ifndef __PRODUCTION__
-            // MDH@05JUN2020 realloc takes care of this: Malloc newAllocation=*_alloc; // MDH@05JUN2020: copy the entire record over
-            // we need to get the allocation type and index out BEFORE memory is reallocated!!!!!
-            if(_alloc->allocationType!=allocationType){
-                bug("The allocation type '%c'(=%i) stored with the data at byte %zd does not match the provided allocation type '%c'.\n",_alloc->allocationType,_alloc->allocationType,freed,allocationType);
-                // let's dump the current contents as text?
-                dump(ptr,freed,size);
-            }
-            // MDH@20APR2020 ASSERT: freed>0 as freed!=occupied
-            allocationIndex=_alloc->allocationIndex;
-            if(allocationIndex>=0&&allocationIndex<allocations.l){
-                if(allocations._owners[allocationIndex]->allocationType!=_alloc->allocationType){
-                    bug("Type '%c' (%d) of remembered allocation #%llu does not match the provided allocation type '%c' (%d)."
-												,allocations._owners[allocationIndex]->allocationType,allocations._owners[allocationIndex]->allocationType,allocationIndex,_alloc->allocationType,_alloc->allocationType);
-                    dump(ptr,freed,size);
-                }
-                // MDH@22APR2020 BUG FIX: do NOT clear the remembered allocation type unless the memory is freed!!!!
-                if(occupied==0) // MDH@22APR2020 ADDITION
-                    allocations._owners[allocationIndex]->allocationType=' ';
-            }else{
-                bug("Allocation index %lld stored with the data at position %llu (resized to %llu) of size %zd is out of range [0,%llu)!",allocationIndex,freed,occupied,size,allocations.l);
-                dump(ptr,freed,size);
-            }
-#endif
-        // MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
-        // MDH@05JUN2020 NOTE: realloc will also copy the allocation record (_alloc) over, which means that we do not need to do it ourselves anymore
-#ifndef __PRODUCTION__
-            newptr=realloc(newptr,occupied+sizeof(Malloc));
+			// MDH@05JUN2020 realloc takes care of this: Malloc newAllocation=*_alloc; // MDH@05JUN2020: copy the entire record over
+			// we need to get the allocation type and index out BEFORE memory is reallocated!!!!!
+			// MDH@18JAN2023: ignoring allocationType when it is 0
+			if(allocationType&&_alloc->allocationType!=allocationType){
+					bug("The allocation type '%c'(=%i) stored with the data at byte %zd does not match the provided allocation type '%c'.\n",_alloc->allocationType,_alloc->allocationType,freed,allocationType);
+					// let's dump the current contents as text?
+					dump(ptr,freed,size);
+			}
+			// MDH@20APR2020 ASSERT: freed>0 as freed!=occupied
+			allocationIndex=_alloc->allocationIndex;
+			if(allocationIndex>=0&&allocationIndex<allocations.l){
+				if(allocations._owners[allocationIndex]!=_alloc){
+					bug("Registered allocation pointer '%p' does not match the reallocated pointer '%p'!",allocations._owners[allocationIndex],ptr);
+					dump(ptr,freed,size);
+				} //else
+				if(allocations._owners[allocationIndex]->allocationType!=_alloc->allocationType){
+					bug("Type '%c' (%d) of remembered allocation #%llu does not match the provided allocation type '%c' (%d)."
+							,allocations._owners[allocationIndex]->allocationType,allocations._owners[allocationIndex]->allocationType,allocationIndex,_alloc->allocationType,_alloc->allocationType);
+					dump(ptr,freed,size);
+				}
+				/* MDH@18JAN2023: with size_t>0 will never happen
+				// MDH@22APR2020 BUG FIX: do NOT clear the remembered allocation type unless the memory is freed!!!!
+				if(occupied==0) // MDH@22APR2020 ADDITION
+					allocations._owners[allocationIndex]->allocationType=' ';
+				*/
+			}else{
+				bug("Allocation index %lld stored with the data at position %llu (resized to %llu) of size %zd is out of range [0,%llu)!",allocationIndex,freed,occupied,size,allocations.l);
+				dump(ptr,freed,size);
+			}
+			// MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
+			// MDH@05JUN2020 NOTE: realloc will also copy the allocation record (_alloc) over, which means that we do not need to do it ourselves anymore
+			newptr=realloc(_alloc,occupied+sizeof(Malloc));
+			info("Number of dynamically reallocated bytes: %zd.\n",occupied+sizeof(Malloc));
+			info("Variable-size allocation of type '%c'(=%i) resized from %zd to %zd!\n",allocationType,allocationType,freed,occupied);
+			// newptr is allowed to be NULL if occupied equals 
+			if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
+				// MDH@18JAN2023: we have to rethink the following: registerReallocation() isn't crucial to the operation so if it fails we can still continue
+				//                it's essential to replace the registered allocation pointer (which should equal ptr with newptr)
+				allocations._owners[allocationIndex]=newptr;
+				// safer to do the following immediately
+				newptr=((char*)newptr)+sizeof(Malloc);
+				unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false);
+				// MDH@03MAY2020: we ALWAYS need to register the allocation
+				long long allocationIndex=registerReallocation(allocationType,size,to_count,_alloc->allocationIndex);
+				if(allocationIndex>=0){ // success
+					info("New index of variable-size (re)allocation of type '%c': %lld\n",allocationIndex,allocationType);
+					// MDH@18JAN2023 FIX: we should NOT do the following since the allocation index won't change (only the pointer it's keeping)
+					///////// removed: ((Malloc*)newptr)->allocationIndex=allocationIndex;
+					/* MDH@05JUN2020: no need for the following anymore
+					if(!_alloc){ // first time allocation (i.e. freed equals zero)
+							info("Storing allocation information...\n");
+							_alloc=(Malloc*)(((char*)newptr)+occupied); // MDH@21APR2020 BUG FIX: it said ptr instead of newptr here before which obviously was terribly wrong as ptr would be NULL on the first allocation
+							// MDH@21APR2020 OK, mapping ptr to char* as we do seems to work: info("Number of bytes between start of dynamic data and allocation information: %zd.\n",(char*)_alloc-(char*)ptr);
+							_alloc->allocationType=allocationType;
+							_alloc->allocationIndex=allocationIndex;
+							info("New allocation information stored...\n");
+					}else{ // not a first time allocation, so we can simply copy the allocation over
+							Malloc* _newalloc=(Malloc*)newptr;
+							_newalloc->allocationType=newAllocation.allocationType;
+							_newalloc->allocationIndex=newAllocation.allocationIndex;
+							// replacing: memcpy(_newalloc,_alloc,sizeof(Malloc)); // replacing:  *((Malloc*)(((char*)newptr)+occupied))=*_alloc; // copying the allocation structure over // OOPS ptr replaced by newptr (what it should be I guess)
+							info("Allocation information bytes copied...\n");
+							// printf("New allocation type %c (%c) - allocation index %llu (%llu).\n",_newalloc->allocationType,_alloc->allocationType,_newalloc->allocationIndex,_alloc->allocationIndex);
+					}
+					*/
+				}else
+					bug("Failed to register the (re)allocation of a variable-size allocation of type '%c' (=%i) from %lld to %lld.\n",allocationType,allocationType,freed,occupied);
 #else
-            newptr=realloc(newptr,occupied); // we have to reallocate nitems each of the given size
+				newptr=realloc(newptr,occupied); // we have to reallocate nitems each of the given size
 #endif
-            info("Variable-size allocation of type '%c'(=%i) resized from %zd to %zd!\n",allocationType,allocationType,freed,occupied);
-            // newptr is allowed to be NULL if occupied equals 
-            if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
-#ifndef __PRODUCTION__
-                unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false); // MDH@28APR2020
-                info("Number of dynamically allocated bytes: %zd.\n",occupied+sizeof(Malloc));
-                // MDH@03MAY2020: we ALWAYS need to register the allocation
-                long long allocationIndex=registerReallocation(allocationType,size,to_count,_alloc->allocationIndex);
-                if(allocationIndex>=0){ // success
-                    info("New index of variable-size (re)allocation of type '%c': %lld\n",allocationIndex,allocationType);
-										((Malloc*)newptr)->allocationIndex=allocationIndex;
-                    /* MDH@05JUN2020: no need for the following anymore
-                    if(!_alloc){ // first time allocation (i.e. freed equals zero)
-                        info("Storing allocation information...\n");
-                        _alloc=(Malloc*)(((char*)newptr)+occupied); // MDH@21APR2020 BUG FIX: it said ptr instead of newptr here before which obviously was terribly wrong as ptr would be NULL on the first allocation
-                        // MDH@21APR2020 OK, mapping ptr to char* as we do seems to work: info("Number of bytes between start of dynamic data and allocation information: %zd.\n",(char*)_alloc-(char*)ptr);
-                        _alloc->allocationType=allocationType;
-                        _alloc->allocationIndex=allocationIndex;
-                        info("New allocation information stored...\n");
-                    }else{ // not a first time allocation, so we can simply copy the allocation over
-                        Malloc* _newalloc=(Malloc*)newptr;
-                        _newalloc->allocationType=newAllocation.allocationType;
-                        _newalloc->allocationIndex=newAllocation.allocationIndex;
-                        // replacing: memcpy(_newalloc,_alloc,sizeof(Malloc)); // replacing:  *((Malloc*)(((char*)newptr)+occupied))=*_alloc; // copying the allocation structure over // OOPS ptr replaced by newptr (what it should be I guess)
-                        info("Allocation information bytes copied...\n");
-                        // printf("New allocation type %c (%c) - allocation index %llu (%llu).\n",_newalloc->allocationType,_alloc->allocationType,_newalloc->allocationIndex,_alloc->allocationIndex);
-                    }
-                    */
-                }else
-                    bug("Failed to register the (re)allocation of a variable-size allocation of type '%c' (=%i) from %lld to %lld.\n",allocationType,allocationType,freed,occupied);
-#endif
-                //                well, it might be a replacement
-                newptr=((char*)newptr)+sizeof(Malloc);
-            }
-        }
-    }else
-        bug("%s.","Number of bytes to reallocate non-positive");
-    return newptr;
+			}
+		}
+	}else
+		bug("%s.","Number of bytes to reallocate non-positive");
+	return newptr;
 }
 
 /* replacing the original Mrealloc

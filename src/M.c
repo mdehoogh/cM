@@ -5361,16 +5361,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 					// garbage collection: remove any values not used anymore...
 					// if(amVerboseDebugging())
-					if(amVerboseDebugging())
+					//if(amVerbose())
 						outputInfo("Removing unreferenced values.");
 					size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
-					if(amVerboseDebugging())
-						{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
+					//if(amVerbose())
+						{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
 
 					// MDH@17JAN2023
 					size_t removedNulledAllocations=nulledAllocationsRemoved();
 					//if(amVerbose())
-						output("Number of removed null allocations: %lld.",removedNulledAllocations);
+						output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
