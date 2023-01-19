@@ -1892,9 +1892,9 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 			if(commandToken->type==TT_COMMENT)break;
 			// TODO there must be a better way to do the coloring!!!
 			if(color){
-				string_append(_commandText,ES"38;5;");output("Command text: '%s'.\n",string(_commandText));
-				string_append(_commandText,getTokenColor(commandToken->type));output("Command text: '%s'.\n",string(_commandText));
-				string_append_char(_commandText,'m');output("Command text: '%s'.\n",string(_commandText));
+				string_append(_commandText,ES"38;5;");/////output("Command text: '%s'.\n",string(_commandText));
+				string_append(_commandText,getTokenColor(commandToken->type));//////output("Command text: '%s'.\n",string(_commandText));
+				string_append_char(_commandText,'m');/////output("Command text: '%s'.\n",string(_commandText));
 			} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
 			// MDH@31OCT2019: for now decided NOT to show the whitespace inside the tokens (by replacing the first whitespace character with the end-of-string marker)
 			char firstWhitespaceTokenCharacter=(isTokenFinished(commandToken)?string_replacedchar(commandToken->text,'\0',getTokenSignificantCharacterCount(commandToken)):'\0');
@@ -1903,14 +1903,14 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 			// MDH@03MAY2019: place an asterisk in front of the type to indicate that expr is NOT null!!
 			if(amAssisting()){
 				if(color){
-					string_append(_commandText,ES"38;5;");output("Command text: '%s'.\n",string(_commandText));
-					string_append(_commandText,getInfoColor());output("Command text: '%s'.\n",string(_commandText));
-					string_append_char(_commandText,'m');output("Command text: '%s'.\n",string(_commandText));
+					string_append(_commandText,ES"38;5;");/////output("Command text: '%s'.\n",string(_commandText));
+					string_append(_commandText,getInfoColor());/////output("Command text: '%s'.\n",string(_commandText));
+					string_append_char(_commandText,'m');/////output("Command text: '%s'.\n",string(_commandText));
 					}
 				string_append_char(_commandText,'(');
-				if(commandToken->expr){string_append_char(_commandText,'*');output("Command text: '%s'.\n",string(_commandText));}
-				string_append(_commandText,TOKENTYPE_STRING[commandToken->type]);output("Command text: '%s'.\n",string(_commandText));
-				string_append(_commandText,") ");output("Command text: '%s'.\n",string(_commandText));
+				if(commandToken->expr)string_append_char(_commandText,'*');/////output("Command text: '%s'.\n",string(_commandText));}
+				string_append(_commandText,TOKENTYPE_STRING[commandToken->type]);/////output("Command text: '%s'.\n",string(_commandText));
+				string_append(_commandText,") ");/////output("Command text: '%s'.\n",string(_commandText));
 			}
 			commandToken=commandToken->next;
 		}
@@ -2227,9 +2227,9 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
-	output("Requesting the command text!\n");
+	///////////output("Requesting the command text!\n");
 	Mstring* _commandText=owned_string(_getCommandText(true),owner); // MDH@13MAR2020 TODO determine later???????
-	output("Command text '%s'.\n",string(_commandText));
+	//////////output("Command text '%s'.\n",string(_commandText));
 	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
 	clock_t before_evaluating=clock();
 	
@@ -5365,10 +5365,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						outputInfo("Removing unreferenced values.");
 					size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
 					//if(amVerbose())
-						{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
+					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
 
 					// MDH@17JAN2023
-					size_t removedNulledAllocations=nulledAllocationsRemoved();
+					size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose());
 					//if(amVerbose())
 						output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
 
