@@ -24,7 +24,7 @@ static struct termios orig_termios;
 static int16_t rawmode=-1;
 
 void disableRawmode(){
-    if(rawmode<0)return;
+	if(rawmode<0)return;
 	outputLine("Disabling character input mode.");
 	rawmode=-1;
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
@@ -36,7 +36,7 @@ Mstring* _getTimestamp(char const * const format){Mallocationowner owner=getOwne
 	if(_timestamp){
 		Mstring* p=string_setlength(_timestamp,50/*,owner*/);
 		if(p){
-	    	time_t now=time(NULL);
+			time_t now=time(NULL);
 			struct tm * nowlocal=localtime(&now);
 			p=string_setlength(p,strftime(p->_chars->chars,50,(format?format:"%Y-%m-%d %H:%M:%S"),nowlocal)/*,owner*/);
 		}
@@ -93,7 +93,7 @@ bool inputCharRead(char* _c){
 	return(read(STDIN_FILENO,_c,1)==1);
 }
 // MDH@12JUL2020: even if updateFunction is NULL we switch to using a 1/10s timeout, only when updateFunction is not NULL do we execute the update function!!!!
-//                this is so that we can use NULL to read characters received as part of an escape sequence!!
+//				this is so that we can use NULL to read characters received as part of an escape sequence!!
 bool inputCharReadNonBlocking(char* _c,UpdateFunction updateFunction){
 	// if(!updateFunction)return inputCharRead(_c);
 	enableRawmode(1);
@@ -115,9 +115,9 @@ bool inputCharReadNonBlocking(char* _c,UpdateFunction updateFunction){
 /*
 int getch(){
 	// ASSERT assume in one-character-at-a-time-mode!!!
-    int r;unsigned char c;
-    if ((r=read(STDIN_FILENO,&c,sizeof(c)))>0)return r; // MDH@11NOV2019: changed <0 into >0 which makes more sense considering how inputCharRead() is implemented!!!
-    return c;
+	int r;unsigned char c;
+	if ((r=read(STDIN_FILENO,&c,sizeof(c)))>0)return r; // MDH@11NOV2019: changed <0 into >0 which makes more sense considering how inputCharRead() is implemented!!!
+	return c;
 }
 */
 //////char getInputChar(){return inputChar;}
@@ -194,7 +194,7 @@ bool windowSizeDetermined() {
 	struct winsize ws;
 	if(ioctl(STDOUT_FILENO,TIOCGWINSZ,&ws)==-1||ws.ws_col==0)return false;
 	windowCols=ws.ws_col;
-    windowRows=ws.ws_row;
+	windowRows=ws.ws_row;
 	return true;
 }
 int getNumberOfWindowTextLines(){return windowRows;}
@@ -207,42 +207,42 @@ bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix){
   if(_timestampedOutputFilename&&string_prepend(_timestampedOutputFilename,outputfilenamePrefix))outputFilenamePrefixLength=strlen(outputfilenamePrefix);
 	if(_timestampedOutputFilename&&string_append(_timestampedOutputFilename,outputfilenameSuffix))outputFilenameSuffixLength=strlen(outputfilenameSuffix);
 	initDisplay();
-    // interfaces with initDisplay() TODO perhaps initialize settings here for a common interactive session???
+	// interfaces with initDisplay() TODO perhaps initialize settings here for a common interactive session???
 	return windowSizeDetermined();
 }
 
 // MDH@17OCT2019: instead of setting the back color we can return the text to be used in out to set the back color
 // set the backcolor
 Mvalue* Mbc(Mvalue* _value){
-    long long ll=(_value?getValueInteger(_value):-1); // all negative colors default to the back color
-    if(ll==M_LL_INVALID)return NULL;
-    char s[16];if(ll>=0)sprintf(s,"'\\033[48;5;%lldm",ll%256);else sprintf(s,"'\\033[48;5;%sm",getBackgroundColor());
-    ////////////output("ANSI background color code: '%s'.\n",s);
+	long long ll=(_value?getValueInteger(_value):-1); // all negative colors default to the back color
+	if(ll==M_LL_INVALID)return NULL;
+	char s[16];if(ll>=0)sprintf(s,"'\\033[48;5;%lldm",ll%256);else sprintf(s,"'\\033[48;5;%sm",getBackgroundColor());
+	////////////output("ANSI background color code: '%s'.\n",s);
 	char* _s=strdup(s);if(!_s)return NULL;
 	Mvalue* _textValue=_getTextValue(_s);free(_s);
 	return _textValue;
-    /* replacing:
-    Mstring* _valueText=_getValueText(_value,true);
-    size_t result=string_length(_valueText);
-    if(result>0)setBackColor(string(_valueText));
-    free_string(_valueText);
-    return _getIntegerValue(result);
-    */
+	/* replacing:
+	Mstring* _valueText=_getValueText(_value,true);
+	size_t result=string_length(_valueText);
+	if(result>0)setBackColor(string(_valueText));
+	free_string(_valueText);
+	return _getIntegerValue(result);
+	*/
 }
  // set text color
 Mvalue* Mtc(Mvalue* _value){
-    long long ll=(_value?getValueInteger(_value):-1);
-    if(ll==M_LL_INVALID)return NULL;
-    char s[16];if(ll>=0)sprintf(s,"'\\033[38;5;%lldm",ll%256);else sprintf(s,"'\\033[38;5;%sm",getInfoColor());
-    ////////output("ANSI foreground color code: '%s'.\n",s);
+	long long ll=(_value?getValueInteger(_value):-1);
+	if(ll==M_LL_INVALID)return NULL;
+	char s[16];if(ll>=0)sprintf(s,"'\\033[38;5;%lldm",ll%256);else sprintf(s,"'\\033[38;5;%sm",getInfoColor());
+	////////output("ANSI foreground color code: '%s'.\n",s);
 	char* _s=strdup(s);if(!_s)return NULL;
 	Mvalue* _textValue=_getTextValue(_s);free(_s);
 	return _textValue;
-    /*
-    Mstring* _valueText=_getValueText(_value,true);
-    size_t result=string_length(_valueText);
-    if(result>0)setColor(string(_valueText));
-    free_string(_valueText);
-    return _getIntegerValue(result);
-    */
+	/*
+	Mstring* _valueText=_getValueText(_value,true);
+	size_t result=string_length(_valueText);
+	if(result>0)setColor(string(_valueText));
+	free_string(_valueText);
+	return _getIntegerValue(result);
+	*/
 }

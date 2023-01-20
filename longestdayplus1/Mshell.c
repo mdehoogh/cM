@@ -446,7 +446,7 @@ Mvalue* DP_value=NULL;
 Mdecimalcontext* M_DECIMALCONTEXT=NULL; // the application-wide decimal context
 
 long long getDP(){
-	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=_getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
+	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
 	long long dp=(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
 	if(dp==M_LL_INVALID)outputBug("No default decimal context active!");
@@ -455,7 +455,7 @@ long long getDP(){
 // MDH@18OCT2019: if someone wants to know about the decimal context
 Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value&&value->type==VT_DECIMAL){
-		Mdecimalcontext* decimalcontext=_getDecimalcontext(value->value._decimal->prec);
+		Mdecimalcontext* decimalcontext=getDecimalcontext(value->value._decimal->prec);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			Mmap* _contextMap=owned_map(_getMapOfType(VT_INTEGER),owner);
@@ -487,7 +487,7 @@ Mvalue* setdp(Mvalue* value){
 		if(decimalprecision!=M_LL_INVALID){ // if not the default!!!
 			if(decimalprecision>=6){
 				// if I fail to create the associated decimal context, no go
-				Mdecimalcontext* _newDecimalContext=_getDecimalcontext(decimalprecision);
+				Mdecimalcontext* _newDecimalContext=getDecimalcontext(decimalprecision);
 				if(_newDecimalContext){
 					M_DECIMALCONTEXT=_newDecimalContext;
 					M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
@@ -1716,7 +1716,7 @@ Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
 /* replaced by methods in Mdecimal.h/c
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -1731,7 +1731,7 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -1749,7 +1749,7 @@ Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -1767,7 +1767,7 @@ Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -1811,7 +1811,7 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
 	// CORRECTION by default should NOT compute the sine table (to speed up computing pi)
-	return _getValueOfDecimal(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE));
+	return _getValueOfDecimal(pi_decimal(getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE));
 }
 
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
@@ -5172,7 +5172,7 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 	return disowned_rational(_rationalPower,owner);
 }
 mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){// TODO check ownership 
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
 	return(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 }
 Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
@@ -5225,7 +5225,7 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 		else
 		if(!isBigintegerOne(exponentBiginteger)){
 			// get a decimal context
-			Mdecimalcontext* decimalcontext=_getDecimalcontext(baseDecimal->prec);
+			Mdecimalcontext* decimalcontext=getDecimalcontext(baseDecimal->prec);
 			mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 			// determine half the exponent
 			Mbiginteger* _halfexponentBiginteger=owned_biginteger(__biginteger(),owner);
@@ -5565,7 +5565,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 			uint32_t status=0;
 			outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
 			// we need an mpd_context for use in the decimal computations!!
-			Mdecimalcontext* _decimalcontext=_getDecimalcontext(_rootArgumentDecimal->prec);
+			Mdecimalcontext* _decimalcontext=getDecimalcontext(_rootArgumentDecimal->prec);
 			mpd_context_t* mpd_context=(_decimalcontext?_decimalcontext->mpd_context:get_default_mpd_context());
 			if(mpd_context){
 				Mdecimal* _rootDegreeDecimal=owned_decimal(_getBigintegerDecimal(rootDegreeBiginteger),owner);

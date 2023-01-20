@@ -3,7 +3,7 @@
 #include "Mstring.h"
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
-//                TODO if blocks is zero failed to 
+//				TODO if blocks is zero failed to 
 extern unsigned long long M_MODULE_DEBUGGING;
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_STRING,id};}
@@ -24,8 +24,8 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
 		// NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
 		// the size of each allocation is BLOCKSIZE characters
 		// MDH@09APR2020: everything that is of dynamic size needs to be allocated using REALLOC even when freeing, that way we can keep track
-		//                of the amount allocated in Malloc.c/h explicitly
-		//                this means that we need to use REALLOC for all dynamic memory allocations of variable length
+		//				of the amount allocated in Malloc.c/h explicitly
+		//				this means that we need to use REALLOC for all dynamic memory allocations of variable length
 		// MDH@16APR2020: using Mchars* instance
 		// MDH@03MAY2020 OOPS the size should go first!!!
 		ans->_chars=owned_chars(__chars(M_BLOCK_SIZE,1,'s'),Msubowner(owner,1));
@@ -129,7 +129,7 @@ Mstring* owned_string(Mstring* _str,Mallocationowner owner_str){
  * Free the memory associated with a String
  */
 // MDH@18MAY2020: you can see what a nuisance it is to free a string for somebody else because the caller needs to DISOWN it first, then I have to obtain ownership otherwise I can't free it
-//                then there's str->_chars that we need to take ownership off as well
+//				then there's str->_chars that we need to take ownership off as well
 Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/){   
 	// in order to be able to free_chars but perhaps we do not need to disown str->_chars before calling free_chars????????
 	if(str){
@@ -152,10 +152,10 @@ bool string_empty(Mstring const * const str){return(str?str->length==0:true);} /
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
 Mstring* string_setlength(Mstring* const str,size_t length){
 	// MDH@22MAY2020: here we have a bit of an issue, because str->chars might change, although str won't change in which case we really need the oid from the caller
-	//                unless we could extract ownership from str->chars itself????
-	//                unless we decide that subpointers do not need to be owned?????
-	//                it's obviously that they are NOT owned by a function (or module), ok, so that will be the decision
-	//                nevertheless instead of a foid we could pass in the pointer of which it is a subclass
+	//				unless we could extract ownership from str->chars itself????
+	//				unless we decide that subpointers do not need to be owned?????
+	//				it's obviously that they are NOT owned by a function (or module), ok, so that will be the decision
+	//				nevertheless instead of a foid we could pass in the pointer of which it is a subclass
 	// if(!OWNED(str,owner))return NULL;
 	if(length>str->length){ // we're supposed to increment the length
 		// how many blocks do we need
@@ -240,8 +240,8 @@ char string_removed_char(Mstring* const str,size_t pos){
 			Mchars* strchars=str->_chars; // str replaced by strchars
 			rc=strchars->chars[pos]; // remember the character that is being removed!!
 			// we have to move characters pos through str->length down
-			// NOTE we have \0 at position str->length, so we have to move that one as well!!!    
-			char c;     
+			// NOTE we have \0 at position str->length, so we have to move that one as well!!!	
+			char c;	 
 			while(pos<l){strchars->chars[pos]=strchars->chars[pos+1];pos++;}
 		}
 	}
@@ -280,7 +280,7 @@ Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,si
 		if(pos<l){
 			if(pos<l-1){ // a true insert, i.e. NOT replacing the last character!!
 				////////printf("{%hu-%d}",l,str->blocks);
-				// do we need to get another block?    
+				// do we need to get another block?	
 				if(l==getNumberOfChars(str)){
 					/////////printf("Realloc string_insert_char().\n");
 					// MDH@17APR2020: reallocating _chars (instead of str->chars)
@@ -375,7 +375,7 @@ char* _stringstart(const Mstring* const str,size_t length){
 }
 
 // MDH@24SEP2019: same as string_append but stopping when count characters were appended!!!
-//                changed it as little as possible by breaking out of the while as soon as the number of appended characters (index) exceeds count!!!!
+//				changed it as little as possible by breaking out of the while as soon as the number of appended characters (index) exceeds count!!!!
 Mstring* string_append_chars(Mstring* const str/*,Mallocationowner owner_str*/,const char* pc,size_t count){
 	if(str!=NULL&&pc!=NULL){ // something to append
 		char c;
@@ -457,8 +457,8 @@ void string_reverse(Mstring* const str){
 }
 
 // MDH@24SEP2019: in order to be able to use a smaller part from the beginning of text we'd like to be able to replace a character by '\0' and later on restore it
-//                we will succeed if we have a function that will return the replaced character so we can put it back in again
-//                this method will NOT change str->length ever, meaning that if you forget to put the character back you're in trouble
+//				we will succeed if we have a function that will return the replaced character so we can put it back in again
+//				this method will NOT change str->length ever, meaning that if you forget to put the character back you're in trouble
 char string_replacedchar(Mstring * const str,char c,size_t pos){
 	if(!str||pos>=str->length)return '\0'; // NOTE even though str->chars[str->length] might not be '\0' we're still returning '\0' in that case, as if it was there (otherwise we would have to write '\0' first as we do in string())
 	char replacedchar=str->_chars->chars[pos];

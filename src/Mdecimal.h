@@ -33,7 +33,7 @@ typedef struct Mdecimalcontext{
 }Mdecimalcontext;
 
 // MDH@29AUG2019: create a decimal context with __decimalcontext passing in the required precision
-Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision
+Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision
 
 Mdecimal* disowned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal);
 Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal);

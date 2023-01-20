@@ -18,9 +18,9 @@ Mvalue* NULL_value=NULL;
 // all the available constants go here...
 const char M_PATH_SEPARATOR =
 #ifdef _WIN32
-                              '\\';
+							  '\\';
 #else
-                              '/';
+							  '/';
 #endif
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference","function","environment"};
 const char* const M_VARIABLE_NAME="M"; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
@@ -44,9 +44,9 @@ const char* M_HIDDEN_VARIABLE_NAMES[]={"M","?","_"}; // MDH@14NOV2019: the varia
 const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES=3;// MDH@14NOV2019: yes, three of them
 
 // MDH@31OCT2019: if the value of something equals the NULL value, this is the text to use to represent it, this is also the name of the NULL variable!!!
-//                alternatively we could use capital letters to denote the variable, and lowercase to denote the value (which makes sense I suppose)
-//                to prevent confusion it's best to use the same text for the value, otherwise they see 'null' as value and think they can use that to embed a NULL value!!!
-//                OK the NULL value is displayed in the normal foreground color whereas the variable is displayed in another color (see showValueColored() for the coloring)
+//				alternatively we could use capital letters to denote the variable, and lowercase to denote the value (which makes sense I suppose)
+//				to prevent confusion it's best to use the same text for the value, otherwise they see 'null' as value and think they can use that to embed a NULL value!!!
+//				OK the NULL value is displayed in the normal foreground color whereas the variable is displayed in another color (see showValueColored() for the coloring)
 const char* const M_NULL_VALUE_TEXT="NULL"; // the text to represent values that are undefined...
 const char* const M_NULL_VARIABLE_NAME="NULL";
 const char* const M_UNDEFINED_VALUE_TEXT="UNDEFINED"; // the text to represent values that are undefined...
@@ -105,27 +105,27 @@ unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized i
 // O=operator that can be either unary or binary depending on its position (+ and - characters)
 // use x for eXit (e.g. with Ctrl-C and Ctrl-Z), c for cancel command, and m for going into M (control) mode
 // as for operators: there are 8 different groups of operators
-// !     not unary operator or first character of binary operator !=
-// ~     pure unary operator
-// -+    sign unary operator or binary minus/plus operator
-// %^    pure binary operator
-// */    binary operator extensible to make ** power operator or // integer division operator
-// <>    binary operator extensible to make << or >> operator but can also be followed by an = sign (is this not the same as */?)
-// =     assignment operator that can follow most of the binary operators (except < and >)
-// |&    binary or and operator extensible to make || logical or or && logical and operator but the latter cannot be followed by =
+// !	 not unary operator or first character of binary operator !=
+// ~	 pure unary operator
+// -+	sign unary operator or binary minus/plus operator
+// %^	pure binary operator
+// */	binary operator extensible to make ** power operator or // integer division operator
+// <>	binary operator extensible to make << or >> operator but can also be followed by an = sign (is this not the same as */?)
+// =	 assignment operator that can follow most of the binary operators (except < and >)
+// |&	binary or and operator extensible to make || logical or or && logical and operator but the latter cannot be followed by =
 // MDH@16APR2019: removing the o input character type (for switching explicitly to or from control mode), replacing it by n, so we can use the backtick for certain purposes...
-//                in certain languages it means evaluate this (or the result of a system command??????)
-//                furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
+//				in certain languages it means evaluate this (or the result of a system command??????)
+//				furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
 // MDH@31OCT2019: let's use the backtick (`) as special whitespace character to use when one wants to insert a line break (i.e. continue the command on the next line)
-//                although this would mean that it would show up when writing the tokens
-//                we tried inserting a TT_WHITESPACE token with a backtick character (i.e. using ` as associated input character type) but ran into all kinds of problems so now we treat ` as W input character type
-//                so it is appended to the current token, we only need to get it displayed in another color
-//                ok, we're going to use \ for newline request character, so \ used to be % now becomes for type \ indicating a newline request (or escape character in a string!!!!)
-//                switched to using the blank to indicate a newline request (using \ is a bit clumsy, backtick goes back to being the backtick, although no idea what we can use it for)
-//                no we let \ be whitespace but we can turn it into a blank when it's a functional newline request
+//				although this would mean that it would show up when writing the tokens
+//				we tried inserting a TT_WHITESPACE token with a backtick character (i.e. using ` as associated input character type) but ran into all kinds of problems so now we treat ` as W input character type
+//				so it is appended to the current token, we only need to get it displayed in another color
+//				ok, we're going to use \ for newline request character, so \ used to be % now becomes for type \ indicating a newline request (or escape character in a string!!!!)
+//				switched to using the blank to indicate a newline request (using \ is a bit clumsy, backtick goes back to being the backtick, although no idea what we can use it for)
+//				no we let \ be whitespace but we can turn it into a blank when it's a functional newline request
 // MDH@04NOV2019: in order to be able to pass value references (i.e. variables) to a function we define @ as the redirection operator so that not the value but the value reference is returned (unresolved)
-//                by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
-//                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
+//				by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
+//								-------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
 // MDH@26OCT2020: all the i input characters can be associated with a macro, e.g. Ctrl-G (7) will insert get() into the command
 // MDH@28OCT2020: type of \ changed from W to e (i.e. the escape character), see what I can do with that elsewhere
 const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[e]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
@@ -134,16 +134,16 @@ const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
 // MDH@24MAR2020 BUG FIX: needed to insert an additional "" for TT_PROPERTY which I forgot previously
 // now we define all the state transitions i.e. what input character types result in which new token type
 // NOTE this can be organized in many ways perhaps it's easiest to tell per input character what the transformation is
-//      only changes to the token type need to be registered, so if the change is NOT present, no need to put it in the transition table
-//      EWW means that when starting an expression any whitespace starts a whitespace token, we use * to indicate ALL possible input character types
-//      *WW means that any W character received in any state will result in a W state 
+//	  only changes to the token type need to be registered, so if the change is NOT present, no need to put it in the transition table
+//	  EWW means that when starting an expression any whitespace starts a whitespace token, we use * to indicate ALL possible input character types
+//	  *WW means that any W character received in any state will result in a W state 
 // we can make an array of transitions with each element corresponding to the character in TOKENTYPES, so the first entry contains all responses to E, the second entry the responses to W etc.
 // it's easier to tell for any possible resulting token type which input character types will result in that type
 // it's a hell of a job to create the token type transitions matrix
 /* LEGEND:
    - signs are allowed in an EREAL but only directly behind the E, which means we have to somehow have an EREALEXPONENT element unless you treat this E as a binary operator which I think is a very good idea!!!
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
-     E is Assignable e r u, so we can get rid of the EREAL token type!!!
+	 E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
 // MDH@16OCT2020: as we can use any character we like to represent NOT better to use ! instead of what we did before (the backtick `)
 char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","","q","q","!D","!S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
@@ -167,20 +167,20 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 */
 /* MDH@23MAR2019: syntacticly we have less operators
 	TOKENTYPE(TT_ONE_CHAR_UNARY=0b10000001) 						!(un) -(un) +(un)
-	TOKENTYPE(TT_ONE_CHAR_BINARY_=0b10100001)      					?
+	TOKENTYPE(TT_ONE_CHAR_BINARY_=0b10100001)	  					?
 	TOKENTYPE(TT_ONE_CHAR_ASSIGNABLE_BIANRY=0b10101010)  			= ~ ^ % \ -(bin) +(bin)
-	TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110)      					! (followed by =)
+	TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110)	  					! (followed by =)
 	TOKENTYPE(TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY=0b10101011)		& | (interesting =+= and &+= and |+= and itself)
 	TOKENTYPE(TT_TWO_CHAR_ASSIGNABLE_BINARY=0b10111011)				< > * /
-	printf("\nError                                        : %d.",TT_ERROR);
-	printf("\nOne character unary operator                 : %d.",TT_ONE_CHAR_UNARY);
-	printf("\nAssignment operator                          : %d.",TT_ASSIGNMENT);
-	printf("\nOne character binary operator                : %d.",TT_ONE_CHAR_BINARY);
-	printf("\nOne character assignable binary operator     : %d.",TT_ONE_CHAR_ASSIGNABLE_BINARY);
-	printf("\nTwo character binary operator                : %d.",TT_TWO_CHAR_BINARY);
+	printf("\nError										: %d.",TT_ERROR);
+	printf("\nOne character unary operator				 : %d.",TT_ONE_CHAR_UNARY);
+	printf("\nAssignment operator						  : %d.",TT_ASSIGNMENT);
+	printf("\nOne character binary operator				: %d.",TT_ONE_CHAR_BINARY);
+	printf("\nOne character assignable binary operator	 : %d.",TT_ONE_CHAR_ASSIGNABLE_BINARY);
+	printf("\nTwo character binary operator				: %d.",TT_TWO_CHAR_BINARY);
 	printf("\nTwo character once assignable binary operator: %d.",TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY);
-	printf("\nTwo character assignable binary operator     : %d.",TT_TWO_CHAR_ASSIGNABLE_BINARY);
-	printf("\nComparison or shift operator                 : %d.",TT_COMPARISON_OR_SHIFT_BINARY);
+	printf("\nTwo character assignable binary operator	 : %d.",TT_TWO_CHAR_ASSIGNABLE_BINARY);
+	printf("\nComparison or shift operator				 : %d.",TT_COMPARISON_OR_SHIFT_BINARY);
 */
 /* MDH@10APR2019: 
 - some transitions only change the type but do not start a new token, but this is true for all binary operators, so I guess we can force that programmatically
@@ -189,41 +189,41 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 // operator input type characters: ! ~ + - % * < = | (8 different operator groups)
 // ! ~ and + start a unary operator when a value is expected
 // MDH@15APR2019: still to determine what to do with @ and ` (the latter for system commands????)
-//                inserting macro's should also be possible somehow...
+//				inserting macro's should also be possible somehow...
 // MDH@05AUG2019: it's a pity that I need to allow a , behind a new variable in order to allow that when a do function call executes code after initializing these variables that are not yet recognized as created
-//                we can solve this by remembering ALL variables when they are created in every expression that is tokenized, this would be possible by creating a tokenizing environment where we remember all created variables in in the tokenizing process
+//				we can solve this by remembering ALL variables when they are created in every expression that is tokenized, this would be possible by creating a tokenizing environment where we remember all created variables in in the tokenizing process
 // MDH@04NOV2019: the reference token type added, so we can pass references to functions wrapped inside a value
 /*
  "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","REF" ,"VAR"  ,"NEWVAR","PROP" ,"L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
-{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ] }="}, /* Baeru finished bin.op. */ \
-{""    ,""    ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""     ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`R;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; CDS% )&*  , >?:    ]"   }, /* BAeRu assignable repeatable */ \
-{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  ,  ?:    ]"   }, /* BaERu comp. (<>) bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]"   }, /* BAeru assignable bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
-{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,"LEN" ,""     ,""      ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
-{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"RLEN" ,""      ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"` ;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,"LEN"   ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`R;! DS%()&*+-  >?:     {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,"RLEN.",","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"` ;  DS (               {"  }, /* PROPERTY (identifier starting with the property separator) */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
-{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,""     ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
-{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,""     ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
-{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""     ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
-{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""     ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,""     ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,""     ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (         LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
-{";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""     ,""      ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS% (   -    :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
-{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,"."    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`R;!CDS%& )*+-, >?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %&  *    >?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (         L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"` ; C  % )&*  , >?:	] }="}, /* EXPRESSION */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,""		,""		,""	   ,""	   ,"["   ,""	 ,""   ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R; CDS% )&*  , >?:	]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
+{"("   ,"!-+~","" ,"="	,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"` ; C  % )&*  , >?:	] }" }, /* ASSIGNMENT = */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R; C  % )&*  , >?:	] }="}, /* Baeru finished bin.op. */ \
+{""	,""	,"" ,"="	,""	 ,""	 ,""	  ,""	 ,""	 ,""	,""	 ,""	  ,""	 ,""	,""   ,""	,""		,""		,""	   ,""	   ,""	,""	 ,""   ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
+{"("   ,"!-+~","=",""	 ,""	 ,""	 ,""	  ,"R"	,""	 ,""	,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,""		,""		,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R; CDS% )&*  , >?:	]"   }, /* BAeRu assignable repeatable */ \
+{"("   ,"!-+~","" ,"="	,""	 ,""	 ,""	  ,"R"	,""	 ,""	,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R; C  % )&*  ,  ?:	]"   }, /* BaERu comp. (<>) bin.op. */ \
+{"("   ,"!-+~","=",""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R; C  % )&*  , >?:	]"   }, /* BAeru assignable bin.op. */ \
+{"("   ,"!-+~","=",""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R; C  % )&*  , >?:	]{}" }, /* Taeru ternary op. (? only now) */ \
+{""	,""	,"" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"LEN" ,""	 ,""	  ,"."	,","   ,""   ,""	,""		,""		,""	   ,""	   ,""	,"]"	,""   ,""   ,"}"	,""		,""	  ,")"	 ,"C" ,"`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
+{""	,""	,"=",""	 ,"!"	,"&*"   ,">"	 ,"-+%"  ,"?"	,""	,"RLEN" ,""	  ,"."	,","   ,""   ,""	,""		,""		,""	   ,""	   ,"["   ,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"` ;  DS (			   {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""	,""	,"=",""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,""	 ,"LEN"   ,"."	,","   ,""   ,""	,""		,""		,""	   ,""	   ,"["   ,"]"	,""   ,""   ,"}"	,""		,""	  ,""	  ,"C" ,"`R;! DS%()&*+-  >?:	 {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""	,""	,"=",""	 ,"!"	,"&*"   ,">"	 ,"-+%"  ,"?"	,""	,""	 ,""	  ,"RLEN.",","   ,""   ,""	,""		,""		,""	   ,""	   ,"["   ,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"` ;  DS (			   {"  }, /* PROPERTY (identifier starting with the property separator) */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,","   ,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,"]"	,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"` ; C  % )&*	>?:	  }="}, /* LIST ELEMENT (similar to expression) */ \
+{";"   ,""	,"" ,"?:"   ,"!="   ,"&*"   ,">"	 ,"-+%E" ,"?"	,""	,""	 ,""	  ,""	 ,","   ,"N"  ,"."   ,""		,""		,""	   ,""	   ,""	,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS (		  L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{";"   ,""	,"" ,"?:"   ,"!="   ,"&*"   ,">"	 ,"-+%E" ,"?"	,""	,""	 ,""	  ,""	 ,","   ,""   ,"N"   ,""		,""		,""	   ,""	   ,""	,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS (	  .   L  [ {"  }, /* REAL: part behind a decimal period */ \
+{""	,""	,"" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,""	 ,""	  ,""	 ,""	,""   ,""	,""		,""		,"D"	  ,""	   ,""	,""	 ,""   ,""   ,""	 ,""		,""	  ,""	  ,""  ,""						   }, /* DQSTRING: double quoted string */ \
+{""	,""	,"" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,""	 ,""	  ,""	 ,""	,""   ,""	,""		,""		,""	   ,"S"	  ,""	,""	 ,""   ,""   ,""	 ,""		,""	  ,""	  ,""  ,""						   }, /* SQSTRING: single quoted string */ \
+{";"   ,""	,"" ,"+"	,"!="   ,"&"	,">"	 ,""	 ,"?"	,""	,""	 ,""	  ,""	 ,","   ,""   ,""	,"D"	   ,"S"	   ,""	   ,""	   ,""	,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";"   ,""	,"" ,"+"	,"!="   ,"&"	,">"	 ,""	 ,"?"	,""	,""	 ,""	  ,""	 ,","   ,""   ,""	,""		,""		,""	   ,""	   ,""	,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,","   ,"N"  ,""	,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,"]"	,"{"  ,""   ,""	 ,""		,""	  ,")"	 ,""  ,"` ; C  %& )*   .>?:	  }="}, /* LIST: [ starts a list */ \
+{";"   ,""	,"=","?"	,"!"	,"&*"   ,">"	 ,"-+%"  ,"?"	,""	,""	 ,""	  ,"."	,","   ,""   ,""	,""		,""		,""	   ,""	   ,"["   ,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS  (		 LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,""	,"N"  ,""	,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,""   ,""   ,"}"	,""		,""	  ,")"	 ,""  ,"` ; C  %& )*  ,.>?:	]{ ="}, /* MAP: { starts a map */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,")"	 ,""  ,"` ; C  %& )*  , >?:	] }="}, /* MAP_VALUE: : starts a map value */ \
+{";"   ,""	,"" ,"?"	,"!="   ,"&*"   ,">"	 ,"+"	,"?"	,""	,""	 ,""	  ,"."	,","   ,""   ,""	,""		,""		,""	   ,""	   ,"["   ,"]"	,""   ,""   ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS% (   -	:LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""	,""	,"" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,""	 ,""	  ,"."	,""	,""   ,""	,""		,""		,""	   ,""	   ,""	,""	 ,""   ,""   ,""	 ,""		,"("	 ,""	  ,""  ,"`R;!CDS%& )*+-, >?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,","   ,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,")"	 ,""  ,"` ; C  %&  *	>?:	] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{";"   ,""	,"" ,"?:"   ,"!="   ,"&*"   ,">"	 ,"-+%E" ,"?"	,""	,""	 ,""	  ,"."	,","   ,""   ,""	,""		,""		,""	   ,""	   ,"["   ,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS  (		 L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,0b1000000,0b11111111};
@@ -260,7 +260,7 @@ bool registerVariables(Menvironment * environment,Mallocationowner owner_environ
 }
 
 // MDH@22OCT2020: in order to be able to use any number of function arguments we now allow moving the list of variables that does not have a name to be placed in the variable that starts with _
-//                it's up to the argument map creator to put all arguments that are not expected in the function and put them in the '' argument
+//				it's up to the argument map creator to put all arguments that are not expected in the function and put them in the '' argument
 bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap,char const * const defaultVariableName){
 	if(amVerboseDebugging())
 		outputMap("Execution environment variable map: ",_variableMap,".\n");
@@ -282,8 +282,8 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		_functionExecutionEnvironment->_name=owned_chars(_getChars(functionName),Msubowner(owner,1)); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
-		//                we do not need to distinguish between the originals and the references (so we never loose the referenced functions
-		//                when an execution environment is freed)
+		//				we do not need to distinguish between the originals and the references (so we never loose the referenced functions
+		//				when an execution environment is freed)
 		_functionExecutionEnvironment->_functionMap=_function->functionunion._userfunction->_functionMap;
 		*/
 		// 2. make the definition environment the parent of the function execution environment
@@ -387,13 +387,13 @@ static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
 }
 
 // MDH@25FEB2021: a helper function that can be called both for testing the validity of a command or a part of a command given the first and last token
-//                taken as is from the original isValidCommandIndicator() (see below)
+//				taken as is from the original isValidCommandIndicator() (see below)
 int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
 
 	if(!lastCommandToken){if(report)outputError("Empty command");return 0;}
 	
 	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
-	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
+	//	in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
 	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
 
 	// MDH@28FEB2020: if the current last command token is an error do NOT remove, but let the caller handle it!!!!
@@ -412,8 +412,8 @@ int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,T
 	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return -2;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
-	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
-	//                    this actually means that if expr is NULL there's one parentheses too many!!!
+	//				BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
+	//					this actually means that if expr is NULL there's one parentheses too many!!!
 	/*
 	if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
 	if(_userInputCommand->_lastToken->expr!=_userInputCommand->_firstToken){outputError("Not enough parentheses!");return false;}
@@ -450,7 +450,7 @@ int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,T
 		}
 		/* replacing:
 		// MDH@23JUL2019: we can now be very strict
-		//                the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
+		//				the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
 		if(_userInputCommand->_lastToken->expr->type!=TT_EXPRESSION||(string_length(_userInputCommand->_lastToken->expr->text)&&string_char(_userInputCommand->_lastToken->expr->text,0)!=' ')){
 			outputError("Incomplete command");
 			return false;
@@ -485,8 +485,8 @@ int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,T
 // keep track of the state of entering a command
 // MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
 // MDH@28FEB2020: we NO longer NULL Mcommand* (we can't because that would require Mcommand**) BUT that would only be required 
-//                I suppose this also means that we do not need to return true or false anymore, any caller can check for a last token itself (i.e. an empty command!!!!)
-//                now returning the new last command token
+//				I suppose this also means that we do not need to return true or false anymore, any caller can check for a last token itself (i.e. an empty command!!!!)
+//				now returning the new last command token
 Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command){
 	// NOTE we can still remove the pointer although you cannot use it anymore (except for testing) because free_token would have released the associated memory!!!
 	if(command&&command->_lastToken){
@@ -518,14 +518,14 @@ Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char co
 
 // decimal stuff
 /* MDH@20JUN2019: by not using DP_value anymore, we solved the problem of DP_value holding a reference to the decimal precision value which apparently was released at some point
-                  so as soon as the value pointer is released by the value list, a reference is still kept by DP_value but the memory will be reused and _integer might point into uncharted territory at some point in the future
+				  so as soon as the value pointer is released by the value list, a reference is still kept by DP_value but the memory will be reused and _integer might point into uncharted territory at some point in the future
 				  if we were to keep using DP_value we should have called assignValue() to assign the value and not DP_value=_getIntegerValue() (see initEnvironment())
 Mvalue* DP_value=NULL; 
 */
 Mdecimalcontext* M_DECIMALCONTEXT=NULL; // the application-wide decimal context
 
 long long getDP(){
-	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=_getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
+	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
 	long long dp=(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
 	if(dp==M_LL_INVALID)outputBug("No default decimal context active!");
@@ -534,7 +534,7 @@ long long getDP(){
 // MDH@18OCT2019: if someone wants to know about the decimal context
 Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value&&value->type==VT_DECIMAL){
-		Mdecimalcontext* decimalcontext=_getDecimalcontext(value->value._decimal->prec);
+		Mdecimalcontext* decimalcontext=getDecimalcontext(value->value._decimal->prec);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			Mmap* _contextMap=owned_map(_getMapOfType(VT_INTEGER),owner);
@@ -566,7 +566,7 @@ Mvalue* setdp(Mvalue* value){
 		if(decimalprecision!=M_LL_INVALID){ // if not the default!!!
 			if(decimalprecision>=6){
 				// if I fail to create the associated decimal context, no go
-				Mdecimalcontext* _newDecimalContext=_getDecimalcontext(decimalprecision);
+				Mdecimalcontext* _newDecimalContext=getDecimalcontext(decimalprecision);
 				if(_newDecimalContext){
 					M_DECIMALCONTEXT=_newDecimalContext;
 					M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
@@ -587,7 +587,7 @@ mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEX
 
 // very special M functions
 // MDH@20DEC2020: added the _invalidTokenValue to be evaluated when the condition is negative
-//                and changed the evaluation of the condition to a sign
+//				and changed the evaluation of the condition to a sign
 Mvalue* Miffunction(Mvalue* _conditionValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue,Mvalue* _undefinedTokenValue){
 	Mvalue* _result=NULL;
 	// MDH@23DEC2020:
@@ -615,7 +615,7 @@ Mvalue* Miffunction(Mvalue* _conditionValue,Mvalue* _thenTokenValue,Mvalue* _els
 			_result=getValueOfExpression("else clause",'e',NULL,0);
 		}
 	}
-    return _result;
+	return _result;
 }
 
 // MDH@21DEC2020: a new way to do a while is by receiving a single token list (just like do does!!)
@@ -636,7 +636,7 @@ Mvalue* Mwhilefunction(Mvalue* _whileTokenlistValue){
 						getExecutionEnvironment()->expressionToken=conditiontoken;
 						Mvalue* _conditionValue=getValueOfExpression("while condition",'w',NULL,0);
 						// MDH@23DEC2020: similar to in Miffunction we use the sign to determine whether
-						//                or not the condition is 'true' (positive values only)
+						//				or not the condition is 'true' (positive values only)
 						if(report)
 							outputValue("Condition value: '",_conditionValue,"'.\n");
 						long long conditionSign=getValueSign(_conditionValue);
@@ -685,11 +685,11 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 }
 */
 // MDH@05AUG2019: the do function allows for executing a single command in its own environment, so all variables created are local
-//                the problem is that we want to allow the user to enter a list of token things i.e. an infinite list of arguments instead of having to wrap the single argument in a list itself
-//                this is solvable if we convert the list of arguments to a single Mvalue wrapping the entire list of arguments before calling Mdofunction
+//				the problem is that we want to allow the user to enter a list of token things i.e. an infinite list of arguments instead of having to wrap the single argument in a list itself
+//				this is solvable if we convert the list of arguments to a single Mvalue wrapping the entire list of arguments before calling Mdofunction
 // MDH@23OCT2021: I had a marvelous idea i.e. to simply return the environment do creates
-//                as we can wrap it in a value, this way it can be retained by assigning it
-//                and therefore become an 'object' that can be accessed (and have 'methods')
+//				as we can wrap it in a value, this way it can be retained by assigning it
+//				and therefore become an 'object' that can be accessed (and have 'methods')
 Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	if(_doTokenValue&&_doTokenValue->type==VT_LIST){
@@ -709,8 +709,8 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 												;
 				if(doEnvironmentInitialized){
 					// MDH@21DEC2020 BUG FIX: pushing an environment will wrap it inside a value
-					//                        which should be able to take over membership
-					//                        which means you have to disown the environment!!!!
+					//						which should be able to take over membership
+					//						which means you have to disown the environment!!!!
 					if(pushExecutionEnvironment(disowned_environment(_doEnvironment,owner))){ // _doEnvironment bound!!!
 						// MDH@25OCT2021: _doEnvironment is now wrapped in a value but for now we do not have access to it
 						// NOTE luckily we know who is owning the environment now (as it is now wrapped inside a value), so we can still register the variables (see below)
@@ -802,7 +802,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"$",VT_UNDEFINED,false))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"_",VT_INTEGER,false))forEnvironmentInitialized=false;
 			// MDH@21DEC2020: TODO we will need to change "_" to something else because _ is used in functions
-			//                     for storing the additional arguments
+			//					 for storing the additional arguments
 			if(forEnvironmentInitialized&&!setValue(_forEnvironment,"_",_getIntegerValue(0)))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized){
 				if(pushExecutionEnvironment(_forEnvironment)){
@@ -810,9 +810,9 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 					if(_initializationTokenValue){
 						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
 						// MDH@11MAR2020: to force the creation of all identifiers that are assigned in the initialization token value, we have to ascertain that they are considered TT_NEW_VARIABLE
-						//                essentially this means you cannot set an outside variable in the first for loop expression
-						//                alternatively, we could simple add all these variables beforehand and mark all as TT_VARIABLE which is another way of doing that
-						//                assignment is crucial? yes, if not assigned 
+						//				essentially this means you cannot set an outside variable in the first for loop expression
+						//				alternatively, we could simple add all these variables beforehand and mark all as TT_VARIABLE which is another way of doing that
+						//				assignment is crucial? yes, if not assigned 
 						Mvalue* initializationValue=getValueOfExpression("for initialization",'i',(TokenType[]){},0); // return value NOT imported
 						// any map is used to initialize as local variables (just like we did in defining functions)
 						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
@@ -887,7 +887,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 							}
 						}
 						// MDH@11MAR2020: if there's a result token value, we use that value as the result of the for loop (in which case we would not need $ at all)
-						//                of course we could let $ take precedence over the result token BUT the general idea is that any result token replaces the implicit result (which would be the number of times the loop is executed)
+						//				of course we could let $ take precedence over the result token BUT the general idea is that any result token replaces the implicit result (which would be the number of times the loop is executed)
 						if(_resultTokenValue){
 							_forEnvironment->expressionToken=_resultTokenValue->value._token;
 							_result=getValueOfExpression("for loop",'l',(TokenType[]){},0);
@@ -1026,7 +1026,7 @@ static InputResponseFunction* inputErrorFunction=NULL;
 // requiring some other stuff for being able to interpret the text and create tokens!!!
 
 // MDH@05JUN2019: it's prudent to return the negative value of the input token type if the given input character type ends the token 
-//                i.e. when NO_TRANSITIONS is a match, so that the caller can set the significantCharacterCount
+//				i.e. when NO_TRANSITIONS is a match, so that the caller can set the significantCharacterCount
 int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
 		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
@@ -1063,7 +1063,7 @@ bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierE
 		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){ // a (new) variable
 			// MDH@11JAN2021: the commandIdentifier can now also be a map property, but only in calls to do() and forw() and I guess function()
 			// MDH@11JAN2021: by using string_replacedchar() the length of the command identifier won't change, but string(commandIdentifier) will still bump into this '\0' if it is in front of the original '\0'
-			//                the length of commandIdentifier (which is stored in Mstring so does not need to be computed!!!!) needs to be at least equal to that of the length of identifierName!!
+			//				the length of commandIdentifier (which is stored in Mstring so does not need to be computed!!!!) needs to be at least equal to that of the length of identifierName!!
 			if(commandIdentifier->significantCharacterCount==l){ // the command identifier has the same number of significant characters as identifierName!!
 				char* commandIdentifierName=string(commandIdentifier->text);
 				if(strncmp(commandIdentifierName,identifierName,l)==0){ // the non-whitespace matches
@@ -1121,32 +1121,32 @@ static bool representsAFunction(Mvariable* variable){
 }
 // MDH@12MAR2020: because containsVariable() is not called in Menvironment.h/c itself, and it uses inputInfoFunction I moved it over here today just before it is getting used
 int8_t containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
-    // MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
-    if(!name)return 0; // invalid input
-    // MDH@12MAR2020: when using dot notation to access properties in maps it is essential that the part in front of the period references an existing map if it does not the 'dot' is basically NOT allowed
-    //                because getVariable() would also return NULL if the map does not yet contain the '' property (to indicate the '' property to be set) it cannot distinguish that situation in getVariable so we do it here
-    //                and we can return -2 as well to indicate invalid input in which case a TT_ERROR token should be started
-    size_t l=strlen(name);
-    if(l==0)return 0;
+	// MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
+	if(!name)return 0; // invalid input
+	// MDH@12MAR2020: when using dot notation to access properties in maps it is essential that the part in front of the period references an existing map if it does not the 'dot' is basically NOT allowed
+	//				because getVariable() would also return NULL if the map does not yet contain the '' property (to indicate the '' property to be set) it cannot distinguish that situation in getVariable so we do it here
+	//				and we can return -2 as well to indicate invalid input in which case a TT_ERROR token should be started
+	size_t l=strlen(name);
+	if(l==0)return 0;
 	Mvariable* variable=NULL;
-    // MDH@12MAR2020: with dot notation it starts with also determining whether or not the dot notation is valid 
-    //                ok the essential thing here is that the thing holding the last property must be a variable that has a map value
-    char* lastPropertySeparator=strrchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
-    if(lastPropertySeparator){
-        name[lastPropertySeparator-name]='\0'; // pretend the name to end at the last property separator
-        if(report>0)output("Looking for map variable '%s'.\n",name);else if(report<0)(*inputInfoFunction)("Looking for map variable '%s'.\n",name);
-        variable=getVariable(_environment,name,report>0); // getVariable() uses output() and we can only use that when report>0
-        name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER; // put the last property separator back
-        if(!variable)return -2; // if this happens the part in front of the period does not denote an existing variable (and it should)
-        if(!variable->_value)return -3; // the part in front of it does not contain a value
-        if(variable->_value->type!=VT_MAP)return -4; // the part in front of it is not a map
-        // if the map contains property '' it's an existing property otherwise it's a non-existing property
-        Mmap* map=variable->_value->value._map;
-        if(!map)return -5;
-        Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,lastPropertySeparator+1)))mapelement=mapelement->_next;
+	// MDH@12MAR2020: with dot notation it starts with also determining whether or not the dot notation is valid 
+	//				ok the essential thing here is that the thing holding the last property must be a variable that has a map value
+	char* lastPropertySeparator=strrchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
+	if(lastPropertySeparator){
+		name[lastPropertySeparator-name]='\0'; // pretend the name to end at the last property separator
+		if(report>0)output("Looking for map variable '%s'.\n",name);else if(report<0)(*inputInfoFunction)("Looking for map variable '%s'.\n",name);
+		variable=getVariable(_environment,name,report>0); // getVariable() uses output() and we can only use that when report>0
+		name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER; // put the last property separator back
+		if(!variable)return -2; // if this happens the part in front of the period does not denote an existing variable (and it should)
+		if(!variable->_value)return -3; // the part in front of it does not contain a value
+		if(variable->_value->type!=VT_MAP)return -4; // the part in front of it is not a map
+		// if the map contains property '' it's an existing property otherwise it's a non-existing property
+		Mmap* map=variable->_value->value._map;
+		if(!map)return -5;
+		Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,lastPropertySeparator+1)))mapelement=mapelement->_next;
 		// point variable to the _variable in the map element
 		variable=(mapelement?mapelement->_variable:NULL);
-    }else // ASSERT not a property reference!!!!!
+	}else // ASSERT not a property reference!!!!!
 		variable=getVariable(_environment,name,false);
 	// if variable is undefined, return -1
 	if(!variable){
@@ -1154,21 +1154,21 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 		return -1;
 	}
 	// ASSERT variable!=NULL
-    // if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
-    if(representsAFunction(variable)){
-        if(report>0)output("'%s' holds a function, not a value.\n",name);else if(report>0)(*inputInfoFunction)("'%s' holds a function, not a value.\n",name);
-        return 1;
-    }
-    if(report>0)output("'%s' exists.\n",name);else if(report<0)(*inputInfoFunction)("'%s' exists.\n",name);
-    return 2;
+	// if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
+	if(representsAFunction(variable)){
+		if(report>0)output("'%s' holds a function, not a value.\n",name);else if(report>0)(*inputInfoFunction)("'%s' holds a function, not a value.\n",name);
+		return 1;
+	}
+	if(report>0)output("'%s' exists.\n",name);else if(report<0)(*inputInfoFunction)("'%s' exists.\n",name);
+	return 2;
 }/* VALIDATED */
 
 // MDH@11JAN2021: if we want to recognize local variables in do, for with, and function commands, we will need to be able to remember the map properties of the first argument to these function calls
-//                given that such a variable should be active as soon as the value has been entered (i.e. on the comma following it), there will be one active at any time depending on the envid
+//				given that such a variable should be active as soon as the value has been entered (i.e. on the comma following it), there will be one active at any time depending on the envid
 // MDH@14JAN2021 NOTE: essentially the property names of a local variable map (first argument in do's and forwith's)
 // MDH@25FEB2021: because we now evaluate any special function first argument, we may decide to register this map during the processing of the rest of the command to check whether a variable used exists
-//                which means that there will be exactly one local variable map per (active) special function call so essentially we keep a stack of these local variables
-//                NOTE we don't have to bother about the stored localvariablesMapValue because it will be garbage collected after the command is executed and therefore this reference is to be considered a weak reference
+//				which means that there will be exactly one local variable map per (active) special function call so essentially we keep a stack of these local variables
+//				NOTE we don't have to bother about the stored localvariablesMapValue because it will be garbage collected after the command is executed and therefore this reference is to be considered a weak reference
 typedef struct Mlocalvariables{
 	Mvalue* mapValue;
 	uint64_t envid;
@@ -1247,7 +1247,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	if(reoutputTokenFunction)(*reoutputTokenFunction)(functionToken);else outputChar('*');
 	/* MDH@01OCT2019 because the token isn't actually removed the feed forward text associated with the token does not need to be deleted actually
 	// MDH@20SEP2019: this function is called when a function name changes into a variable name (because the user did not enter ( behind a function name)
-	//                and it makes sense to simply remove the associated feed forward of the token
+	//				and it makes sense to simply remove the associated feed forward of the token
 	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
 	*/
 	/* replacing:
@@ -1260,13 +1260,13 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 }
 
 // MDH@19OCT2020: sometimes we want to know whether or not a certain character will finish the current token or start a new token (like when tabbing through the suggested text)
-//                for that we would need a way to ask for that information
-//                NOTE we're keeping commandCharacterAppended() as it is now although we're replicating code here
+//				for that we would need a way to ask for that information
+//				NOTE we're keeping commandCharacterAppended() as it is now although we're replicating code here
 static void correctInputCharacterType(Mtoken const * const token,char inputChar,char* inputCharacterType){
 	if((TOKENTYPE_IDS[token->type]&0x62)==0x62)if(inputChar==string_char(token->text,0))*inputCharacterType='r'; // MDH@04NOV2019: changed into lowercase r as we're now using R for token of type reference!!!
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 	// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
-	//                there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
+	//				there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
 	if(*inputCharacterType=='W'){ // whitespace isn't always 'functional' whitespace (i.e. they can be part of the actual command)
 		if(token->type==TT_ERROR||token->type==TT_COMMENT||token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
 	}else
@@ -1280,7 +1280,7 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 	switch(newTokenType){
 		case TT_ERROR:
 			// MDH@09MAR2020: interestingly this is also the situation where a variable might have to become a function
-			//                this happens e.g. when an identifier at the end changed from function to variable
+			//				this happens e.g. when an identifier at the end changed from function to variable
 			if(*tokenType==TT_FUNCTION){
 				*tokenType=TT_VARIABLE;
 				newTokenType=nextTokenType(*tokenType,inputCharacterType);
@@ -1294,7 +1294,7 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 			break;
 		case TT_END_OF_DQSTRING:
 			// MDH@13OCT2020: if the last character is a real escape character (and not simply the escape character behind the escape character, and therefore a true \)
-			//                the only way to find out whether this is true is when the number of escape characters at the end is replicated is odd
+			//				the only way to find out whether this is true is when the number of escape characters at the end is replicated is odd
 			if(string_last_char_count(token->text,M_ESCAPE_CHARACTER)%2)newTokenType=TT_DQSTRING;
 			break;
 		case TT_END_OF_SQSTRING:
@@ -1358,10 +1358,10 @@ bool characterContinuesToken(Mtoken const * const token,char inputChar,char inpu
 }
 
 // MDH@28OCT2019: in order to implement the eval function the part in commandCharacterAccepted() that can work with any command is moved over to commandCharacterAppended()
-//                and is called from commandCharacterAccepted() passing _userInputCommand->_lastToken in as first argument!!
-//                NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
-//                NOTE we have to use the pointer to the last command token because if we used the last command token itself, we wouldn't be able to change the last command token!!!!
-//                NOTE instead we're returning the last command token (which will change if starting a new token!!!!)
+//				and is called from commandCharacterAccepted() passing _userInputCommand->_lastToken in as first argument!!
+//				NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
+//				NOTE we have to use the pointer to the last command token because if we used the last command token itself, we wouldn't be able to change the last command token!!!!
+//				NOTE instead we're returning the last command token (which will change if starting a new token!!!!)
 Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput){
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
@@ -1371,15 +1371,15 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	// if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
-	//                so it's actually best if we create a new token that points to the last non-whitespace command token
-	//                and we should not allow an R input character type to continue an operator like that on the previous line, or checking whether someone entered a whitespace where it's not an whitespace ending a token
+	//				so it's actually best if we create a new token that points to the last non-whitespace command token
+	//				and we should not allow an R input character type to continue an operator like that on the previous line, or checking whether someone entered a whitespace where it's not an whitespace ending a token
 	Mtoken* lastNonwhitespaceCommandToken=lastCommandToken;while(lastNonwhitespaceCommandToken->type==TT_WHITESPACE)lastNonwhitespaceCommandToken=lastNonwhitespaceCommandToken->prev;
 	if(lastNonwhitespaceCommandToken==lastCommandToken){ // not behind a whitespace (newline) token
 	*/
 		if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))*inputCharacterType='r'; // MDH@04NOV2019: changed into lowercase r as we're now using R for token of type reference!!!
 		// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 		// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
-		//                there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
+		//				there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
 		if(*inputCharacterType=='W'){ // whitespace isn't always 'functional' whitespace (i.e. they can be part of the actual command)
 			if(lastCommandToken->type==TT_ERROR||lastCommandToken->type==TT_COMMENT||lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)*inputCharacterType='w';
 		}else
@@ -1392,7 +1392,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	int16_t newTokenType=0; // MDH@05JUN2019: we need newTokenType AFTER appending the last character allowed in a token (like q behind a integer or real)
 	if(*inputCharacterType!='W'){ // only characters that are not whitespace can start a new token
 		// MDH@31OCT2019: if we decide to always insert an empty TT_NEWLINE token on a backtick (`) newline character
-		//                we have to be careful here though because if we're in a TT_WHITESPACE (dummy) token, we should look at the one before that (so essentially any TT_WHITESPACE should end immediately)
+		//				we have to be careful here though because if we're in a TT_WHITESPACE (dummy) token, we should look at the one before that (so essentially any TT_WHITESPACE should end immediately)
 		if(*inputCharacterType=='`'){ // a (functional) new line request character
 			// not acceptable when not end of input or behind another new line token
 			if(!endOfInput||lastCommandToken->type==TT_WHITESPACE)return NULL;
@@ -1410,7 +1410,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 		switch(newTokenType){
 			case TT_ERROR:
 				// MDH@09MAR2020: interestingly this is also the situation where a variable might have to become a function
-				//                this happens e.g. when an identifier at the end changed from function to variable
+				//				this happens e.g. when an identifier at the end changed from function to variable
 				if(lastCommandToken->type==TT_FUNCTION){
 					// we should assume that the identifier represents a (new) variable (identifier)
 					changeFunctionTokenToAVariable(command,endOfInput);
@@ -1426,7 +1426,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				break;
 			case TT_END_OF_DQSTRING:
 				// MDH@13OCT2020: if the last character is a real escape character (and not simply the escape character behind the escape character, and therefore a true \)
-				//                the only way to find out whether this is true is when the number of escape characters at the end is replicated is odd
+				//				the only way to find out whether this is true is when the number of escape characters at the end is replicated is odd
 				if(string_last_char_count(lastCommandToken->text,M_ESCAPE_CHARACTER)%2)newTokenType=TT_DQSTRING;
 				break;
 			case TT_END_OF_SQSTRING:
@@ -1476,20 +1476,20 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 		}
 		/////if(amDebugging())(*inputInfoFunction)("D");
 		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
-		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
-		//                this way it will always be there!!
+		//				this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
+		//				this way it will always be there!!
 		if(newTokenType<0){
 
 		}else
 		if(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||isTokenFinished(lastCommandToken)){
 			///////////if(amVerbose())outputInfo("!");/////(*inputInfoFunction)("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
-			//                if we're in a binary operator and move to another binary operator type it's an extension
-			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
+			//				if we're in a binary operator and move to another binary operator type it's an extension
+			//				NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
 			///////if(!isBinaryOperatorTokenType(_userInputCommand->_lastToken->type)||!isBinaryOperatorTokenType(newTokenType))
 
 			// MDH@16APR2019: a character that is assumed to indicate the assignment operator has to be checked because it could well be the = that starts the binary equality operator
-			//                which means we have to switch from assignment token to BearU token (which is unfinished)
+			//				which means we have to switch from assignment token to BearU token (which is unfinished)
 			if(newTokenType==TT_ASSIGNMENT){
 				// checking for validity of accepting as assignment is not that easy
 				// we can allow a binary operator in front of the assignment of course in that case it definitely is an assignment if it is not the = is an error!!
@@ -1501,7 +1501,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				if(amVerbose())(*inputInfoFunction)("Type of token to check: %s.",TOKENTYPE_STRING[lastTokenToCheck->type]);
 				// ASSERT lastTokenToCheck should either represent a variable or the end of a list element to allow for operator
 				// MDH@17NOV2019: we now allow multiple index elements after one another not just one
-				//                but we do need a variable in front of those
+				//				but we do need a variable in front of those
 				while(lastTokenToCheck&&lastTokenToCheck->type==TT_END_OF_LIST){ // end of a list
 					// we have to find the associated start of the list, and the token in front of that (which should be a variable!!!)
 					// which is easy because the expr tells us the start of the list BUT 
@@ -1652,7 +1652,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 						case TT_LISTELEMENT:
 							if(lastCommandToken->expr&&lastCommandToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
 								// MDH@01MAR2021 removal: if we do this the argument following would be considered containing local variables again, which we do not want to happen
-								//               TODO what should we do here then???????
+								//			   TODO what should we do here then???????
 								// if(lastCommandToken->argument==-1)lastCommandToken->argument=1;
 								/* replacing:
 								// not any comma is a function call argument separator!!!
@@ -1749,7 +1749,7 @@ Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken cons
 }
 
 // MDH@25OCT2020: tokenization consist of converting a text to a command so an immutable commandText is provided to be converted into a command
-//                NOTE that the text is tokenized within the current execution environment whatever that may be at this moment
+//				NOTE that the text is tokenized within the current execution environment whatever that may be at this moment
 Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOwner(__LINE__);
 	Mcommand* _command=NULL;
 	char commandCharacter=(commandText?*commandText:'\0');
@@ -1827,7 +1827,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				if(amVerbose())outputChar(evalInputChar);
 				evalInputCharType=INPUTCHARACTERTYPES[evalInputChar];
 				// MDH@26OCT2020: A HA commandCharacterAppended is the one doing the damage
-				//                because if a new command token is create it is not currently owned
+				//				because if a new command token is create it is not currently owned
 				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,evalInputChar,&evalInputCharType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
 				// MDH@28MAY2020: take over ownership of the new token returned
 				// MDH@26OCT2020: owned_token replacing SUBOWNED(OWNED()) not completely certain why owned_token is to be used I guess that's because there's text in there as well to be owned!!!!
@@ -1844,7 +1844,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					// MDH@27OCT2020: when pushing an environment, it is being wrapped in a value, therefore we need to disown it before passing it
 					if(pushExecutionEnvironment(disowned_environment(_evalEnvironment,owner))){
 						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
-						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
+						//				TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
 						_evalValue=getCommandValue(_evalCommand,owner,'e'); // NOTE only place where getCommandValue() is called in Mshell.c
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else{
@@ -1866,7 +1866,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // MDH@27OCT2020: Manonymousfunction and Mdefinefunction moved over here, so we can parse 
-//                the body provided into a list of commands (=tokens) to execute 
+//				the body provided into a list of commands (=tokens) to execute 
 
 // end very special M functions
 
@@ -1888,7 +1888,7 @@ void free_command(Mcommand* _command){
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
-//                therefore it is best to set the last token type using a separate function
+//				therefore it is best to set the last token type using a separate function
 // MDH@03OCT2019: every time the token type changes we need to sync the immediate feed forward text as well!!!!
 void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 	if(token){
@@ -1901,7 +1901,7 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 	///////// MDH@29OCT2019 probably don't need this here anymore: if(endOfInput)updateLastTokenAutocompletionText();
 }
 // MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
-//                this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
+//				this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* pNewToken=owned_token(__token(),owner);
 	if(pNewToken){
@@ -1918,18 +1918,18 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			// MDH@27MAY2019: let's by default copy prevToken-expr over
 
 			// MDH@18MAY2019: if a , starts an expression we won't be pointing to the opening parenthesis!!!
-			//                which would mean that on verification we'd have to jump back until we found a non-comma!!!
-			//                so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
-			//                BUT the first (dummy) expression token should be included though!!!
+			//				which would mean that on verification we'd have to jump back until we found a non-comma!!!
+			//				so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
+			//				BUT the first (dummy) expression token should be included though!!!
 			// TODO having to test an expression for starting with ( is a bit of a nuisance (so we won't accidently do that on the initial expression token and any comma token!!!)
 			// MDH@27MAY2019: set expr NOTE the first token behind the (start of) expression token, should keep pointing to NULL
 			// MDH@23JUL2019: we're going to change this a little bit because we want } ) ] to point to what the expr of prevToken points to
-			//                and NOT wait for the next token
-			//                typically a new token points to the same expr that the predecessor points to
-			//                but we want 
+			//				and NOT wait for the next token
+			//				typically a new token points to the same expr that the predecessor points to
+			//				but we want 
 			// take special care when the new token ends a list, map or function call
 			// MDH@29OCT2019: no need for \p first anymore (that we used previously) because testing for the first TT_EXPRESSION can also be done by looking at the text in the expression
-			//                TODO in time we should change the first token into a WHITESPACE token
+			//				TODO in time we should change the first token into a WHITESPACE token
 			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_length(prevToken->text)>0&&string_char(prevToken->text,0)!=' '))
 				pNewToken->expr=prevToken;
 			else
@@ -1949,10 +1949,10 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				pNewToken->envid=prevToken->envid; // MDH@09AUG2019: take over the environment id!!
 
 			// MDH@16OCT2019: if the previous token was an end of list/function call/map it was accepted and itself would be pointing to the start of the list/function call/map
-			//                therefore we do not need to set 
+			//				therefore we do not need to set 
 			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
 				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
-				//                TODO this is checked afterwards, so perhaps we should do that here?????
+				//				TODO this is checked afterwards, so perhaps we should do that here?????
 				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
 			}
 			// we still have to recognize an error
@@ -1961,7 +1961,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			/* replacing:
 			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP){
 				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
-				//                TODO this is checked afterwards, so perhaps we should do that here?????
+				//				TODO this is checked afterwards, so perhaps we should do that here?????
 				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
 			}
 			*/
@@ -1974,8 +1974,8 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=_userInputCommand->_firstToken; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
 			// MDH@07AUG2019: a token 'inherits' the prevIdentifier and argument of its previous token, to be adapted if necessary depending on what it is
-			//                of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
-			//                how about function identifiers? they are special in that they change the argument value
+			//				of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
+			//				how about function identifiers? they are special in that they change the argument value
 			/////if(amDebugging())inputInfo("E3");
 			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?) TODO shouldn't we test whether the new token type is TT_FUNCTION_CALL instead??????
 				pNewToken->prevIdentifier=prevToken;
@@ -2027,7 +2027,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 					pNewToken->prevIdentifier=prevToken->prevIdentifier;
 				}else{ // behind a variable identifier or end of function call
 					// MDH@01MAR2021: it's essential to skip local variables (because otherwise they would be treated as existing outside the special function call)
-					//                TODO should we not also not use TT_NEW_VARIABLEs????????
+					//				TODO should we not also not use TT_NEW_VARIABLEs????????
 					char* _identifierName=_getSignificantTokenCharacters(prevToken); // free asap
 					if(prevToken->type!=TT_VARIABLE||!existsAsLocalVariable(_identifierName,prevToken->envid))
 						pNewToken->prevIdentifier=prevToken;
@@ -2051,19 +2051,19 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 					// let's inspect the expr field which should point to start parenthesis
 					// BUT we should only subtract from argument when this is a `do`, `for` or `function` call
 					// MDH@09MAR2020: `function` renamed to `defun` and `function` now represents anynomous function
-					//                which has to be assigned to a variable in order to be remembered (and used)
-					//                both with `function` and `defun` the user can define the body inside the definition itself
+					//				which has to be assigned to a variable in order to be remembered (and used)
+					//				both with `function` and `defun` the user can define the body inside the definition itself
 					if(pNewToken->expr){
 						if(pNewToken->expr->type==TT_FUNCTION_CALL){ // a function call argument
 							// MDH@09MAR2020: with function calls that have a 'body' i.e. for, do, function and defun
-							//                I think we can use envid to determine whether this is the case
-							//                there's different behaviour for the different arguments
+							//				I think we can use envid to determine whether this is the case
+							//				there's different behaviour for the different arguments
 							if(pNewToken->expr->argument>0){
 								pNewToken->argument=pNewToken->argument-1;
 								if(amVerboseDebugging())
 									if(inputInfoFunction)(*inputInfoFunction)("Local variables argument!");
 								// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
-								//                what we would do on ) 
+								//				what we would do on ) 
 								if(pNewToken->argument==0){
 									// outputChar('A');
 									// MDH@25FEB2021:  we can now evaluate the command from the first token in the first argument to this special function representing the local variable map of this special function
@@ -2192,7 +2192,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
-	//                but we should remove any identifier continuation
+	//				but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
 	Mtoken* _newCommandToken=owned_token(_getToken(lastCommandToken,tokenType),owner);
 	if(_newCommandToken)
@@ -2293,7 +2293,7 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 	bool delta1undefined=floatIsUndefined(_rational1->delta),delta2undefined=floatIsUndefined(_rational2->delta);
 	// pure rationals are easy
 	if(delta1undefined&&delta2undefined){
-	    return _getRational(_num,_den,M_LD_NAN,true,true);
+		return _getRational(_num,_den,M_LD_NAN,true,true);
 	}
 	// if we assume the delta's to be very small (as they will be), the parts containing squares to be too small to care about 
 	if(delta1undefined){
@@ -2377,7 +2377,7 @@ Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
 /* replaced by methods in Mdecimal.h/c
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -2392,7 +2392,7 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -2410,7 +2410,7 @@ Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -2428,7 +2428,7 @@ Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 	if(!mpd_context){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
@@ -2480,7 +2480,7 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
 	// CORRECTION by default should NOT compute the sine table (to speed up computing pi)
-	return _getValueOfDecimal(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE));
+	return _getValueOfDecimal(pi_decimal(getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE));
 }
 
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
@@ -2491,18 +2491,18 @@ source: https://en.wikipedia.org/wiki/Chudnovsky_algorithm
 from decimal import Decimal as Dec, getcontext as gc
 
 def PI(maxK=70, prec=1008, disp=1007): # parameter defaults chosen to gain 1000+ digits within a few seconds
-    gc().prec = prec
-    K, M, L, X, S = 6, 1, 13591409, 1, 13591409
-    for k in range(1, maxK+1):
-        M = (K**3 - 16*K) * M // k**3 
-        L += 545140134
-        X *= -262537412640768000
-        S += Dec(M * L) / X
-        K += 12
-    pi = 426880 * Dec(10005).sqrt() / S
-    pi = Dec(str(pi)[:disp]) # drop few digits of precision for accuracy
-    print("PI(maxK={} iterations, gc().prec={}, disp={} digits) =\n{}".format(maxK, prec, disp, pi))
-    return pi
+	gc().prec = prec
+	K, M, L, X, S = 6, 1, 13591409, 1, 13591409
+	for k in range(1, maxK+1):
+		M = (K**3 - 16*K) * M // k**3 
+		L += 545140134
+		X *= -262537412640768000
+		S += Dec(M * L) / X
+		K += 12
+	pi = 426880 * Dec(10005).sqrt() / S
+	pi = Dec(str(pi)[:disp]) # drop few digits of precision for accuracy
+	print("PI(maxK={} iterations, gc().prec={}, disp={} digits) =\n{}".format(maxK, prec, disp, pi))
+	return pi
 
 Pi = PI()
 print("\nFor greater precision and more digits (takes a few extra seconds) - Try")
@@ -2692,24 +2692,24 @@ import cdecimal
 import decimal
 
 def pi(module, prec):
-    """From the decimal.py documentation"""
-    module.getcontext().prec = prec + 2
-    D = module.Decimal
-    lasts, t, s, n, na, d, da = D(0), D(3), D(3), D(1), D(0), D(0), D(24)
-    while s != lasts:
-        lasts = s
-        n, na = n+na, na+8
-        d, da = d+da, da+32
-        t = (t * n) / d
-        s += t
-    module.getcontext().prec -= 2
-    return +s
+	"""From the decimal.py documentation"""
+	module.getcontext().prec = prec + 2
+	D = module.Decimal
+	lasts, t, s, n, na, d, da = D(0), D(3), D(3), D(1), D(0), D(0), D(24)
+	while s != lasts:
+		lasts = s
+		n, na = n+na, na+8
+		d, da = d+da, da+32
+		t = (t * n) / d
+		s += t
+	module.getcontext().prec -= 2
+	return +s
 
 for i in range(10000):
-    x = pi(cdecimal, 28)
+	x = pi(cdecimal, 28)
 
 for i in range(10000):
-    y = pi(decimal, 28)
+	y = pi(decimal, 28)
  */
 
 /* MDH@14NOV2019: replaced by the M variable and M function
@@ -3146,11 +3146,11 @@ Mvalue* Mb(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
 /* f : number to convert.
  * num, denom: returned parts of the rational.
  * md: max denominator value.  Note that machine floating point number
- *     has a finite resolution (10e-16 ish for 64 bit double), so specifying
- *     a "best match with minimal error" is often wrong, because one can
- *     always just retrieve the significand and return that divided by 
- *     2**52, which is in a sense accurate, but generally not very useful:
- *     1.0/7.0 would be "2573485501354569/18014398509481984", for example.
+ *	 has a finite resolution (10e-16 ish for 64 bit double), so specifying
+ *	 a "best match with minimal error" is often wrong, because one can
+ *	 always just retrieve the significand and return that divided by 
+ *	 2**52, which is in a sense accurate, but generally not very useful:
+ *	 1.0/7.0 would be "2573485501354569/18014398509481984", for example.
  */
 /*
 Mrational* _getLongDoubleRational(long double f){ // taking out: int64_t md, int64_t *num, int64_t *denom){
@@ -3195,40 +3195,40 @@ Mrational* _getLongDoubleRational(long double f){ // taking out: int64_t md, int
 */
 /* a Java version
 public Rational limitDenominator(long maximumDenominator) {
-    if (maximumDenominator < 1) {
-        throw new IllegalArgumentException("Denominator cannot be less than 1.");
-    }
-    if(this.den <= maximumDenominator)
-        // we can't get closer than the current value
-        return this;
-    long p0 = 0;
-    long q0 = 1;
-    long p1 = 1;
-    long q1 = 0;
-    long n = this.num;
-    long d = this.den;
-    while(true) {
-        long a = n / d;
-        long q2 = q0 + a * q1;
-        if(q2 > maximumDenominator)
-            break;
-        long oldP0 = p0;
-        p0 = p1;
-        q0 = q1;
-        p1 = oldP0 + a * p1;
-        q1 = q2;
-        long oldN = n;
-        n = d;
-        d = oldN - a * d;
-    }
-    long k = (maximumDenominator - q0) / q1;
-    Rational bound1 = new Rational(p0 + k * p1, q0 + k * q1);
-    Rational bound2 = new Rational(p1, q1);
-    if(bound2.minus(this).abs().compareTo(bound1.minus(this).abs()) <= 0){
-        return bound2;
-    } else {
-        return bound1;
-    }
+	if (maximumDenominator < 1) {
+		throw new IllegalArgumentException("Denominator cannot be less than 1.");
+	}
+	if(this.den <= maximumDenominator)
+		// we can't get closer than the current value
+		return this;
+	long p0 = 0;
+	long q0 = 1;
+	long p1 = 1;
+	long q1 = 0;
+	long n = this.num;
+	long d = this.den;
+	while(true) {
+		long a = n / d;
+		long q2 = q0 + a * q1;
+		if(q2 > maximumDenominator)
+			break;
+		long oldP0 = p0;
+		p0 = p1;
+		q0 = q1;
+		p1 = oldP0 + a * p1;
+		q1 = q2;
+		long oldN = n;
+		n = d;
+		d = oldN - a * d;
+	}
+	long k = (maximumDenominator - q0) / q1;
+	Rational bound1 = new Rational(p0 + k * p1, q0 + k * q1);
+	Rational bound2 = new Rational(p1, q1);
+	if(bound2.minus(this).abs().compareTo(bound1.minus(this).abs()) <= 0){
+		return bound2;
+	} else {
+		return bound1;
+	}
 }
 */
 Mrational* _getRationalCopy(Mrational* _rational){Mallocationowner owner=getOwner(__LINE__);
@@ -3372,7 +3372,7 @@ Mvalue* Mf(Mvalue* _value){
 Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	// MDH@10DEC2020: this is a bit of an issue with time values in that _getValueText technically returns the epoch time text representation
-	//                and not the timestamp (calendar time)
+	//				and not the timestamp (calendar time)
 	Mstring* _valueText=owned_string(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
 		if(amVerbose())
@@ -3403,9 +3403,9 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)re
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
 	Mvalue* _sumValue=NULL;
-    if(_value){
+	if(_value){
 		if(amVerbose())outputValue("Computing the sum of '",_value,"'.\n");
-        if(_value->type==VT_LIST){
+		if(_value->type==VT_LIST){
 			// all the values in the list could be integer
 			Mlist* list=_value->value._list;
 			if(list){
@@ -3433,8 +3433,8 @@ Mvalue* Msum(Mvalue* _value){
 			}
 		}else // if not something that can be summed, returning the original value
 			_sumValue=_value;
-    }
-    return _sumValue;
+	}
+	return _sumValue;
 }
 
 // MDH@10OCT2019: applying unary operator (=function) to all elements in a list
@@ -3708,7 +3708,7 @@ but <value><operator><value> here operator is a set of token types that separate
 */
 
 /* MDH@07JUL2019: we need to put the current token of the expression being evaluated in the execution environment, so we can execute a user function call
-                  without loosing the original expression we're evaluating
+				  without loosing the original expression we're evaluating
 Mtoken* expressionToken=NULL; // the current evaluation token
 */
 /**
@@ -3748,7 +3748,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	if(amVerboseDebugging())
 		output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
-	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
+	//				then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mlist* _list=owned_list(__list("getValueOfList"),owner);
 	if(!_list){
 		outputError("Failed to create a list to return");
@@ -3822,7 +3822,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
 			if(amVerboseDebugging())
 				output("Appending list element #%llu.\n",listElementIndex);
-		    long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
+			long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex<=0){
 				output("%s",M_ERROR_PREFIX);
@@ -3899,7 +3899,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				if(_functionExecutionEnvironment){
 					// ASSERT now it exists I ALWAYS need to free it 
 					// MDH@21OCT2020: it makes sense to pass a disowned version of environment to pushExecutionEnvironment() so it can take over ownership
-					//                NO because I want to free this given environment push should not take over ownership
+					//				NO because I want to free this given environment push should not take over ownership
 					if(pushExecutionEnvironment(disowned_environment(_functionExecutionEnvironment,owner))){
 						// ASSERT once pushed successfully I am responsible of ALWAYS popping
 						// execute ALL the commands in _bodyCommandList
@@ -4121,7 +4121,7 @@ bool startFunctionBodyInput(){
 	bool result=true;
 	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next; // remember the function body request to do next
 	// MDH@02MAR2020 ADJUSTMENT: because _functionName is now a heap copy of the original function name (from the function argument list to 'function') we need to free it BEFORE returning the result
-	//                           now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
+	//						   now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
 	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
 	if(!functionBodyInputCreated)output("%sFailed to honour the request to input the body of function '%s'.\n",M_ERROR_PREFIX,_firstFunctionBodyRequest->_functionName);
 	free_functionbodyrequest(_firstFunctionBodyRequest,owner_functionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request (if we succeed to request the function body input or not)
@@ -4166,12 +4166,12 @@ bool endFunctionBodyInput(){
  * this value can also be a composite value like a list or a map, nevertheless a list or a map is a single value
  * it makes sense to delegate getting a list or a map literal to another function
  * NOTE getValueOfExpression() knows nothing about the type of expression it is processing, so it has to check whether to delegate or not
- *      however the general structure would be: <value><binary operator><value> or perhaps <value><ternary operator><value> but the idea is the same
- *      we could store these parts in elements of a list, where operator is stored as string and value as Mvalue*, so technically simply a list of Mvalue's so an Mlist*
- *      we can call these operands and operators or perhaps expressionelements??????
+ *	  however the general structure would be: <value><binary operator><value> or perhaps <value><ternary operator><value> but the idea is the same
+ *	  we could store these parts in elements of a list, where operator is stored as string and value as Mvalue*, so technically simply a list of Mvalue's so an Mlist*
+ *	  we can call these operands and operators or perhaps expressionelements??????
  * 			at the end the operators would need to be removed from the expressionelements array and we'd end up with a single value as result...
  * 		  if the resulting value is an variable, we should return the value of the variable, technically this means that an expressionelement cannot be a variable that makes sense
- *      so I guess we should only accept assignments at the start of an expression (which makes perfect sense)
+ *	  so I guess we should only accept assignments at the start of an expression (which makes perfect sense)
  */
 
 /**
@@ -4237,7 +4237,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 					if(variable||strlen(_valuereference->_name->chars)==1){
 						referencedValue=_getValueOfReference(_getReference(variable));
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
-						//                so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
+						//				so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
 					}else
 						output("%sReferenced variable '%s' does not exist.\n",M_ERROR_PREFIX,_valuereference->_name->chars+1);
 				}else // a non-referenced variable which means we are supposed to return the value of the variable
@@ -4266,7 +4266,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 					// let's get the first index/attribute name
 					Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@19JUN2020 not anymore: MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
-					//                this works for lists not for maps
+					//				this works for lists not for maps
 					// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
 					Mvalue*** _valueholders=MALLOC_1(sizeof(void*),-'_',owner); // set immediately so MALLOC suffices
 					if(_valueholders){
@@ -4289,11 +4289,11 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									// for each list element value we're going to need numberOfValueholders elements in newValueholders BUT with nested lists we can't tell in advance how many so we might need to use REALLOC to do so
 									// we can start with initializing newValueholders to have at least numberOfValueholders elements
 									// MDH@30MAR2020: we need to create newValueholder here because when we have a list as index we get copies of the value holder, so instead of assigning to value holder we assign to new value holder instead
-									//                of course this makes it a bit more complicated, of course the alternative is to only duplicate the value holders when we come across a list, which makes perfect sense as well
-									//                obviously we can check for a list BEFORE the loop instead of in the loop
-									//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
+									//				of course this makes it a bit more complicated, of course the alternative is to only duplicate the value holders when we come across a list, which makes perfect sense as well
+									//				obviously we can check for a list BEFORE the loop instead of in the loop
+									//				we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 									// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
-									//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
+									//				so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
 									Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
 									numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
@@ -4308,7 +4308,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
 											// MDH@06APR2020: it is very hard to determine what the end result should now be because an 'flattened' list element could now be a list itself, so it is hard to determine what is to be indexed...
-											//                BUT it is still possible by looking at the first element in sublists...
+											//				BUT it is still possible by looking at the first element in sublists...
 											// let's check if all index list elements are integer, if not, convert integers to their text equivalent
 											Mlistelement* flattenedIndexListelement=_flattenedIndexList->_first;
 											Mvalue* flattenedIndexListelementValue;
@@ -4353,12 +4353,12 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 															// if we are accessing a map we have to ascertain that the attribute name in a string
 															if((*valueholder)->type==VT_MAP){
 																// MDH@22OCT2020: because the attributes are supposed to be text, we simply convert all indices to text using _getValueText(indexvalue,true)
-																//                which means that even integer keys can be used
+																//				which means that even integer keys can be used
 																// removing: if(_flattenedIndexList->valuetype!=VT_INTEGER){
 																	// MDH@06APR2020: if indexorattributenameListelementValue can now also be a list of indices we need to iterate over the list elements and apply each list element as an index
-																	//                so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
-																	//                which means that we can only retrieve successive elements from maps
-																	//                we could flatten the value here????? so if it is a list we get the list of indices here
+																	//				so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
+																	//				which means that we can only retrieve successive elements from maps
+																	//				we could flatten the value here????? so if it is a list we get the list of indices here
 																	Mmap* valueholderMap=(*valueholder)->value._map;
 																	Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
 																	if(report)
@@ -4604,10 +4604,10 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 		if(itemidList){ // the hard part: index/attribute name list assignment!!
 			// _valuereference->_value=_newValue; // MDH@07APR2020: TODO do we need this?????
 			// MDH@25MAR2020: we can cut the user some slack by allowing automatic initialization to a list or map depending on the whether a property is added or an index
-			//                so value needs to be a list or a map or NULL to be indexable unless we allow values to become maps, or making a list
-			//                but that's dangerous, so _value&& changed to !_value||
+			//				so value needs to be a list or a map or NULL to be indexable unless we allow values to become maps, or making a list
+			//				but that's dangerous, so _value&& changed to !_value||
 			// MDH@26MAR2020: BUT in order to be able to put a value into the variable we need the address of the value pointer, i.e. the value holder so to speak
-			//                i.e. we need a pointer to where the value pointer is stored, could we be using & on the value pointer being returned to get at the holder?????????
+			//				i.e. we need a pointer to where the value pointer is stored, could we be using & on the value pointer being returned to get at the holder?????????
 			// MDH@28MAR2020: if we allow item index elements to be lists we need an array of value holders
 			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name->chars);
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
@@ -4622,7 +4622,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				// let's get the first index/attribute name
 				Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
-				//                this works for lists not for maps
+				//				this works for lists not for maps
 				// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
 				Mvalue*** _valueholders=MALLOC_1(sizeof(void*),-'_',owner); // set immediately so MALLOC suffices // MDH@19JUN2020: a single value holders array
 				if(_valueholders){
@@ -4644,11 +4644,11 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 								// for each list element value we're going to need numberOfValueholders elements in newValueholders BUT with nested lists we can't tell in advance how many so we might need to use REALLOC to do so
 								// we can start with initializing newValueholders to have at least numberOfValueholders elements
 								// MDH@30MAR2020: we need to create newValueholder here because when we have a list as index we get copies of the value holder, so instead of assigning to value holder we assign to new value holder instead
-								//                of course this makes it a bit more complicated, of course the alternative is to only duplicate the value holders when we come across a list, which makes perfect sense as well
-								//                obviously we can check for a list BEFORE the loop instead of in the loop
-								//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
+								//				of course this makes it a bit more complicated, of course the alternative is to only duplicate the value holders when we come across a list, which makes perfect sense as well
+								//				obviously we can check for a list BEFORE the loop instead of in the loop
+								//				we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 								// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
-								//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
+								//				so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
 								// if(_valuereference->_itemid)outputValue("Item id before flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 								Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
 								// if(_valuereference->_itemid)outputValue("Item id after  flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
@@ -4665,7 +4665,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
 										// MDH@06APR2020: it is very hard to determine what the end result should now be because an 'flattened' list element could now be a list itself, so it is hard to determine what is to be indexed...
-										//                BUT it is still possible by looking at the first element in sublists...
+										//				BUT it is still possible by looking at the first element in sublists...
 										// let's check if all index list elements are integer, if not, convert integers to their text equivalent
 										Mlistelement* flattenedIndexListelement=_flattenedIndexList->_first;
 										Mvalue* flattenedIndexListelementValue;
@@ -4735,9 +4735,9 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 															// MDH@23OCT2020: same here
 															// removing: if(_flattenedIndexList->valuetype!=VT_INTEGER){
 																// MDH@06APR2020: if indexorattributenameListelementValue can now also be a list of indices we need to iterate over the list elements and apply each list element as an index
-																//                so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
-																//                which means that we can only retrieve successive elements from maps
-																//                we could flatten the value here????? so if it is a list we get the list of indices here
+																//				so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
+																//				which means that we can only retrieve successive elements from maps
+																//				we could flatten the value here????? so if it is a list we get the list of indices here
 																Mmap* valueholderMap=(*valueholder)->value._map;
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
 																if(report)
@@ -4981,8 +4981,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 							if((*_valueholders[valueholderIndex])->type==VT_LIST){
 								// NOTE allow appending using 0 or inserting with negative values
 								// MDH@18OCT2019: we now have four situations: 0=prepend, NULL=append, negative integers=set from the back (-1=last element)
-								//                so if no list element is defined, we just append to the list!!!!
-								//                the only invalid situations is when the _value is NULL although it still could NOT denote an integer
+								//				so if no list element is defined, we just append to the list!!!!
+								//				the only invalid situations is when the _value is NULL although it still could NOT denote an integer
 								long long index=(indexorattributenameListelement?getValueInteger(indexorattributenameListelement->_value):M_LL_INVALID);
 								// replace the index to the actual index with the index of the element in the list (so getReferencedValue() will not complain!!!)
 								if(index!=M_LL_INVALID){
@@ -5019,14 +5019,14 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				output("%sVariable '%s' cannot be indexed: its value is not a list or a map.\n",M_ERROR_PREFIX,_valuereference->_name);
 		}else{
 			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
-			//                the same way as happens when you use the defun internal function
+			//				the same way as happens when you use the defun internal function
 			// MDH@23DEC2020: BUG FIX we have an issue here in that the given variable should be created if it does not currently exist, which means we should NOT call setValue()
-			//                        because setValue() does not create the variable!!!!
-			//                SOLUTION so similar to what Mset() does we ascertain to add the variable if it does not yet exist, except we always use type VT_UNDEFINED (which is safer!!)
+			//						because setValue() does not create the variable!!!!
+			//				SOLUTION so similar to what Mset() does we ascertain to add the variable if it does not yet exist, except we always use type VT_UNDEFINED (which is safer!!)
 			char* variableName=_valuereference->_name->chars;
 			Menvironment* executionEnvironment=getExecutionEnvironment();
 			Mvariable* variable=getVariable(executionEnvironment,variableName,false); // if the variable exists, variable will be non-NULL
-	        if((variable||addVariable(executionEnvironment,owner,variableName,VT_UNDEFINED,false))
+			if((variable||addVariable(executionEnvironment,owner,variableName,VT_UNDEFINED,false))
 				&&setValue(executionEnvironment,variableName,_newValue)){
 				// NOTE even if the value itself is NULL, its address is never NULL
 				_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
@@ -5170,9 +5170,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		}
 		*/
 		// MDH@17NOV2019: some value references can be indexed BEFORE applying the unary operators
-		//                the index can be determined following determining what is being indexex
-		//                alternatively: we can determine the initial value reference and check afterwards
-		//                we can start with making the theoretic indexing possibility
+		//				the index can be determined following determining what is being indexex
+		//				alternatively: we can determine the initial value reference and check afterwards
+		//				we can start with making the theoretic indexing possibility
 		bool canbeindexedtheoretically=false; // this should have the same result as the tokenizer does
 		char* _significantTokenText=_getSignificantTokenCharacters(expressionToken);
 		switch(expressionToken->type){
@@ -5182,8 +5182,8 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					if(function){
 						canbeindexedtheoretically=true; // MDH@17NOV2019: stick to what the tokenizer allow TODO exclude special functions
 						// MDH@17JUL2019: we know the function and when the name is one of the special functions
-						//                like 'function' to define a function we know not to evaluate the third argument!!
-						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
+						//				like 'function' to define a function we know not to evaluate the third argument!!
+						//				it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
 						// MDH@25JUL2019: adding if, while and for functions
 						unsigned long long numberOfFunctionParameters=(function->_parameterMap?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
 						/* MDH@28OCT2020: defining user functions no longer 'special' function (calls)
@@ -5201,7 +5201,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						// MDH@23DEC2020: the 'new' for function works the same way as while in that all arguments should not be evaluated beforehand (i.e. will be passed as tokens to Mforfunnction)
 						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){
 							// MDH@21DEC2020: if we decide that all arguments are not to be evaluated
-							//                we can have as many as we want!!
+							//				we can have as many as we want!!
 							numberOfElementsToNotEvaluate=LLONG_MAX; // all elements should NOT be evaluated
 							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
 							numberOfFunctionParameters=LLONG_MAX; // replacing 2 with the actual number of parameters we allow for the function
@@ -5209,7 +5209,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						}else
 						if(!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
 							// MDH@21DEC2020: if we decide that all arguments are not to be evaluated
-							//                we can have as many as we want!!
+							//				we can have as many as we want!!
 							numberOfElementsToNotEvaluate=LLONG_MAX; // all elements should NOT be evaluated
 							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
 							numberOfFunctionParameters=LLONG_MAX; // replacing 2 with the actual number of parameters we allow for the function
@@ -5322,11 +5322,11 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			case TT_NEW_VARIABLE: // a non-existing value reference
 				// we have to create the variable first (TODO should we wait until actually assigning???)
 				// NOTE in certain situations tokenizing occurs outside the evaluation environment so it could be marked as new where it will not be when evaluated
-				//      therefore I've adapted addVariable() so it won't return false when the variable already exists
+				//	  therefore I've adapted addVariable() so it won't return false when the variable already exists
 				// MDH@08AUG2019: any variable that's marked as new should be added to the top-level environment if it does not exist there
-				//                we can make that happen by passing in NULL for getExecutionEnvironment() in which case it should check getExecutionEnvironment() only (and not all the parents as well)
+				//				we can make that happen by passing in NULL for getExecutionEnvironment() in which case it should check getExecutionEnvironment() only (and not all the parents as well)
 				// MDH@09AUG2019: I suppose only explicit local variables (in special function calls) should not be checked to exist in parent environments, but otherwise they should
-				//                we could give a warning if this variable is defined inside a special function call and is not a local variable
+				//				we could give a warning if this variable is defined inside a special function call and is not a local variable
 				////////if(amVerbose())
 				if(amVerboseDebugging())
 					output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
@@ -5363,10 +5363,10 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
 					// MDH@18OCT2019: let's allow a NULL value to allow for appending to a list (as with Python)
-					//                how should we treat an empty list???????? differently I guess
-					//                the problem with NULL is that _itemid is NULL by itself, so this poses a problem it can't be NULL
-					//                I think we'd get an empty list in return not a NULL value (which is a problem if we do!!!!)
-					//                for now allow an empty list
+					//				how should we treat an empty list???????? differently I guess
+					//				the problem with NULL is that _itemid is NULL by itself, so this poses a problem it can't be NULL
+					//				I think we'd get an empty list in return not a NULL value (which is a problem if we do!!!!)
+					//				for now allow an empty list
 					if(indexListValue&&indexListValue->type==VT_LIST){ // a non-empty list
 						if(amVerbose())outputValue("Index id: '",indexListValue,"'.\n");
 						// MDH@15OCT2019: apparently there is enlisting too many: we can take the first element to unlist what we received BUT this must mean there's a mistake somewhere
@@ -5407,9 +5407,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			case TT_REFERENCE:
 				// TODO might allow indexing in the future???
 				// MDH@04NOV2019: a reference is an interesting little bugger which we unfortunately need for certain function calls like settype()
-				//                for now we only allow referencing FULL variables i.e. not parts of variables like array or map elements although that seems to be a straightforward extension
-				//                so it's much similar to an unindexed variable at the moment
-				//                for now the only thing we're going to do is store the name of the reference (i.e. starting with @) (without value) so that whoever uses it will know how to resolve it!!!
+				//				for now we only allow referencing FULL variables i.e. not parts of variables like array or map elements although that seems to be a straightforward extension
+				//				so it's much similar to an unindexed variable at the moment
+				//				for now the only thing we're going to do is store the name of the reference (i.e. starting with @) (without value) so that whoever uses it will know how to resolve it!!!
 				// MDH@17APR2020: here we go again
 				_valueReference->_name=owned_chars(_getChars(_significantTokenText),Msubowner(owner,1)); // MDH@09JUN2020: OOPS ownership again
 				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
@@ -5433,8 +5433,8 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(strlen(_realSignificantTokenText)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
 						if(amVerboseDebugging())output("Parsing '%s' to a decimal.\n",string(pRealText));
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
-						//                the problem is that we need a context, and therefore a decimal precision 
-						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
+						//				the problem is that we need a context, and therefore a decimal precision 
+						//				to this purpose I've added an integer variable in which the actual decimal precision can be set
 						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
 						free(_realSignificantTokenText); // freed!!!
 						if(amVerboseDebugging())output("Real part string length: %u.\n",l);
@@ -5470,7 +5470,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
 							// outputBiginteger("Storing the small integer of '",_biginteger,"' as referenced value.\n"); // DEBUG
 							_valueReference->_value=_getIntegerValue(mp_get_i64(MP_INT_POINTER(_biginteger)));
-              				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
+			  				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
 							FREE_BIGINTEGER(_biginteger,owner);
 						}else{
 							outputBiginteger("Storing big integer '",_biginteger,"' as referenced value.\n"); // DEBUG
@@ -5538,11 +5538,11 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		}
 
 		// MDH@17NOV2019: if indexing is theoretically possible, we should further check for indexes
-		//                now, even if _valueReference is NULL we have to consume the indexes if present
+		//				now, even if _valueReference is NULL we have to consume the indexes if present
 		if(canbeindexedtheoretically){
 			// MDH@24MAR2020: 'indexing' can either take the form of something inside square brackets but now also combined with property names using dot notation
-			//                BECAUSE all 'indexing' can be done using square bracket notation every property should become an element in the itemIdsList
-			//                so apart from testing for TT_LIST (which start an square bracket index list), we should also test for TT_PROPERTY which also results in adding something to the index list
+			//				BECAUSE all 'indexing' can be done using square bracket notation every property should become an element in the itemIdsList
+			//				so apart from testing for TT_LIST (which start an square bracket index list), we should also test for TT_PROPERTY which also results in adding something to the index list
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 			// MDH@17NOV2019: moved over from getValueOfExpression() to where it should below i.e. before unary operators are applied!!!
 			// MDH@24MAR2020: it's probably easier to create a list of item ids here to be filled with indices (some of which can be property names)
@@ -5623,7 +5623,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 				// MDH@17NOV2019: applying a unary operator is dangerous because we may set the value BUT that's NOT enough
-				//                because if the name and/or item id remains it will be used again later on
+				//				because if the name and/or item id remains it will be used again later on
 				///output("A\n");
 				if(_valueReference->_name){
 					///output("B\n");
@@ -5636,7 +5636,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					///output("D\n");
 					// conform what would happen in free_valuereference!!! 
 					// TODO consider alternative creating a new value reference
-					//      which is probably better!!!!
+					//	  which is probably better!!!!
 					assignValue(&_valueReference->_itemid,NULL);
 					///output("E\n");
 					/* which is identical to:
@@ -5720,7 +5720,7 @@ static Mvaluetype getMatchingListValuetype(Mvaluetype listValuetype,Mvaluetype v
 Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	if(!_list1)return _list2;if(!_list2)return _list1;
 	// MDH@30OCT2019: ALWAYS apply the binary operator i.e. do NOT just return the value!!! (which makes perfect sense for equality / unequality)
-	//                TODO if the result equals NULL, should we then NOT add the given element?????
+	//				TODO if the result equals NULL, should we then NOT add the given element?????
 	// ASSERT neither are NULL
 	// MDH@03NOV2020: the return type of the list really depends on the binary operator applied, whether or not it maintains type integrity, so it makes sense to actually pass in the list result type as a separate argument
 	Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list1->valuetype,_list2->valuetype):VT_UNDEFINED),owner); // TODO if the types are the same use that?
@@ -5956,10 +5956,10 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 	if(isValueZero(_value1)==M_TRUE)return _value2;
 	if(isValueZero(_value2)==M_TRUE)return _value1;
 	// MDH@24OCT2019: integer operations should be done using big integers, if the result is to be integer we map to M_LL_INVALID if the result is out of range!!!!
-	//                we first do this for the add() binary operator, after this we're going to role this procedure out on the other binary operations!!!
-	//                this means:
-	//                1. comment out the next block
-	//                2. function getBigintegerInteger() was created in order to map the sum big integer into the valid range of integers (if possible)
+	//				we first do this for the add() binary operator, after this we're going to role this procedure out on the other binary operations!!!
+	//				this means:
+	//				1. comment out the next block
+	//				2. function getBigintegerInteger() was created in order to map the sum big integer into the valid range of integers (if possible)
 	/* no longer treat differently here
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
@@ -5974,7 +5974,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
 		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
 		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
-		//             
+		//			 
 		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
@@ -5998,7 +5998,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
-		//                but if we can't don't
+		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			if(!_sumBiginteger)return _getIntegerValue(M_LL_INVALID);
@@ -6117,7 +6117,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
 		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
 		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
-		//             
+		//			 
 		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
@@ -6143,7 +6143,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner); 
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
-		//                but if we can't don't
+		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			if(!_differenceBiginteger)return _getIntegerValue(M_LL_INVALID);
@@ -6211,7 +6211,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
 		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
 		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
-		//             
+		//			 
 		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
@@ -6232,7 +6232,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
-		//                but if we can't don't
+		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			if(!_productBiginteger)return _getIntegerValue(M_LL_INVALID);
@@ -6442,7 +6442,7 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 	return disowned_rational(_rationalPower,owner);
 }
 mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){// TODO check ownership 
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
+	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
 	return(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 }
 Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
@@ -6495,7 +6495,7 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 		else
 		if(!isBigintegerOne(exponentBiginteger)){
 			// get a decimal context
-			Mdecimalcontext* decimalcontext=_getDecimalcontext(baseDecimal->prec);
+			Mdecimalcontext* decimalcontext=getDecimalcontext(baseDecimal->prec);
 			mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 			// determine half the exponent
 			Mbiginteger* _halfexponentBiginteger=owned_biginteger(__biginteger(),owner);
@@ -6536,7 +6536,7 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 	if(result==MP_OKAY){
 		if(!isBigintegerOne(baseBiginteger)&&!isBigintegerZero(exponentBiginteger)){
 			Mbiginteger *_multiplierBiginteger=owned_biginteger(_getBigintegerCopy(baseBiginteger),owner)
-			           ,*_exponentBiginteger=owned_biginteger(_getBigintegerCopy(exponentBiginteger),owner);
+					   ,*_exponentBiginteger=owned_biginteger(_getBigintegerCopy(exponentBiginteger),owner);
 			if(_multiplierBiginteger&&_exponentBiginteger){
 				if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))!=MP_YES)mp_set_i32(MP_INT_POINTER(powerBiginteger),1);else result=mp_copy(MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(powerBiginteger)); // initialize powerBiginteger to 1
 				// can we do this iteratively???
@@ -6575,7 +6575,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						// TODO how to check whether rootDegreeBiginteger is nottoo large????
 						mp_err result=MP_OKAY;
 						// MDH@13OCT2019: TODO if there's exactly one mp_digit being used in the root degree we can improve on the initial approximation
-						//                NOTE assuming that 
+						//				NOTE assuming that 
 						int64_t rootDegreeDigit=mp_get_i64(MP_INT_POINTER(rootDegreeBiginteger));
 						// let's change the initial approximation of the root using the n root method on the big integer numerator and denominator
 						if((result=mp_n_root(MP_INT_POINTER(p_a),(mp_digit)rootDegreeDigit,MP_INT_POINTER(_pk)))==MP_OKAY&&
@@ -6599,7 +6599,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 								// MDH@30MAY2020: TOTO own all the bigintegers
 								// we need some additional helper big integers
 								Mbiginteger *_pktothepowern=owned_biginteger(__biginteger(),owner)
-								           ,*_qktothepowern=owned_biginteger(_getBiginteger(1),owner)
+										   ,*_qktothepowern=owned_biginteger(_getBiginteger(1),owner)
 										   ,*_delta1=owned_biginteger(__biginteger(),owner)
 										   ,*_delta2=owned_biginteger(__biginteger(),owner)
 										   ,*_distancenumerator=owned_biginteger(__biginteger(),owner)
@@ -6607,14 +6607,14 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										   ,*_divremainder=owned_biginteger(__biginteger(),owner)
 										   ,*_gcd=owned_biginteger(__biginteger(),owner);
 								Mbiginteger *_num1=owned_biginteger(__biginteger(),owner)
-								           ,*_num=owned_biginteger(__biginteger(),owner)
+										   ,*_num=owned_biginteger(__biginteger(),owner)
 										   ,*_den=owned_biginteger(__biginteger(),owner)
 										   ,*_nextpk=owned_biginteger(__biginteger(),owner)
 										   ,*_nextqk=owned_biginteger(__biginteger(),owner); // initially the same as _pk and _qk
 								Mbiginteger *_distancedenominator=owned_biginteger(__biginteger(),owner); // the distance to the root
 								Mbiginteger *_pkctothepowern=owned_biginteger(__biginteger(),owner)
 										   ,*_pkonthisside=owned_biginteger(__biginteger(),owner)
-								           ,*_pkontheotherside=owned_biginteger(__biginteger(),owner)
+										   ,*_pkontheotherside=owned_biginteger(__biginteger(),owner)
 										   ,*_deltapk=owned_biginteger(__biginteger(),owner)
 										   ,*_distanceonthisside=owned_biginteger(__biginteger(),owner)
 										   ,*_distanceontheotherside=owned_biginteger(__biginteger(),owner)
@@ -6821,7 +6821,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 	return disowned_rational(_rationalBigintegerRootRational,owner);
 }
 // MDH@10OCT2019: better to return a decimal instead of already wrapping the result in a value (so we can do postprocessing!!!!)
-//                wait we're wrapping it because the result could be different from a decimal!!!!
+//				wait we're wrapping it because the result could be different from a decimal!!!!
 Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegreeBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _bigintegerRootValue=NULL;
 	if(rootArgumentValue&&rootDegreeBiginteger){
@@ -6837,7 +6837,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 			if(amVerbose())
 				outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
 			// we need an mpd_context for use in the decimal computations!!
-			Mdecimalcontext* _decimalcontext=_getDecimalcontext(_rootArgumentDecimal->prec);
+			Mdecimalcontext* _decimalcontext=getDecimalcontext(_rootArgumentDecimal->prec);
 			mpd_context_t* mpd_context=(_decimalcontext?_decimalcontext->mpd_context:get_default_mpd_context());
 			if(mpd_context){
 				Mdecimal* _rootDegreeDecimal=owned_decimal(_getBigintegerDecimal(rootDegreeBiginteger),owner);
@@ -6846,9 +6846,9 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 						outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
 					// MDH@10OCT2019: to anticipate on root arguments smaller than 1 of which the root will be larger instead of smaller we use the square root as first approximation
 					// MDH@10OCT2019: because we are approaching the root from above, as soon as the next approximation is equal to or larger than the previous approximation we're done
-					//                this means not using the distance anymore because e.g. 2**(7/9) with decimal precision 20 failed to converge (resulted in toggling between two decimals that different by the final digit)
+					//				this means not using the distance anymore because e.g. 2**(7/9) with decimal precision 20 failed to converge (resulted in toggling between two decimals that different by the final digit)
 					Mdecimal *_bigintegerRootDecimal=owned_decimal(__decimal(mpd_context,1,0),owner)
-					        ,*_nextBigintegerRootDecimal=owned_decimal(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
+							,*_nextBigintegerRootDecimal=owned_decimal(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
 					if(_bigintegerRootDecimal&&_nextBigintegerRootDecimal){
 						if(amVerbose())
 						outputInfo("Root computation result decimals created...");
@@ -6887,7 +6887,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 											Mdecimal *_distance=__decimal(mpd_context,0,0),*_prevdistance=__decimal(mpd_context,0,0);
 											*/
 											Mdecimal *_product=owned_decimal(__decimal(mpd_context,0,0),owner)
-											        ,*_quotient=owned_decimal(__decimal(mpd_context,0,0),owner)
+													,*_quotient=owned_decimal(__decimal(mpd_context,0,0),owner)
 													,*_productplusquotient=owned_decimal(__decimal(mpd_context,0,0),owner)
 													,*_power=owned_decimal(__decimal(mpd_context,0,0),owner);
 											// initial value of the quotient denominator that we need for checking whether we're done and in the computation
@@ -7013,7 +7013,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 	if(_value1->type==VT_FLOAT)return _getFloatValue(getRealPowerValue(_value1->value._float->ld,_value2));
 	// ASSERT neither is real
 	// MDH@27OCT2019: typically for integers with an expoonent that is positive the result should also be integer
-	//                and we deal with that separatately
+	//				and we deal with that separatately
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&
 		((_value2->type==VT_INTEGER&&isIntegerPositive(_value2->value._integer)==M_TRUE)||
 		 (_value2->type==VT_BIGINTEGER&&isBigintegerPositive(_value2->value._biginteger)==M_TRUE))){
@@ -7084,13 +7084,13 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 					if(exponentDenominator&&!isBigintegerOne(exponentDenominator)){ // a 'real' rational (i.e. not simply pretending to be one)
 						// MDH@10OCT2019: we can improve on the computation of the power by computing the integer quotient of the rational and the remainder
 						// MDH@10OCT2019: we can even improve even more by choosing the smallest of the numerator and denominator to be used in the power computation
-						//                NO we can't because 2**(x/y) is NOT equal to 1/2**(y/x) as I conjectured, so we have to stick to the original approximation for now
+						//				NO we can't because 2**(x/y) is NOT equal to 1/2**(y/x) as I conjectured, so we have to stick to the original approximation for now
 						// MDH@13OCT2019: if the numerator is negative we will have to invert the solution
 						
 						mp_ord numdencomp=mp_cmp(MP_INT_POINTER(_positiveExponentNumerator),MP_INT_POINTER(exponentDenominator));
 						if(numdencomp!=MP_EQ){ // numerator and denominator are not equal
 							Mbiginteger *_integerdividend=owned_biginteger(__biginteger(),owner)
-							           ,*_remainder=owned_biginteger(__biginteger(),owner); // the defaults when the denominator equals NULL
+									   ,*_remainder=owned_biginteger(__biginteger(),owner); // the defaults when the denominator equals NULL
 							// we divide the maximum of the numerator and the denominator by the minimum of the numerator and the denominator (which typically means that _integerdividend will always be nonzero essentially)
 							if(_integerdividend
 									&&_remainder
@@ -7103,7 +7103,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 								Mvalue* rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
 								// if the root argument is rational, we should use pure big integer computations and have all rational approximations to the root
 								// MDH@30OCT2019: wait a minute, if the root argument value is a big integer we would still like to do a rational root instead of decimal root finding
-								//                and also when the it's a rational in disguise (stored as a decimal with repeating digits) CAREFUL use a copy of the big integer calling _getRational!!!
+								//				and also when the it's a rational in disguise (stored as a decimal with repeating digits) CAREFUL use a copy of the big integer calling _getRational!!!
 								Mrational* _rootArgumentRational=NULL;
 								if(rootArgumentValue->type==VT_BIGINTEGER)
 									_rootArgumentRational=owned_rational(_getRational(_getBigintegerCopy(rootArgumentValue->value._biginteger),NULL,M_LD_NAN,false),owner);
@@ -7276,7 +7276,7 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO shouldn't we return infinity?????
 	// MDH@26OCT2019: dealing with any integer conform as we did in the other binary operators
-	//                NO dividing integers should result in a rational so we can keep the accuracy
+	//				NO dividing integers should result in a rational so we can keep the accuracy
 	// NOT replacing:
 	// integer divisions are not computed but stored in rational format (without a delta to not suggest that the division is decimal)
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
@@ -7345,7 +7345,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
 		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
 		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
-		//             
+		//			 
 		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
@@ -7364,7 +7364,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
-		//                but if we can't don't
+		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			if(!_integerquotientBiginteger)return _getIntegerValue(M_LL_INVALID);
@@ -7465,7 +7465,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
 		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
 		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
-		//             
+		//			 
 		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
@@ -7485,7 +7485,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
-		//                but if we can't don't
+		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			if(!_moduloBiginteger)return _getIntegerValue(M_LL_INVALID);
@@ -7907,7 +7907,7 @@ static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
+				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
@@ -7925,7 +7925,7 @@ static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
@@ -7975,7 +7975,7 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
+				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
@@ -7993,7 +7993,7 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
@@ -8041,7 +8041,7 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
+				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
@@ -8060,7 +8060,7 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
@@ -8109,7 +8109,7 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
+				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
@@ -8128,7 +8128,7 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
@@ -8176,7 +8176,7 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
+				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
@@ -8195,7 +8195,7 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
@@ -8254,7 +8254,7 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
+				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
@@ -8273,7 +8273,7 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
@@ -8300,7 +8300,7 @@ Mvalue* Msmallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 // end comparison operator implementation
 
 // MDH@01APR2020: we can make a list with intermediate values for multi-dimensional ranging by passing in the start list, the delta list and the end list each of which should have equal length
-//                I guess we can pass in a count that tells us how many multidimensional points to return instead of the end 
+//				I guess we can pass in a count that tells us how many multidimensional points to return instead of the end 
 static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?owned_list(_getListOfType(VT_INTEGER),owner):NULL);
 	if(_scalarRangeList){
@@ -8416,8 +8416,8 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	if(_value1->type==VT_FUNCTION||_value2->type==VT_FUNCTION)return NULL; // neither operand can be a function for sure
 	if(_value1->type==VT_ENVIRONMENT||_value2->type==VT_ENVIRONMENT)return NULL; // neither operand can be a environment for sure
 	// MDH@01APR2020: in the past we could use a list as first argument and as second argument and get the same result i.e. 1:[10,10] ===[1,1]:10 -> [[1,...,10],[1,...,10]]
-	//                but now we allow multi-dimensional ranges for all calls that have a list as first argument, and getRangeList is used to get the multi-dimensional points
-	//                I suppose we can stick to the original approach if there are less than 2 elements in the list
+	//				but now we allow multi-dimensional ranges for all calls that have a list as first argument, and getRangeList is used to get the multi-dimensional points
+	//				I suppose we can stick to the original approach if there are less than 2 elements in the list
 	bool up;
 	if(_value1->type==VT_LIST){
 		if(!_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange,false);
@@ -8667,7 +8667,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
 	// typically the offset token determines what the expression ends with!!
-	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.   
+	// e.g. ( ends with , or )	[ ends with ]	 { ends with }	etc.   
 	/////////_expressionvalue->_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference)); // create a value reference that is to hold a single value reference as result
 	
 	if(expressionToken){
@@ -8714,17 +8714,17 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			// the next token(s) should be a binary operator
 			// MDH@14NOV2019: we now also allow continued indexing i.e. an operand (value) that evaluates somehow to a list or map
-			//                which means that what follows would be another list that should be appended to the item id of the value reference
-			//                this can be done any number of times
+			//				which means that what follows would be another list that should be appended to the item id of the value reference
+			//				this can be done any number of times
 
 			// NOTE some binary operators are stored in a couple of tokens!!!
 			if(expressionToken){
 				if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)
 					expressionToken=nextEnvironmentExpressionToken();
 				// MDH@14NOV2019: this is the first possible place where we should be aware of further indexing
-				//                TODO alternatively we could move this functionality to getValueReference()!!
-				//                TODO this also means that we can have an index on a value (not per se a variable)
-				//                TODO are we allowing indexing strings as well??????
+				//				TODO alternatively we could move this functionality to getValueReference()!!
+				//				TODO this also means that we can have an index on a value (not per se a variable)
+				//				TODO are we allowing indexing strings as well??????
 				/* MDH@17NOV2019: moved over to _getValueReference() where it actually belongs
 				if(amVerbose()&&amDebugging())
 				{output("Possible augmented list item ids expression token");outputToken(expressionToken);outputChar('\n');}
@@ -8812,7 +8812,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			// skip all assignments
 			// MDH@11AUG2019: how about creating ALL new variables IMMEDIATELY BEFORE evaluating the right-hand-side therefore allowing the use of these new variables in the right-hand-side in formulas as we have accepted??????
-			//                the main advantage being that you can use it directly even in the same expression, so as such it won't harm and it has benefits e.g. you can use a local variable immediately
+			//				the main advantage being that you can use it directly even in the same expression, so as such it won't harm and it has benefits e.g. you can use a local variable immediately
 			uint16_t numberOfAssignments=0;
 			Mformulaelement* _lastAssignmentFormulaelement=NULL;
 			_formulaelement=formula;
@@ -8843,9 +8843,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				output("Type '4' BEFORE: allocated: %llu - freed: %llu.\n",allocated,freed);
 
 			// MDH@14OCT2019: applying binary operators typically is done taking operator precedence into account which means we cannot apply lower precedence binary operators until higher precedence binary operators are applied first
-			//                which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
-			//                we always need to compare two successive operators if the precedence of the first is not below the precedence of the second you may apply the first operator, otherwise you skip applying the operator
-			//                perhaps it's best to immediately consume formula elements we no longer need!!!!!
+			//				which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
+			//				we always need to compare two successive operators if the precedence of the first is not below the precedence of the second you may apply the first operator, otherwise you skip applying the operator
+			//				perhaps it's best to immediately consume formula elements we no longer need!!!!!
 			Mvalue* _result=(_formulaelement->_next?NULL:getReferencedValue(_formulaelement->_operand)); // bit of a nuisance though!!!
 			Mformulaelement* nextformulaelement;
 			char operatorprecedence,nextoperatorprecedence;
@@ -9004,8 +9004,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 }
 
 // MDH@22DEC2020: I can simplify the for loop by wrapping it inside an environment by being able to create one
-//                on the fly with a local variable map similar to what the anonymous function does
-//                thus effectively separating commands inside the block from the declaration of local variables
+//				on the fly with a local variable map similar to what the anonymous function does
+//				thus effectively separating commands inside the block from the declaration of local variables
 Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	long long result=M_LL_INVALID;
@@ -9078,7 +9078,7 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 	return _getIntegerValue(result);
 }
 // MDH@23DEC2020: you can decide now to return whatever you want (from the current environment)
-//                but if the value is NULL the default i.e. the entire variable map is returned
+//				but if the value is NULL the default i.e. the entire variable map is returned
 Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__);
 	// let's make endwith return a copy of the variable map of the environment we're going to pop!!!
 	// TODO we should check whether there's a with environment active!!!!!!!!
@@ -9097,23 +9097,23 @@ Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__)
 }
 // the functions to create functions are moved here from Menvironment.h/c because they require parsing the command texts
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
-//                so these are actually anonymous functions
+//				so these are actually anonymous functions
 // MDH@25OCT2020: it's easier to let _bodyTokenValue not be an actual command but a list of commands (untokenized) i.e. texts
-//                this makes sense when reading commands from a text file, and yes when defining a function we're NOT evaluating the commands yet
-//                which would mean tokenize the commands and NOT execute them
+//				this makes sense when reading commands from a text file, and yes when defining a function we're NOT evaluating the commands yet
+//				which would mean tokenize the commands and NOT execute them
 // MDH@28OCT2020: the body token value should now be a list of texts where the escape character should be used as last character to indicate that the command continues on the next line
-//                TODO it's better to first create all the required elements first, before parsing the body
+//				TODO it's better to first create all the required elements first, before parsing the body
 // MDH@29OCT2020: any user function might not know all the names of the external variables, but it will always know the variables that it wants to use locally
-//                ok it might also know which external variables it uses and the body won't parse if trying to access an external variable that does not exist
-//                I'm wondering if the local map value should define initial values at all????
-//                what if a person forget the local map value???? I guess we will just assume no local variables
+//				ok it might also know which external variables it uses and the body won't parse if trying to access an external variable that does not exist
+//				I'm wondering if the local map value should define initial values at all????
+//				what if a person forget the local map value???? I guess we will just assume no local variables
 Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mvalue* _bodyValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging();
-    Mvalue* _functionValue=NULL;
+	Mvalue* _functionValue=NULL;
 	// MDH@29OCT2020: to meet the user a little more we simply allow skipping maps so that the first argument that is a list is assumed to be the body
-	//                alternatively we could change the order i.e. body first, then parameters, then local variables in which case it is easier to skip the body
-	//                however, if the body is missing the parameters and/or local variables should still be there
-	//                OK, we need two maps and one list
+	//				alternatively we could change the order i.e. body first, then parameters, then local variables in which case it is easier to skip the body
+	//				however, if the body is missing the parameters and/or local variables should still be there
+	//				OK, we need two maps and one list
 	Mmap *parameterMap=NULL,*localMap=NULL;
 	Mlist* bodyCommandList=NULL;
 	if(_parameterMapValue&&_parameterMapValue->type==VT_LIST){
@@ -9147,7 +9147,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 			if(report)outputInfo("Function created.");
 
 			// MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
-			//                so we have to make a copy of the parameter map
+			//				so we have to make a copy of the parameter map
 			if(parameterMap)
 				_function->_parameterMap=owned_map(_getMapCopy(parameterMap),Msubowner(owner,1)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
 			else
@@ -9190,7 +9190,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 											// immediately determine whether this command is continued on the next command text
 											// if it does cut off the continuation character as we do not consider it to be part of the actual command text
 											// TODO how about if the escape character does not indicate a continuation?????? e.g. when used in a string literal
-											//      this actually means that we cannot enter a string literal over multiple lines
+											//	  this actually means that we cannot enter a string literal over multiple lines
 											commandContinued=(string_last_char(_bodyCommandText)==M_COMMAND_CONTINUATION_CHARACTER);
 											if(commandContinued)string_setlength(_bodyCommandText,string_length(_bodyCommandText)-1);
 											if(report)output("Characters of command text%s '%s' parsed: '",(_command?" continuation":""),string(_bodyCommandText));
@@ -9276,107 +9276,107 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 	}else
 		outputError("Failed to create the anonymous user function");
 
-    if(!_functionValue)
-        outputError("Failed to create an anonymous function");
-    else
-    if(report)outputInfo("Anonymous function created!");
-    return _functionValue;
+	if(!_functionValue)
+		outputError("Failed to create an anonymous function");
+	else
+	if(report)outputInfo("Anonymous function created!");
+	return _functionValue;
 }
 // might make the following obsolete (defun)
 Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
-    // the user specifies the body as a text (to prevent evaluation during defining the function)
-    // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
-    // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
-    if(_nameValue&&_parameterMapValue){
-        if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-            Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
-            if(_userfunction){
-                if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
-                Mtext* functionName=_nameValue->value._text;
-                // user function expects a list of commands, so we have to wrap the single token (if any)
-                if(_bodyTokenValue){
-                    _userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
-                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
-                        output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
-                    // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
-                }
-                //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
-                ///////if(_userfunctionValue){
-                    // MDH@17JUL2019: the map needs to be stored with the Mfunction
-                Mallocationowner owner_environment=getOwnerExecutionEnvironment();
-                Mfunction* _function=owned_function(_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c),owner);
-                if(_function){
-                    // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
-                    //                so we have to make a copy of the parameter map
-                    _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,3)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
-                    _function->functionunion._userfunction=owned_userfunction(disowned_userfunction(_userfunction,owner),Msubowner(owner_environment,3));
-                    // return the result of applying the function to the default parameter map
+	// the user specifies the body as a text (to prevent evaluation during defining the function)
+	// but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
+	// of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
+	if(_nameValue&&_parameterMapValue){
+		if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
+			Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
+			if(_userfunction){
+				if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
+				Mtext* functionName=_nameValue->value._text;
+				// user function expects a list of commands, so we have to wrap the single token (if any)
+				if(_bodyTokenValue){
+					_userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
+					if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
+						output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
+					// replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
+				}
+				//////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
+				///////if(_userfunctionValue){
+					// MDH@17JUL2019: the map needs to be stored with the Mfunction
+				Mallocationowner owner_environment=getOwnerExecutionEnvironment();
+				Mfunction* _function=owned_function(_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c),owner);
+				if(_function){
+					// MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
+					//				so we have to make a copy of the parameter map
+					_function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,3)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+					_function->functionunion._userfunction=owned_userfunction(disowned_userfunction(_userfunction,owner),Msubowner(owner_environment,3));
+					// return the result of applying the function to the default parameter map
 
-                    return _getIntegerValue(1);
-                }
-                ///////////free_value(_userfunctionValue); // freed
-                output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,functionName);
-                ///////}
-            }
-        }else
-            outputError("Invalid user function name, parameter map or body");
-    }else{
-        if(!_nameValue)outputError("No name defined of function");
-        if(!_parameterMapValue)outputError("No (formal) parameter map defined for function");
-        ////////if(!_bodyTokenValue)outputError("No body (expression) defined of function");
-    }
-    return _getIntegerValue(0); // indicating failure...
+					return _getIntegerValue(1);
+				}
+				///////////free_value(_userfunctionValue); // freed
+				output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,functionName);
+				///////}
+			}
+		}else
+			outputError("Invalid user function name, parameter map or body");
+	}else{
+		if(!_nameValue)outputError("No name defined of function");
+		if(!_parameterMapValue)outputError("No (formal) parameter map defined for function");
+		////////if(!_bodyTokenValue)outputError("No body (expression) defined of function");
+	}
+	return _getIntegerValue(0); // indicating failure...
 }/*VALIDATED */
 
 // MDH@04DEC2020: computing sample statistics on any sequence inserted here as it uses Misnumeric (see Mfunctions.c/h), multiply and add M functions
 // MDH@04DEC2020: generic sample statistics map producer, which only processes the numeric values
-//                as it uses M functions it has to be here and not in Mlist.c/h
+//				as it uses M functions it has to be here and not in Mlist.c/h
 static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _statisticsMap=(iterator?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
-    if(_statisticsMap){
-        if(amVerbose())output("Computing float sample statistics.\n");
-        long long missings=0,errors=0,count=0,minimumindex=0,maximumindex=0;
-        // initialize sum, sumofsquares, minimum and maximum to NULL
-        Mvalue *value=NULL,*squarevalue=NULL,*sum=NULL,*sumofsquares=NULL,*minimum=NULL,*maximum=NULL;
-        unsigned long long index=0;
-        while((index=iter_nextindex(iterator))){
+	Mmap* _statisticsMap=(iterator?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
+	if(_statisticsMap){
+		if(amVerbose())output("Computing float sample statistics.\n");
+		long long missings=0,errors=0,count=0,minimumindex=0,maximumindex=0;
+		// initialize sum, sumofsquares, minimum and maximum to NULL
+		Mvalue *value=NULL,*squarevalue=NULL,*sum=NULL,*sumofsquares=NULL,*minimum=NULL,*maximum=NULL;
+		unsigned long long index=0;
+		while((index=iter_nextindex(iterator))){
 			// output("Index: %llu",index); // DEBUG
-            value=iter_next(iterator);
+			value=iter_next(iterator);
 			// output(" - value='",value,"'\n"); // DEBUG
-            if(value){
-                if(getValueInteger(Misnumeric(value))==M_TRUE){
-                    squarevalue=multiply(value,value);
-                    if(count>0){
-                        sum=add(sum,value);
-                        sumofsquares=add(sumofsquares,squarevalue);
-                        if(smallerthan(value,minimum)==M_TRUE){minimum=value;minimumindex=index;}
+			if(value){
+				if(getValueInteger(Misnumeric(value))==M_TRUE){
+					squarevalue=multiply(value,value);
+					if(count>0){
+						sum=add(sum,value);
+						sumofsquares=add(sumofsquares,squarevalue);
+						if(smallerthan(value,minimum)==M_TRUE){minimum=value;minimumindex=index;}
 						if(largerthan(value,maximum)==M_TRUE){maximum=value;maximumindex=index;}
-                    }else{ // no sum yet
-                        sum=value;
-                        minimum=value;minimumindex=index;
-                        maximum=value;maximumindex=index;
-                        sumofsquares=squarevalue;
-                    }
-                    count++;
-                }else // not numeric, so skip and assume being an error
-                    errors++;
-            }else
-                missings++;
-        }
-        // ready to compose the map elements
-        appendedToMap(_statisticsMap,owner,"size",_getIntegerValue(count));
-        appendedToMap(_statisticsMap,owner,"sum",sum);
-        appendedToMap(_statisticsMap,owner,"sumofsquares",sumofsquares);
-        appendedToMap(_statisticsMap,owner,"minimum",minimum);
-        appendedToMap(_statisticsMap,owner,"maximum",maximum);
-        appendedToMap(_statisticsMap,owner,"minimumindex",_getIntegerValue(minimumindex));
-        appendedToMap(_statisticsMap,owner,"maximumindex",_getIntegerValue(maximumindex));
-        appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
-        appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
-        return disowned_map(_statisticsMap,owner);
-    }
-    if(iterator)outputMemoryError("Failed to create a map to store statistics in.");
-    return NULL;
+					}else{ // no sum yet
+						sum=value;
+						minimum=value;minimumindex=index;
+						maximum=value;maximumindex=index;
+						sumofsquares=squarevalue;
+					}
+					count++;
+				}else // not numeric, so skip and assume being an error
+					errors++;
+			}else
+				missings++;
+		}
+		// ready to compose the map elements
+		appendedToMap(_statisticsMap,owner,"size",_getIntegerValue(count));
+		appendedToMap(_statisticsMap,owner,"sum",sum);
+		appendedToMap(_statisticsMap,owner,"sumofsquares",sumofsquares);
+		appendedToMap(_statisticsMap,owner,"minimum",minimum);
+		appendedToMap(_statisticsMap,owner,"maximum",maximum);
+		appendedToMap(_statisticsMap,owner,"minimumindex",_getIntegerValue(minimumindex));
+		appendedToMap(_statisticsMap,owner,"maximumindex",_getIntegerValue(maximumindex));
+		appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
+		appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
+		return disowned_map(_statisticsMap,owner);
+	}
+	if(iterator)outputMemoryError("Failed to create a map to store statistics in.");
+	return NULL;
 }
 Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
@@ -9448,13 +9448,13 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 	return NULL;
 }
 // MDH@04JAN2021: if the first element of the iterator is a list itself, we should be returning an array of sample statistics for each list element
-//                and a correlation matrix for the combined samples but only for pairs with the same number of elements
+//				and a correlation matrix for the combined samples but only for pairs with the same number of elements
 static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _statsMap=NULL;
-    if(iterator){
+	Mmap* _statsMap=NULL;
+	if(iterator){
 		// MDH@04JAN2021: the valuetype of the iterator is the valuetype of the array or the list
-		//                I suppose that we should now accomodate MAP and LIST value iterators as well
-		//                if the value type of the array is not set i.e. it can store values of any type, we use the type of the first element
+		//				I suppose that we should now accomodate MAP and LIST value iterators as well
+		//				if the value type of the array is not set i.e. it can store values of any type, we use the type of the first element
 		Mvalue* firstvalue=NULL;
 		Mvaluetype valuetype=iterator->valuetype;
 		if(valuetype==VT_UNDEFINED){
@@ -9473,7 +9473,7 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 				if(_statsList&&_corrsList){
 					// wrap the lists and append them to the map
 					// NOTE by disowning the lists they will be freed if failing to wrap them
-					//      which means we do not need to free them anymore
+					//	  which means we do not need to free them anymore
 					Mvalue *statsListValue=_getValueOfList(disowned_list(_statsList,owner))
 							,*corrsListValue=_getValueOfList(disowned_list(_corrsList,owner));
 					if(statsListValue&&corrsListValue){
@@ -9537,62 +9537,62 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 				}
 			}
 		}else
-        if(valuetype==VT_INTEGER)
+		if(valuetype==VT_INTEGER)
 			_statsMap=owned_map(_getIntegerSampleStatisticsMap(iterator),owner);
 		else
-        if(valuetype==VT_BIGINTEGER)
+		if(valuetype==VT_BIGINTEGER)
 			_statsMap=owned_map(_getBigintegerSampleStatisticsMap(iterator),owner);
 		else
-    	if(valuetype==VT_RATIONAL)
+		if(valuetype==VT_RATIONAL)
 			_statsMap=owned_map(_getRationalSampleStatisticsMap(iterator),owner);
 		else
-        if(valuetype==VT_DECIMAL)
+		if(valuetype==VT_DECIMAL)
 			_statsMap=owned_map(_getDecimalSampleStatisticsMap(iterator),owner);
 		else
-        if(valuetype==VT_FLOAT)
+		if(valuetype==VT_FLOAT)
 			_statsMap=owned_map(_getFloatSampleStatisticsMap(iterator),owner);
 		else
-        if(valuetype==VT_UNDEFINED)
+		if(valuetype==VT_UNDEFINED)
 			_statsMap=owned_map(_getSampleStatisticsMap(iterator),owner);
-        else
-            output("%sInvalid iterator value type '%s' in computing statistics.\n",M_ERROR_PREFIX,VALUETYPENAMES[valuetype]);
-    }
-    return disowned_map(_statsMap,owner);
+		else
+			output("%sInvalid iterator value type '%s' in computing statistics.\n",M_ERROR_PREFIX,VALUETYPENAMES[valuetype]);
+	}
+	return disowned_map(_statsMap,owner);
 }
 Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _statsMap=NULL;
-    if(sequenceValue){
-        Miterator iterator={};
-        if(sequenceValue->type==VT_LIST){
-            Mlist* list=sequenceValue->value._list;
-            if(list){
-                iterator=getListiterator(list);
-                /*
-                if(list->valuetype!=VT_MAP&&list->valuetype!=VT_REFERENCE&&list->valuetype!=VT_LIST&&list->valuetype!=VT_UNDEFINED){
-                    // the values in the list need to be scalars of the same type
-                    if(list->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(list),owner);
-                    if(list->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(list),owner);
-                }else
-                    output("All values in the list should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
-                */
-            }else 
-                outputBug("Missing value list!");
-        }else
-        if(sequenceValue->type==VT_ARRAY){
-            Marray* array=sequenceValue->value._array;
-            if(array)
-                iterator=getArrayiterator(array);
-            else
-                outputBug("Missing value array!");
-        }
-        if(iterator.next)
-            _statsMap=owned_map(_getStatsMap(&iterator),owner);
-    }else
-        outputError("No sample list to compute statistics of");
-    return(_statsMap?_getValueOfMap(disowned_map(_statsMap,owner)):NULL);
+	Mmap* _statsMap=NULL;
+	if(sequenceValue){
+		Miterator iterator={};
+		if(sequenceValue->type==VT_LIST){
+			Mlist* list=sequenceValue->value._list;
+			if(list){
+				iterator=getListiterator(list);
+				/*
+				if(list->valuetype!=VT_MAP&&list->valuetype!=VT_REFERENCE&&list->valuetype!=VT_LIST&&list->valuetype!=VT_UNDEFINED){
+					// the values in the list need to be scalars of the same type
+					if(list->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(list),owner);
+					if(list->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(list),owner);
+					if(list->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(list),owner);
+					if(list->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(list),owner);
+					if(list->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(list),owner);
+				}else
+					output("All values in the list should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
+				*/
+			}else 
+				outputBug("Missing value list!");
+		}else
+		if(sequenceValue->type==VT_ARRAY){
+			Marray* array=sequenceValue->value._array;
+			if(array)
+				iterator=getArrayiterator(array);
+			else
+				outputBug("Missing value array!");
+		}
+		if(iterator.next)
+			_statsMap=owned_map(_getStatsMap(&iterator),owner);
+	}else
+		outputError("No sample list to compute statistics of");
+	return(_statsMap?_getValueOfMap(disowned_map(_statsMap,owner)):NULL);
 }
 
 // MDH@29OCT2020: the famous array functions of JS: foreach, map, reduce, filter
@@ -9600,10 +9600,10 @@ Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccum
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _accumulatedValue=_initialAccumulatedValue;
 	// it's up to the user to supply an initial accumulated value like a default
-    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-    if(list){
-        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-        if(function){
+	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list){
+		Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+		if(function){
 			Mlist* _reduceFunctionArgumentList=owned_list(__list("reduce"),owner);
 			if(_reduceFunctionArgumentList){
 				// we are to append a total of 
@@ -9633,21 +9633,21 @@ Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccum
 				FREE_LIST(_reduceFunctionArgumentList,owner);
 			}else
 				outputError("Failed to create the reduce function argument list");
-        }else
-            outputError("No reduce function specified");
-    }else
-        outputError("No list to reduce specified.");
-    return _accumulatedValue;
+		}else
+			outputError("No reduce function specified");
+	}else
+		outputError("No list to reduce specified.");
+	return _accumulatedValue;
 }
 
 Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _mapValue=NULL;
 	// it's up to the user to supply an initial accumulated value like a default
-    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-    if(list){
-        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-        if(function){
+	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list){
+		Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+		if(function){
 			Mlist* _mapFunctionArgumentList=owned_list(__list("lmap"),owner);
 			if(_mapFunctionArgumentList){
 				Mlist* _mapList=owned_list(__list("lmap"),owner);
@@ -9683,24 +9683,24 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
 				FREE_LIST(_mapFunctionArgumentList,owner);
 			}else
 				outputError("Failed to create the map function argument list");
-        }else
-            outputError("No map function specified");
-    }else
-        outputError("No list to map specified.");
+		}else
+			outputError("No map function specified");
+	}else
+		outputError("No list to map specified.");
 	return _mapValue;
 }
 Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _filterValue=NULL;
 	// it's up to the user to supply an initial accumulated value like a default
-    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-    if(list){
+	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list){
 		Mlist* _filterList=owned_list(__list("lfilter"),owner);
 		if(_filterList){
 			Mlistelement* listelement=list->_first;
 			if(listelement){
-		        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-    		    if(function){
+				Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+				if(function){
 					Mlist* _filterFunctionArgumentList=owned_list(__list("lfilter"),owner);
 					if(_filterFunctionArgumentList){
 						// we are to append a total of 
@@ -9742,10 +9742,10 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 			}
 			_filterValue=_getValueOfList(disowned_list(_filterList,owner));
 			if(!_filterValue)free_list(_filterList); // if not bound (but already disowned) free the list myself
-        }else
+		}else
 			outputError("Failed to create the filter result list");
-    }else
-        outputError("No list to filter specified");
+	}else
+		outputError("No list to filter specified");
 	return _filterValue;
 }
 // NOTE how does foreach compare to map???? as it seems that foreach does not return a value as opposed to map
@@ -9754,11 +9754,11 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 	long long foreachCount=M_LL_INVALID; // counting the number of times the function was applied
 	// similar to map but returning the number of elements the function was applied to
 	// it's up to the user to supply an initial accumulated value like a default
-    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-    if(list){ // there is a list to iterate
+	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list){ // there is a list to iterate
 		Mlistelement* listelement=list->_first;
 		// let's allow the function to be NULL
-        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+		Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
 		if(function){
 			Mlist* _foreachFunctionArgumentList=owned_list(__list("lforeach"),owner);
 			if(_foreachFunctionArgumentList){
@@ -9791,8 +9791,8 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 		}else{ // no function, simply return the number of elements in the list
 			foreachCount=0;while(listelement){foreachCount++;listelement=listelement->_next;}
 		}
-    }else
-        outputError("No list to foreach specified.");
+	}else
+		outputError("No list to foreach specified.");
 	return _getIntegerValue(foreachCount);
 }
 
@@ -9990,10 +9990,10 @@ static Mlistelement* lpartition(Mlist* const list,Mlistelement* const lmin1,Mlis
 		for(Mlistelement* j=l;j->index<h->index;j=j->_next){ // int j=1;j<h;j++
 			// output("Comparing element #%zd with element #%zd.\n",j->index,h->index);
 			// MDH@02NOV2020: every comparison this way creates a new value which will need to be discarded by the gc which is very wasteful
-			//                as such it would make sense to actually not do it this way but prevent the wrapping of the integer result by letting these functions delegate to a function that does not do the wrapping
-			//                unless we can find a way to NOT gc this value immediately as it's only a wrapper for the comparison??????
-			//                SOLUTION all comparison functions now have a helper function that does the actual comparison but does not wrap the returned result (M_TRUE, M_FALSE or M_LL_INVALID)
-			//                careful we have to ascertain that neither is a list
+			//				as such it would make sense to actually not do it this way but prevent the wrapping of the integer result by letting these functions delegate to a function that does not do the wrapping
+			//				unless we can find a way to NOT gc this value immediately as it's only a wrapper for the comparison??????
+			//				SOLUTION all comparison functions now have a helper function that does the actual comparison but does not wrap the returned result (M_TRUE, M_FALSE or M_LL_INVALID)
+			//				careful we have to ascertain that neither is a list
 			long long notlarger=(j->_value->type!=VT_LIST?smallerthanorequalto(j->_value,x):M_LL_INVALID);
 			if(notlarger==M_TRUE){
 				i=(i?i->_next:list->_first); // i++; // make i start at index l otherwise increment
@@ -10026,7 +10026,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 					output("Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
 				// MDH@02NOV2020: best to use CALLOC not calloc
 				// MDH@03NOV2020: if there are many many list elements allocating all at once is an issue
-				//                how about re-allocating in
+				//				how about re-allocating in
 				unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(_list->numberOfElements)));
 				Mlistelement** stack=MALLOC(sizeof(Mlistelement*),maxtop=initialmaxtop,-'l',owner);
 				if(stack){
@@ -10417,9 +10417,9 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 }
 
 // MDH@04NOV2020: due to the problem with the index values (which we need to keep in ascending order)
-//                it's easier to simply merge in all second sequence values into the first sequence values
+//				it's easier to simply merge in all second sequence values into the first sequence values
 // MDH@05NOV2020: lmerge does not need to keep the index values ascending so it can safely
-//                exchange the position of list elements in the list
+//				exchange the position of list elements in the list
 static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirstone,Mlistelement * const lastone,Mlistelement * const lastanother){
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 
@@ -10557,7 +10557,7 @@ static void areverse(Mvalue** values,unsigned long long firstindex,unsigned long
 }
 // reversing the order of list elements is expected to be much faster than having to insert into a large list, where merging would be possible!!!
 // CHANGING first -> ... -> last -> afterlast TO last -> ... -> first -> afterlast
-//          essentially all the successors change but beforefirst should now point to last I suppose
+//		  essentially all the successors change but beforefirst should now point to last I suppose
 static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement * const last,bool report){
 	// ASSERT beforelist can be NULL, but last should NOT
 	Mlistelement* first=(beforefirst?beforefirst->_next:_list->_first);
@@ -10834,7 +10834,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 								// both the main run is up, as well as the run we just finished
 								// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
 								// MDH@08NOV2020: if I'm right you can use runsmallest as initial insertion point
-								//                apparently NOT as it loops indefinitely somewhere
+								//				apparently NOT as it loops indefinitely somewhere
 								// MDH@09NOV2020: OOPS we're supposed to pass in the beforefirst NOT the first, so how do we find the predecessor of runsmallest?????
 								sortstatistics.pointertests++;
 								if(largest)lmerge(_list,NULL/*runsmallest*/,largest,previous);
@@ -10966,17 +10966,17 @@ const unsigned long long M_RUN_LENGTH=32;
 // if we run out of memory we simply double the space between the remembered list elements
 static unsigned long long llsqrt(unsigned long long n){
 	unsigned long long q=1;
-    while(q<=n)q<<=2;
-    long long t,r=0;
-    while(q>1){
-        q>>=2;
-        t=-r;
+	while(q<=n)q<<=2;
+	long long t,r=0;
+	while(q>1){
+		q>>=2;
+		t=-r;
 		t+=n;
 		t-=q;
-        r>>=1;
-        if(t>=0){n=t;r+=q;}
-    }
-    return r;
+		r>>=1;
+		if(t>=0){n=t;r+=q;}
+	}
+	return r;
 }
 static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long numberoflistelements,Mvalue* value){
 	if(smallerthan(value,(*listelements)->_value)==M_TRUE)return NULL;
@@ -11057,7 +11057,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 				Mindexrange indexrange={_list->_first->index,_list->_first->index};
 				Mindexrange* nextindexrange=&indexrange;
 				// MDH@10NOV2020: if we are supposed to create and use a stack the elements to stack will be placed between previous and current
-				//                then we sort that sublist with quick sort (which doesn't pay attention to the indices which of course will now be incorrect)
+				//				then we sort that sublist with quick sort (which doesn't pay attention to the indices which of course will now be incorrect)
 				if(/*stack||*/_list->_last->index>_list->numberOfElements){ // possibly multiple range
 					Mlistelement *prevlistelement=_list->_first;
 					Mlistelement *listelement=prevlistelement->_next; // initialized to the second element
@@ -11163,7 +11163,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 									// both the main run is up, as well as the run we just finished
 									// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
 									// MDH@08NOV2020: if I'm right you can use runsmallest as initial insertion point
-									//                apparently NOT as it loops indefinitely somewhere
+									//				apparently NOT as it loops indefinitely somewhere
 									// MDH@09NOV2020: OOPS we're supposed to pass in the beforefirst NOT the first, so how do we find the predecessor of runsmallest?????
 									sortstatistics.pointertests++;
 									if(largest){
@@ -11647,8 +11647,8 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 */
 static void ainsertionsort(Mvalue** const values,unsigned long long first,unsigned long long last){
 	// ASSERT first and last are assumed to be array positions (one-based) not zero-based
-	//        which means that we need to insert [first,last-1] instead of (originally)
-	//        this is done because we're using unsigneds so we cannot go below 0
+	//		which means that we need to insert [first,last-1] instead of (originally)
+	//		this is done because we're using unsigneds so we cannot go below 0
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* toinsertValue=NULL;
 	if(report)
@@ -11666,7 +11666,7 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 		if(report)
 			outputValue("\tInserting '",toinsertValue,"'.\n");
 		// NOTE source (insertionSort) from 'https://geeksforgeeks.org/timsort/' adapted a bit (copied to timsort_geeksforgeeks.c)
-		//      the first element to compare with is the element in front of position arrayindex, and the element at position first would be the last
+		//	  the first element to compare with is the element in front of position arrayindex, and the element at position first would be the last
 		insertionarrayindex=arrayindex-1; // still 1-based
 		// NOTE the first time the condition insertionarrayindex>=first is always met
 		do{
@@ -11745,7 +11745,7 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 		nexttoinsert=toinsert->_next; // remember the next to insert
 		toinsertValue=toinsert->_value; // the value to insert into what's in front of it
 		// MDH@04NOV2020: we can speed things up a little bit by comparing with the largest value so far
-		//                if toinsertValue is smaller than lastinsertedValue, we have to insert it
+		//				if toinsertValue is smaller than lastinsertedValue, we have to insert it
 		sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences+=2;
 		sortstatistics.comparisons++;
 		if(smallerthan(toinsertValue,largest->_value)==M_TRUE){ // toinsertValue<largest value
@@ -11814,7 +11814,7 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	while(listelement){ // safety check
 		listelementValue=listelement->_value; // the value to insert into what's in front of it
 		// MDH@04NOV2020: we can speed things up a little bit by comparing with the largest value so far
-		//                if toinsertValue is smaller than lastinsertedValue, we have to insert it
+		//				if toinsertValue is smaller than lastinsertedValue, we have to insert it
 		if(smallerthan(listelementValue,largestValue)==M_TRUE){ // listelementValue<largest value
 			// NOTE we can never jump over the current largest value, so at some point the test will fail
 			checklistelement=first;
@@ -12163,10 +12163,10 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 									Mvalue* groupListValue=_getValueOfList(disowned_list(groupList,owner));
 									if(groupListValue){
 										// NOTE unfortunately appendedToMap() will copy the list in groupListValue
-										//      TODO I have to think about whether this is correct or not
-										//      DONE it seems correct in that assignValue() will create a new
-										//           value wrapping a copy of the (currently) empty list
-										//           as a result groupListValue's reference count will still be 1
+										//	  TODO I have to think about whether this is correct or not
+										//	  DONE it seems correct in that assignValue() will create a new
+										//		   value wrapping a copy of the (currently) empty list
+										//		   as a result groupListValue's reference count will still be 1
 										if(appendedToMap(_groupMap,owner,group,groupListValue)!=M_TRUE){
 											output(M_ERROR_PREFIX);
 											outputValue("Failed to register '",listelementValue,"' in group");
@@ -12179,8 +12179,8 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 									}else // groupList is not bound in a group list value, so we have to free it ourselves
 										outputError("Failed to wrap a group list");
 									// NOTE the following is a bit elaborate because we know that
-									//      groupListValue will NOT be referenced (count==0) when it exists
-									//      so in any normal situation, we either get the warning or the list is freed
+									//	  groupListValue will NOT be referenced (count==0) when it exists
+									//	  so in any normal situation, we either get the warning or the list is freed
 									if(groupListValue){
 										// can't free groupList anyway because it is now owned
 										if(groupListValue->count==0){
@@ -12232,7 +12232,7 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 	return NULL;
 }
 // MDH@03NOV2020: runs tells you how many runs there are in a given list and what length they are
-//                it's more convenient to return the points where the direction changes
+//				it's more convenient to return the points where the direction changes
 Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__);
 	if(_listValue){
 		if(_listValue->type==VT_LIST){
@@ -12421,7 +12421,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(!UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
 
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
-	//                therefore it shouldn't be a token value 
+	//				therefore it shouldn't be a token value 
 	/*
 	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
 	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputBug("Failed to create NULL value!");
@@ -12561,28 +12561,28 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			// register if, while and for special functions
 			// MDH@20DEC2020: one additional token of the if function
-		    if(!completedValueTokenTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
-		    
+			if(!completedValueTokenTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
+			
 			// MDH@21DEC2020: all while arguments are like with do() also tokens now
-		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
+			if(!completedTokenListFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
 			// replacing: if(!completedTokenTokenFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
-		    
+			
 			if(!completedTokenListFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false; // MDH@23DEC2020: just like while no initial evaluation before executing
 			if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORWITHFUNCTION_NAME),FORWITHFUNCTION_NAME,Mforwithfunction))return false;
 
 			// MDH@05AUG2019: the do function has a single token to process
-		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
-		    if(!completedValueFunction(_getFunction(_Menvironment,owner,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
+			if(!completedTokenListFunction(_getFunction(_Menvironment,owner,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
 			// MDH@28OCT2020: no longer internal functions as defined in Menvironment.h/c but moved over here because they need command parsing features
-		    if(!completedStringMapTokenFunction(_getFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
-    		if(!completedMapMapListFunction(_getFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
+			if(!completedStringMapTokenFunction(_getFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
+			if(!completedMapMapListFunction(_getFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
 
 			// MDH@22DEC2020: register the with() and endwith() function
 			if(!completedMapFunction(_getFunction(_Menvironment,owner,"with"),"with",Mwith))return false;
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"end"),"end",Mendwith))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
-		    // if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
+			// if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
 
 			if(!registerInternalFunctions(_Menvironment,owner)){
 				outputError("Failed to register all internal functions");

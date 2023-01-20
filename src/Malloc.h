@@ -86,6 +86,7 @@ Mallocationtype* _getAllocationTypes();
 bool resetAllocationManagement();
 
 size_t nulledAllocationsRemoved(bool verbose);
+void reportAllocations();
 
 long long getAllocationTypeOccupied(signed char allocationType,unsigned long long history);
 long long getAllocationTypeFreed(signed char allocationType,unsigned long long history);

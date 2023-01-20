@@ -23,23 +23,23 @@ mpd_t* get_mpd_copy(mpd_context_t const * mpd_context,mpd_t* mpd){
 }
 
 Msincoselement* owned_sincoselement(Msincoselement* _sincoselement,Mallocationowner owner_sincoselement){
-    if(!_sincoselement)return NULL;
+	if(!_sincoselement)return NULL;
 	if(_sincoselement->_next)owned_sincoselement(_sincoselement->_next,owner_sincoselement); // unlikely though
 	return OWNED(_sincoselement,owner_sincoselement);
 }
 Msincoselement* disowned_sincoselement(Msincoselement* _sincoselement,Mallocationowner owner_sincoselement){
-    if(!_sincoselement)return NULL;
+	if(!_sincoselement)return NULL;
 	if(_sincoselement->_next)disowned_sincoselement(_sincoselement->_next,owner_sincoselement); // unlikely though
 	return DISOWNED(_sincoselement,owner_sincoselement);
 }
 void free_sincoselement(Msincoselement* _sincoselement/*,Mallocationowner owner_sincoselement*/){
-    if(_sincoselement){
+	if(_sincoselement){
 		if(_sincoselement->_next)free_sincoselement(_sincoselement->_next/*,owner_sincoselement*/); // unlikely though
-        free_mpd(_sincoselement->_angle);
+		free_mpd(_sincoselement->_angle);
 		free_mpd(_sincoselement->_sine);
 		free_mpd(_sincoselement->_cosine); // MDH@20MAY2020: TODO whoever calls free_sincoselement needs to disown it first
 		FREE_1(_sincoselement,'#'/*,owner_sincoselement*/);
-    }
+	}
 }
 #define FREE_SINCOSELEMENT(_sincoselement,owner_sincoselement) free_sincoselement(disowned_sincoselement(_sincoselement,owner_sincoselement))
 
@@ -100,13 +100,13 @@ typedef struct MdecimalcontextElement{
 
 MdecimalcontextElement* owned_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
 	if(!_decimalcontextElement)return NULL;
-	if(_decimalcontextElement->_next)owned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
+	//// MDH@20JAN2023 leave next alone: if(_decimalcontextElement->_next)owned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
 	if(_decimalcontextElement->_decimalcontext)owned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
 	return(MdecimalcontextElement*)OWNED(_decimalcontextElement,owner_decimalcontextElement);
 }
 MdecimalcontextElement* disowned_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
 	if(!_decimalcontextElement)return NULL;
-	if(_decimalcontextElement->_next)disowned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
+	// MDH@20JAN2023 leave next alone: if(_decimalcontextElement->_next)disowned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
 	if(_decimalcontextElement->_decimalcontext)disowned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
 	return(MdecimalcontextElement*)DISOWNED(_decimalcontextElement,owner_decimalcontextElement);
 }
@@ -120,14 +120,15 @@ void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement/*
 
 static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={MI_DECIMAL,__LINE__,1};
 // to get the unique decimal context with the requested precision
-static Mdecimalcontext* _getExistingDecimalcontext(mpd_ssize_t prec){
+static Mdecimalcontext* getExistingDecimalcontext(mpd_ssize_t prec){
 	if(prec<6)return NULL; // prec needs to be at least 6
 	MdecimalcontextElement *decimalcontextElement=_firstDecimalcontextElement;
 	while(decimalcontextElement&&decimalcontextElement->_decimalcontext->mpd_context->prec!=prec)decimalcontextElement=decimalcontextElement->_next;
 	return(decimalcontextElement?decimalcontextElement->_decimalcontext:NULL);
 }
-Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getOwner(__LINE__); // NOTE a global so use module level id
-	Mdecimalcontext* decimalcontext=_getExistingDecimalcontext(prec);
+// TODO _getDecimalcontext should be called getDecimalcontext
+Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getOwner(__LINE__); // NOTE a global so use module level id
+	Mdecimalcontext* decimalcontext=getExistingDecimalcontext(prec);
 	if(decimalcontext)return decimalcontext;
 	MdecimalcontextElement* decimalcontextElement=(MdecimalcontextElement*)CALLOC_1(sizeof(MdecimalcontextElement),'e',owner);
 	if(decimalcontextElement){
@@ -135,10 +136,10 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=get
 		if(decimalcontextElement->_decimalcontext){
 			decimalcontextElement->_decimalcontext->mpd_context=owned_mpd_context(__mpd_context(prec),owner);
 			if(decimalcontextElement->_decimalcontext->mpd_context){
-				if(_lastDecimalcontextElement)_lastDecimalcontextElement->_next=decimalcontextElement;
+				if(_lastDecimalcontextElement)_lastDecimalcontextElement->_next=owned_decimalcontextElement(disowned_decimalcontextElement(decimalcontextElement,owner),owner_decimalcontextElement); // MDH@20JAN2023: switch owner to the module global decimal context element owner
 				_lastDecimalcontextElement=decimalcontextElement;
 				if(!_firstDecimalcontextElement)_firstDecimalcontextElement=_lastDecimalcontextElement;
-				return decimalcontextElement->_decimalcontext;
+				return decimalcontextElement->_decimalcontext; 
 			}
 			// not bound!!!
 			disowned_decimalcontext(decimalcontextElement->_decimalcontext,owner);
@@ -151,23 +152,23 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=get
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _decimalText=owned_string(__string(),owner);
-    if(_decimalText){
+	Mstring* _decimalText=owned_string(__string(),owner);
+	if(_decimalText){
 		if(_decimal&&_decimal->mpd){ // MDH@16JUN2020: was getting Segmentation fault on _decimal->mpd TODO why????????
 			/////////outputChar('D');
-            Mstring* _p=_decimalText;
-            // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
-            // NOTE if _decimal->repeating always use fixed-point notation
+			Mstring* _p=_decimalText;
+			// NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
+			// NOTE if _decimal->repeating always use fixed-point notation
 			// MDH@20MAY2020 _decimalChars here eludes the dynamic allocation registration so essential to validate this function
-            char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT->mpd_context);
-            // output("Decimal rep: '%s'.\n",_decimalChars);
-            if(_decimalChars){
-                _p=string_append(_p,_decimalChars);
+			char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT->mpd_context);
+			// output("Decimal rep: '%s'.\n",_decimalChars);
+			if(_decimalChars){
+				_p=string_append(_p,_decimalChars);
 				// output("Decimal characters appended!");
-                if(_p){
+				if(_p){
 					if(_decimal->repeating){
-                    	_p=string_insert_char(_p,string_length(_p)-_decimal->repeating,'[');
-                    	if(_p&&!fixedpoint)_p=string_append_char(_p,']');
+						_p=string_insert_char(_p,string_length(_p)-_decimal->repeating,'[');
+						if(_p&&!fixedpoint)_p=string_append_char(_p,']');
 					}else{
 						// if there's a period in _p, and no 'e' we can insert a blank every 50 decimals
 						char* _period=strchr(_decimalChars,'.');
@@ -180,22 +181,22 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
 							}
 						}
 					}
-                }
-                free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
-            }else
-                _p=NULL;
-            if(!_p){FREE_STRING(_decimalText,owner);_decimalText=NULL;}
-        }else
+				}
+				free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
+			}else
+				_p=NULL;
+			if(!_p){FREE_STRING(_decimalText,owner);_decimalText=NULL;}
+		}else
 			string_append_char(_decimalText,'?');
-    }else outputChar('?');
-    return disowned_string(_decimalText,owner);
+	}else outputChar('?');
+	return disowned_string(_decimalText,owner);
 }/* VALIDATED */
 // MDH@26DEC2020: get JSON representation of decimal
 Mstring* _getDecimalJSON(Mdecimal const * const _decimal){Mallocationowner owner=getOwner(__LINE__);
   Mstring* _decimalJSON;
 	if(_decimal&&_decimal->mpd){
 		_decimalJSON=owned_string(__string(),owner);
-    	if(_decimalJSON){
+		if(_decimalJSON){
 			Mstring* p=_decimalJSON;
 			p=string_append(p,JSON_OBJECT_START);
 
@@ -246,38 +247,38 @@ Mdecimal* _getJSONDecimal(Mstring const * const _decimalJSON){
  */
 Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){Mallocationowner owner=getOwner(__LINE__);
 	if(!_decimal)return NULL;
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
+	Mdecimalcontext* decimalcontext=getDecimalcontext(_decimal->prec); // MDH@20JAN2023: do NOT take over ownership since decimal contexts are global!!!!
 	// MDH@31MAY2020 undone, so no need to do this: if(!decimalcontext)decimalcontext=_getNewDecimalContext(_decimal->prec);
-    if(!decimalcontext)return NULL;
+	if(!decimalcontext)return NULL;
 	mpd_t* _mpd=get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd); // make a copy
 	if(!_mpd)return NULL;
 	Mdecimal* _decimalCopy=owned_decimal(_getDecimal(_mpd,_decimal->prec,_decimal->repeating,true),owner);
 	return disowned_decimal(_decimalCopy,owner); // if failing to wrap the mpd copy free it
 	/* replacing:
 	// TODO use get_mpd_copy() to copy the mpd in _decimal to speed things up, and use the
-    Mdecimal* _decimalCopy=__decimal(M_DECIMALCONTEXT->mpd_context,0,_decimal->repeating);
-    if(_decimalCopy){
-        _decimalCopy->mpd=NULL; // TODO check if __decimal uses calloc or malloc (BTW this does not seem to be such a good idea as mpd_copy would fail)
-        mpd_copy(_decimalCopy->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context); // copy attempt
-        if(!_decimalCopy->mpd){free_decimal(_decimalCopy);_decimalCopy=NULL;} // on failure, release the decimal
-    }else
-        outputError("Failed to copy a decimal");
-    return _decimalCopy;
+	Mdecimal* _decimalCopy=__decimal(M_DECIMALCONTEXT->mpd_context,0,_decimal->repeating);
+	if(_decimalCopy){
+		_decimalCopy->mpd=NULL; // TODO check if __decimal uses calloc or malloc (BTW this does not seem to be such a good idea as mpd_copy would fail)
+		mpd_copy(_decimalCopy->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context); // copy attempt
+		if(!_decimalCopy->mpd){free_decimal(_decimalCopy);_decimalCopy=NULL;} // on failure, release the decimal
+	}else
+		outputError("Failed to copy a decimal");
+	return _decimalCopy;
 	*/
 }/* VALIDATED */
 
 // CONVERSION FROM OTHER M TYPES
 // MDH@24JUN2019: used an Mlist before to store the remainders, but because Mlist uses Mvalue instances, which we do not have access to here anymore (we have to create our own list for storing the remainders)
 typedef struct MbigintegerListelement{
-    Mbiginteger* _biginteger;
-    struct MbigintegerListelement* _next;
+	Mbiginteger* _biginteger;
+	struct MbigintegerListelement* _next;
 }MbigintegerListelement;
 
 // MDH@20MAY2020: you can't free what isn't yours to start with, we can make it easy by allowing passing in the owner id of the big integer list element
 static void free_bigintegerListelement(MbigintegerListelement* _bile,Mallocationowner owner){
-    // ASSERT assume _bile to not be NULL
-    if(_bile->_next)free_bigintegerListelement(_bile->_next,owner);
-    if(_bile->_biginteger)FREE_BIGINTEGER(_bile->_biginteger,owner);
+	// ASSERT assume _bile to not be NULL
+	if(_bile->_next)free_bigintegerListelement(_bile->_next,owner);
+	if(_bile->_biginteger)FREE_BIGINTEGER(_bile->_biginteger,owner);
 	FREE_DISOWNED_1(_bile,'b',owner);
 }/* VALIDATED */
 
@@ -331,7 +332,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 										}else 
 										if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
 									}
-                }else
+				}else
 									_den=owned_biginteger(_getBigintegerCopy(_den2),owner);
 									if(_den){ // denominator computed successfully, either to be bound or freed in this block
 										*periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
@@ -363,12 +364,12 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 												_num=NULL;
 										}else
 										if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
-                  }
-                }else{
+				  }
+				}else{
 									FREE_BIGINTEGER(_num,owner);
 									_num=NULL;
 								}
-								FREE_BIGINTEGER(_num1,owner);    
+								FREE_BIGINTEGER(_num1,owner);	
 							}
 							// negate the numerator if the decimal is negative
 							if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){FREE_BIGINTEGER(_num,owner);_num=NULL;}
@@ -431,13 +432,13 @@ long double getDecimalLongDouble(Mdecimal* _decimal){
 
 // MDH@09OCT2019: TODO think we forgot to take the delta into account (if any)
 Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowner owner=getOwner(__LINE__);
-    if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
-    // _decimalText is a local variable that when set should be freed before returning!!!
-    Mstring* _decimalText=NULL;
-    Mbiginteger *numerator=_rational->num,*denominator=_rational->den; // shortcut to the rational numerator and denominator
-    uint64_t repeating=0;
-    if(denominator){
-        // local variables to be freed at the end (so NOT before)
+	if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
+	// _decimalText is a local variable that when set should be freed before returning!!!
+	Mstring* _decimalText=NULL;
+	Mbiginteger *numerator=_rational->num,*denominator=_rational->den; // shortcut to the rational numerator and denominator
+	uint64_t repeating=0;
+	if(denominator){
+		// local variables to be freed at the end (so NOT before)
 		// MDH@15OCT2019: take the sign into account
 		Mbiginteger *_nonnegativenumerator=(mp_isneg(MP_INT_POINTER(numerator))?owned_biginteger(_getBigintegerNeg(numerator),owner):numerator);
 		if(_nonnegativenumerator){
@@ -549,20 +550,20 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 			// free all locally used pointers to dynamic memory
 			FREE_BIGINTEGER(_digit,owner);FREE_BIGINTEGER(_remainder,owner);FREE_BIGINTEGER(_bi10,owner);
 		}
-    }else
-        _decimalText=owned_string(_getBigintegerText(numerator),owner);
-    // parse _decimalText to a decimal
-    Mdecimal* _decimal=NULL;
-    if(_decimalText){
-        _decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating),owner);
-        if(!_decimal)
+	}else
+		_decimalText=owned_string(_getBigintegerText(numerator),owner);
+	// parse _decimalText to a decimal
+	Mdecimal* _decimal=NULL;
+	if(_decimalText){
+		_decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating),owner);
+		if(!_decimal)
 			output("%sFailed to parse decimal text '%s' of the corresponding rational",M_ERROR_PREFIX,string(_decimalText));
 		else 
 		if(amVerboseDebugging())
 			outputDecimal("Decimal of rational: '",_decimal,"'.\n");
-        FREE_STRING(_decimalText,owner);
-    }
-    return disowned_decimal(_decimal,owner);
+		FREE_STRING(_decimalText,owner);
+	}
+	return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
 
 // decimalerrorstatus() filter out the rounding and inexact 'errors'
@@ -606,42 +607,42 @@ mpd_context_t** mpd_contexts=NULL; // keep track of all decimal contexts
 // * if creating a new context succeeded it will be returned even when failing to remember the decimal context
 //
 mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
-    mpd_context_t* mpd_context=NULL; // the context we will be returning
-    if(amVerbose())output("Retrieving the decimal context with precision %lld.\n",decimalprecision);
-    // locate the context with the requested decimal precision
-    int mpd_context_index=mpd_context_count;
-    while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimalprecision){mpd_context=mpd_contexts[mpd_context_index];break;}
-    // if we haven't found a match, try to get one
-    if(!mpd_context){ // wasn't found
-        // TODO perhaps re-using is not such a good idea...
-        if(mpd_context_count>=MAXIMUM_NUMBER_OF_CONTEXTS){ // re-use the last one
-            mpd_context=mpd_contexts[mpd_context_count-1];
-            output("Changing the decimal precision of the last remembered decimal context to %llu.\n",decimalprecision);
-            mpd_qsetprec(mpd_contexts[mpd_context_count-1],decimalprecision);
-        }else{
-            if(amVerbose())output("About to create the decimal context with precision %lld.\n",decimalprecision);
-            mpd_context=(mpd_context_t*)malloc(sizeof(mpd_context_t));
-            if(mpd_context){
-                if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
-                // initialize the new context to the default context (specification)
-                mpd_init(mpd_context,decimalprecision);
-                if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_context));
-                // try to append this context
-                mpd_context_t** new_mpd_contexts=(mpd_context_count>0?realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t*)):malloc(sizeof(mpd_context_t))); // realloc will work anyway
-                if(new_mpd_contexts){
-                    mpd_contexts=new_mpd_contexts;
-                    mpd_contexts[mpd_context_count++]=mpd_context;
-                    if(amVerbose())output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
-                }else
-                    output("%sFailed to return a decimal context with precision %u.\n",M_ERROR_PREFIX,decimalprecision);
-            }else
-                outputError("Failed to create a new decimal context");
-        }
-        ////Mdecimalraphandler=MMdecimalraphandler;
-    }
-    // reset the status, so we can use the context as if it were new
-    if(mpd_context)mpd_qsetstatus(mpd_context,0); // using the setter is preferred over ->status=0 assignment
-    return mpd_context;
+	mpd_context_t* mpd_context=NULL; // the context we will be returning
+	if(amVerbose())output("Retrieving the decimal context with precision %lld.\n",decimalprecision);
+	// locate the context with the requested decimal precision
+	int mpd_context_index=mpd_context_count;
+	while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimalprecision){mpd_context=mpd_contexts[mpd_context_index];break;}
+	// if we haven't found a match, try to get one
+	if(!mpd_context){ // wasn't found
+		// TODO perhaps re-using is not such a good idea...
+		if(mpd_context_count>=MAXIMUM_NUMBER_OF_CONTEXTS){ // re-use the last one
+			mpd_context=mpd_contexts[mpd_context_count-1];
+			output("Changing the decimal precision of the last remembered decimal context to %llu.\n",decimalprecision);
+			mpd_qsetprec(mpd_contexts[mpd_context_count-1],decimalprecision);
+		}else{
+			if(amVerbose())output("About to create the decimal context with precision %lld.\n",decimalprecision);
+			mpd_context=(mpd_context_t*)malloc(sizeof(mpd_context_t));
+			if(mpd_context){
+				if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
+				// initialize the new context to the default context (specification)
+				mpd_init(mpd_context,decimalprecision);
+				if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_context));
+				// try to append this context
+				mpd_context_t** new_mpd_contexts=(mpd_context_count>0?realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t*)):malloc(sizeof(mpd_context_t))); // realloc will work anyway
+				if(new_mpd_contexts){
+					mpd_contexts=new_mpd_contexts;
+					mpd_contexts[mpd_context_count++]=mpd_context;
+					if(amVerbose())output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
+				}else
+					output("%sFailed to return a decimal context with precision %u.\n",M_ERROR_PREFIX,decimalprecision);
+			}else
+				outputError("Failed to create a new decimal context");
+		}
+		////Mdecimalraphandler=MMdecimalraphandler;
+	}
+	// reset the status, so we can use the context as if it were new
+	if(mpd_context)mpd_qsetstatus(mpd_context,0); // using the setter is preferred over ->status=0 assignment
+	return mpd_context;
 }// VALIDATED */
 
 // MDH@25AUG2019: now requiring mpd_context to not be NULL
@@ -652,25 +653,25 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
  * \return on success the mpd_t instance equal to \p value, NULL otherwise
  */
 mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){ // MDH@20MAY2020: TODO mpd_qnew NOT under memory allocation management!!!
-    mpd_t* _mpd=NULL;
+	mpd_t* _mpd=NULL;
 	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
-    // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
-    if(mpd_context){
-        _mpd=mpd_qnew();
-        // NOTE it is essential to initialize the stored value even when 0 as we would otherwise get errors on mpd_to_sci calls
-        if(_mpd){
-            mpd_set_i64(_mpd,value,mpd_context);
-            if(_mpd->len==0){
-                output("%sFailed to create decimal with value " PRId64 ".\n",M_ERROR_PREFIX,value);
-                free_mpd(_mpd);
-                _mpd=NULL;
-            }
-        }else
-            outputError("Failed to create a decimal data instance");
-    }else
-        outputError("No context to store the decimal data in");
-     /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
-    return _mpd;
+	// using mpd_qnew over mpd_new because we want to return NULL on failure!!!
+	if(mpd_context){
+		_mpd=mpd_qnew();
+		// NOTE it is essential to initialize the stored value even when 0 as we would otherwise get errors on mpd_to_sci calls
+		if(_mpd){
+			mpd_set_i64(_mpd,value,mpd_context);
+			if(_mpd->len==0){
+				output("%sFailed to create decimal with value " PRId64 ".\n",M_ERROR_PREFIX,value);
+				free_mpd(_mpd);
+				_mpd=NULL;
+			}
+		}else
+			outputError("Failed to create a decimal data instance");
+	}else
+		outputError("No context to store the decimal data in");
+	 /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
+	return _mpd;
 }/* VALIDATED */
 /**
  * \brief frees \p mpd, calling mpd_del()
@@ -688,9 +689,9 @@ Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){retur
  */
 void free_decimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
 	if(!_decimal)return;
-    if(amVerboseDebugging())output("Freeing decimal.\n");
-    if(_decimal->mpd){free_mpd(_decimal->mpd);_decimal->mpd=NULL;}//////else if(verbose)outputError("No data in decimal to free");
-    FREE_1(_decimal,'D'/*,owner_decimal*/);
+	if(amVerboseDebugging())output("Freeing decimal.\n");
+	if(_decimal->mpd){free_mpd(_decimal->mpd);_decimal->mpd=NULL;}//////else if(verbose)outputError("No data in decimal to free");
+	FREE_1(_decimal,'D'/*,owner_decimal*/);
 }/* VALIDATED */
 
 /**
@@ -709,24 +710,24 @@ Mdecimal* __adecimal(){Mallocationowner owner=getOwner(__LINE__);
  * \param repeating the number of repeating decimal digits at the end
  */
 Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating){Mallocationowner owner=getOwner(__LINE__);
-    Mdecimal* _decimal=NULL;
-    if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context; // use the application-wide decimal context if no context is defined
-    if(mpd_context){
-        _decimal=owned_decimal(__adecimal(),owner); // get an uninitialized decimal
-        if(_decimal){
-            _decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
-            if(_decimal->mpd){
-                _decimal->repeating=repeating;
-                _decimal->prec=mpd_context->prec;
-            }else{
-                FREE_DISOWNED_1(_decimal,'D',owner);
-                _decimal=NULL;
-            }
-        }else
-            outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
-    }else
-        outputError("No context to create decimal in");
-    return disowned_decimal(_decimal,owner);
+	Mdecimal* _decimal=NULL;
+	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context; // use the application-wide decimal context if no context is defined
+	if(mpd_context){
+		_decimal=owned_decimal(__adecimal(),owner); // get an uninitialized decimal
+		if(_decimal){
+			_decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
+			if(_decimal->mpd){
+				_decimal->repeating=repeating;
+				_decimal->prec=mpd_context->prec;
+			}else{
+				FREE_DISOWNED_1(_decimal,'D',owner);
+				_decimal=NULL;
+			}
+		}else
+			outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
+	}else
+		outputError("No context to create decimal in");
+	return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
 
 // MDH@29AUG2019: as mpd_t does not itself store the precision with which the decimal was created AND an Mdecimal* does store the precision I've added the prec parameter
@@ -734,15 +735,15 @@ Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t rep
  * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
  */
 Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){Mallocationowner owner=getOwner(__LINE__);
-    if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
-    Mdecimal* _decimal=owned_decimal(__adecimal(),owner); // always using the default decimal context
-    if(_decimal){
+	if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
+	Mdecimal* _decimal=owned_decimal(__adecimal(),owner); // always using the default decimal context
+	if(_decimal){
 		////////output("Wrapping decimal with precision %u.\n",prec);
 		_decimal->mpd=_mpd;_decimal->prec=prec;_decimal->repeating=repeating;
 		////////output("Decimal with precision %u wrapped.\n",prec);
 	}else
 	if(freeonfailure)free_mpd(_mpd);
-    return disowned_decimal(_decimal,owner);
+	return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
 
 /**
@@ -754,7 +755,7 @@ Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// the decimal with the highest decimal context determines the context to use
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
-		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		Mdecimalcontext* decimalcontext=(precision>=6?owned_decimalcontext(getDecimalcontext(precision),owner):M_DECIMALCONTEXT); // MDH@23JAN2023: take over decimal context ownership
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the sum
@@ -768,8 +769,8 @@ Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 	return disowned_decimal(_decimal,owner);
 }
 //MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
-//               which will make it a little harder to compute the decimal sum
-//               how about returning to the associated rational multiply and convert back to a decimal???????
+//			   which will make it a little harder to compute the decimal sum
+//			   how about returning to the associated rational multiply and convert back to a decimal???????
 Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
@@ -801,7 +802,7 @@ Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// the decimal with the highest decimal context determines the context to use
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
-		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		Mdecimalcontext* decimalcontext=(precision>=6?getDecimalcontext(precision):M_DECIMALCONTEXT);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the sum
@@ -815,8 +816,8 @@ Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 	return disowned_decimal(_decimal,owner);
 }
 //MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
-//               which will make it a little harder to compute the decimal sum
-//               how about returning to the associated rational multiply and convert back to a decimal???????
+//			   which will make it a little harder to compute the decimal sum
+//			   how about returning to the associated rational multiply and convert back to a decimal???????
 Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
@@ -848,7 +849,7 @@ Mdecimal* _ddiv(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// the decimal with the highest decimal context determines the context to use
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
-		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		Mdecimalcontext* decimalcontext=(precision>=6?getDecimalcontext(precision):M_DECIMALCONTEXT);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the quotient
@@ -899,7 +900,7 @@ Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// the decimal with the highest decimal context determines the context to use
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
-		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		Mdecimalcontext* decimalcontext=(precision>=6?getDecimalcontext(precision):M_DECIMALCONTEXT);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the quotient
@@ -917,8 +918,8 @@ Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 	return disowned_decimal(_decimal,owner);
 }
 //MDH@19SEP2019: if we multiply two decimals we need to take the repeating digits into account (which we didn't do so far)
-//               which will make it a little harder to compute the decimal product
-//               how about returning to the associated rational multiply and convert back to a decimal???????
+//			   which will make it a little harder to compute the decimal product
+//			   how about returning to the associated rational multiply and convert back to a decimal???????
 Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
@@ -945,26 +946,26 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
  * \brief returns a decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
  */
 Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){Mallocationowner owner=getOwner(__LINE__);
-    Mdecimal* _textDecimal=NULL;
-    if(decimalText&&strlen(decimalText)){
-        if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
-        // can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
-        // the rounding at the end of course could prove to be problematic
-        _textDecimal=owned_decimal(__decimal(NULL,0,repeating),owner);
-        if(_textDecimal){
+	Mdecimal* _textDecimal=NULL;
+	if(decimalText&&strlen(decimalText)){
+		if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
+		// can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
+		// the rounding at the end of course could prove to be problematic
+		_textDecimal=owned_decimal(__decimal(NULL,0,repeating),owner);
+		if(_textDecimal){
 			uint32_t status=0;
-            mpd_qset_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context,&status); // NOTE here we have to pass in the default decimal context
-            if((status&0xEFBF)!=0){
+			mpd_qset_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context,&status); // NOTE here we have to pass in the default decimal context
+			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_textDecimal,owner);
 				output("%sFailed to parse decimal '%s' (error status: %" PRIu32 ").\n",M_ERROR_PREFIX,decimalText,status);
 				return NULL;
 			} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
-        }else
+		}else
 			outputError("Failed to create a decimal");
-        ////////////if(!_textDecimal)output("%sFailed to create a decimal from '%s'.\n",M_ERROR_PREFIX,decimalText);
-    }else
-        outputError("No decimal text to parse");
-    return disowned_decimal(_textDecimal,owner);
+		////////////if(!_textDecimal)output("%sFailed to create a decimal from '%s'.\n",M_ERROR_PREFIX,decimalText);
+	}else
+		outputError("No decimal text to parse");
+	return disowned_decimal(_textDecimal,owner);
 }/* VALIDATED */
 
 // END BASE STUFF
@@ -1141,7 +1142,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 						mpd_t *_pi=get_mpd_copy(mpd_context,s);
 						if(_pi){
 							// MDH@05AUG2019: it's relatively simple to compute the sin/cosine of angles like 15, 30, 45, 60, 75 so we can start with storing multiples of pi/12 which of course include all we need!!!
-							//                how about storing the sine and cosines of these values along with these predefined angles?????
+							//				how about storing the sine and cosines of these values along with these predefined angles?????
 							mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
 							if(_pidiv2&&_pidiv4&&_pimul2){
 								mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
@@ -1224,15 +1225,15 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 			uint32_t status=0;
 			mpd_t *_pi=decimalcontext->pi,*_pidiv2=decimalcontext->pidiv2,*_pidiv4=decimalcontext->pidiv4,*_pimul2=decimalcontext->pimul2;
 			// MDH@11SEP2019: so far I've used 15, 30, 45, 60, 75 and 90 as relative angles of which the sine/cosine is known or exactly computable (although depending on the sqrt decimal function)
-			//                but we used halving of the angle and the formulas for that to compute the CORDIC angles
-			//                NOTE that doubling the angle does not require taking square roots
-			//                what I want to do is precompute a number of equidistant (co)sines, if we start at a certain granularity
-			//                for the sine 30 degrees has a unique sine (1/2), for the cosine that's 60 degrees, obviously we can compute the cosines from the sine and back
-			//                halving these 'exact' sine angles will require square rooting a number of times unless we store the squares?????
-			//                some analysis told me that if we keep halving x times we end up with x constituent binary angles that can be binary encoded as: 1000000, 01000000, 00100000, 00010000, ..., 00000001
-			//                for any multiple of the smallest angle you'd get x bits and you will need to perform y-1 rotations using the original known sines where y is the number of set bits
-			//                this means you can store a fixed number of sines easily in a table with 2^x entries, so we get mpd_t[257] predefinedsines for storing all sines we'll be needing from 0 degrees in predefinedsines[0]
-			//                and sine of pi/2 in predefinedsines[256], any angle you get divide by 256 to get the entry to use in the predefined table!!!
+			//				but we used halving of the angle and the formulas for that to compute the CORDIC angles
+			//				NOTE that doubling the angle does not require taking square roots
+			//				what I want to do is precompute a number of equidistant (co)sines, if we start at a certain granularity
+			//				for the sine 30 degrees has a unique sine (1/2), for the cosine that's 60 degrees, obviously we can compute the cosines from the sine and back
+			//				halving these 'exact' sine angles will require square rooting a number of times unless we store the squares?????
+			//				some analysis told me that if we keep halving x times we end up with x constituent binary angles that can be binary encoded as: 1000000, 01000000, 00100000, 00010000, ..., 00000001
+			//				for any multiple of the smallest angle you'd get x bits and you will need to perform y-1 rotations using the original known sines where y is the number of set bits
+			//				this means you can store a fixed number of sines easily in a table with 2^x entries, so we get mpd_t[257] predefinedsines for storing all sines we'll be needing from 0 degrees in predefinedsines[0]
+			//				and sine of pi/2 in predefinedsines[256], any angle you get divide by 256 to get the entry to use in the predefined table!!!
 			// ok, we're going to store some predefined sine/cosines
 			// in particular all multiples of pi/12 below pi, NOTE that the sine/cosine of 0 does not need to be stored as that can't help us speed up sine/cosine computation
 			// we start with pi/12 and then up to 6*pi/12, so we'd have in total 6 predefined sine/cosines
@@ -1457,9 +1458,9 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 }
 
 // MDH@06SEP2019: if we turn the following into the computation of the sinequared itself, the caller itself can do the square rooting and or turning over to computing the cosine
-//                NOTE this implementation is almost the same as that of _dsquarerootofsinorcossquared() except that it does not do the conversion to a cosine and square rooting
-//                NOTE this has the disadvantage that sin squared is approximated with two additional decimals but conversion and square rooting will take place AFTER returning to the original precision
-//                DONE we solve that by taking changing the precision to the _dsine/_dcosine functions
+//				NOTE this implementation is almost the same as that of _dsquarerootofsinorcossquared() except that it does not do the conversion to a cosine and square rooting
+//				NOTE this has the disadvantage that sin squared is approximated with two additional decimals but conversion and square rooting will take place AFTER returning to the original precision
+//				DONE we solve that by taking changing the precision to the _dsine/_dcosine functions
 mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const x){Mallocationowner owner=getOwner(__LINE__);
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinsquared=NULL;
@@ -2235,7 +2236,7 @@ static mpd_t* _getCORDICsinorcos(Mdecimalcontext const * const decimalcontext,mp
 Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
 		// use the same decimal context as used by x
-		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=getDecimalcontext(x->prec);
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
@@ -2346,7 +2347,7 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
 		// use the same decimal context as used by x
-		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=getDecimalcontext(x->prec);
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
@@ -2459,7 +2460,7 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 
 /* replacing:
 // MDH@11SEP2019: with CORDIC predefined sine and cosines we can approximate the sine/cosine of an angle under pi/2 by determining the CORDIC angles that sum up to the angle we want
-//                how can we make this function recursive????
+//				how can we make this function recursive????
 mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 	// I guess an iterative procedure is better than a recursive procedure, because in a recursive procedure we have to keep passing the mpd_context...
 	// this means I can't get down but then the problem is that I can't do the rotations until I find all the constituent angles
@@ -2540,7 +2541,7 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
 		// use the same decimal context as used by x
-		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=getDecimalcontext(x->prec);
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
@@ -2686,7 +2687,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 							*/
 							// MDH@11SEP2019: the following is preferred because we have precomputed 257 equidistant angle sines between 0 and pi/2
 							// MDH@09NOV2022: the following is NOT included in _dcosine so I suggest to remove it here (unless we understand what it is used for)
-							//                perhaps we should make it optional as well????????
+							//				perhaps we should make it optional as well????????
 							if(amVerbose()){
 								mpd_relative_angle_t* _predefinedSinesRelativeAngle=owned_mpd_relative_angle(_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd),owner);
 								if(_predefinedSinesRelativeAngle){
@@ -2805,7 +2806,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
 		// use the same decimal context as used by x
-		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=getDecimalcontext(x->prec);
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
@@ -2956,7 +2957,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
 		// use the same decimal context as used by x
-		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=getDecimalcontext(x->prec);
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
@@ -3085,7 +3086,7 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 
 Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x){
-		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=getDecimalcontext(x->prec);
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		mpd_context_t* mpd_context=decimalcontext->mpd_context;
 		if(mpd_context){
@@ -3137,7 +3138,7 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 
 Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){Mallocationowner owner=getOwner(__LINE__);
 	if(decimal){
-		Mdecimalcontext* decimalcontext=_getDecimalcontext(decimal->prec);
+		Mdecimalcontext* decimalcontext=getDecimalcontext(decimal->prec);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 		Mdecimal* _inverseDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 		if(_inverseDecimal){
@@ -3174,7 +3175,7 @@ const mpd_t* getDecimalOne(){
 long long isDecimalOne(Mdecimal const * const decimal){
 	long long result=M_LL_INVALID;
 	if(isDecimalUndefined(decimal)==M_FALSE&&decimal->repeating==0){
-	    // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
+		// MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
 		uint32_t status=0;
 		int cmpresult=mpd_qcmp(decimal->mpd,getDecimalOne(),&status);
 		if((status&0xEFBF)==0)result=(cmpresult==0?M_TRUE:M_FALSE);else output("%sFailed to determine whether a decimal equals 1 (status: %" PRIu32 ").\n",M_ERROR_PREFIX,status);
@@ -3183,7 +3184,7 @@ long long isDecimalOne(Mdecimal const * const decimal){
 }/* VALIDATED */
 
 // MDH@18OCT2019: assuming that \p decimal already is rounded somehow to the given integer using ceil, floor, trunc or round
-//                so that we should simply remove the fractional part
+//				so that we should simply remove the fractional part
 long long decimal2long(Mdecimal* decimal){
 	uint32_t status=0;
 	int64_t ll=mpd_qget_i64(decimal->mpd,&status);
