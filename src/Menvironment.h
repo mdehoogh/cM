@@ -100,40 +100,40 @@ Mfunction* _getFunction(Menvironment* const _environment,Mallocationowner owner_
 // MDH@20DEC2022: we're going to need this to keep track of the expected number of function arguments
 long long getNumberOfFunctionParameters(char const * const functionName);
 
-bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction);
-bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
-bool completedIntegerFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
-bool completedFloatFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
-bool completedListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
-bool completedMapFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
-bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction);
+bool completedValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedMapFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedTokenListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 
-bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedFloatFloatFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedStringStringFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 
-bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedValueValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedIntegerValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedListValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedIntegerBooleanFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedMapTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedMapListFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedListFunctionFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedListTextFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedValueIntegerFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedListValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedIntegerBooleanFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedMapListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedListFunctionFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedListTextFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
-bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
-bool completedValueValueValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
-bool completedMapMapListFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
-bool completedListFunctionValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
-bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
-bool completedListValueIndexFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedValueValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedMapMapListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedListFunctionValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedListValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedListValueIndexFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 
-bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
-bool completedValueTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
+bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction);
+bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction);
 
-bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction);
+bool completedTokenTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FiveArgumentFunction fiveArgumentFunction);
 
 // MDH@28OCT2020 moved over to Mshell.h/c: Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
 

@@ -9308,8 +9308,8 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 				if(_function){
 					// MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
 					//				so we have to make a copy of the parameter map
-					_function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,3)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
-					_function->functionunion._userfunction=owned_userfunction(disowned_userfunction(_userfunction,owner),Msubowner(owner_environment,3));
+					_function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,4)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+					_function->functionunion._userfunction=owned_userfunction(disowned_userfunction(_userfunction,owner),Msubowner(owner_environment,4));
 					// return the result of applying the function to the default parameter map
 
 					return _getIntegerValue(1);
@@ -12561,28 +12561,30 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			// register if, while and for special functions
 			// MDH@20DEC2020: one additional token of the if function
-			if(!completedValueTokenTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
-			
+			if(!completedValueTokenTokenTokenFunction(_Menvironment,owner,IFFUNCTION_NAME,Miffunction))return false;
+			output("If function created!\n");
 			// MDH@21DEC2020: all while arguments are like with do() also tokens now
-			if(!completedTokenListFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
-			// replacing: if(!completedTokenTokenFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
+			if(!completedTokenListFunction(_Menvironment,owner,WHILEFUNCTION_NAME,Mwhilefunction))return false;
+			output("While function created!\n");
+			// replacing: if(!completedTokenTokenFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
 			
-			if(!completedTokenListFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false; // MDH@23DEC2020: just like while no initial evaluation before executing
-			if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORWITHFUNCTION_NAME),FORWITHFUNCTION_NAME,Mforwithfunction))return false;
+			if(!completedTokenListFunction(_Menvironment,owner,FORFUNCTION_NAME,Mforfunction))return false; // MDH@23DEC2020: just like while no initial evaluation before executing
+			output("For function created!\n");
+			if(!completedTokenTokenTokenTokenTokenFunction(_Menvironment,owner,FORWITHFUNCTION_NAME,Mforwithfunction))return false;
 
 			// MDH@05AUG2019: the do function has a single token to process
-			if(!completedTokenListFunction(_getFunction(_Menvironment,owner,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
+			if(!completedTokenListFunction(_Menvironment,owner,DOFUNCTION_NAME,Mdofunction))return false;
+			if(!completedValueFunction(_Menvironment,owner,EVALFUNCTION_NAME,Mevalfunction))return false;
 			// MDH@28OCT2020: no longer internal functions as defined in Menvironment.h/c but moved over here because they need command parsing features
-			if(!completedStringMapTokenFunction(_getFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
-			if(!completedMapMapListFunction(_getFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
+			if(!completedStringMapTokenFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
+			if(!completedMapMapListFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
 
 			// MDH@22DEC2020: register the with() and endwith() function
-			if(!completedMapFunction(_getFunction(_Menvironment,owner,"with"),"with",Mwith))return false;
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"end"),"end",Mendwith))return false;
+			if(!completedMapFunction(_Menvironment,owner,"with",Mwith))return false;
+			if(!completedValueFunction(_Menvironment,owner,"end",Mendwith))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
-			// if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
+			// if(!completedValueFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
 
 			if(!registerInternalFunctions(_Menvironment,owner)){
 				outputError("Failed to register all internal functions");
@@ -12590,206 +12592,206 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 			/* MDH@14NOV2019: replaced by the M variable and M function
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
-			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),"M",getResult)){
+			if(_resultListValue&&!completedIntegerFunction(_Menvironment,"M"),"M",getResult)){
 				outputError("Failed to register function M (for requesting previous results)");
 				return false;
 			}
 			*/
 			/*
-			if(!completedFunction(_getFunction(_Menvironment,"ml"),ml)){
+			if(!completedFunction(_Menvironment,"ml"),ml)){
 				outputInfo("ERROR: Failed to register map list (constructor) function.");
 				return false;
 			}
 			*/
-			if(!completedIntegerFunction(_getFunction(_Menvironment,owner,"setdp"),"setdp",setdp)
-				||!completedIntegerFunction(_getFunction(_Menvironment,owner,"getdc"),"getdc",getdc)
-				||!completedIntegerFunction(_getFunction(_Menvironment,owner,"getdp"),"getdp",getdp)){
+			if(!completedIntegerFunction(_Menvironment,owner,"setdp",setdp)
+				||!completedIntegerFunction(_Menvironment,owner,"getdc",getdc)
+				||!completedIntegerFunction(_Menvironment,owner,"getdp",getdp)){
 				outputError("Failed to register the setdp, getdc and getdp functions");
 				return NULL;
 			}
 			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(_getFunction(_Menvironment,owner,"pi$q"),"pi$q",pi_q)
-					||!completedIntegerFunction(_getFunction(_Menvironment,owner,"pi$ql"),"pi$ql",pi_ql)
-					||!completedIntegerBooleanFunction(_getFunction(_Menvironment,owner,"pi"),"pi",Mpi)){
+			if(!completedIntegerFunction(_Menvironment,owner,"pi$q",pi_q)
+					||!completedIntegerFunction(_Menvironment,owner,"pi$ql",pi_ql)
+					||!completedIntegerBooleanFunction(_Menvironment,owner,"pi",Mpi)){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return NULL;
 			}
-			if(!completedValueValueFunction(_getFunction(_Menvironment,owner,"range"),"range",Mrange)){
+			if(!completedValueValueFunction(_Menvironment,owner,"range",Mrange)){
 				outputError("Failed to register the range function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"i"),"i",Mi)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"l"),"l",Ml) // MDH@25NOV2020: conversion to a list
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"a"),"a",Ma) // MDH@25NOV2020: conversion to an array
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"m"),"m",Mm) // MDH@25NOV2020: conversion to a map
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"b"),"b",Mb)
-					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"t"),"t",Mt)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"f"),"f",Mf)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"q"),"q",Mq)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"Q"),"Q",MQ)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"d"),"d",Md)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"o"),"o",Mo)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"O"),"O",MO)){
+			if(!completedValueFunction(_Menvironment,owner,"i",Mi)
+					||!completedValueFunction(_Menvironment,owner,"l",Ml) // MDH@25NOV2020: conversion to a list
+					||!completedValueFunction(_Menvironment,owner,"a",Ma) // MDH@25NOV2020: conversion to an array
+					||!completedValueFunction(_Menvironment,owner,"m",Mm) // MDH@25NOV2020: conversion to a map
+					||!completedValueFunction(_Menvironment,owner,"b",Mb)
+					||!completedValueValueFunction(_Menvironment,owner,"t",Mt)
+					||!completedValueFunction(_Menvironment,owner,"f",Mf)
+					||!completedValueFunction(_Menvironment,owner,"q",Mq)
+					||!completedValueFunction(_Menvironment,owner,"Q",MQ)
+					||!completedValueFunction(_Menvironment,owner,"d",Md)
+					||!completedValueFunction(_Menvironment,owner,"o",Mo)
+					||!completedValueFunction(_Menvironment,owner,"O",MO)){
 				outputError("Failed to register value type conversion functions");
 				return NULL;
 			}
 			/* MDH@04NOV2019: moved over to Menvironment.h/c
-			if(!completedValueFunction(_getFunction(_Menvironment,"type"),"type",Mtype)){
+			if(!completedValueFunction(_Menvironment,"type"),"type",Mtype)){
 				outputError("Failed to register the type function");
 				return false;
 			}
 			*/
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"keys"),"keys",Mkeys)){
+			if(!completedValueFunction(_Menvironment,owner,"keys",Mkeys)){
 				outputError("Failed to register the keys function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"neg"),"neg",Mneg)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"bnot"),"bnot",Mbnot)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"not"),"not",Mnot)){
+			if(!completedValueFunction(_Menvironment,owner,"neg",Mneg)
+					||!completedValueFunction(_Menvironment,owner,"bnot",Mbnot)
+					||!completedValueFunction(_Menvironment,owner,"not",Mnot)){
 				outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"exists"),"exists",Mexists)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"numeric"),"numeric",Misnumeric)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"list"),"list",Misalist)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"scalar"),"scalar",Mscalar)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"null"),"null",Mnull)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"undefined"),"undefined",Mundefined)){
+			if(!completedValueFunction(_Menvironment,owner,"exists",Mexists)
+					||!completedValueFunction(_Menvironment,owner,"numeric",Misnumeric)
+					||!completedValueFunction(_Menvironment,owner,"list",Misalist)
+					||!completedValueFunction(_Menvironment,owner,"scalar",Mscalar)
+					||!completedValueFunction(_Menvironment,owner,"null",Mnull)
+					||!completedValueFunction(_Menvironment,owner,"undefined",Mundefined)){
 				outputError("Failed to register the exists, scalar, null and undefined functions");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sign"),"sign",Msign)){
+			if(!completedValueFunction(_Menvironment,owner,"sign",Msign)){
 				outputError("Failed to register the sign function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"zero"),"zero",Mzero)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"positive"),"positive",Mpositive)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"negative"),"negative",Mnegative)){
+			if(!completedValueFunction(_Menvironment,owner,"zero",Mzero)
+					||!completedValueFunction(_Menvironment,owner,"positive",Mpositive)
+					||!completedValueFunction(_Menvironment,owner,"negative",Mnegative)){
 				outputError("Failed to register the zero, positive and negative functions");
 				return NULL;
 			}
 			// MDH@06JAN2021: adding the split function!!
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sum"),"sum",Msum)
-					||!completedValueIntegerFunction(_getFunction(_Menvironment,owner,"setlength"),"setlength",Msetlen)
-					||!completedValueValueValueFunction(_getFunction(_Menvironment,owner,"split"),"split",Msplit)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"length"),"length",Mlen)
+			if(!completedValueFunction(_Menvironment,owner,"sum",Msum)
+					||!completedValueIntegerFunction(_Menvironment,owner,"setlength",Msetlen)
+					||!completedValueValueValueFunction(_Menvironment,owner,"split",Msplit)
+					||!completedValueFunction(_Menvironment,owner,"length",Mlen)
 			){
 				outputError("Failed to register the split function and the sum, length and setlength list functions");
 				return NULL;
 			}
 			// MDH@01NOV2019: I have some generic list functions implemented
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"empty"),"empty",Mempty)||!completedValueFunction(_getFunction(_Menvironment,owner,"clear"),"clear",Mclear)){
+			if(!completedValueFunction(_Menvironment,owner,"empty",Mempty)||!completedValueFunction(_Menvironment,owner,"clear",Mclear)){
 				outputError("Failed to register the empty and clear function");
 				return false;
 			}
-			if(!completedListFunction(_getFunction(_Menvironment,owner,"statistics"),"statistics",Mstats)
-					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"corr"),"corr",Mcorr) // MDH@05JAN2021: for those only interested in the correlation coefficient (and not simple sample statistics) 
-					||!completedListFunction(_getFunction(_Menvironment,owner,"first"),"first",Mfirst)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"last"),"last",Mlast)
+			if(!completedListFunction(_Menvironment,owner,"statistics",Mstats)
+					||!completedValueValueFunction(_Menvironment,owner,"corr",Mcorr) // MDH@05JAN2021: for those only interested in the correlation coefficient (and not simple sample statistics) 
+					||!completedListFunction(_Menvironment,owner,"first",Mfirst)
+					||!completedListFunction(_Menvironment,owner,"last",Mlast)
 				){
 				outputError("Failed to register the statistics, first and last list functions");
 				return NULL;
 			}
 
-			if(!completedIntegerValueFunction(_getFunction(_Menvironment,owner,"array"),"array",marray)
-					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fill"),"fill",mfill)
+			if(!completedIntegerValueFunction(_Menvironment,owner,"array",marray)
+					||!completedValueValueFunction(_Menvironment,owner,"fill",mfill)
 			){
 				outputError("Failed to register the array and fill array functions");
 				return NULL;
 			}
 
-			if(!completedListValueFunction(_getFunction(_Menvironment,owner,"removed"),"removed",Mremoved)
-					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
-					||!completedListValueFunction(_getFunction(_Menvironment,owner,"append"),"append",Mpush)
-					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
-					||!completedListValueFunction(_getFunction(_Menvironment,owner,"prepend"),"prepend",Mshove)
-					||!completedListValueIndexFunction(_getFunction(_Menvironment,owner,"insert"),"insert",Minsert)
-					||!completedListTextFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Msort)
-					||!completedListTextFunction(_getFunction(_Menvironment,owner,"sorted"),"sorted",Msorted)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"runpoints"),"runpoints",Mrunpoints)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)
+			if(!completedListValueFunction(_Menvironment,owner,"removed",Mremoved)
+					||!completedListValueFunction(_Menvironment,owner,"push",Mpush)
+					||!completedListValueFunction(_Menvironment,owner,"append",Mpush)
+					||!completedListValueFunction(_Menvironment,owner,"shove",Mshove)
+					||!completedListValueFunction(_Menvironment,owner,"prepend",Mshove)
+					||!completedListValueIndexFunction(_Menvironment,owner,"insert",Minsert)
+					||!completedListTextFunction(_Menvironment,owner,"sort",Msort)
+					||!completedListTextFunction(_Menvironment,owner,"sorted",Msorted)
+					||!completedListFunction(_Menvironment,owner,"runpoints",Mrunpoints)
+					||!completedListFunction(_Menvironment,owner,"pop",Mpop)
 				){
 				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");
 				return NULL;
 			}
-			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,owner,"find"),"find",Mfind)){
+			if(!completedListValueIntegerFunction(_Menvironment,owner,"find",Mfind)){
 				outputError("Failed to register the find function");
 				return NULL;
 			}
 			// MDH@29OCT2020: can't do without them
-			if(!completedListFunctionValueFunction(_getFunction(_Menvironment,owner,"reduce"),"reduce",Mlreduce)
-					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"map"),"map",Mlmap)
-					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"filter"),"filter",Mlfilter)
-					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"foreach"),"foreach",Mlforeach)
-					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"group"),"group",Mlgroup)
+			if(!completedListFunctionValueFunction(_Menvironment,owner,"reduce",Mlreduce)
+					||!completedListFunctionFunction(_Menvironment,owner,"map",Mlmap)
+					||!completedListFunctionFunction(_Menvironment,owner,"filter",Mlfilter)
+					||!completedListFunctionFunction(_Menvironment,owner,"foreach",Mlforeach)
+					||!completedListFunctionFunction(_Menvironment,owner,"group",Mlgroup)
 					){
 				outputError("Failed to register the infamous reduce, map, filter and foreach list functions");
 				return NULL;
 			}
 
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"tl"),"tl",Mtl)){
+			if(!completedValueFunction(_Menvironment,owner,"tl",Mtl)){
 				outputError("Failed to register the tl text function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"fac"),"fac",Mfac)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"facd"),"facd",Mfacd)){
+			if(!completedValueFunction(_Menvironment,owner,"fac",Mfac)
+					||!completedValueFunction(_Menvironment,owner,"facd",Mfacd)){
 				outputError("Failed to register the fac and facd function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"reciprocal"),"reciprocal",Mreciprocal)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
+			if(!completedValueFunction(_Menvironment,owner,"reciprocal",Mreciprocal)
+					||!completedValueFunction(_Menvironment,owner,"fibonacci",Mfibonacci)){ // MDH@10OCT2019
 				outputError("Failed to register the reciprocal and fibonacci function");
 				return NULL;
 			}
-			if(!completedValueValueFunction(_getFunction(_Menvironment,owner,"concat"),"concat",Mconcat)){
+			if(!completedValueValueFunction(_Menvironment,owner,"concat",Mconcat)){
 				outputError("Failed to register the concat function");
 				return NULL;
 			}
 			// register list conversions
-			if(!completedListFunction(_getFunction(_Menvironment,owner,"l2m"),"l2m",l2m)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"l2ml"),"l2ml",l2ml)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"ml2l"),"ml2l",ml2l)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"ml2m"),"ml2m",ml2m)){
+			if(!completedListFunction(_Menvironment,owner,"l2m",l2m)
+					||!completedListFunction(_Menvironment,owner,"l2ml",l2ml)
+					||!completedListFunction(_Menvironment,owner,"ml2l",ml2l)
+					||!completedListFunction(_Menvironment,owner,"ml2m",ml2m)){
 				outputError("Failed to register list conversion functions");
 				return NULL;
 			}
 			// register map conversions
-			if(!completedListFunction(_getFunction(_Menvironment,owner,"m2ml"),"m2ml",m2ml)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"m2l"),"m2l",m2l)){
+			if(!completedListFunction(_Menvironment,owner,"m2ml",m2ml)
+					||!completedListFunction(_Menvironment,owner,"m2l",m2l)){
 				outputError("Failed to register map conversion functions");
 				return NULL;
 			}
 			// MDH@28SEP2020: register file functions
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"file"),"file",mfile)
-				||!completedValueFunction(_getFunction(_Menvironment,owner,"fdelete"),"fdelete",mfdelete)
-				||!completedValueFunction(_getFunction(_Menvironment,owner,"files"),"files",mfiles)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fopen"),"fopen",mfopen)
-				||!completedValueFunction(_getFunction(_Menvironment,owner,"fclose"),"fclose",mfclose)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fread"),"fread",mfread)
-				||!completedValueFunction(_getFunction(_Menvironment,owner,"freadline"),"freadline",mfreadline)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"freadlines"),"freadlines",mfreadlines)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fwrite"),"fwrite",mfwrite)){
+			if(!completedValueFunction(_Menvironment,owner,"file",mfile)
+				||!completedValueFunction(_Menvironment,owner,"fdelete",mfdelete)
+				||!completedValueFunction(_Menvironment,owner,"files",mfiles)
+				||!completedValueValueFunction(_Menvironment,owner,"fopen",mfopen)
+				||!completedValueFunction(_Menvironment,owner,"fclose",mfclose)
+				||!completedValueValueFunction(_Menvironment,owner,"fread",mfread)
+				||!completedValueFunction(_Menvironment,owner,"freadline",mfreadline)
+				||!completedValueValueFunction(_Menvironment,owner,"freadlines",mfreadlines)
+				||!completedValueValueFunction(_Menvironment,owner,"fwrite",mfwrite)){
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}
 			// MDH@10DEC2020: register system function(s)
-			if(!completedFunction(_getFunction(_Menvironment,owner,"systemvariables"),"systemvariables",Msystemvariables)
-				||!completedFunction(_getFunction(_Menvironment,owner,"clearenv"),"clearenv",Mclearenv)
-				||!completedValueFunction(_getFunction(_Menvironment,owner,"getenv"),"getenv",Mgetenv)
-				||!completedValueFunction(_getFunction(_Menvironment,owner,"unsetenv"),"unsetenv",Munsetenv)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"setenv"),"setenv",Msetenv)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"putenv"),"putenv",Mputenv)
+			if(!completedFunction(_Menvironment,owner,"systemvariables",Msystemvariables)
+				||!completedFunction(_Menvironment,owner,"clearenv",Mclearenv)
+				||!completedValueFunction(_Menvironment,owner,"getenv",Mgetenv)
+				||!completedValueFunction(_Menvironment,owner,"unsetenv",Munsetenv)
+				||!completedValueValueFunction(_Menvironment,owner,"setenv",Msetenv)
+				||!completedValueValueFunction(_Menvironment,owner,"putenv",Mputenv)
 			){
 				outputError("Failed to register the system environment functions");
 				return NULL;				
 			}
 			// MDH@08DEC2020: register time functions
-			if(!completedFunction(_getFunction(_Menvironment,owner,"now"),"now",Mnow)
-				||!completedFunction(_getFunction(_Menvironment,owner,"gettimezone"),"gettimezone",Mgettimezone)
-				||!completedValueFunction(_getFunction(_Menvironment,owner,"settimezone"),"settimezone",Msettimezone)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"calendartime"),"calendartime",Mcalendartime)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"time"),"time",Mparsetime)){
+			if(!completedFunction(_Menvironment,owner,"now",Mnow)
+				||!completedFunction(_Menvironment,owner,"gettimezone",Mgettimezone)
+				||!completedValueFunction(_Menvironment,owner,"settimezone",Msettimezone)
+				||!completedValueValueFunction(_Menvironment,owner,"calendartime",Mcalendartime)
+				||!completedValueValueFunction(_Menvironment,owner,"time",Mparsetime)){
 				outputError("Failed to register the time functions");
 				return NULL;
 			}

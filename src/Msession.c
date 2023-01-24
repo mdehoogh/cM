@@ -45,7 +45,7 @@ Mstring* _getTimestamp(char const * const format){Mallocationowner owner=getOwne
 	return disowned_string(_timestamp,owner);
 }
 
-Mstring* _timestampedOutputFilename=NULL;
+Mstring* _timestampedOutputFilename=NULL;Mallocationowner owner_timestampedOutputFilename={MI_SESSION,__LINE__,1};
 size_t outputFilenamePrefixLength,outputFilenameSuffixLength;
 
 void endOfUserInput(){Mallocationowner owner=getOwner(__LINE__);
@@ -203,7 +203,7 @@ int getNumberOfWindowTextColumns(){return windowCols;}
 int getCurrentNumberOfWindowTextColumns(){windowSizeDetermined();return windowCols;}
 
 bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix){
-	_timestampedOutputFilename=owned_string(_getTimestamp(".%Y%m%d.%H%M%S"),getOwner(__LINE__));
+	_timestampedOutputFilename=owned_string(_getTimestamp(".%Y%m%d.%H%M%S"),owner_timestampedOutputFilename); // MDH@24JAN2023: replacing: getOwner(__LINE__));
   if(_timestampedOutputFilename&&string_prepend(_timestampedOutputFilename,outputfilenamePrefix))outputFilenamePrefixLength=strlen(outputfilenamePrefix);
 	if(_timestampedOutputFilename&&string_append(_timestampedOutputFilename,outputfilenameSuffix))outputFilenameSuffixLength=strlen(outputfilenameSuffix);
 	initDisplay();

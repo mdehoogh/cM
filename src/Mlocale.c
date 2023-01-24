@@ -69,7 +69,7 @@ bool updateLocalesettingsMap(){
 
 // are we supposed to update the locale every time getLocaleValue() is called???????
 // I suppose we could update the map every time???? i.e. the map is mutable but localeValue is not (i.e. you can't change the map it contains)
-Mmap* getLocalesettingsMap(){Mallocationowner owner=getOwner(__LINE__);
+Mmap* getLocalesettingsMap(){///////////Mallocationowner owner=getOwner(__LINE__);
   // if the current locale value is not bound somehow, we create a new one, essentially allowing external party to get a new locale value created
   if(!_localesettingsMap)
     _localesettingsMap=owned_map(__map("getLocaleSettingsMap()"),owner_localesettingsmap);
@@ -78,7 +78,8 @@ Mmap* getLocalesettingsMap(){Mallocationowner owner=getOwner(__LINE__);
         outputError("Failed to register the current locale settings");
   }else
     outputError("Failed to create the map for storing the locale settings");
-  return _localesettingsMap; // NOTE not returning the map disowned, so this module will keep ownership of the map
+	// NOTE not returning the map disowned, so this module will keep ownership of the map
+  return _localesettingsMap; //////disowned_map(_localesettingsMap,owner_localesettingsmap); 
 }
 /*
 static char *int_sep(char *s, size_t sz, int x){

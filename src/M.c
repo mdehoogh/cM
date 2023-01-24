@@ -4038,7 +4038,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
 	if(M_value){
-		if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME),MFUNCTION_NAME,MM)){
+		if(!completedValueFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME,MM)){
 			errorflags|=8;
 			output("%sFailed to register function %s.",M_ERROR_PREFIX,MFUNCTION_NAME);
 		}else
@@ -4046,33 +4046,32 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			output("Function %s registered.\n",MFUNCTION_NAME);
 	}
 
-	if(!completedFunction(_getFunction(_Menvironment,owner_executionenvironment,"variables"),"variables",Mvariables)){
+	if(!completedFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables)){
 		errorflags|=16;
 		outputWarning("Failed to register the variables() function");
 	}
-	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"values"),"values",Mvalues)){
+	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"values",Mvalues)){
 		errorflags|=32;
 		outputWarning("Failed to register the values() function");
 	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
-	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"in"),"in",Min)){
+	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"in",Min)){
 		errorflags|=64;
 		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
 	}
-	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"os"),"os",MexecuteOSCommand)){
+	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"os",MexecuteOSCommand)){
 		errorflags|=128;
 		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	// color functions
-	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"bc"),"bc",Mbc)){
+	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"bc",Mbc)){
 		errorflags|=256;
 		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
 	}
-	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"tc"),"tc",Mtc)){
-		errorflags|=512;
-		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
+	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"tc",Mtc)){
+		errorflags|=512;		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	return errorflags;
@@ -4393,6 +4392,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			exit(3);
 		}
 	}
+
+	//if(amVerbose())
+	{output("Initial allocations:\n");reportAllocations();}
 
 	while(1){ // command loop
 

@@ -1271,11 +1271,7 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
 							if(amVerbose())outputChar('.'); // 5
 							Mfunctionmap* _functionmap=_environment->_functionMap;
 							Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
-							if(_lastFunctionmapelement){
-								_lastFunctionmapelement->_next=_functionmapelement;
-								_functionmap->_last=_functionmapelement;
-							}else
-								_functionmap->_first=_functionmapelement;
+							if(_lastFunctionmapelement)_lastFunctionmapelement->_next=_functionmapelement;else _functionmap->_first=_functionmapelement;
 							_functionmap->_last=_functionmapelement;
 							_functionmap->numberOfFunctions++;
 							if(amVerbose())outputChar('.'); // 6
@@ -1308,17 +1304,17 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
 				if(amVerbose())
 					output("%s"," done"); // 7
 			}else
+			if(!_function)
 				output("%sFailed to create the function name to store '%s' in.",M_ERROR_PREFIX,name);
 			// if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
 		}else
-		if(!_function)
-				output("%sNo function map in the environment to store '%s' in.",M_ERROR_PREFIX,name);
+			output("%sNo function map in the environment to store '%s' in.",M_ERROR_PREFIX,name);
 	}else
 		output("%sNo environment to search for function '%s'.",M_ERROR_PREFIX,name);
 	if(_function)
 		if(amVerbose())
 			output("%s",".\n");
-	return _function;
+	return _function; /////// if _function is added to the environment successfully do not disown!!!! disowned_function(_function,owner); // MDH@24JAN2023: important to disown the returned function!!!
 }/* VALIDATED */
 
 // END FUNCTION STUFF
@@ -1540,7 +1536,8 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
 	return Mtype(value);
 }/* INVALIDATED */
 
-bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction){
+bool completedFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction){
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		_function->type=FT_INTERNAL_NO_ARGUMENTS;
 		_function->functionunion.noArgumentFunction=noArgumentFunction;
@@ -1551,12 +1548,14 @@ bool completedFunction(Mfunction* const _function,const char* const functionName
 	return false;
 }/* VALIDATED */
 // MDH@03JUN2020: if we assume that _function (in all following methods) is disowned, we can simply take over ownership
-bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+// MDH@24JAN2023: the parameter map is hosted by the function and should be a subowner of the function
+bool completedValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_ONE_ARGUMENT;
 		_function->functionunion.oneArgumentFunction=oneArgumentFunction;
-		_function->_parameterMap=owned_map(_getMap("v"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getMap("v"),Msubowner(owner_environment,4)); // MDH@24JAN2023: owner replaced by owner_function
 		if(_function->_parameterMap){
 			// no defaults here!!!
 			if(amVerbose())output("Registered single value argument function '%s' completed.\n",functionName);
@@ -1566,12 +1565,13 @@ bool completedValueFunction(Mfunction* const _function,const char* const functio
 	}
 	return false;
 }/* VALIDATED */
-bool completedFloatFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_ONE_ARGUMENT;
 		_function->functionunion.oneArgumentFunction=oneArgumentFunction;
-		_function->_parameterMap=owned_map(_getFloatMap("x",_getFloatValue(M_LD_NAN)),Msubowner(owner,1)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
+		_function->_parameterMap=owned_map(_getFloatMap("x",_getFloatValue(M_LD_NAN)),Msubowner(owner_environment,4)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered single real argument function '%s' completed.\n",functionName);
 			return true;
@@ -1580,13 +1580,14 @@ bool completedFloatFunction(Mfunction* const _function,const char* const functio
 	}
 	return false;
 }/* VALIDATED */
-bool completedIntegerFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_ONE_ARGUMENT;
 		_function->functionunion.oneArgumentFunction=oneArgumentFunction;
 		// NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-		_function->_parameterMap=owned_map(_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)),Msubowner(owner,1)); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
+		_function->_parameterMap=owned_map(_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)),Msubowner(owner_environment,4)); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
 		if(_function->_parameterMap){
 		   if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;	
@@ -1595,13 +1596,14 @@ bool completedIntegerFunction(Mfunction* const _function,const char* const funct
 	}
 	return false;
 }/* VALIDATED */
-bool completedListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_ONE_ARGUMENT;
 		_function->functionunion.oneArgumentFunction=oneArgumentFunction;
 		// NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-		_function->_parameterMap=owned_map(_getListMap("l",_getListValue(VT_UNDEFINED,false,"completedListFunction")),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getListMap("l",_getListValue(VT_UNDEFINED,false,"completedListFunction")),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered list function '%s' completed.\n",functionName);
 			return true;
@@ -1610,13 +1612,14 @@ bool completedListFunction(Mfunction* const _function,const char* const function
 	}
 	return false;
 }/* VALIDATED */
-bool completedMapFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedMapFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_ONE_ARGUMENT;
 		_function->functionunion.oneArgumentFunction=oneArgumentFunction;
 		// NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-		_function->_parameterMap=owned_map(_getMapMap("m",_getMapValue(VT_UNDEFINED,false,"completedMapFunction")),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getMapMap("m",_getMapValue(VT_UNDEFINED,false,"completedMapFunction")),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered map function '%s' completed.\n",functionName);
 			return true;
@@ -1626,13 +1629,14 @@ bool completedMapFunction(Mfunction* const _function,const char* const functionN
 	return false;
 }/* VALIDATED */
 
-bool completedListTextFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListTextFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
 		// NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-		_function->_parameterMap=owned_map(_getListTextMap("tosort:list|map","sortmethod:text"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getListTextMap("tosort:list|map","sortmethod:text"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered sort list|map function '%s' completed.\n",functionName);
 			return true;
@@ -1641,13 +1645,14 @@ bool completedListTextFunction(Mfunction* const _function,const char* const func
 	}
 	return false;
 }/* VALIDATED */
-bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedTokenListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_ONE_ARGUMENT;
 		_function->functionunion.oneArgumentFunction=oneArgumentFunction;
 		// NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-		_function->_parameterMap=owned_map(_getListMap("l",_getListValue(VT_TOKEN,false,"completedTokenListFunction")),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getListMap("l",_getListValue(VT_TOKEN,false,"completedTokenListFunction")),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())
 				output("Registered token list function '%s' completed.\n",functionName);
@@ -1657,13 +1662,14 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
 	}
 	return false;
 }/* VALIDATED */
-bool completedIntegerBooleanFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedIntegerBooleanFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
 		// NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-		_function->_parameterMap=owned_map(_getIntegerBooleanMap("number of decimals","compute sine table"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getIntegerBooleanMap("number of decimals","compute sine table"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered integer boolean function '%s' completed.\n",functionName);
 			return true;
@@ -1672,13 +1678,14 @@ bool completedIntegerBooleanFunction(Mfunction* const _function,const char* cons
 	}
 	return false;
 }/* NOT VALIDATED */
-bool completedListFunctionFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListFunctionFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
 		// NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-		_function->_parameterMap=owned_map(_getListFunctionMap("list","function"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getListFunctionMap("list","function"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered list function function '%s' completed.\n",functionName);
 			return true;
@@ -1687,12 +1694,13 @@ bool completedListFunctionFunction(Mfunction* const _function,const char* const 
 	}
 	return false;
 }/* NOT VALIDATED */
-bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedStringStringFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getStringStringMap("variable","type"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getStringStringMap("variable","type"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1701,12 +1709,13 @@ bool completedStringStringFunction(Mfunction* const _function,const char* const 
 	}
 	return false;
 }/* VALIDATED */
-bool completedFloatFloatFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getFloatFloatMap("base","exponent"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getFloatFloatMap("base","exponent"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1715,12 +1724,13 @@ bool completedFloatFloatFunction(Mfunction* const _function,const char* const fu
 	}
 	return false;
 }/* VALIDATED */
-bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getStringMapTokenMap("name","parameters","body"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getStringMapTokenMap("name","parameters","body"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1729,12 +1739,13 @@ bool completedStringMapTokenFunction(Mfunction* const _function,const char* cons
 	}
 	return false;
 }/* VALIDATED */
-bool completedMapTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getMapTokenMap("parameters","body"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getMapTokenMap("parameters","body"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1743,12 +1754,13 @@ bool completedMapTokenFunction(Mfunction* const _function,const char* const func
 	}
 	return false;
 }/* VALIDATED */
-bool completedListFunctionValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListFunctionValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getListFunctionValueMap("list","function","initial value"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getListFunctionValueMap("list","function","initial value"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1757,12 +1769,13 @@ bool completedListFunctionValueFunction(Mfunction* const _function,const char* c
 	}
 	return false;
 }/* VALIDATED */
-bool completedMapMapListFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedMapMapListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getMapMapListMap("parameters:map","local variables:map","commands:list"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getMapMapListMap("parameters:map","local variables:map","commands:list"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1771,12 +1784,13 @@ bool completedMapMapListFunction(Mfunction* const _function,const char* const fu
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueTextValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueTextValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getStringMapTokenMap("variable name, list or map","value type","immutable"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getStringMapTokenMap("variable name, list or map","value type","immutable"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1785,12 +1799,13 @@ bool completedValueTextValueFunction(Mfunction* const _function,const char* cons
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueValueValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getValueValueValueMap("text(s)","separator(s)","item wrapper(s)"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getValueValueValueMap("text(s)","separator(s)","item wrapper(s)"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1800,12 +1815,13 @@ bool completedValueValueValueFunction(Mfunction* const _function,const char* con
 	return false;
 }
 
-bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getTokenTokenMap("while condition","while body"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getTokenTokenMap("while condition","while body"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1814,12 +1830,13 @@ bool completedTokenTokenFunction(Mfunction* const _function,const char* const fu
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getTokenTokenMap("value to text","format specifier"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getTokenTokenMap("value to text","format specifier"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1828,7 +1845,8 @@ bool completedValueValueFunction(Mfunction* const _function,const char* const fu
 	}
 	return false;
 }/* VALIDATED */
-bool completedIntegerValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
@@ -1842,7 +1860,8 @@ bool completedIntegerValueFunction(Mfunction* const _function,const char* const 
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueIntegerFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
@@ -1856,7 +1875,8 @@ bool completedValueIntegerFunction(Mfunction* const _function,const char* const 
 	}
 	return false;
 }/* VALIDATED */
-bool completedListValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
@@ -1870,12 +1890,13 @@ bool completedListValueFunction(Mfunction* const _function,const char* const fun
 	}
 	return false;
 }/* VALIDATED */
-bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getListValueIntegerMap("list to search","value to find","maximum number of elements"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getListValueIntegerMap("list to search","value to find","maximum number of elements"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1884,12 +1905,13 @@ bool completedListValueIntegerFunction(Mfunction* const _function,const char* co
 	}
 	return false;
 }/* VALIDATED */
-bool completedListValueIndexFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListValueIndexFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getListValueIntegerMap("list to insert into","value to insert","index of list element"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getListValueIntegerMap("list to insert into","value to insert","index of list element"),Msubowner(owner_environment,1));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1898,12 +1920,17 @@ bool completedListValueIndexFunction(Mfunction* const _function,const char* cons
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction){////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
+		//////output("1\n");
 		_function->type=FT_INTERNAL_FOUR_ARGUMENTS;
+		//////output("2\n");
 		_function->functionunion.fourArgumentFunction=fourArgumentFunction;
-		_function->_parameterMap=owned_map(_getValueTokenTokenTokenMap("if condition","then clause","else clause","undefined clause"),Msubowner(owner,1));
+		/////output("3\n");
+		_function->_parameterMap=owned_map(_getValueTokenTokenTokenMap("if condition","then clause","else clause","undefined clause"),Msubowner(owner_environment,4));
+		/////output("4\n");
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1912,12 +1939,13 @@ bool completedValueTokenTokenTokenFunction(Mfunction* const _function,const char
 	}
 	return false;
 }/* VALIDATED */
-bool completedThreeIntegersFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedThreeIntegersFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getThreeIntegerMap("red","green","blue"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getThreeIntegerMap("red","green","blue"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1926,7 +1954,8 @@ bool completedThreeIntegersFunction(Mfunction* const _function,const char* const
 	}
 	return false;
 }/* VALIDATED */
-bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_FOUR_ARGUMENTS;
@@ -1940,12 +1969,13 @@ bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char
 	}
 	return false;
 }/* VALIDATED */
-bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedTokenTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FiveArgumentFunction fiveArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_FIVE_ARGUMENTS;
 		_function->functionunion.fiveArgumentFunction=fiveArgumentFunction;
-		_function->_parameterMap=owned_map(_getTokenTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body","result"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getTokenTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body","result"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -2097,51 +2127,51 @@ Mvalue* Mlocalesettings(){Mallocationowner owner=getOwner(__LINE__);
 // these internal functions do NOT have a body as M defined functions have...
 bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment){
 
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"get"),"get",Mget))return false;
-	if(!completedValueValueFunction(_getFunction(_environment,owner_environment,"set"),"set",Mset))return false;
+	if(!completedValueFunction(_environment,owner_environment,"get",Mget))return false;
+	if(!completedValueValueFunction(_environment,owner_environment,"set",Mset))return false;
 
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"setlocale"),"setlocale",Msetlocale))return false;
-	if(!completedFunction(_getFunction(_environment,owner_environment,"localesettings"),"localesettings",Mlocalesettings))return false;
+	if(!completedValueFunction(_environment,owner_environment,"setlocale",Msetlocale))return false;
+	if(!completedFunction(_environment,owner_environment,"localesettings",Mlocalesettings))return false;
 
 	// variable functions
 
 	// MDH@02NOV2020: random functions
-	if(!completedFunction(_getFunction(_environment,owner_environment,"rand"),"rand",Mrand))return false;
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"rands"),"rands",Mrands))return false;
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"srand"),"srand",Msrand))return false;
+	if(!completedFunction(_environment,owner_environment,"rand",Mrand))return false;
+	if(!completedValueFunction(_environment,owner_environment,"rands",Mrands))return false;
+	if(!completedValueFunction(_environment,owner_environment,"srand",Msrand))return false;
 	// TODO can we have an completedInteger and completedIntegerInteger function here????
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"irand"),"irand",Mirand))return false;
-	if(!completedValueValueFunction(_getFunction(_environment,owner_environment,"irands"),"irands",Mirands))return false;
+	if(!completedValueFunction(_environment,owner_environment,"irand",Mirand))return false;
+	if(!completedValueValueFunction(_environment,owner_environment,"irands",Mirands))return false;
 
 	// math functions
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cos"),"cos",Mcos))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cordiccos"),"cordiccos",Mcordiccos))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"sin"),"sin",Msin))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cordicsin"),"cordicsin",Mcordicsin))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"tan"),"tan",Mtan))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cosh"),"cosh",Mcosh))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"sinh"),"sinh",Msinh))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"tanh"),"tanh",Mtanh))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"sqrt"),"sqrt",Msqrt))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"log"),"log",Mlog))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"log10"),"log10",Mlog10))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"floor"),"floor",Mfloor))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"trunc"),"trunc",Mtrunc))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"round"),"round",Mround))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"ceil"),"ceil",Mceil))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"exp"),"exp",Mexp))return false;
-	if(!completedFloatFunction(_getFunction(_environment,owner_environment,"dexp"),"dexp",Mdexp))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"cos",Mcos))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"cordiccos",Mcordiccos))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"sin",Msin))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"cordicsin",Mcordicsin))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"tan",Mtan))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"cosh",Mcosh))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"sinh",Msinh))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"tanh",Mtanh))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"sqrt",Msqrt))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"log",Mlog))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"log10",Mlog10))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"floor",Mfloor))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"trunc",Mtrunc))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"round",Mround))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"ceil",Mceil))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"exp",Mexp))return false;
+	if(!completedFloatFunction(_environment,owner_environment,"dexp",Mdexp))return false;
 	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"type"),"type",Mtype))return false;
-	if(!completedValueTextValueFunction(_getFunction(_environment,owner_environment,"settype"),"settype",Msettype))return false;
-	if(!completedFloatFloatFunction(_getFunction(_environment,owner_environment,"pow"),"pow",Mpow))return false;
+	if(!completedValueFunction(_environment,owner_environment,"type",Mtype))return false;
+	if(!completedValueTextValueFunction(_environment,owner_environment,"settype",Msettype))return false;
+	if(!completedFloatFloatFunction(_environment,owner_environment,"pow",Mpow))return false;
 
-	if(!completedFunction(_getFunction(_environment,owner_environment,"break"),"break",Mbreak))return false;
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"return"),"return",Mreturn))return false;
+	if(!completedFunction(_environment,owner_environment,"break",Mbreak))return false;
+	if(!completedValueFunction(_environment,owner_environment,"return",Mreturn))return false;
 
-	if(!completedValueFunction(_getFunction(_environment,owner_environment,"out"),"out",Mout))return false;
+	if(!completedValueFunction(_environment,owner_environment,"out",Mout))return false;
 
-	if(!completedThreeIntegersFunction(_getFunction(_environment,owner_environment,"brgb"),"brgb",Mbrgb))return false;
-	if(!completedThreeIntegersFunction(_getFunction(_environment,owner_environment,"trgb"),"trgb",Mtrgb))return false;
+	if(!completedThreeIntegersFunction(_environment,owner_environment,"brgb",Mbrgb))return false;
+	if(!completedThreeIntegersFunction(_environment,owner_environment,"trgb",Mtrgb))return false;
 	return true;
 }/* VALIDATED */
