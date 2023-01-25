@@ -252,19 +252,21 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
 }/* VALIDATED */
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
 	if(!_map)return NULL; // MDH@22OCT2020: this was missing before, which was causing crashes
+	if(_map->_creator)owned_chars(_map->_creator,Msubowner(owner_map,1)); // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
 	if(_map->_first)owned_mapelement(_map->_first,Msubowner(owner_map,1));
 	return OWNED(_map,owner_map);
 }
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
 	if(!_map)return NULL;
+	if(_map->_creator)disowned_chars(_map->_creator,owner_map); // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
 	if(_map->_first)disowned_mapelement(_map->_first,owner_map);
 	return DISOWNED(_map,owner_map);
 }
 // MDH@01NOV2020: why wasn't this here before?
 Mmap* __map(char* source){Mallocationowner owner=getOwner(__LINE__);
-	//////if(source!=NULL)output("Creating a map of source '%s'.\n",source);
 	Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
 	if(source){
+		output("Creating a map of source '%s'.\n",source);
 		_map->_creator=owned_chars(_getChars(source),Msubowner(owner,1)); 
 		if(!_map->_creator)
 			output("%sFailed to register map creator '%s'.\n",M_ERROR_PREFIX,source);
@@ -1329,7 +1331,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	if(_listelement->index!=index){ // insert or append
 		SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
 		// MDH@24JAN2023: OOPS Have to take over the ownership of the _value as well!!!!!! TODO check whether this is ok to do!!!!!
-		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else outputValue("List element value '",_listelement->_value,"' is not disowned!");
+		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else outputValue("List element value '",_listelement->_value,"' is not disowned!\n");
 		_listelement->index=index;
 		// linking
 		if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
@@ -1339,7 +1341,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	if(index==0){ // prepending
 		SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
 		// MDH@24JAN2023: OOPS Have to take over the ownership of the _value as well!!!!!! TODO check whether this is ok to do!!!!!
-		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else outputValue("New list element value '",_listelement->_value,"' is not disowned!");
+		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else outputValue("New list element value '",_listelement->_value,"' is not disowned!\n");
 		// linking into the list
 		_listelement->_next=_list->_first;
 		_list->_first=_listelement;
@@ -2907,11 +2909,14 @@ Mfunction* owned_function(Mfunction* _function,Mallocationowner owner_function){
 Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function){
 	if(!_function)return NULL;
 	/////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
-	output("X");
 	if(_function->_parameterMap)disowned_map(_function->_parameterMap,owner_function);
-	output("Y");
-	if(_function->type==FT_USER)disowned_userfunction(_function->functionunion._userfunction,owner_function); // TODO ?????
-	output("Z");
+	//if(amVerboseDebugging())
+		output("\t\tFunction parameter map disowned.\n");
+	if(_function->type==FT_USER){
+		disowned_userfunction(_function->functionunion._userfunction,owner_function); // TODO ?????
+		//if(amVerboseDebugging())
+			output("\t\tUser function disowned!\n");
+	}
 	return DISOWNED(_function,owner_function);
 }
 void free_function(Mfunction* _function/*,Mallocationowner owner_function*/){
@@ -2932,11 +2937,12 @@ Mfunctionmapelement* owned_functionmapelement(Mfunctionmapelement* _functionmape
 Mfunctionmapelement* disowned_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocationowner owner_functionmapelement){
 	if(!_functionmapelement)return NULL;
 	disowned_functionmapelement(_functionmapelement->_next,owner_functionmapelement);
-	output("Disowning function '%s'",string(_functionmapelement->_name));
+	output("Disowning function map element '%s'.\n",string(_functionmapelement->_name));
+	output("\tDisowning the function.\n");
 	disowned_function(_functionmapelement->_function,owner_functionmapelement);
-	output(".");
+	output("\tDisowning the function name.\n");
 	disowned_string(_functionmapelement->_name,owner_functionmapelement);
-	output(" done\n");
+	output("\tDisowning the function map element!\n");
 	return DISOWNED(_functionmapelement,owner_functionmapelement);
 }
 void free_functionmapelement(Mfunctionmapelement* _functionmapelement){
@@ -2999,12 +3005,17 @@ Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owne
 }
 Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment){
 	if(!_environment)return NULL;
-	if(amVerboseDebugging())output("Releasing ownership environment.\n");
+	//if(amVerboseDebugging())
+		output("Releasing ownership environment '%s'.\n",_environment->_name->chars);
 	disowned_chars(_environment->_name,owner_environment);
-	if(amVerboseDebugging())output("Environment name ownership released.\n");
+	//if(amVerboseDebugging())
+		output("\tEnvironment name ownership released.\n");
 	disowned_map(_environment->_variableMap,owner_environment);
-	if(amVerboseDebugging())output("Environment variable map ownership released.\n");
+	//if(amVerboseDebugging())
+		output("\tEnvironment variable map ownership released.\n");
 	disowned_functionmap(_environment->_functionMap,owner_environment); // all functions also need to be disowned
+	if(amVerboseDebugging())
+		output("\tEnvironment function map ownership released!");
 	///////if(amVerboseDebugging())output("Environment function map ownership released.\n");
 	// disowned_map(_environment->_functionMap);
 	return DISOWNED(_environment,owner_environment);

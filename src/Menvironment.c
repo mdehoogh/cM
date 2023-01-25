@@ -1239,6 +1239,8 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
 // _getFunction() will create the function
 // MDH@03FEB2020: now wrapping the environment in the parameter list in a value
 //				a new function is always created on the currently executing environment
+// MDH@25JAN2023 NOTE: _getFunction add the given function to the given environment, and returns it, this means that said function will already be owned by said environment
+//                     and there's no need to change it's ownership?????
 Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner_environment,const char* const name){Mallocationowner owner=getOwner(__LINE__);
 	if(!name||strlen(name)==0)return NULL;
 	Mfunction* _function=NULL;
@@ -1265,7 +1267,10 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
 						Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
 						if(_functionmapelement){
 							if(amVerbose())outputChar('.'); // 4
-							_functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
+							// MDH@25JAN2023: the problem here probably is the ownership of the chars inside the _functionName!!!!
+							_functionmapelement->_name=(Mstring*)SUBOWNED(owned_string(disowned_string(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
+							// replacing: _functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
+							//////////output("\tOwner of the function map element name: '%s'.\n",getOwnerText(_functionmapelement->_name));
 							_functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
 							SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
 							if(amVerbose())outputChar('.'); // 5
@@ -1565,7 +1570,7 @@ bool completedValueFunction(Menvironment* const _environment,Mallocationowner ow
 	}
 	return false;
 }/* VALIDATED */
-bool completedFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1629,7 +1634,7 @@ bool completedMapFunction(Menvironment* const _environment,Mallocationowner owne
 	return false;
 }/* VALIDATED */
 
-bool completedListTextFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListTextFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){////////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1645,7 +1650,7 @@ bool completedListTextFunction(Menvironment* const _environment,Mallocationowner
 	}
 	return false;
 }/* VALIDATED */
-bool completedTokenListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedTokenListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){////////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1694,7 +1699,7 @@ bool completedListFunctionFunction(Menvironment* const _environment,Mallocationo
 	}
 	return false;
 }/* NOT VALIDATED */
-bool completedStringStringFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedStringStringFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1709,7 +1714,7 @@ bool completedStringStringFunction(Menvironment* const _environment,Mallocationo
 	}
 	return false;
 }/* VALIDATED */
-bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1724,7 +1729,7 @@ bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationown
 	}
 	return false;
 }/* VALIDATED */
-bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1739,7 +1744,7 @@ bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocatio
 	}
 	return false;
 }/* VALIDATED */
-bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1754,7 +1759,7 @@ bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner
 	}
 	return false;
 }/* VALIDATED */
-bool completedListFunctionValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListFunctionValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1769,7 +1774,7 @@ bool completedListFunctionValueFunction(Menvironment* const _environment,Malloca
 	}
 	return false;
 }/* VALIDATED */
-bool completedMapMapListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedMapMapListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1784,7 +1789,7 @@ bool completedMapMapListFunction(Menvironment* const _environment,Mallocationown
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueTextValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueTextValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1830,7 +1835,7 @@ bool completedTokenTokenFunction(Menvironment* const _environment,Mallocationown
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
@@ -1845,13 +1850,13 @@ bool completedValueValueFunction(Menvironment* const _environment,Mallocationown
 	}
 	return false;
 }/* VALIDATED */
-bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getTokenTokenMap("number of elements","fill value"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getTokenTokenMap("number of elements","fill value"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1860,13 +1865,13 @@ bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationo
 	}
 	return false;
 }/* VALIDATED */
-bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getTokenTokenMap("list, array or text","new length"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getTokenTokenMap("list, array or text","new length"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1875,13 +1880,13 @@ bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationo
 	}
 	return false;
 }/* VALIDATED */
-bool completedListValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedListValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
-		_function->_parameterMap=owned_map(_getTokenTokenMap("list","value"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getTokenTokenMap("list","value"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1911,7 +1916,7 @@ bool completedListValueIndexFunction(Menvironment* const _environment,Mallocatio
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_THREE_ARGUMENTS;
 		_function->functionunion.threeArgumentFunction=threeArgumentFunction;
-		_function->_parameterMap=owned_map(_getListValueIntegerMap("list to insert into","value to insert","index of list element"),Msubowner(owner_environment,1));
+		_function->_parameterMap=owned_map(_getListValueIntegerMap("list to insert into","value to insert","index of list element"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
@@ -1954,13 +1959,13 @@ bool completedThreeIntegersFunction(Menvironment* const _environment,Mallocation
 	}
 	return false;
 }/* VALIDATED */
-bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_FOUR_ARGUMENTS;
 		_function->functionunion.fourArgumentFunction=fourArgumentFunction;
-		_function->_parameterMap=owned_map(_getTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body"),Msubowner(owner,1));
+		_function->_parameterMap=owned_map(_getTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;

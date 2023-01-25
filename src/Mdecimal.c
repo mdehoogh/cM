@@ -44,17 +44,22 @@ void free_sincoselement(Msincoselement* _sincoselement/*,Mallocationowner owner_
 #define FREE_SINCOSELEMENT(_sincoselement,owner_sincoselement) free_sincoselement(disowned_sincoselement(_sincoselement,owner_sincoselement))
 
 mpd_context_t* owned_mpd_context(mpd_context_t* _mpd_context,Mallocationowner owner_mpd_context){
+	//////output("Owning a decimal context!\n");
 	return OWNED(_mpd_context,owner_mpd_context);
-}mpd_context_t* disowned_mpd_context(mpd_context_t* _mpd_context,Mallocationowner owner_mpd_context){
+}
+mpd_context_t* disowned_mpd_context(mpd_context_t* _mpd_context,Mallocationowner owner_mpd_context){
+	/////output("Disowning a decimal context!\n");
 	return DISOWNED(_mpd_context,owner_mpd_context);
 }
 mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){Mallocationowner owner=getOwner(__LINE__);
 	mpd_context_t* _mpd_context=(mpd_context_t*)CALLOC_1(sizeof(mpd_context_t),'c',owner); // MDH@29APR2020: calloc replaced by CALLOC for sure, because it must match FREE(,'c') on mpd_context (see below)
 	if(_mpd_context){
-		if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
+		if(amVerbose())
+			output("New decimal context with precision %lld created.\n",decimalprecision);
 		// initialize the new context to the default context (specification)
 		mpd_init(_mpd_context,decimalprecision);
-		if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(_mpd_context));
+		if(amVerbose())
+			output("Decimal context with precision %u initialized.\n",mpd_getprec(_mpd_context));
 	}else
 		outputError("Failed to create a new decimal context");
 	return disowned_mpd_context(_mpd_context,owner);
@@ -62,9 +67,19 @@ mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){Mallocationowner owne
 
 Mdecimalcontext* disowned_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner_decimalcontext){
 	if(!_decimalcontext)return NULL;
-	if(_decimalcontext->mpd_context)disowned_mpd_context(_decimalcontext->mpd_context,owner_decimalcontext);
-	if(_decimalcontext->_firstCordicelement)disowned_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
-	if(_decimalcontext->_firstSincoselement)disowned_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
+	////output("\tDisowning a decimal context!");
+	if(_decimalcontext->mpd_context){
+		disowned_mpd_context(_decimalcontext->mpd_context,owner_decimalcontext);
+		////output("\t\tmpd_context disowned!\n");
+	}
+	if(_decimalcontext->_firstCordicelement){
+		disowned_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
+		////output("\t\tSincos elements disowned!\n");
+	}
+	if(_decimalcontext->_firstSincoselement){
+		disowned_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
+		/////output("\t\tCordic elements disowned!\n");
+	}
 	return DISOWNED(_decimalcontext,owner_decimalcontext);
 }
 Mdecimalcontext* owned_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner_decimalcontext){
@@ -100,14 +115,22 @@ typedef struct MdecimalcontextElement{
 
 MdecimalcontextElement* owned_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
 	if(!_decimalcontextElement)return NULL;
+	////output("Owning a decimal context element!\n");
 	//// MDH@20JAN2023 leave next alone: if(_decimalcontextElement->_next)owned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
-	if(_decimalcontextElement->_decimalcontext)owned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
+	if(_decimalcontextElement->_decimalcontext){
+		owned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
+		/////output("\tDecimal context owned!\n");
+	}
 	return(MdecimalcontextElement*)OWNED(_decimalcontextElement,owner_decimalcontextElement);
 }
 MdecimalcontextElement* disowned_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
 	if(!_decimalcontextElement)return NULL;
 	// MDH@20JAN2023 leave next alone: if(_decimalcontextElement->_next)disowned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
-	if(_decimalcontextElement->_decimalcontext)disowned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
+	/////output("Disowning a decimal context element!\n");
+	if(_decimalcontextElement->_decimalcontext){
+		disowned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
+		/////output("\tDecimal context disowned!\n");
+	}
 	return(MdecimalcontextElement*)DISOWNED(_decimalcontextElement,owner_decimalcontextElement);
 }
 void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement/*,Mallocationowner owner_decimalcontextElement*/){
@@ -131,22 +154,26 @@ Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getO
 	Mdecimalcontext* decimalcontext=getExistingDecimalcontext(prec);
 	if(decimalcontext)return decimalcontext;
 	MdecimalcontextElement* decimalcontextElement=(MdecimalcontextElement*)CALLOC_1(sizeof(MdecimalcontextElement),'e',owner);
-	if(decimalcontextElement){
+	if(decimalcontextElement!=NULL){
 		decimalcontextElement->_decimalcontext=(Mdecimalcontext*)CALLOC_1(sizeof(Mdecimalcontext),'C',owner);
-		if(decimalcontextElement->_decimalcontext){
+		if(decimalcontextElement->_decimalcontext!=NULL){
 			decimalcontextElement->_decimalcontext->mpd_context=owned_mpd_context(__mpd_context(prec),owner);
-			if(decimalcontextElement->_decimalcontext->mpd_context){
-				if(_lastDecimalcontextElement)_lastDecimalcontextElement->_next=owned_decimalcontextElement(disowned_decimalcontextElement(decimalcontextElement,owner),owner_decimalcontextElement); // MDH@20JAN2023: switch owner to the module global decimal context element owner
+			if(decimalcontextElement->_decimalcontext->mpd_context!=NULL){
+				if(_lastDecimalcontextElement)
+					_lastDecimalcontextElement->_next=owned_decimalcontextElement(disowned_decimalcontextElement(decimalcontextElement,owner),owner_decimalcontextElement);
+				else
+					_firstDecimalcontextElement=owned_decimalcontextElement(disowned_decimalcontextElement(decimalcontextElement,owner),owner_decimalcontextElement);
 				_lastDecimalcontextElement=decimalcontextElement;
-				if(!_firstDecimalcontextElement)_firstDecimalcontextElement=_lastDecimalcontextElement;
-				return decimalcontextElement->_decimalcontext; 
+				return decimalcontextElement->_decimalcontext;
 			}
+			output("Failed to create the decimal context with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
 			// not bound!!!
 			disowned_decimalcontext(decimalcontextElement->_decimalcontext,owner);
-		}
+		}else
+			output("Failed to create the decimal context wrapper with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
 		FREE_DECIMALCONTEXTELEMENT(decimalcontextElement,owner);
 	}else
-		output("%sFailed to create the decimal context with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
+		output("%sFailed to create the decimal context element with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
 	return NULL;
 }
 
@@ -1127,6 +1154,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 				}
 #endif
 			}
+			output("\n");
 			mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
 			uint32_t status=0;
 			mpd_qfinalize(s,mpd_context,&status);

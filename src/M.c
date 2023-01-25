@@ -4394,7 +4394,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	}
 
 	//if(amVerbose())
-	{output("Initial allocations:\n");reportAllocations();}
+		reportAllocations("Initial allocations:\n","\t");
 
 	while(1){ // command loop
 
@@ -5363,19 +5363,19 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 					// garbage collection: remove any values not used anymore...
 					// if(amVerboseDebugging())
-					//if(amVerbose())
+					if(amVerbose())
 						outputInfo("Removing unreferenced values.");
 					size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
-					//if(amVerbose())
+					if(amVerbose())
 					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
 
 					// MDH@17JAN2023
 					size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose());
-					//if(amVerbose())
+					if(amVerbose())
 						output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
 
-					//if(amVerbose())
-						reportAllocations();
+					if(amVerbose())
+						reportAllocations("Allocations.\n","\t");
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)

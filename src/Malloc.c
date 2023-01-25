@@ -597,25 +597,34 @@ size_t nulledAllocationsRemoved(bool verbose){
 	if(verbose)printf("No nulled allocations to remove!\n");
 	return (nr_allocations-allocations.l);
 }
-void reportAllocations(){
+void reportAllocations(char* title,char* prefix){
+	printf("%s",title);
 	// let's collect the counts per allocation type
-	unsigned long allocationTypeCounts[256];
-	memset(allocationTypeCounts,0,256*sizeof(unsigned long));
-	Mallocationowner owner;
-	signed char allocationType;
-	Mallocationtypeowner *owners=allocations._owners;
-	for(size_t allocationIndex=allocations.l;allocationIndex>0;){
-		if(owners[--allocationIndex]!=NULL){
-			owner=owners[allocationIndex]->owner;
-			allocationType=owners[allocationIndex]->allocationType;
-			allocationTypeCounts[allocationType+128]++;
-			if(!owners[allocationIndex]->owner.global){
-				printf("Allocation #%zu of type '%c' (%d) is still owned by %s:%d.\n",allocationIndex,allocationType,allocationType,MODULE_NAMES[owner.module],owner.id);
+	size_t allocationIndex=allocations.l;
+	if(allocationIndex){
+		unsigned long allocationTypeCounts[256];
+		memset(allocationTypeCounts,0,256*sizeof(unsigned long));
+		Mallocationowner owner;
+		signed char allocationType;
+		Mallocationtypeowner *owners=allocations._owners;
+		size_t locals=0;
+		while(1){
+			if(owners[--allocationIndex]!=NULL){
+				owner=owners[allocationIndex]->owner;
+				allocationType=owners[allocationIndex]->allocationType;
+				allocationTypeCounts[allocationType+128]++;
+				if(!owners[allocationIndex]->owner.global){
+					locals++;
+					printf("%sAllocation #%zu of type '%c' (%d) is still owned by %s:%d.\n",prefix,allocationIndex,allocationType,allocationType,MODULE_NAMES[owner.module],owner.id);
+				}
 			}
+			if(allocationIndex==0)break;
 		}
-	}
-	// write the allocation type counts
-	for(uint16_t i=0;i<256;i++)if(allocationTypeCounts[i])printf("%c'%c': %lu.\n",(i<128?'-':' '),(i<128?128-i:i-128),allocationTypeCounts[i]);
+		if(!locals)output("%sNo local (erroneous) allocations!\n",prefix);
+		// write the allocation type counts
+		for(uint16_t i=0;i<256;i++)if(allocationTypeCounts[i])printf("%s%c'%c': %lu.\n",prefix,(i<128?'-':' '),(i<128?128-i:i-128),allocationTypeCounts[i]);
+	}else
+		printf("%sNo allocations!\n",prefix);
 }
 
 Mallocationtype* _getAllocationTypes(){
@@ -904,7 +913,7 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 		,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
 		,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 		);
-	if(_alloc->allocationIndex>0){
+	if(_alloc->allocationIndex>=0){ // MDH@25JAN2023: allocationIndex can now be 0 as well!!!!!
 		// info("Disowned: %p\n",_alloc);
 		info("\tAllocation #%i=%s:%u(%s%u%s%s).\n",_alloc->allocationIndex
 			,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.freed);
@@ -945,7 +954,7 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 	// MDH@20MAY2020: you can only own something if disowned by the previous owner (in which case ownerId should be negative)
 	// info("Owned %p:\n",_alloc);
 	// printf("%s","U");
-	if(_alloc->allocationIndex>0){
+	if(_alloc->allocationIndex>=0){
 		Mallocationowner *_owner=&(allocations._owners[_alloc->allocationIndex]->owner); // MDH@02JUN2020: pointing to where the owner of the allocation is registered
 		info("\tAllocation #%i=%s:%u(%s%u%s%s).\n",_alloc->allocationIndex
 			,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
@@ -1077,7 +1086,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 			bug("\tFreed before!");
 	}else{
 		bug("\tInvalid allocation index %i.",allocationIndex);
-		if(allocationIndex>0)allocationIndex=INT32_MIN; // MDH@17JAN2023: makes testing a little easier
+		if(allocationIndex>=0)allocationIndex=INT32_MIN; // MDH@17JAN2023: makes testing a little easier
 	}
 	/////info("Freeing type '%c' data",type);
 	// determine the amount of items to free which depends on the type size!!
@@ -1512,13 +1521,14 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 	numberOfAllocationMarkTypes=numberOfAllocationTypes;
 	output("\tMemory allocation mark management initialized...\n");
 
+	/* MDH@14JAN2023: DONE not doing this anymore!!!!! TODO check if we really need this at all???????????
 	// MDH@18JUN2020: force mark the first allocation
-		// MDH@14JAN2023: TODO check if we really need this at all???????????
-	if(addAllocation((Mallocationtypeowner)malloc(sizeof(Malloc))/*'\0',owner*/)!=0){
+	if(addAllocation((Mallocationtypeowner)malloc(sizeof(Malloc)))!=0){
 		error("\tFailed to mark the start of allocation management.");
 		return false;
 	}
-		output("\tStart of allocation management marked...\n");
+	*/
+	output("\tStart of allocation management marked...\n");
 	return true;
 
 	// replacing: if(!allocations._chars)info("ERROR: Failed to initialize recording allocations.\n");else info("Allocation recording initialized.\n");
