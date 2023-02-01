@@ -11,30 +11,81 @@ extern unsigned long long M_MODULE_DEBUGGING;
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ALLOC,id};}
 
+/**
+ * @brief the (module local) names of the modules in the same order as the abbreviations stored in MODULES
+ * 
+ */
 static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue","Msystem","Mtime","Miterator","Marray","Mlist","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
-
+/**
+ * @brief the (module local) text representation of the sign of the type field in the owner structure
+ * 
+ */
 static char const * const DISOWNED_FLAG_TEXTS[]={"","-"};
+/**
+ * @brief the (module local) text representation of the global flag in the owner structure
+ * 
+ */
 static char const * const GLOBAL_FLAG_TEXTS[]={"f","m"};
+/**
+ * @brief the (module local) text representation of the free flag in the owner structure
+ * 
+ */
 static char const * const FREED_FLAG_TEXTS[]={"","X"};
 
 extern char const * const M_ERROR_PREFIX;
 extern char const * const M_WARNING_PREFIX;
 extern char const * const M_BUG_PREFIX;
-
+/**
+ * @brief the (module local) hour-minute-second format string
+ * 
+ */
 static char const * const HMS_FORMAT_STRING="%H:%M:%S";
-
+/**
+ * @brief vprints the additional arguments in \p ... using format string \p fmt (module local)
+ * 
+ * @param fmt the format string
+ * @param ... the values to vprint
+ */
 static void tell(char const * fmt,...){
 	va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
+/**
+ * @brief vprints the additional arguments in \p ... using format string \p fmt when both flags M_MODULE_DEBUGGING and MM_ALLOC are set (module local)
+ * 
+ * @param fmt the format string
+ * @param ... the values to vprint
+ */
 static void info(char const * fmt,...){
 	if((M_MODULE_DEBUGGING&MM_ALLOC)){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 }
+/**
+ * @brief vprints the additional arguments in \p ... using format string \p fmt prefixed by M_WARNING_PREFIX
+ * 
+ * @param fmt the format string
+ * @param ... the values to vprint
+ */
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
+/**
+ * @brief vprints the additional arguments in \p ... using format string \p fmt prefixed by M_ERROR_PREFIX
+ * 
+ * @param fmt the format string
+ * @param ... the values to vprint
+ */
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
+/**
+ * @brief vprints the additional arguments in \p ... using format string \p fmt prefixed by M_BUG_PREFIX
+ * 
+ * @param fmt the format string
+ * @param ... the values to vprint
+ */
 static void bug(char const * fmt,...){printf("%s",M_BUG_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
 
 // MDH@26MAY2020: all char types changed to signed char so we can use the sign bit to indicate that it's a variable sized allocation unless we make all types variable sized
 #ifndef __PRODUCTION__
+/**
+ * @brief the structure holding the allocation index, owner and allocation type that is prefixed to every dynamically allocated memory by Malloc, Mcalloc and Mrealloc
+ * 
+ */
 typedef struct{
 	int32_t allocationIndex; // MDH@19MAY2020: assuming 32 bits will suffice
 	Mallocationowner owner; // MDH@19MAY2020: storing the owner id as well
@@ -43,7 +94,13 @@ typedef struct{
 // MDH@22MAY2020: assuming that the moduleId is below 1024, and the functionId below 1024^2
 //Mallocationowner getOwner(uint16_t moduleId,uint32_t functionId){return(Mallocationowner){0,moduleId,0,functionId};}
 #endif
-
+/**
+ * @brief prints \p count elements of \p size bytes in \p _c 
+ * 
+ * @param _c the elements to print
+ * @param count the number of elements to print
+ * @param size the number of bytes per element
+ */
 static void dump(char* _c,size_t count,size_t size){
 	printf("Contents: '");
 	size_t l=0;
@@ -55,22 +112,66 @@ static void dump(char* _c,size_t count,size_t size){
 }
 
 // MDH@15NOV2019: want to keep track of the number of allocations for each type (with character id)
+/**
+ * @brief stores all registered allocation types (in order of appearance) (module local)
+ * 
+ */
 static Mallocationtype* _allocationTypes=NULL; // the unique allocation type characters
+/**
+ * @brief stores the number of registered allocation types
+ * 
+ */
 static unsigned long long numberOfAllocationTypes=0; // keep track of the number of allocation types
 // MDH@14APR2020 now being stored as part of the allocationtypes: size_t* _allocationcounts=NULL; // the size of the type is stored every odd size_t
 
 // MDH@07MAY2020: keep track of all allocation marks
-static unsigned long long firstActiveAllocationMark=0,lastActiveAllocationMark=-1; // MDH@11MAY2020: as marks get deleted (from the back the firstAllocationMark changes)
+/**
+ * @brief index of the first active allocation mark
+ * 
+ */
+static unsigned long long firstActiveAllocationMark=0;
+/**
+ * @brief index of the last active allocation mark
+ * 
+ */
+static unsigned long long lastActiveAllocationMark=-1; // MDH@11MAY2020: as marks get deleted (from the back the firstAllocationMark changes)
+/**
+ * @brief number of allocation marks
+ * 
+ */
 static unsigned long long numberOfAllocationMarks=0; // we need at least one mark (TODO this could change if we decide to not do this in the production version)
+/**
+ * @brief the number of types we have marks of
+ * 
+ */
 static unsigned long long numberOfAllocationMarkTypes=0; // keep track of the number of types we have marks of
+/**
+ * @brief array that stores all allocation marks
+ * 
+ */
 static Mallocationmark* _allocationMarks=NULL;
+/**
+ * @brief array of characters storing all allocation type mark ids
+ * 
+ */
 static char* *_allocationMarkIds=NULL; // the pointer to the list of allocation type mark ids
 
 // as we're expecting more marks to be added then types we do mark 1 type 1, mark 1 type 2, etc.
 // every time a new allocation type is created we need to expand the allocation marks
+/**
+ * @brief computes and returns the number of characters in the decimal text representation of the non-negative integer \p units
+ * 
+ * @param units the non-negative integer to determine the number of characters in its decimal text representation
+ * @return uint8_t the number of characters needed to store the decimal text representation of the non-negative integer \p units
+ */
 static uint8_t getTextRepresentationLength(unsigned long long units){
 	uint8_t textRepresentationLength=1;while(units>9){units/=10;textRepresentationLength+=1;}return textRepresentationLength;
 }
+/**
+ * @brief outputs all allocation type marks
+ * 
+ * @param linePrefix the text to use for indentation
+ */
 void outputAllocationTypeMarks(char* linePrefix){
 	size_t size;
 	unsigned long long freed,occupied,totaloccupied,totalfreed;
@@ -144,6 +245,12 @@ void outputAllocationTypeMarks(char* linePrefix){
 		free(_allocationTypeColumnLengths);
 	}
 }
+/**
+ * @brief updates the allocation type marks (module local)
+ * 
+ * @return true indicates success
+ * @return false indicates failure
+ */
 static bool updateAllocationTypeMarks(){
 	// ascertain that numberOfAllocationMarkTypes is at least numberOfAllocationTypes
 	// ASSERT numberOfAllocationMarkTypes should NEVER be larger than numberOfAllocationTypes
@@ -192,6 +299,10 @@ static bool updateAllocationTypeMarks(){
 // we need a local something to store the allocation types in
 // MDH@18MAY2020: we are not just going to store the allocation type (a char) but also the id of the owner (i.e. every allocation will be owned)
 // MDH@14JAN2023: since we're no longer storing type and owner but the direct pointer itself we no longer need this type
+/**
+ * @brief temporary type definition of a allocation type and owner 
+ * 
+ */
 typedef Malloc *Mallocationtypeowner; // a bit weird though to have to do it this way!!!!
 /* replacing:
 typedef struct{
@@ -199,6 +310,11 @@ typedef struct{
 	signed char type;
 }Mallocationownertype;
 */
+
+/**
+ * @brief allocations stores all dynamically allocated pointers, allowing checking for memory leaks
+ * 
+ */
 struct{
 	size_t nulled; // MDH@17JAN2023: keep track of the number of NULLed pointers as well as the amount removed so far (that end up at the end of l allocated pointers)
 	size_t l; // the number of allocation types stored
@@ -206,6 +322,12 @@ struct{
 	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
 }allocations={0,0,0,NULL};
 
+/**
+ * @brief returns the index of allocation type \p allocationType
+ * 
+ * @param allocationType the allocation type
+ * @return long long the index of allocation type \p allocationType
+ */
 static long long getAllocationTypeIndex(signed char allocationType){
 	long long allocationTypeIndex=numberOfAllocationTypes;
 	while(--allocationTypeIndex>=0&&_allocationTypes[allocationTypeIndex].type!=allocationType)
@@ -213,10 +335,21 @@ static long long getAllocationTypeIndex(signed char allocationType){
 	if(allocationTypeIndex>=0)info("Index of allocation type '%c'(=%i): %lld.\n",allocationType,allocationType,allocationTypeIndex);
 	return allocationTypeIndex;
 }
-
+/**
+ * @brief returns the number of registered allocation types
+ * 
+ * @return long long the number of registered allocation types
+ */
 long long getNumberOfAllocationTypes(){return (_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/?numberOfAllocationTypes:0);}
 
 // MDH@21APR2020: getNewAllocationTypeIndex() changed to also check whether the provided allocationType already exists 
+/**
+ * @brief returns the current index of allocation type \p allocationType and registers \p count items of size \p size
+ * @param allocationType the allocation type
+ * @param size the size of the data record each allocation type
+ * @param count the number of data records to register
+ * @return long long the new allocation type index
+ */
 static long long getNewAllocationTypeIndex(signed char allocationType,size_t size,long long count/*,bool fixedsize*/){
 	if(_allocationTypes){
 			long long newAllocationTypeIndex=getAllocationTypeIndex(allocationType);
@@ -279,6 +412,11 @@ static long long getNewAllocationTypeIndex(signed char allocationType,size_t siz
 // MDH@21APR2020: addAllocation() doesn't use size so we remove it from the parameter list
 // MDH@14JAN2023: there's NO need to actually store owner twice since we want to be able to check for memory leaks
 //				which require keeping all pointers
+/**
+ * @brief registers allocation type and owner \p allocationowner
+ * @param allocationowner
+ * @result the index in allocations._owners where \p allocationowner is registered
+ */
 long long addAllocation(Mallocationtypeowner allocationowner/*,signed char type,Mallocationowner owner*/){
 	// I suppose that the allocation might fail but we do NOT want to loose allocations._chars over it
 	// MDH@14APR2020: there's room for improvement here
@@ -310,6 +448,12 @@ long long addAllocation(Mallocationtypeowner allocationowner/*,signed char type,
 	return allocations.l++; // returning the position where the allocation is stored, and incrementing the length of the allocations unless we replace allocations.l by allocations.lastIndex
 }
 
+/**
+ * @brief increments the occupied field of the current allocation mark of allocation type \p allocationTypeIndex by \p increment
+ * 
+ * @param allocationTypeIndex 
+ * @param increment 
+ */
 static void incrementAllocationTypeOccupied(long long allocationTypeIndex,unsigned long long increment){
 	if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
 	if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
@@ -320,6 +464,12 @@ static void incrementAllocationTypeOccupied(long long allocationTypeIndex,unsign
 	// output(" to %llu.\n",_allocationMarks[allocationTypeMarkIndex].occupied);
 	// replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
 }
+/**
+ * @brief increments the freed field of the current allocation mark of allocation type \p allocationTypeIndex by \p increment
+ * 
+ * @param allocationTypeIndex 
+ * @param increment 
+ */
 static void incrementAllocationTypeFreed(long long allocationTypeIndex,unsigned long long increment){
 	if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
 	if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
@@ -333,9 +483,17 @@ static void incrementAllocationTypeFreed(long long allocationTypeIndex,unsigned 
 			bug("More memory freed than allocated for allocation type '%c'.",_allocationTypes[allocationTypeIndex].type);
 	// replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
 }
+
 // MDH@14APR2020: addAllocationType renamed to registerAllocation
 // MDH@03MAY2020: it's preferable to distinguish between a fixed-size allocation (always new), and a variable-size
 //				(re)allocation possibly new (allocationIndex<0)
+/**
+ * @brief registers the reallocation of \p count elements of size \p size of allocation type \p type stored at allocation index \p allocationIndex
+ * @param type
+ * @param size
+ * @param count
+ * @param allocationIndex
+ */
 static long long registerReallocation(signed char type/*,Mallocationowner owner*/,size_t size,long long count,long long allocationIndex){
 if(type!=0&&size>0&&count>0){
 	// MDH@05JUN2020 if this is a true reallocation (as we assume it is, no need to use getNewAllocationTypeIndex,
@@ -396,13 +554,20 @@ if(type!=0&&size>0&&count>0){
 	}
 	return allocationIndex;
 }
+
 // MDH@03MAY2020: now a fixed-size (always new) allocation 
 // MDH@26MAY2020: now also accepts variable-size allocations (when type is negative), wait a minute I think registerAllocation is still to be called for fixed size allocations (with type>0), and registerReallocation() for variable-sized (re)allocations
 //				wait a minute, registerReallocation does NOT require an owner (so should only be called from Mrealloc whereas registerAllocation() should be used for fixed AND variable-sized allocations!!)
+/**
+ * @brief registers \p allocationtypeowner of \p count elements of size \p size
+ * @param allocationtypeowner the pointer to the dynamically allocated memory block
+ * @param size the size of each element allocated
+ * @param count the number of elements to allocate
+ */
 static long long registerAllocation(Mallocationtypeowner allocationtypeowner/*,unsigned char type,Mallocationowner owner*/,size_t size,long long count){
 	assert(allocationtypeowner!=NULL);
-		long long allocationIndex=-1;
-		signed char type=allocationtypeowner->allocationType;
+	long long allocationIndex=-1;
+	signed char type=allocationtypeowner->allocationType;
 	if(type!=0&&type!='*'){
 		// how about registering the type first if we need to???????
 		// increase size if necessary
@@ -474,6 +639,16 @@ static long long registerAllocation(Mallocationtypeowner allocationtypeowner/*,u
 	}
 	return allocationIndex;
 }
+
+/**
+ * @brief unregisters \p count elements of the allocation type with index \p allocationTypeIndex
+ * 
+ * @param allocationTypeIndex the index of the allocation type
+ * @param count the number of allocation type data records
+ * @param fixedsize true if the size of the allocation type is fixed, false otherwise
+ * @return true when successful
+ * @return false when failed
+ */
 static bool unregisterAllocation(long long allocationTypeIndex,long long count,bool fixedsize){
 	// NOTE the given size is actually the count i.e. the number of units allocated
 	bool result=false;
@@ -522,7 +697,14 @@ long long* _getAllocationCounts(){
 	return NULL;
 }
 */
+
 // MDH@17JAN2023: every now and then we should shrink the allocations
+/**
+ * @brief deletes all nulled allocations, shifting all non-null allocations to become contiguous again
+ * 
+ * @param verbose when true, outputs diagnostic messages
+ * @return size_t the number of nulled allocations
+ */
 size_t nulledAllocationsRemoved(bool verbose){
 	size_t nr_allocations=allocations.l;
 	if(allocations.nulled){ // there are nulled allocation pointers
@@ -597,6 +779,13 @@ size_t nulledAllocationsRemoved(bool verbose){
 	if(verbose)printf("No nulled allocations to remove!\n");
 	return (nr_allocations-allocations.l);
 }
+
+/**
+ * @brief reports the allocations by type
+ * 
+ * @param title the title text
+ * @param prefix the indentation text
+ */
 void reportAllocations(char* title,char* prefix){
 	printf("%s",title);
 	// let's collect the counts per allocation type
@@ -627,11 +816,23 @@ void reportAllocations(char* title,char* prefix){
 		printf("%sNo allocations!\n",prefix);
 }
 
+/**
+ * @brief returns a (dynamically allocated) copy pointer of all allocation types
+ * 
+ * @return Mallocationtype* a pointer to a copy of _allocationTypes
+ */
 Mallocationtype* _getAllocationTypes(){
 	size_t allocationTypesSize=(_allocationTypes?numberOfAllocationTypes*sizeof(Mallocationtype):0);
 	return(allocationTypesSize>0?memcpy(malloc(allocationTypesSize),_allocationTypes,allocationTypesSize):NULL);
 }
+
 // MDH@19NOV2019: 
+/**
+ * @brief resets allocation management, to be called once
+ * 
+ * @return true 
+ * @return false 
+ */
 bool resetAllocationManagement(){
 	/////info("Resetting allocation type counts.\n");
 	// best to free the lot, the reinitialize
@@ -643,13 +844,18 @@ bool resetAllocationManagement(){
 	////////info("Allocation type counts reset.\n");
 	// free(_allocationMarks);numberOfAllocationMarks=0;free(_allocationMarkIds);
 	output("Resetting dynamic memory allocation management.\n");
-
 	return allocationRecordingInitialized();
 
 }
 
 // MDH@25NOV2019: markAllocationTypes() remembers the current allocation type counts in the 4th and 5th element
 // MDH@11MAY2020: either we can use a reusable allocation mark or append one
+/**
+ * @brief starts a new allocation period
+ * 
+ * @return true on success
+ * @return false on failure
+ */
 bool allocationMarkAdded(){
 	// output("Last active allocation mark before: %llu.\n",lastActiveAllocationMark); // DEBUG
 	if(_allocationMarks){
@@ -726,6 +932,14 @@ bool allocationMarkAdded(){
 	}
 	*/
 }
+
+/**
+ * @brief returns the number of occupied allocations of type \p allocationType since allocation \p history
+ * 
+ * @param allocationType the allocation type
+ * @param history the number of allocation marks to skip
+ * @return long long 
+ */
 long long getAllocationTypeOccupied(signed char allocationType,unsigned long long history){
 	long long allocationTypeAllocated=-2; // if there's some error
 	if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
@@ -739,6 +953,13 @@ long long getAllocationTypeOccupied(signed char allocationType,unsigned long lon
 	}
 	return allocationTypeAllocated;
 }
+/**
+ * @brief returns the number of freed allocations of type \p allocationType since allocation \p history
+ * 
+ * @param allocationType the allocation type
+ * @param history the number of allocation marks to skip
+ * @return long long 
+ */
 long long getAllocationTypeFreed(signed char allocationType, unsigned long long history){
 	long long allocationTypeFreed=-2; // if there's some error
 	if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
@@ -755,6 +976,12 @@ long long getAllocationTypeFreed(signed char allocationType, unsigned long long 
 
 // 'public' functions
 // MDH@11MAY2020 some new functions
+/**
+ * @brief returns true after dropping the oldest allocation period from the cyclic allocation period buffer
+ * 
+ * @return true on success
+ * @return false on failure
+ */
 bool oldestAllocationMarkDropped(){
 	if(firstActiveAllocationMark>=0){
 		firstActiveAllocationMark=(firstActiveAllocationMark+1)%numberOfAllocationMarks;
@@ -799,6 +1026,17 @@ void syncallocations(){
 
 #ifndef __PRODUCTION__
 // MDH@21APR2020: general function to store allocation info with the dynamically allocated memory
+/**
+ * @brief registers the allocation \p ptr of \p count elements of size \p size of type \p type by owner \p owner
+ * 
+ * @param ptr pointer to the allocated dynamic memory block
+ * @param type the allocation type
+ * @param owner the owner of the allocation
+ * @param size the size of an allocated element
+ * @param count the number of allocated elements
+ * @return true on success
+ * @return false on failure
+ */
 static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner owner,size_t size,long long count){
 	// ASSERT all arguments supposedly valid i.e. ptr!=NULL, size>0
 	// MDH@13APR2020: all Mmalloc calls represent fixed size allocations
@@ -810,8 +1048,8 @@ static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner own
 	_alloc->allocationType=type; // register the type
 	_alloc->owner=owner;
 	_alloc->allocationIndex=registerAllocation(_alloc/*,type,owner*/,size,count);
-		return(_alloc->allocationIndex>=0);
-		/* replacing:
+	return(_alloc->allocationIndex>=0);
+	/* replacing:
 	// MDH@26MAY2020: now we should also accomodate for variable size allocations in which case we call registerReallocation with -1 for the allocationIndex (as this is a new allocation), see Mvalloc for a rewrite of Mrealloc with from_count=0 and to_count=1 with the required functionality)
 	long long allocationIndex=registerAllocation(type,owner,size,count); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
 	if(allocationIndex<0)return false;
@@ -854,8 +1092,18 @@ static void* Mvalloc(size_t size,unsigned char allocationType,Mallocationowner o
 	return ((char*)newptr)+sizeof(Malloc);
 }
 */
+
 // MDH@08APR2020: if ptr starts with an allocation_index size_t field we can store the result of addallocation into it
 //				so we have to ascertain that in the non-production version every structure that we allocate this way starts with
+/**
+ * @brief allocates \p count elements of size \p size of type \p type to owner \p owner using malloc()
+ * 
+ * @param size the size of each element to allocate
+ * @param count the number of elements to allocate
+ * @param type the type of the allocation
+ * @param owner the owner of the allocation
+ * @return void* pointer to the element, NULL on failure
+ */
 void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner){
 	void* ptr=NULL;
 	if(size>0&&count>0&&type!=0){
@@ -878,6 +1126,15 @@ void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owne
 	return ((char*)ptr)+sizeof(Malloc);
 }
 
+/**
+ * @brief allocates \p count elements of size \p size of type \p type to owner \p owner using calloc()
+ * 
+ * @param size the size of each element to allocate
+ * @param count the number of elements to allocate
+ * @param type the type of the allocation
+ * @param owner the owner of the allocation
+ * @return void* pointer to the element, NULL on failure
+ */
 void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner){
 	void* ptr=NULL;
 	if(size>0&&count>0&&type!=0){
@@ -899,13 +1156,34 @@ void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owne
 	return ((char*)ptr)+sizeof(Malloc);
 }
 
+/**
+ * @brief determines whether allocation element pointed to by \p ptr is currently owned
+ * 
+ * @param ptr pointer to the allocated element
+ * @return true when currently owned
+ * @return false when not currently owned
+ */
 bool Misowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));return(!_alloc->owner.freed&&!_alloc->owner.disowned);}
+
+/**
+ * @brief determines whether allocation element pointed to by \p ptr is currently disowned
+ * 
+ * @param ptr pointer to the allocated element
+ * @return true when currently disowned
+ * @return false when not currently disowned
+ */
 bool Misdisowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));return(!_alloc->owner.freed&&_alloc->owner.disowned);}
 
 // MDH@18MAY2020: passing along ownership is done through macros DISOWNED and OWNED 
 //				unfortunately we need to know the size so we can find the allocation id
 // MDH@02JUN2020: yes, we do need to register current ownership 'globally' i.e. not just in the memory 'record' itself because we do not know where the pointer is
 #ifndef __PRODUCTION__
+/**
+ * @brief returns \p ptr when it was successfully marked as disowned by owner \p owner
+ * @param ptr pointer to the allocated element
+ * @param owner the assumed current owner of the allocated element
+ * @result void* ptr when disowning it succeeded, NULL otherwise
+ */
 void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 	if(!ptr)return NULL;
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/*+size*/);
@@ -942,6 +1220,13 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 	info("\tDisowned by %s:%u(%s%u%s%s).\n",MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]);
 	return ptr;
 }
+
+/**
+ * @brief returns \p ptr when it was successfully marked as owned by owner \p owner
+ * @param ptr pointer to the allocated element
+ * @param owner the new owner of the allocated element
+ * @result void* ptr when owning succeeded, NULL otherwise
+ */
 void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 	if(!ptr)return NULL;
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
@@ -996,6 +1281,13 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 	info("\tOwned by %s:%u(%s%u%s%s).\n",MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]);
 	return ptr;
 }
+
+/**
+ * @brief returns \p ptr when it was successfully marked as owned at level \p level
+ * @param ptr pointer to the allocated element
+ * @param level the increment of the level of ownership
+ * @result void* ptr when subowning it succeeded, NULL otherwise
+ */
 void* Msubowned(void* ptr,uint8_t level){
 	if(!ptr)return NULL;
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
@@ -1024,7 +1316,15 @@ void* Msubowned(void* ptr,uint8_t level){
 				,allocationIndex);
 	return ptr;
 }
+
 // MDH@25MAY2020 careful here Msubowner result is supposed to be a local variable (on the program stack) so it will be disposed off 'automagically'
+/**
+ * @brief returns an allocation record of owner \p owner with increment level \p level
+ * 
+ * @param owner the original owner
+ * @param level the level increment
+ * @return Mallocationowner 
+ */
 Mallocationowner Msubowner(Mallocationowner owner,uint8_t level){
 	return (Mallocationowner){owner.module,owner.id,owner.global,owner.level+level,owner.disowned,owner.freed};
 }
@@ -1062,6 +1362,13 @@ void Mvfree(){
 // MDH@20APR2020: unfortunately we need to know the size of what was allocated which is easy for fixed size allocation but problematic for variable size records
 //				unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
 // MDH@17JAN2023: Since there's now only one allocation owner record (pointed to in allocations), no need to compare them anymore!!!! but still to NULL the pointer (present in allocations!!!!!) by allocationIndex
+/**
+ * @brief frees the allocation of element \p ptr of \p count elements of type \p allocationType
+ * @param ptr pointer to the data of the elements
+ * @param count the number of allocated elements
+ * @param allocationType the allocation type
+ * @param report when true, diagnostic messages are output
+ */
 void Mfree(void const * const ptr,long long count,signed char allocationType,bool report/*,Mallocationowner owner*/){
 	if(!ptr||allocationType==0||count<=0)return;
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
@@ -1211,6 +1518,14 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 // MDH@09APR2020: from now on (v0.1.2) REALLOC is only to be used for all variable dynamic memory allocations
 //				and also for freeing (i.e. when occupied equals zero)
 // MDH@26MAY2020: rewrite assuming from_count and to_count are positive
+/**
+ * @brief reallocates the allocation of element \p ptr from \p from_count elements to \p to_count elements of size \p size of allocation type \p allocationType using realloc()
+ * @param ptr pointer to the data elements
+ * @param from_count the currently allocated number of elements
+ * @param to_count the new number of elements to allocate
+ * @param allocationType the allocation type
+ * @result the pointer to the new \p to_count data elements
+ */
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char allocationType/*,Mallocationowner owner*/){
 	// info("Size of Malloc: %zd, size of long long: %zd.\n",sizeof(Malloc),sizeof(long long));
 	void* newptr=ptr;
@@ -1396,6 +1711,14 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 	return ((char*)newptr)+sizeof(Malloc);
 }
 */
+
+/**
+ * @brief returns the number of bytes occupied by the allocation type with index \p allocationTypeIndex of allocation mark \p allocationMarkIndex (module local)
+ * 
+ * @param allocationTypeIndex 
+ * @param allocationMarkIndex 
+ * @return long long 
+ */
 static long long getAllocationTypeSize(unsigned long long allocationTypeIndex,unsigned long long allocationMarkIndex){
 	// output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
 	if(allocationTypeIndex<0||!_allocationMarks||allocationTypeIndex>=numberOfAllocationMarkTypes||allocationMarkIndex>=numberOfAllocationMarks)return 0;
@@ -1405,7 +1728,16 @@ static long long getAllocationTypeSize(unsigned long long allocationTypeIndex,un
 	return size;
 	// replacing: return(_allocationTypes[allocationTypeIndex].occupied-_allocationTypes[allocationTypeIndex].freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
 }
+
 // MDH@07MAY2020: passing in the number of allocation marks requested (<0=one, 0=all, otherwise the number given, returning what is actually returned)
+/**
+ * @brief return the sizes of all \p *_numberOfAllocationTypes requested allocation types in \p types for all requested number of allocation marks \p *_numberOfAllocationMarks
+ * 
+ * @param types the requested types
+ * @param _numberOfAllocationTypes the number of requested types
+ * @param _numberOfAllocationMarks the number of requested allocation marks
+ * @return long long* 
+ */
 long long * _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes,long long *_numberOfAllocationMarks){
 	// *_numberOfAllocationMarks is the requested number of allocation marks, the total number of returned allocation types is returned in *_numberOfAllocationTypes
 	
@@ -1461,6 +1793,12 @@ long long * _getAllocationTypeSizes(char const * const types,unsigned long long 
 }
 
 // you HAVE to call this method to be able to register allocations
+/**
+ * @brief initializes the allocation recording
+ * 
+ * @return true on success
+ * @return false on failure
+ */
 bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 	
 	bool result=false;
