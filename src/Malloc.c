@@ -8,6 +8,38 @@
 #include "Malloc.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
+extern char const * const M_ERROR_PREFIX;
+extern char const * const M_WARNING_PREFIX;
+extern char const * const M_BUG_PREFIX;
+
+// MDH@26MAY2020: all char types changed to signed char so we can use the sign bit to indicate that it's a variable sized allocation unless we make all types variable sized
+#ifndef __PRODUCTION__
+/**
+ * @brief the structure holding the allocation index, owner and allocation type that is prefixed to every dynamically allocated memory by Malloc, Mcalloc and Mrealloc
+ * 
+ */
+typedef struct{
+	int32_t allocationIndex; // MDH@19MAY2020: assuming 32 bits will suffice
+	Mallocationowner owner; // MDH@19MAY2020: storing the owner id as well
+	signed char allocationType;
+}Malloc;
+// MDH@22MAY2020: assuming that the moduleId is below 1024, and the functionId below 1024^2
+//Mallocationowner getOwner(uint16_t moduleId,uint32_t functionId){return(Mallocationowner){0,moduleId,0,functionId};}
+#endif
+// we need a local something to store the allocation types in
+// MDH@18MAY2020: we are not just going to store the allocation type (a char) but also the id of the owner (i.e. every allocation will be owned)
+// MDH@14JAN2023: since we're no longer storing type and owner but the direct pointer itself we no longer need this type
+/**
+ * @brief temporary type definition of a allocation type and owner 
+ * 
+ */
+typedef Malloc *Mallocationtypeowner; // a bit weird though to have to do it this way!!!!
+/* replacing:
+typedef struct{
+	Mallocationowner owner;
+	signed char type;
+}Mallocationownertype;
+*/
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ALLOC,id};}
 
@@ -32,9 +64,6 @@ static char const * const GLOBAL_FLAG_TEXTS[]={"f","m"};
  */
 static char const * const FREED_FLAG_TEXTS[]={"","X"};
 
-extern char const * const M_ERROR_PREFIX;
-extern char const * const M_WARNING_PREFIX;
-extern char const * const M_BUG_PREFIX;
 /**
  * @brief the (module local) hour-minute-second format string
  * 
@@ -80,20 +109,6 @@ static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args
  */
 static void bug(char const * fmt,...){printf("%s",M_BUG_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
 
-// MDH@26MAY2020: all char types changed to signed char so we can use the sign bit to indicate that it's a variable sized allocation unless we make all types variable sized
-#ifndef __PRODUCTION__
-/**
- * @brief the structure holding the allocation index, owner and allocation type that is prefixed to every dynamically allocated memory by Malloc, Mcalloc and Mrealloc
- * 
- */
-typedef struct{
-	int32_t allocationIndex; // MDH@19MAY2020: assuming 32 bits will suffice
-	Mallocationowner owner; // MDH@19MAY2020: storing the owner id as well
-	signed char allocationType;
-}Malloc;
-// MDH@22MAY2020: assuming that the moduleId is below 1024, and the functionId below 1024^2
-//Mallocationowner getOwner(uint16_t moduleId,uint32_t functionId){return(Mallocationowner){0,moduleId,0,functionId};}
-#endif
 /**
  * @brief prints \p count elements of \p size bytes in \p _c 
  * 
@@ -134,7 +149,7 @@ static unsigned long long firstActiveAllocationMark=0;
  * @brief index of the last active allocation mark
  * 
  */
-static unsigned long long lastActiveAllocationMark=-1; // MDH@11MAY2020: as marks get deleted (from the back the firstAllocationMark changes)
+static unsigned long long lastActiveAllocationMark=0; // MDH@11MAY2020: as marks get deleted (from the back the firstAllocationMark changes)
 /**
  * @brief number of allocation marks
  * 
@@ -154,7 +169,7 @@ static Mallocationmark* _allocationMarks=NULL;
  * @brief array of characters storing all allocation type mark ids
  * 
  */
-static char* *_allocationMarkIds=NULL; // the pointer to the list of allocation type mark ids
+static char* *_allocationMarkTimestamps=NULL; // the pointer to the list of allocation type mark ids
 
 // as we're expecting more marks to be added then types we do mark 1 type 1, mark 1 type 2, etc.
 // every time a new allocation type is created we need to expand the allocation marks
@@ -167,84 +182,7 @@ static char* *_allocationMarkIds=NULL; // the pointer to the list of allocation 
 static uint8_t getTextRepresentationLength(unsigned long long units){
 	uint8_t textRepresentationLength=1;while(units>9){units/=10;textRepresentationLength+=1;}return textRepresentationLength;
 }
-/**
- * @brief outputs all allocation type marks
- * 
- * @param linePrefix the text to use for indentation
- */
-void outputAllocationTypeMarks(char* linePrefix){
-	size_t size;
-	unsigned long long freed,occupied,totaloccupied,totalfreed;
-	uint8_t *_allocationTypeColumnLengths=calloc(numberOfAllocationMarkTypes,sizeof(uint8_t)); // all zero
-	if(_allocationTypeColumnLengths){
-		unsigned long long units,allocationMarkIndex=0; // the successor of the last active allocation mark (which supposedly is the oldest)
-		uint8_t unitsTextLength=0;
-		while(allocationMarkIndex<numberOfAllocationMarks){
-			if(_allocationMarkIds[allocationMarkIndex]){
-				for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
-					size=_allocationTypes[allocationMarkTypeIndex].size;
-					if(size==0)continue; // only the case for the * allocation type mark
-					occupied=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
-					freed=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
-					unitsTextLength=getTextRepresentationLength((occupied-freed)/size);
-					if(unitsTextLength>_allocationTypeColumnLengths[allocationMarkTypeIndex])
-						_allocationTypeColumnLengths[allocationMarkTypeIndex]=unitsTextLength;
-				}
-			}
-			allocationMarkIndex++;
-		}
-		// output("%llu allocation marks of %llu types:\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
-		// I suppose it's best to write the types first
-		output("%s#\tTime\tType ->\t",linePrefix);
-		uint8_t l;
-		for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
-			if(_allocationTypes[allocationMarkTypeIndex].type<0){
-				if(_allocationTypeColumnLengths[allocationMarkTypeIndex]<2)_allocationTypeColumnLengths[allocationMarkTypeIndex]=2;
-				outputChar('-');
-				l=2;
-			}else
-				l=1;
-			outputChar(abs(_allocationTypes[allocationMarkTypeIndex].type));
-			while(l++<=_allocationTypeColumnLengths[allocationMarkTypeIndex])outputChar(' ');
-		}
-		output("\tTotal (bytes)\n");
-		// how about showing the oldest until the newest
-		// how about determining the widths of the columns first??????
-		// when actually showing the values the order is important
-		allocationMarkIndex=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
-		while(allocationMarkIndex!=lastActiveAllocationMark){
-			if(_allocationMarkIds[allocationMarkIndex]){
-				output("%s",linePrefix);
-				output("%llu",allocationMarkIndex+1);
-				outputChar('\t');
-				output("%s",_allocationMarkIds[allocationMarkIndex]);
-				if(lastActiveAllocationMark>=firstActiveAllocationMark){
-					if(allocationMarkIndex>=firstActiveAllocationMark&&allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
-				}else{
-					if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
-				}
-				outputChar('\t');
-				totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
-				for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
-					size=_allocationTypes[allocationMarkTypeIndex].size;
-					if(size==0)continue; // only the case for the * allocation type mark
-					// how about showing the number of elements instead of the size??????
-					occupied=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
-					freed=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
-					units=(occupied-freed)/size;
-					unitsTextLength=getTextRepresentationLength(units);
-					output("%llu",units);
-					while(unitsTextLength++<=_allocationTypeColumnLengths[allocationMarkTypeIndex])outputChar(' ');
-					totaloccupied+=occupied;
-					totalfreed+=freed;
-				}
-				output("\t%llu = %llu - %llu\n",totaloccupied-totalfreed,totaloccupied,totalfreed);
-			}
-			allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks; // increment the allocation mark index
-		}
-		free(_allocationTypeColumnLengths);
-	}
-}
+
 /**
  * @brief updates the allocation type marks (module local)
  * 
@@ -296,20 +234,7 @@ static bool updateAllocationTypeMarks(){
 // MDH@07MAY2020 END
 
 // helper functions
-// we need a local something to store the allocation types in
-// MDH@18MAY2020: we are not just going to store the allocation type (a char) but also the id of the owner (i.e. every allocation will be owned)
-// MDH@14JAN2023: since we're no longer storing type and owner but the direct pointer itself we no longer need this type
-/**
- * @brief temporary type definition of a allocation type and owner 
- * 
- */
-typedef Malloc *Mallocationtypeowner; // a bit weird though to have to do it this way!!!!
-/* replacing:
-typedef struct{
-	Mallocationowner owner;
-	signed char type;
-}Mallocationownertype;
-*/
+
 
 /**
  * @brief allocations stores all dynamically allocated pointers, allowing checking for memory leaks
@@ -358,38 +283,38 @@ static long long getNewAllocationTypeIndex(signed char allocationType,size_t siz
 					info("New allocation type #%lld: '%c'(=%i) of %s size %zd!\n",numberOfAllocationTypes,allocationType,allocationType,(fixedsize?"variable":"fixed"),size);
 					Mallocationsize* _allocationTypeSizeHistogram=(fixedsize?NULL:calloc(1,sizeof(Mallocationsize)));
 					if(fixedsize||_allocationTypeSizeHistogram){
-							// how about allocating memory for the histogram beforehand?
-							void* newAllocationTypes=realloc(_allocationTypes,sizeof(Mallocationtype)*(numberOfAllocationTypes+1));
-							if(newAllocationTypes){   
-									info("New allocation type record created.\n");
-									newAllocationTypeIndex=numberOfAllocationTypes++; 
-									info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
-									// MDH@14APR2020: _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*5); // for every type we store 5 size_t values, one to keep the item count, and one to keep the size
-									_allocationTypes=newAllocationTypes;
-									_allocationTypes[newAllocationTypeIndex].type=allocationType;
-									_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size=size;
-									// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
-									updateAllocationTypeMarks(); // MDH@07MAY2020: to be called each time a new allocation type is added (i.e. when numberOfAllocationTypes is incremented!!!!!)
-									/* replacing:
-									// MDH@06MAY2020: essential to ascertain that occupied and freed are initialized to zero!!!!
-									_allocationTypes[newAllocationTypeIndex].occupied=0;
-									_allocationTypes[newAllocationTypeIndex].freed=0;
-									*/
-									info("New allocation type '%c' registered!\n",allocationType);	   
-									if(!fixedsize){
-											// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
-											_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=_allocationTypeSizeHistogram;
-											// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
-											_allocationTypes[newAllocationTypeIndex].count=-1; // MDH@04MAY2020: counting down to indicate variable-size allocations
-											// this is a bit 'verwarrend' but count is the size of what's allocated, and it's always a single allocation (as stored in the count field)
-											_allocationTypeSizeHistogram->class=count;
-											_allocationTypeSizeHistogram->count=1;			
-									}else
-											_allocationTypes[newAllocationTypeIndex].count=count;
-							}else{
-									if(!fixedsize)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
-									error("Failed to register new allocation type '%c'.\n",allocationType);
-							}
+						// how about allocating memory for the histogram beforehand?
+						void* newAllocationTypes=realloc(_allocationTypes,sizeof(Mallocationtype)*(numberOfAllocationTypes+1));
+						if(newAllocationTypes){   
+							info("New allocation type record created.\n");
+							newAllocationTypeIndex=numberOfAllocationTypes++; 
+							info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
+							// MDH@14APR2020: _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*5); // for every type we store 5 size_t values, one to keep the item count, and one to keep the size
+							_allocationTypes=newAllocationTypes;
+							_allocationTypes[newAllocationTypeIndex].type=allocationType;
+							_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size=size;
+							// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+							updateAllocationTypeMarks(); // MDH@07MAY2020: to be called each time a new allocation type is added (i.e. when numberOfAllocationTypes is incremented!!!!!)
+							/* replacing:
+							// MDH@06MAY2020: essential to ascertain that occupied and freed are initialized to zero!!!!
+							_allocationTypes[newAllocationTypeIndex].occupied=0;
+							_allocationTypes[newAllocationTypeIndex].freed=0;
+							*/
+							info("New allocation type '%c' registered!\n",allocationType);	   
+							if(!fixedsize){
+								// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+								_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=_allocationTypeSizeHistogram;
+								// output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+								_allocationTypes[newAllocationTypeIndex].count=-1; // MDH@04MAY2020: counting down to indicate variable-size allocations
+								// this is a bit 'confusing' but count is the size of what's allocated, and it's always a single allocation (as stored in the count field)
+								_allocationTypeSizeHistogram->class=count;
+								_allocationTypeSizeHistogram->count=1;
+							}else
+								_allocationTypes[newAllocationTypeIndex].count=count;
+						}else{
+							if(_allocationTypeSizeHistogram!=NULL)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
+							error("Failed to register new allocation type '%c'.\n",allocationType);
+						}
 					}else
 							error("Failed to allocate memory for the histogram data of variable size type '%c'.\n",allocationType);
 					/* MDH@14APR2020:
@@ -417,7 +342,7 @@ static long long getNewAllocationTypeIndex(signed char allocationType,size_t siz
  * @param allocationowner
  * @result the index in allocations._owners where \p allocationowner is registered
  */
-long long addAllocation(Mallocationtypeowner allocationowner/*,signed char type,Mallocationowner owner*/){
+static long long addAllocation(Mallocationtypeowner allocationowner/*,signed char type,Mallocationowner owner*/){
 	// I suppose that the allocation might fail but we do NOT want to loose allocations._chars over it
 	// MDH@14APR2020: there's room for improvement here
 	assert(allocationowner!=NULL);
@@ -697,6 +622,142 @@ long long* _getAllocationCounts(){
 	return NULL;
 }
 */
+#ifndef __PRODUCTION__
+// MDH@21APR2020: general function to store allocation info with the dynamically allocated memory
+/**
+ * @brief registers the allocation \p ptr of \p count elements of size \p size of type \p type by owner \p owner
+ * 
+ * @param ptr pointer to the allocated dynamic memory block
+ * @param type the allocation type
+ * @param owner the owner of the allocation
+ * @param size the size of an allocated element
+ * @param count the number of allocated elements
+ * @return true on success
+ * @return false on failure
+ */
+static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner owner,size_t size,long long count){
+	// ASSERT all arguments supposedly valid i.e. ptr!=NULL, size>0
+	// MDH@13APR2020: all Mmalloc calls represent fixed size allocations
+	if(ptr==NULL||type==0||size==0||count<=0)return false;
+		// MDH@14JAN2023: replacing the following block with equivalent code passing ptr as well to registerAllocation
+		//				exchanging the order so the contents of pointer is already set however we could have all this done
+		//				in registerAllocation instead, I suppose, but for now we don't
+	Mallocationtypeowner _alloc=(Mallocationtypeowner)ptr/*((char*)ptr+size)*/;
+	_alloc->allocationType=type; // register the type
+	_alloc->owner=owner;
+	_alloc->allocationIndex=registerAllocation(_alloc/*,type,owner*/,size,count);
+	return(_alloc->allocationIndex>=0);
+	/* replacing:
+	// MDH@26MAY2020: now we should also accomodate for variable size allocations in which case we call registerReallocation with -1 for the allocationIndex (as this is a new allocation), see Mvalloc for a rewrite of Mrealloc with from_count=0 and to_count=1 with the required functionality)
+	long long allocationIndex=registerAllocation(type,owner,size,count); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
+	if(allocationIndex<0)return false;
+	Malloc* _alloc=(Malloc*)ptr; // replacing ((char*)ptr+size) by ptr
+	_alloc->allocationType=type; // register the type
+	_alloc->allocationIndex=allocationIndex;
+	_alloc->owner=owner;
+	/// MDH@03JUN2020: we do NOT want to disown something that is allocated, i.e. the receiving pointer module function actually owns it until disowning when returning the pointer as result
+	///_alloc->owner.disowned=1; // immediately disown the thing
+	///allocations._owners[allocationIndex].owner.disowned=1; // don't forget it in the registration!!!
+	return true;
+		*/
+}
+#endif
+
+/**
+ * @brief returns the number of bytes occupied by the allocation type with index \p allocationTypeIndex of allocation mark \p allocationMarkIndex (module local)
+ * 
+ * @param allocationTypeIndex 
+ * @param allocationMarkIndex 
+ * @return long long 
+ */
+static long long getAllocationTypeSize(unsigned long long allocationTypeIndex,unsigned long long allocationMarkIndex){
+	// output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
+	if(allocationTypeIndex<0||!_allocationMarks||allocationTypeIndex>=numberOfAllocationMarkTypes||allocationMarkIndex>=numberOfAllocationMarks)return 0;
+	Mallocationmark allocationMark=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationTypeIndex];
+	long long size=allocationMark.occupied;
+	size-=allocationMark.freed;
+	return size;
+	// replacing: return(_allocationTypes[allocationTypeIndex].occupied-_allocationTypes[allocationTypeIndex].freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
+}
+
+/**
+ * @brief outputs all allocation type marks
+ * 
+ * @param linePrefix the text to use for indentation
+ */
+void outputAllocationTypeMarks(char* linePrefix){
+	size_t size;
+	unsigned long long freed,occupied,totaloccupied,totalfreed;
+	uint8_t *_allocationTypeColumnLengths=calloc(numberOfAllocationMarkTypes,sizeof(uint8_t)); // all zero
+	if(_allocationTypeColumnLengths){
+		unsigned long long units,allocationMarkIndex=0; // the successor of the last active allocation mark (which supposedly is the oldest)
+		uint8_t unitsTextLength=0;
+		while(allocationMarkIndex<numberOfAllocationMarks){
+			if(_allocationMarkTimestamps[allocationMarkIndex]){
+				for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
+					size=_allocationTypes[allocationMarkTypeIndex].size;
+					if(size==0)continue; // only the case for the * allocation type mark
+					occupied=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
+					freed=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
+					unitsTextLength=getTextRepresentationLength((occupied-freed)/size);
+					if(unitsTextLength>_allocationTypeColumnLengths[allocationMarkTypeIndex])
+						_allocationTypeColumnLengths[allocationMarkTypeIndex]=unitsTextLength;
+				}
+			}
+			allocationMarkIndex++;
+		}
+		// output("%llu allocation marks of %llu types:\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
+		// I suppose it's best to write the types first
+		output("%s#\tTime\tType ->\t",linePrefix);
+		uint8_t l;
+		for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
+			if(_allocationTypes[allocationMarkTypeIndex].type<0){
+				if(_allocationTypeColumnLengths[allocationMarkTypeIndex]<2)_allocationTypeColumnLengths[allocationMarkTypeIndex]=2;
+				outputChar('-');
+				l=2;
+			}else
+				l=1;
+			outputChar(abs(_allocationTypes[allocationMarkTypeIndex].type));
+			while(l++<=_allocationTypeColumnLengths[allocationMarkTypeIndex])outputChar(' ');
+		}
+		output("\tTotal (bytes)\n");
+		// how about showing the oldest until the newest
+		// how about determining the widths of the columns first??????
+		// when actually showing the values the order is important
+		allocationMarkIndex=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
+		while(allocationMarkIndex!=lastActiveAllocationMark){
+			if(_allocationMarkTimestamps[allocationMarkIndex]){
+				output("%s",linePrefix);
+				output("%llu",allocationMarkIndex+1);
+				outputChar('\t');
+				output("%s",_allocationMarkTimestamps[allocationMarkIndex]);
+				if(lastActiveAllocationMark>=firstActiveAllocationMark){
+					if(allocationMarkIndex>=firstActiveAllocationMark&&allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+				}else{
+					if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+				}
+				outputChar('\t');
+				totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
+				for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
+					size=_allocationTypes[allocationMarkTypeIndex].size;
+					if(size==0)continue; // only the case for the * allocation type mark
+					// how about showing the number of elements instead of the size??????
+					occupied=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
+					freed=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
+					units=(occupied-freed)/size;
+					unitsTextLength=getTextRepresentationLength(units);
+					output("%llu",units);
+					while(unitsTextLength++<=_allocationTypeColumnLengths[allocationMarkTypeIndex])outputChar(' ');
+					totaloccupied+=occupied;
+					totalfreed+=freed;
+				}
+				output("\t%llu = %llu - %llu\n",totaloccupied-totalfreed,totaloccupied,totalfreed);
+			}
+			allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks; // increment the allocation mark index
+		}
+		free(_allocationTypeColumnLengths);
+	}
+}
 
 // MDH@17JAN2023: every now and then we should shrink the allocations
 /**
@@ -842,7 +903,7 @@ bool resetAllocationManagement(){
 	if(allocations._chars)free(allocations._chars);
 	*/
 	////////info("Allocation type counts reset.\n");
-	// free(_allocationMarks);numberOfAllocationMarks=0;free(_allocationMarkIds);
+	// free(_allocationMarks);numberOfAllocationMarks=0;free(_allocationMarkTimestamps);
 	output("Resetting dynamic memory allocation management.\n");
 	return allocationRecordingInitialized();
 
@@ -863,10 +924,10 @@ bool allocationMarkAdded(){
 		unsigned long long newLastActiveAllocationMark=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
 		// output("New last active allocation mark: %llu.\n",newLastActiveAllocationMark); // DEBUG
 		if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
-			char** newAllocationTypeMarkIds=realloc(_allocationMarkIds,(numberOfAllocationMarks+1)*sizeof(char*));
+			char** newAllocationTypeMarkIds=realloc(_allocationMarkTimestamps,(numberOfAllocationMarks+1)*sizeof(char*));
 			if(!newAllocationTypeMarkIds)return false;
-			_allocationMarkIds=newAllocationTypeMarkIds;
-			_allocationMarkIds[numberOfAllocationMarks]=NULL; // because we haven't set it yet!!!!
+			_allocationMarkTimestamps=newAllocationTypeMarkIds;
+			_allocationMarkTimestamps[numberOfAllocationMarks]=NULL; // because we haven't set it yet!!!!
 			// MDH@07MAY2020: we have to add a new mark
 			size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
 			Mallocationmark* newAllocationTypeMarks=realloc(_allocationMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark));
@@ -884,9 +945,9 @@ bool allocationMarkAdded(){
 			firstActiveAllocationMark=(newLastActiveAllocationMark+1)%numberOfAllocationMarks;
 		}else
 		// free the mark id that is going to be replaced!!!!
-		if(_allocationMarkIds[newLastActiveAllocationMark]){
-			free(_allocationMarkIds[newLastActiveAllocationMark]);
-			_allocationMarkIds[newLastActiveAllocationMark]=NULL; // MDH@15JUN2020: might be an issue if we don't!!!
+		if(_allocationMarkTimestamps[newLastActiveAllocationMark]){
+			free(_allocationMarkTimestamps[newLastActiveAllocationMark]);
+			_allocationMarkTimestamps[newLastActiveAllocationMark]=NULL; // MDH@15JUN2020: might be an issue if we don't!!!
 		}
 		// we have to make room for the new allocation and copy the current last active mark over
 		// moving over lastActiveAllocationMark to newLastActiveAllocationMark (nonoverlapping allocation type marks so we can use memcpy)
@@ -905,20 +966,23 @@ bool allocationMarkAdded(){
 
    }else{
 
-		_allocationMarkIds=calloc(1,sizeof(char*));
-		if(!_allocationMarkIds)return false;
+		_allocationMarkTimestamps=calloc(1,sizeof(char*));
+		if(!_allocationMarkTimestamps)return false;
 
 		_allocationMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
-		if(!_allocationMarks){free(_allocationMarkIds);return false;}
-
+		if(!_allocationMarks){
+			free(_allocationMarkTimestamps);_allocationMarkTimestamps=NULL;
+			output("\t%sFailed to initialize allocation marks registration.\n",M_ERROR_PREFIX);
+			return false;
+		}
 		numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;
 		output("\tAllocation marks registration initialized...\n");		
 	}
  
 	// output("Last active allocation mark after: %llu.\n",lastActiveAllocationMark); // DEBUG
 	time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
-	_allocationMarkIds[lastActiveAllocationMark]=strdup(hms); // TODO for now assume that strdup() will NOT fail!!!! of course if it does it will return NULL so that's OK
-	// output("Allocation type mark id #%llu: '%s'.\n",lastActiveAllocationMark,_allocationMarkIds[lastActiveAllocationMark]); // DEBUG
+	_allocationMarkTimestamps[lastActiveAllocationMark]=strdup(hms); // TODO for now assume that strdup() will NOT fail!!!! of course if it does it will return NULL so that's OK
+	// output("Allocation type mark id #%llu: '%s'.\n",lastActiveAllocationMark,_allocationMarkTimestamps[lastActiveAllocationMark]); // DEBUG
 	return true;
 	/* replacing:
 	long long numberOfAllocationTypes=getNumberOfAllocationTypes();
@@ -1023,47 +1087,6 @@ void syncallocations(){
 #endif
 }
 */
-
-#ifndef __PRODUCTION__
-// MDH@21APR2020: general function to store allocation info with the dynamically allocated memory
-/**
- * @brief registers the allocation \p ptr of \p count elements of size \p size of type \p type by owner \p owner
- * 
- * @param ptr pointer to the allocated dynamic memory block
- * @param type the allocation type
- * @param owner the owner of the allocation
- * @param size the size of an allocated element
- * @param count the number of allocated elements
- * @return true on success
- * @return false on failure
- */
-static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner owner,size_t size,long long count){
-	// ASSERT all arguments supposedly valid i.e. ptr!=NULL, size>0
-	// MDH@13APR2020: all Mmalloc calls represent fixed size allocations
-	if(ptr==NULL||type==0||size==0||count<=0)return false;
-		// MDH@14JAN2023: replacing the following block with equivalent code passing ptr as well to registerAllocation
-		//				exchanging the order so the contents of pointer is already set however we could have all this done
-		//				in registerAllocation instead, I suppose, but for now we don't
-	Mallocationtypeowner _alloc=(Mallocationtypeowner)ptr/*((char*)ptr+size)*/;
-	_alloc->allocationType=type; // register the type
-	_alloc->owner=owner;
-	_alloc->allocationIndex=registerAllocation(_alloc/*,type,owner*/,size,count);
-	return(_alloc->allocationIndex>=0);
-	/* replacing:
-	// MDH@26MAY2020: now we should also accomodate for variable size allocations in which case we call registerReallocation with -1 for the allocationIndex (as this is a new allocation), see Mvalloc for a rewrite of Mrealloc with from_count=0 and to_count=1 with the required functionality)
-	long long allocationIndex=registerAllocation(type,owner,size,count); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
-	if(allocationIndex<0)return false;
-	Malloc* _alloc=(Malloc*)ptr; // replacing ((char*)ptr+size) by ptr
-	_alloc->allocationType=type; // register the type
-	_alloc->allocationIndex=allocationIndex;
-	_alloc->owner=owner;
-	/// MDH@03JUN2020: we do NOT want to disown something that is allocated, i.e. the receiving pointer module function actually owns it until disowning when returning the pointer as result
-	///_alloc->owner.disowned=1; // immediately disown the thing
-	///allocations._owners[allocationIndex].owner.disowned=1; // don't forget it in the registration!!!
-	return true;
-		*/
-}
-#endif
 
 /* MDH@26MAY2020: Mvalloc is a rewrite of Mrealloc for the case that from_count is 0 and to_count is 1 (i.e. freed is 0)
 static void* Mvalloc(size_t size,unsigned char allocationType,Mallocationowner owner){
@@ -1427,7 +1450,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 	if(_alloc->allocationType!=allocationType){
 			bug("\tAllocation type of dynamic memory '%c' (=%i) freed of size %zd does not match provided allocation type '%c' (=%i).",_alloc->allocationType,_alloc->allocationType,size,allocationType,allocationType);
 			dump(ptr,count*size,size);
-			free(_alloc);
+			free(_alloc);_alloc=NULL;
 			return;
 	}
 	// if(_alloc->allocationIndex<=0)bug("No allocation index registered for allocation of type '%c'.\n",allocationType);
@@ -1480,7 +1503,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 	if(report)
 		output("Freeing '%p'...",_alloc);
 	// MDH@17JAN2023: we need to remove the reference in allocations
-	free(_alloc);
+	free(_alloc);///// TODO perhaps NOT do this as _alloc is still used below!!!!! _alloc=NULL;
 	if(report)
 		output(" done!\n");
 #ifndef __PRODUCTION__
@@ -1712,23 +1735,6 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 }
 */
 
-/**
- * @brief returns the number of bytes occupied by the allocation type with index \p allocationTypeIndex of allocation mark \p allocationMarkIndex (module local)
- * 
- * @param allocationTypeIndex 
- * @param allocationMarkIndex 
- * @return long long 
- */
-static long long getAllocationTypeSize(unsigned long long allocationTypeIndex,unsigned long long allocationMarkIndex){
-	// output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
-	if(allocationTypeIndex<0||!_allocationMarks||allocationTypeIndex>=numberOfAllocationMarkTypes||allocationMarkIndex>=numberOfAllocationMarks)return 0;
-	Mallocationmark allocationMark=_allocationMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationTypeIndex];
-	long long size=allocationMark.occupied;
-	size-=allocationMark.freed;
-	return size;
-	// replacing: return(_allocationTypes[allocationTypeIndex].occupied-_allocationTypes[allocationTypeIndex].freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
-}
-
 // MDH@07MAY2020: passing in the number of allocation marks requested (<0=one, 0=all, otherwise the number given, returning what is actually returned)
 /**
  * @brief return the sizes of all \p *_numberOfAllocationTypes requested allocation types in \p types for all requested number of allocation marks \p *_numberOfAllocationMarks
@@ -1815,8 +1821,7 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
    
 	if(_allocationMarks){
 		if(numberOfAllocationMarks*numberOfAllocationMarkTypes>0)output("\tReleasing %llu allocation marks of %llu registered allocation types...\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
-		free(_allocationMarks);
-		_allocationMarks=NULL;
+		free(_allocationMarks);_allocationMarks=NULL;
 		output("\tAllocation marks released...\n");
 	} 
 	numberOfAllocationMarks=0;numberOfAllocationMarkTypes=0;
@@ -1824,34 +1829,55 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 #ifndef __PRODUCTION__
 	if(!allocations._owners){
 		allocations._owners=calloc(16,sizeof(Malloc*/*ationownertype*/)); // starting out with one block
-		if(!allocations._owners)return false;
-		printf("\tHistory of allocations initialized...\n");
+		if(!allocations._owners){
+			output("\t%sFailed to initialize memory allocation management.\n",M_ERROR_PREFIX);
+			return false;
+		}
+		allocations.size=16;
+		allocations.l=0;
+		allocations.nulled=0;
+		output("\tMemory allocation management initialized...\n");
 	}
 
 	// keep all current allocation types (if any)
 	if(numberOfAllocationTypes==0){
 		_allocationTypes=calloc(1,sizeof(Mallocationtype));
-		if(_allocationTypes){
-			numberOfAllocationTypes=1;
-			_allocationTypes[0].type='*';
-		} // always keep track of the total allocation count, which we mark with a wildcard *
+		if(_allocationTypes==NULL){
+			output("\t%sFailed to initialize memory allocation type management!\n",M_ERROR_PREFIX);
+			return false;
+		}
+		numberOfAllocationTypes=1;
+		_allocationTypes[0].type='*';
+		output("\tMemory allocation type management initialized...\n");	
 	}
-	if(numberOfAllocationTypes==0)return false;
-	output("\tMemory allocation type management initialized...\n");
+
 		// MDH@14APR2020: if(numberofallocationtypes>0)_allocationcounts=calloc(5,sizeof(size_t)); // start out with two size_t items one to store the count and one to store the size!!
 #endif
 	// MDH@12MAY2020: I suppose that if we have allocation types we can create them
 	// assuming we have a single (global) allocation type (i.e. *)
-	_allocationMarkIds=calloc(1,sizeof(char*)); // a single char* that is initialized to NULL!!!!
-	if(!_allocationMarkIds)return false;
+	if(!_allocationMarkTimestamps){
+		_allocationMarkTimestamps=calloc(1,sizeof(char*)); // a single char* that is initialized to NULL!!!!
+		if(!_allocationMarkTimestamps){
+			output("\t%sFailed to initialize the memory allocation marks.\n",M_ERROR_PREFIX);
+			return false;
+		}
+	}
 
 	time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
 
-	_allocationMarkIds[0]=strdup(hms);
-	if(!_allocationMarkIds[0]){free(_allocationMarkIds);return false;}
+	_allocationMarkTimestamps[0]=strdup(hms);
+	if(!_allocationMarkTimestamps[0]){
+		free(_allocationMarkTimestamps);_allocationMarkTimestamps=NULL;
+		output("\t%sFailed to initialize the allocation mark timestamps.\n",M_ERROR_PREFIX);
+		return false;
+	}
 
 	_allocationMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
-	if(!_allocationMarks){free(_allocationMarkIds);return false;}
+	if(!_allocationMarks){
+		free(_allocationMarkTimestamps);_allocationMarkTimestamps=NULL;
+		output("\t%sFailed to initialize the memory allocation mark management.\n",M_ERROR_PREFIX);
+		return false;
+	}
 	
 	numberOfAllocationMarks=1;
 	firstActiveAllocationMark=0;

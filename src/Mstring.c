@@ -15,7 +15,11 @@ static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_STRING
  *  therefore I change the entire thing in a null terminated string to start with!!
  */
 
-/** Create a String */
+/**
+ * @brief creates and returns a (mutable) Mstring*
+ * 
+ * @return Mstring* the created Mstring* on success, NULL on failure
+ */
 Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@09APR2020: because sizeof(Mstring) would not include what we need for the characters pointed to by chars, we need to allocated one BLOCK_SIZE of characters to start with
 	Mstring* ans=CALLOC_1(sizeof(Mstring),'S',owner);
@@ -45,6 +49,12 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
 	return disowned_string(ans,owner);
 }
 
+/**
+ * @brief creates and returns an Mstring* initialized using C string \p s
+ * 
+ * @param s the C string to initialize the Mstring with
+ * @return Mstring* pointer to the created and initialed Mstring
+ */
 Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE__);
 	if(!s)return NULL;
 	Mstring* ans=CALLOC_1(sizeof(Mstring),'S',owner);
@@ -83,11 +93,24 @@ Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE
 }
 
 // MDH@17APR2020: it's best for every variable size allocation unit to have a method that will return its size to be used in a call to REALLOC as from_count
+/**
+ * @brief returns the number of characters the Mstring pointed to by \p str can hold
+ * 
+ * @param str the Mstring
+ * @return size_t the number of characters \p str can hold
+ */
 static size_t getSizeOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_SIZE*str->blocks:0);}
 static size_t getNumberOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_CHARACTERS*str->blocks:0);}
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
 // WARNING: if length==0 the entire string is returned!!!!!!
+/**
+ * @brief returns a newly created Mstring pointer initialized from the first \p length characters in the Mstring pointed to by \p src
+ * 
+ * @param src the source Mstring
+ * @param length the number of characters to copy
+ * @return Mstring* the newly created Mstring pointer on success, or NULL on failure
+ */
 Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=getOwner(__LINE__);
 	if(!src)return NULL;
 	// MDH@17APR2020: replacing src->chars by src->_chars->chars
@@ -115,21 +138,40 @@ Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=g
 	*/
 }
 
-Mstring* disowned_string(Mstring* _str,Mallocationowner owner_str){
-	if(!_str)return NULL;
-	disowned_chars(_str->_chars,owner_str);
-	return DISOWNED(_str,owner_str);
-}
-Mstring* owned_string(Mstring* _str,Mallocationowner owner_str){
-	if(!_str)return NULL;
-	owned_chars(_str->_chars,Msubowner(owner_str,1));
-	return OWNED(_str,owner_str);
-}
-/** 
- * Free the memory associated with a String
+/**
+ * @brief disownes Mstring* \p _str from its current owner \p owner_str
+ * 
+ * @param _str the Mstring* to disown
+ * @param owner_str the owner to disown
+ * @return Mstring* the disowned Mstring*
  */
+Mstring* disowned_string(Mstring* str,Mallocationowner owner_str){
+	if(!str)return NULL;
+	disowned_chars(str->_chars,owner_str);
+	return DISOWNED(str,owner_str);
+}
+
+/**
+ * @brief turns ownership of Mstring* \p str over to \p owner_str
+ * 
+ * @param str the (disowned) Mstring* to change the ownership of
+ * @param owner_str the new owner
+ * @return Mstring* the newly owned Mstring*
+ */
+Mstring* owned_string(Mstring* str,Mallocationowner owner_str){
+	if(!str)return NULL;
+	owned_chars(str->_chars,Msubowner(owner_str,1));
+	return OWNED(str,owner_str);
+}
+
 // MDH@18MAY2020: you can see what a nuisance it is to free a string for somebody else because the caller needs to DISOWN it first, then I have to obtain ownership otherwise I can't free it
 //				then there's str->_chars that we need to take ownership off as well
+/**
+ * @brief frees the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring pointer to be freed
+ * @return Mstring* the freed Mstring pointer on success, NULL otherwise
+ */
 Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/){   
 	// in order to be able to free_chars but perhaps we do not need to disown str->_chars before calling free_chars????????
 	if(str){
@@ -144,12 +186,31 @@ Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/){
 	return str;
 }
 
+/**
+ * @brief returns the current length (number of held characters) in the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @return size_t the number of characters held by \p str when str is not NULL, zero otherwise
+ */
 size_t string_length(Mstring const * const str){return(str?str->length:0);}
 
-/** Is the String empty? */
+/**
+ * @brief returns whether or not the Mstring pointed to by \p str is empty
+ * 
+ * @param str the Mstring*
+ * @return true when the length of the Mstring is zero or when str is NULL
+ * @return false when the length of the non-null Mstring is not zero
+ */
 bool string_empty(Mstring const * const str){return(str?str->length==0:true);} // MDH@17APR2020: removing 
 
- // MDH@26FEB2018: we might want to set the length (to a smaller one)
+// MDH@26FEB2018: we might want to set the length (to a smaller one)
+/**
+ * @brief sets the length of the Mstring pointed to by \p str to \p length resizing Mstring is necessary padding with space characters when the length increases
+ * 
+ * @param str the Mstring*
+ * @param length the new length of \p str
+ * @return Mstring* \p str
+ */
 Mstring* string_setlength(Mstring* const str,size_t length){
 	// MDH@22MAY2020: here we have a bit of an issue, because str->chars might change, although str won't change in which case we really need the oid from the caller
 	//				unless we could extract ownership from str->chars itself????
@@ -189,6 +250,13 @@ Mstring* string_setlength(Mstring* const str,size_t length){
 	}
 	return str;
 }
+
+/**
+ * @brief syncs the length of the Mstring pointed to by \p str to the position of the last '\0' character in the Mstring
+ * 
+ * @param str the Mstring*
+ * @return Mstring* \p str
+ */
 Mstring* string_synclength(Mstring* const str){
 	if(str){
 		size_t l=str->length;
@@ -200,6 +268,14 @@ Mstring* string_synclength(Mstring* const str){
 	return str;
 }
 
+/**
+ * @brief 'shortens' the Mstring pointed to by \p str by \p length characters without changing any of the characters
+ * 
+ * @param str the Mstring*
+ * @param length the new length of \p str
+ * @return true when length does not exceed the current length
+ * @return false when length exceeds the current length
+ */
 bool string_shorten(Mstring* const str,size_t length){
 	if(!str)return false;
 	if(length>str->length)return false;
@@ -208,17 +284,38 @@ bool string_shorten(Mstring* const str,size_t length){
 	return true;
 }
 
-char string_char(const Mstring* const str,size_t pos){
+/**
+ * @brief return character at position \p pos of the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param pos the (zero-based) position of the character
+ * 
+ * @return char the character in the Mstring pointed to by \str at position \pos, or '\0' if that character does not exist
+ */
+char string_char(Mstring const * const str,size_t pos){
 	// MDH@17APR2020: inserting ->_chars
 	return(str!=NULL?(pos<str->length?str->_chars->chars[pos]:'\0'):'\0');
 }
 
-char string_last_char(const Mstring* const str){
+/**
+ * @brief returns the last character stored in the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @return char the last character stored in the Mstring, or '\0' if \p str is NULL or of zero length
+ */
+char string_last_char(Mstring const * const str){
 	// MDH@17APR2020: inserting ->_chars
 	return(str!=NULL?(str->length>0?str->_chars->chars[str->length-1]:'\0'):'\0');
 }
 
 // MDH@13OCT2020: string_last_char_count() returns the number of times str ends with c
+/**
+ * @brief returns the number of characters equal to \p c in the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param c the character to search for
+ * @return size_t the number of occurrences at the end of the Mstring equal to \p c
+ */
 size_t string_last_char_count(const Mstring* const str,char c){
 	size_t count=0;
 	if(str&&str->_chars){
@@ -231,6 +328,13 @@ size_t string_last_char_count(const Mstring* const str,char c){
 	return count;
 }
 
+/**
+ * @brief returns the character removed at position \p pos of the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param pos the position of the character to remove
+ * @return char the removed character
+ */
 char string_removed_char(Mstring* const str,size_t pos){
 	char rc='\0';
 	if(str!=NULL){
@@ -242,12 +346,20 @@ char string_removed_char(Mstring* const str,size_t pos){
 			// we have to move characters pos through str->length down
 			// NOTE we have \0 at position str->length, so we have to move that one as well!!!	
 			char c;	 
-			while(pos<l){strchars->chars[pos]=strchars->chars[pos+1];pos++;}
+			while(pos<l){strchars->chars[pos]=strchars->chars[pos+1];pos++;} // TODO certainly this could be written more efficiently
 		}
 	}
 	return rc;
 }
 
+/**
+ * @brief returns the number of characters removed from the Mstring pointed to by \p str starting at position \p pos and ending at position \p pos + \p length - 1
+ * 
+ * @param str the Mstring*
+ * @param pos the position of the first character to remove
+ * @param length the maximum number of characters to remove
+ * @return size_t the number of characters removed
+ */
 size_t string_removed(Mstring * const str,size_t pos,size_t length){ // MDH@03OCT2019: remove length characters from str starting at position pos
 	size_t removed=0;
 	if(str){
@@ -269,9 +381,13 @@ size_t string_removed(Mstring * const str,size_t pos,size_t length){ // MDH@03OC
 	return removed;
 }
 
-/** 
- * insert char c at position pos in the given string 
- * NOTE: returns NULL on failure, @str otherwise 
+/**
+ * @brief inserts the character \p c at position \p pos of the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param pos the position to insert \p c at
+ * @param c the character to insert
+ * @return Mstring* \p str on success, NULL on failure
  */
 Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,size_t pos,char c){
 	if(str!=NULL){
@@ -312,8 +428,16 @@ Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,si
 }
 
 // MDH@23APR2020: could come in handy (similar to string_prepend)
+/**
+ * @brief inserts all characters from \p pc into the Mstring pointed to by \p str starting at position \p pos
+ * 
+ * @param str the Mstring*
+ * @param pos the first position to replace
+ * @param pc the characters to insert
+ * @return Mstring* \p str
+ */
 Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc){
-	if(str&&pc){
+	if(str!=NULL&&pc!=NULL){
 		char c;
 		size_t index=0;
 		while((c=pc[index])){if(!string_setchar(str,c,pos))break;index++;pos++;} // increment index at the end is better than at the beginning TODO can we do even better?
@@ -321,9 +445,12 @@ Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc){
 	return str;
 }
 
-/** 
- * Add a character to the end of the String 
- * NOTE: returns NULL on failure
+/**
+ * @brief appends character \p c to the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param c the character to append
+ * @return \p str
  */
 Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,char c){
 	if(str!=NULL){
@@ -356,6 +483,14 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
 }
 
 // MDH@12JUL2019: we can set a specific char which should only fail if pos is larger than the length
+/**
+ * @brief replaces the character at position \p pos of the Mstring pointed to by \p str by \p c
+ * 
+ * @param str the Mstring*
+ * @param c the character to replace the current character at position \p pos
+ * @param pos the position
+ * @return Mstring* \p str
+ */
 Mstring* string_setchar(Mstring* const str,char c,size_t pos){
 	if(!str)return NULL;
 	if(pos>=str->length)return NULL;
@@ -364,6 +499,14 @@ Mstring* string_setchar(Mstring* const str,char c,size_t pos){
 	if(c=='\0')str->length=pos;
 	return str;
 }
+
+/**
+ * @brief returns a C string with maximum length \p length but containing all characters in the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param length the maximum number of characters to return
+ * @return char* the C string being returned
+ */
 char* _stringstart(const Mstring* const str,size_t length){
 	if(!str)return NULL;
 	// MDH@17APR2020 inserting ->_chars
@@ -376,6 +519,13 @@ char* _stringstart(const Mstring* const str,size_t length){
 
 // MDH@24SEP2019: same as string_append but stopping when count characters were appended!!!
 //				changed it as little as possible by breaking out of the while as soon as the number of appended characters (index) exceeds count!!!!
+/**
+ * @brief appends at most \p count characters in C string \p pc to the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param pc the C string containing the characters to append
+ * @return \p str
+ */
 Mstring* string_append_chars(Mstring* const str/*,Mallocationowner owner_str*/,const char* pc,size_t count){
 	if(str!=NULL&&pc!=NULL){ // something to append
 		char c;
@@ -387,8 +537,15 @@ Mstring* string_append_chars(Mstring* const str/*,Mallocationowner owner_str*/,c
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array
+/**
+ * @brief appends all characters in C string \p pc to the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param pc the C string with characters to append
+ * @return \p str on success, or NULL on failure
+ */
 Mstring* string_append(Mstring * const str/*,Mallocationowner owner_str*/,char const * const pc){
-	if(str&&pc){ // something to append (to)
+	if(str!=NULL&&pc!=NULL){ // something to append (to)
 		char c;
 		size_t index=0;
 		while((c=pc[index++])){if(!string_append_char(str,c))return NULL;/*output("***** %c appended! ******\n",c);*/}
@@ -396,8 +553,16 @@ Mstring* string_append(Mstring * const str/*,Mallocationowner owner_str*/,char c
 	}
 	return str;
 }
+
+/**
+ * @brief prepend all characters in \p pc to the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param pc the C string to prepend
+ * @return \p str on success, or NULL on failure
+ */
 Mstring* string_prepend(Mstring* const str/*,Mallocationowner owner_str*/,char const * const pc){
-	if(str&&pc){ // something to prepend (to)
+	if(str!=NULL&&pc!=NULL){ // something to prepend (to)
 		char c;
 		size_t index=0;
 		while((c=pc[index])){if(!string_insert_char(str,index,c))return NULL;index++;} // increment index at the end is better than at the beginning TODO can we do even better?
@@ -407,28 +572,44 @@ Mstring* string_prepend(Mstring* const str/*,Mallocationowner owner_str*/,char c
 }
 
 // MDH@17APR2020: inserting ->_chars between str and ->chars
+/**
+ * @brief returns a pointer to all (non-duplicated) characters in the Mstring pointed to by \p str starting at position \p firstpos
+ * 
+ * @param str the Mstring*
+ * @param firstpos the position of the first character
+ * @return char* the C string on success, or NULL if firstpos exceeds the length of the Mstring
+ */
 char* string_remainder(Mstring* const str,size_t firstpos){
-	if(!str)return NULL;
+	if(str==NULL)return NULL;
 	if(!firstpos)return string(str);
 	if(firstpos>str->length)return NULL;
 	str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
 	return str->_chars->chars+firstpos;
 }
 
-/** 
- * Get a C-String with the proper null-terminator 
- * NOTE: returning the pointer to the characters stored in the Mstring (which is str->chars)
-*/
+/**
+ * @brief returns the C string representation of the Mstring pointed to by \p str
+ * @details will sync the Mstring by placing a '\0' character at the length position of the C string held by the Mstring
+ * @param str 
+ * @return char* the C string pointer on success, or NULL on failure
+ */
 char* string(Mstring* const str){
-	if(!str)return NULL;
+	if(str==NULL)return NULL;
 	if(str->_chars)str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
 	return str->_chars->chars;
 	// MDH@21JUN2019: replacing: return (str?str->chars:NULL);
 }
 
-/** Get where the first occurrence of a character in the String is */
+/**
+ * @brief locates and returns the position of the first occurrence of character \p c at or after position \p pos in the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param c the character to find
+ * @param pos the first position to investigate
+ * @return long long the position of the character in the Mstring, or -1 when not found
+ */
 long long string_find_char(const Mstring* const str,char c,size_t pos){
-	if(str){
+	if(str!=NULL){
 		// MDH@16DEC2018: better to increment pos inside the condition
 		// MDH@25OCT2019: type of pos changed from long long to size_t and pos<l replaced by pos!=l because I'm not sure if 0<0 evaluates to false for unsigned integers like size_t
 		size_t l=str->length; // first character to check
@@ -442,8 +623,13 @@ long long string_find_char(const Mstring* const str,char c,size_t pos){
 	return -1;
 }
 
+/**
+ * @brief reverses the characters in the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ */
 void string_reverse(Mstring* const str){
-	if(!str)return;
+	if(str==NULL)return;
 	size_t l=str->length;
 	if(!l)return;
 	l--;
@@ -459,14 +645,29 @@ void string_reverse(Mstring* const str){
 // MDH@24SEP2019: in order to be able to use a smaller part from the beginning of text we'd like to be able to replace a character by '\0' and later on restore it
 //				we will succeed if we have a function that will return the replaced character so we can put it back in again
 //				this method will NOT change str->length ever, meaning that if you forget to put the character back you're in trouble
+/**
+ * @brief replaces the character at position \p pos in the Mstring pointed to by \p str by character \p c
+ * 
+ * @param str the Mstring*
+ * @param c the character to replace
+ * @param pos the position of the character to replace
+ * @return char the replaced character on success, or '\0' on failure
+ */
 char string_replacedchar(Mstring * const str,char c,size_t pos){
-	if(!str||pos>=str->length)return '\0'; // NOTE even though str->chars[str->length] might not be '\0' we're still returning '\0' in that case, as if it was there (otherwise we would have to write '\0' first as we do in string())
+	if(str==NULL||pos>=str->length)return '\0'; // NOTE even though str->chars[str->length] might not be '\0' we're still returning '\0' in that case, as if it was there (otherwise we would have to write '\0' first as we do in string())
 	char replacedchar=str->_chars->chars[pos];
 	str->_chars->chars[pos]=c;
 	return replacedchar;
 }
 
 // the number of matching character at the start
+/**
+ * @brief returns the number of characters at the start of the Mstring pointed to by \p str that match starting characters in C string \p chars
+ * 
+ * @param str the Mstring*
+ * @param chars the C string
+ * @return size_t the number of matching characters
+ */
 size_t string_number_of_matching_chars(Mstring const * const str,char const * chars){
 	size_t numberOfMatchingCharacters=0;
 	// if str and chars are used as value arguments so the pointers themselves shouldn't be constant
@@ -485,30 +686,63 @@ size_t string_number_of_matching_chars(Mstring const * const str,char const * ch
 } 
 
 // MDH@24OCT2019: return true if str1 and str2 are equal (qua contents)
+/**
+ * @brief determines if the characters in the Mstring pointed to by \p str1 match the characters in the Mstring pointed to by \p str2
+ * 
+ * @param str1 the Mstring*
+ * @param str2 the Mstring*
+ * @return true when all characters are the same
+ * @return false when not all characters are the same
+ */
 bool string_equal(Mstring* str1,Mstring* str2){
-	if(!str1&&!str2)return false; // if both NULL not the same
+	if(str1==NULL&&str2==NULL)return false; // if both NULL not the same
 	if(str1==str2)return true; // if pointing to the same memory, the same
-	if(!str1||!str2)return false; // if either NULL not the same
+	if(str1==NULL||str2==NULL)return false; // if either NULL not the same
 	// ASSERT both are not NULL
 	if(str1->length!=str2->length)return false; // if length not equal not the same
-	if(!str1->_chars||!str2->_chars)return false; // we need both chars arrays (actually should never be NULL though)
+	if(str1->_chars==NULL||str2->_chars==NULL)return false; // we need both chars arrays (actually should never be NULL though)
 	str1->_chars->chars[str1->length]='\0';str2->_chars->chars[str2->length]='\0'; // place end-of-text markers so we can use str_cmp for comparison
 	return(strcmp(str1->_chars->chars,str2->_chars->chars)==0);
 }
 
 // MDH@13MAR2020: helper functions now implemented here (instead of in Mexecution.h/c)
-Mstring* string_append_ull(Mstring* const str,unsigned long long ll){
+/**
+ * @brief appends the text representation of \p ull to the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param ull the unsigned integer to append
+ * @return Mstring* \p str with \p ull appended
+ */
+Mstring* string_append_ull(Mstring* const str,unsigned long long ull){
+	if(str==NULL)return NULL;
 	char llText[80];
-	snprintf(llText,80,"%lld",ll); // TODO will this fit?
+	snprintf(llText,80,"%llu",ull); // TODO will this fit?
 	return string_append(str,llText);
 }/* VALIDATED */
+
 // helper function
+/**
+ * @brief appends the text representation of \p ll to the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param ll the signed integer to append
+ * @return Mstring* \p str with \p ll appended
+ */
 Mstring* string_append_ll(Mstring* const str,long long ll){
+	if(str==NULL)return NULL;
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
 	return string_append(str,llText);
 }/* VALIDATED */
-Mstring* string_append_ld(Mstring* const ms,long double ld){
+
+/**
+ * @brief appends \p ld to the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param ld a long double to append
+ * @return Mstring* \p str with \p ld appended
+ */
+Mstring* string_append_ld(Mstring* const str,long double ld){
 	char ldText[80];
 	// how about using scientific notation here?????
 	snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); //////snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); // replaced f with e to get scientific notation!!
@@ -554,11 +788,17 @@ Mstring* string_append_ld(Mstring* const ms,long double ld){
 		while(ldText[--l]=='0'); // a bit naughty to simply replacing '0' with '\0' to pretend to end the text!!!
 		ldText[l+1]='\0';
 	}
-	if(!string_append(ms,ldText))return NULL;
-	if(exponent!=0)if(!string_append_char(ms,'e')||!string_append_ll(ms,exponent))return NULL; // append the exponent
-	return ms;
+	if(!string_append(str,ldText))return NULL;
+	if(exponent!=0)if(!string_append_char(str,'e')||!string_append_ll(str,exponent))return NULL; // append the exponent
+	return str;
 }/* VALIDATED */
 
+/**
+ * @brief returns an Mstring* with information on the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @return Mstring* the information Mstring*
+ */
 Mstring* _string_info(Mstring* str){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* str_info=owned_string(__string(),owner);
 	if(str_info){
@@ -593,8 +833,15 @@ Mstring* _string_info(Mstring* str){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // MDH@16MAR2020: let's allow for determining the number of trailing elements
+/**
+ * @brief determines the number of trailing \p c characters in the Mstring pointed to by \p str
+ * 
+ * @param str the Mstring*
+ * @param c the character to use
+ * @return size_t the number of \p c characters at the end of \p str
+ */
 size_t string_trailing(Mstring* str,char c){
-	size_t i,l=(str?str->length:0u);
+	size_t i,l=(str!=NULL?str->length:0u);
 	if(l>0){
 		size_t i=l;
 		Mchars* strchars=str->_chars;
@@ -606,8 +853,16 @@ size_t string_trailing(Mstring* str,char c){
 }
 
 // MDH@21OCT2020
+/**
+ * @brief determines if the Mstring pointed to by \p str ends with the characters in C string \p pc
+ * 
+ * @param str the Mstring*
+ * @param pc the C string
+ * @return true if the Mstring pointed to by \p str ends with all characters in C string \p pc
+ * @return false if the Mstring pointed to by \p str does not end with all characters in C string \p pc
+ */
 bool string_endswith(Mstring const * const str,char const * const pc){
-	size_t l=(str?str->length:0),pcl=(pc?strlen(pc):0);
+	size_t l=(str!=NULL?str->length:0),pcl=(pc!=NULL?strlen(pc):0);
 	if(pcl>0&&l>=pcl){ // something to compare, and enough characters to compare
 		Mchars* strchars=str->_chars;
 		while(pcl>0)if(pc[--pcl]!=strchars->chars[--l])return false;

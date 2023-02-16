@@ -6,18 +6,45 @@
 #include "Mchars.h"
 
 extern unsigned long long M_MODULE_DEBUGGING;
-
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_CHARS,id};}
-
 extern char const * const M_WARNING_PREFIX;
 
+/**
+ * @brief creates an owner structure
+ * 
+ * @param id the file line
+ * @return Mallocationowner 
+ */
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_CHARS,id};}
+
+/**
+ * @brief disowns \p _chars from its current owner \p owner_chars
+ * 
+ * @param _chars 
+ * @param owner_chars 
+ * @return Mchars* the disowned \p _chars
+ */
 Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return DISOWNED(_chars,owner_chars);}
+/**
+ * @brief makes \p _chars owned by \p owner_chars
+ * 
+ * @param _chars 
+ * @param owner_chars 
+ * @return Mchars* the owned \p _chars
+ */
 Mchars* owned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return OWNED(_chars,owner_chars);}
 
 // I guess it's prudent to pass in how many initial characters you want to be able to store in the result
 // NOTE this would mean that an external party should somehow keep track of the number of characters that can be stored in the character array
 //	  because this is a variable size dynamic memory type we need to use REALLOC
 //	  for actual use the number of blocks need to be defined
+/**
+ * @brief returns a new Mchars* pointing to \p count items of size \p size of type \p type
+ * 
+ * @param size the size of each item to allocate
+ * @param count the number of items to allocate
+ * @param type the type of the items to allocate
+ * @return Mchars* 
+ */
 Mchars* __chars(size_t size,long long count,signed char type){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@19MAY2020: it's a bit weird to pass the negative value of the owner id to REALLOC but this prevents us from having to call DISOWNED on the pointer returned by REALLOC
 	//				this way we get a pointer that we know who created it by disowns it immediately
@@ -26,6 +53,16 @@ Mchars* __chars(size_t size,long long count,signed char type){Mallocationowner o
 
 // if you want to expand an Mchars by the number of characters should we return the new _chars or simply true or false??????
 // ok, we're plugging in an Mchars pointer (which is the address of an Mchars structure)
+/**
+ * @brief returns a Mchars* by increasing the number of items allocated of the previously allocated \p _chars from \p from_count to \p to_count
+ * 
+ * @param _chars the Mchars* to be reallocated
+ * @param size the size of each item
+ * @param from_count the number of items currently allocated
+ * @param to_count the new number of items to allocate
+ * @param type the type of the items
+ * @return Mchars* NULL if \p _chars equals NULL or when failing to reallocate \p _chars, otherwise the reallocated Mchars*
+ */
 Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,long long to_count,signed char type){
 	// MDH@19MAY2020: NOTE that _chars needs to be DISOWNED by the owner in order for REALLOC to allow changing ownership
 	if(!_chars)return NULL;
@@ -33,6 +70,13 @@ Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,lo
 	return(Mchars*)REALLOC(_chars,from_count,to_count,size,(type>0?-type:type));
 }
 
+/**
+ * @brief frees an Mchars* pointing to \p count items of size \p count of type \p type
+ * 
+ * @param size the size of each item allocated
+ * @param count the number of items allocated
+ * @param type the type of the items allocated
+ */
 void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,size_t size,long long count,signed char type){
 	// typically the caller would need to tell us the current number of characters stored in _chars
 	// ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
@@ -44,6 +88,12 @@ void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,siz
 // you typically use _getChars() to store an immutable character array
 // MDH@02MAY2020: always assuming _getChars() to b dynamic of type '\'' (single quote) with fixed size 1
 // MDH@19MAY2020: if oid is positive, that's the owner id passed to _chars, otherwise I use my own as owner
+/**
+ * @brief allocates memory to store \p chars characters
+ * 
+ * @param chars the pointer to the C string with characters to store
+ * @return Mchars* the allocated pointer (or NULL on failure)
+ */
 Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LINE__);
 	Mchars* _chars=NULL;
 	if(chars){
@@ -59,7 +109,13 @@ Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LI
 	}
 	return NULL;
 }
+
 // utility function to free an Mchars* created using _getChars
+/**
+ * @brief frees Mchars* \p _chars created with _getChars
+ * @param _chars the Mchars pointer to free
+ * 
+ */
 void freeChars(Mchars const * const _chars/*,Mallocationowner owner_chars*/){
 	// if oid is not positive, assuming I was the owner to start with and use that as owner id
 	if(_chars)free_chars(_chars/*,owner_chars*/,1,strlen(_chars->chars)+1,'\'');
