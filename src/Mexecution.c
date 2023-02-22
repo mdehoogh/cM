@@ -33,7 +33,7 @@ static int8_t littleEndian=-1;
  * \brief determines whether the hardware stores data in little or big endian format
  */
 __attribute__((constructor)) void initExecution(){
-    int i=1;
+	int i=1;
 	char* c=(char*)&i;
 	littleEndian=*c;
 	if(amVerbose())output("On this system data is stored in %s endian format.\n",(littleEndian?"little":"big"));
@@ -43,8 +43,8 @@ __attribute__((constructor)) void initExecution(){
  * \brief returns true if the hardware supports little endian, false otherwise
  */
 bool isLittleEndian(){
-    if(littleEndian<0)initExecution();
-    return(littleEndian>0);
+	if(littleEndian<0)initExecution();
+	return(littleEndian>0);
 }
 
 // NOTE when binaryText is returned, it does not need to be freed internally, otherwise it does
@@ -56,15 +56,15 @@ bool isLittleEndian(){
  * needs to be freed with FREE_STRING() after use (e.g. of its string representation) as indicated by the _ that starts the name
  */
 Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _binaryText=owned_string(__string(),owner);
-    if(_binaryText){
-        Mstring* _p=_binaryText;
-        int l=64;
-        while(--l>=0&&_p){_p=string_append_char(_p,ul&1?'1':'0');ul>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
-        if(presuffix)_p=string_append_char(_p,presuffix);
-        if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
-    }
-    return disowned_string(_binaryText,owner);
+	Mstring* _binaryText=owned_string(__string(),owner);
+	if(_binaryText){
+		Mstring* _p=_binaryText;
+		int l=64;
+		while(--l>=0&&_p){_p=string_append_char(_p,ul&1?'1':'0');ul>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
+		if(presuffix)_p=string_append_char(_p,presuffix);
+		if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
+	}
+	return disowned_string(_binaryText,owner);
 }/* VALIDATED */
 /**
  * \brief determines the binary text representation of the 16-bit unsigned integer \p us using text prefix and postfix \p presuffix
@@ -74,15 +74,15 @@ Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner
  * needs to be freed with FREE_STRING() after use (e.g. of its string representation) as indicated by the _ that starts the name
  */
 Mstring* _getUint16BinaryText(uint16_t us,char presuffix){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _binaryText=owned_string(__string(),owner);
-    if(_binaryText){
-        Mstring* _p=_binaryText;
-        int l=16;
-        while(--l>=0&&_p){_p=string_append_char(_p,us&1?'1':'0');us>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
-        if(presuffix)_p=string_append_char(_p,presuffix);
-        if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
-    }
-    return disowned_string(_binaryText,owner);
+	Mstring* _binaryText=owned_string(__string(),owner);
+	if(_binaryText){
+		Mstring* _p=_binaryText;
+		int l=16;
+		while(--l>=0&&_p){_p=string_append_char(_p,us&1?'1':'0');us>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
+		if(presuffix)_p=string_append_char(_p,presuffix);
+		if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
+	}
+	return disowned_string(_binaryText,owner);
 }/* VALIDATED */
 
 /* initialization for big integer arithmetic
@@ -95,80 +95,144 @@ bool initExecution(){
 */
 
 // BIG INTEGER STUFF
+/**
+ * @brief disownes the big integer pointed to by \p _biginteger from its current owner \p owner_biginteger
+ * 
+ * @param _biginteger the pointer to the big integer
+ * @param owner_biginteger the current owner of the big integer
+ * @return Mbiginteger* the disowned big integer pointer
+ */
 Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
-    if(!_biginteger)return NULL;
-    if(_biginteger->_bi)DISOWNED(_biginteger->_bi,owner_biginteger);
-    return DISOWNED(_biginteger,owner_biginteger);
+	if(!_biginteger)return NULL;
+	if(_biginteger->_bi)DISOWNED(_biginteger->_bi,owner_biginteger);
+	return DISOWNED(_biginteger,owner_biginteger);
 }
+/**
+ * @brief sets the ownership of the big integer pointed to by \p _biginteger to \p owner_biginteger
+ * 
+ * @param _biginteger the pointer to the M big integer
+ * @param owner_biginteger the new owner of the big integer pointed to by \p _biginteger
+ * @return Mbiginteger* the owned big integer pointer
+ */
 Mbiginteger* owned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
-    if(!_biginteger)return NULL;
-    if(_biginteger->_bi)OWNED(_biginteger->_bi,Msubowner(owner_biginteger,1));
-    return OWNED(_biginteger,owner_biginteger);
+	if(!_biginteger)return NULL;
+	if(_biginteger->_bi)OWNED(_biginteger->_bi,Msubowner(owner_biginteger,1));
+	return OWNED(_biginteger,owner_biginteger);
 }
+/**
+ * @brief returns a pointer to a new big integer
+ * 
+ * @return Mbiginteger* a pointer to a newly created big integer
+ */
 Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* _biginteger=(Mbiginteger*)CALLOC_1(sizeof(Mbiginteger),'B',owner);
-    if(_biginteger){
+	Mbiginteger* _biginteger=(Mbiginteger*)CALLOC_1(sizeof(Mbiginteger),'B',owner);
+	if(_biginteger){
 #ifndef __PRODUCTION__
-        _biginteger->_bi=(mp_int*)SUBOWNED(CALLOC_1(sizeof(mp_int),'b',owner),1);
-        if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE_DISOWNED_1(_biginteger->_bi,'b',owner);_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
-        if(!_biginteger->_bi){FREE_DISOWNED_1(_biginteger,'B',owner);_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
+		_biginteger->_bi=(mp_int*)SUBOWNED(CALLOC_1(sizeof(mp_int),'b',owner),1);
+		if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE_DISOWNED_1(_biginteger->_bi,'b',owner);_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
+		if(!_biginteger->_bi){FREE_DISOWNED_1(_biginteger,'B',owner);_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
 #else
-        if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
+		if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
 #endif
-    }
-    return disowned_biginteger(_biginteger,owner);
+	}
+	return disowned_biginteger(_biginteger,owner);
 }/* VALIDATED */
+
 // end of block that uses __PRODUCTION__ flag
-/** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
- *  \return a newly created big integer
+/** \brief frees the big integer pointed to by \p __biginteger
+ * 
  */
 void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/){
-    if(_biginteger){
-        if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
+	if(_biginteger){
+		if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
 #ifndef __PRODUCTION__
-        mp_clear(_biginteger->_bi);
-        FREE_1(_biginteger->_bi,'b'/*,owner_biginteger*/);
+		mp_clear(_biginteger->_bi);
+		FREE_1(_biginteger->_bi,'b'/*,owner_biginteger*/);
 #else
-        mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
+		mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
 #endif
-        FREE_1(_biginteger,'B'/*,owner_biginteger*/); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
-    }else
-    if(amVerbose())outputInfo("No big integer to free!");
+		FREE_1(_biginteger,'B'/*,owner_biginteger*/); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
+	}else
+	if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
 
 // MDH@09APR2020: for all methods that call mp_int methods now require calling MP_INT_POINTER() on Mbiginteger instances
+/**
+ * @brief creates and returns the pointer to a M big integer initialized to \p ll
+ * 
+ * @param ll the int64_t long integer to wrap
+ * @return Mbiginteger* the pointer to the M big integer created
+ */
 Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__);
-    // if(ll==M_LL_INVALID)return NULL; // MDH@16DEC2020: essentially a long long could be larger so technically do not call _getBiginteger() with an invalid long long!!!!!
-    Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
-    // MDH@09APR2020: in the non-production version we're keeping track of the allocations and get_mpint on Mbiginteger will return what is required
-    if(_biginteger)mp_set_i64(MP_INT_POINTER(_biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
-    return disowned_biginteger(_biginteger,owner);
+	// if(ll==M_LL_INVALID)return NULL; // MDH@16DEC2020: essentially a long long could be larger so technically do not call _getBiginteger() with an invalid long long!!!!!
+	Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
+	// MDH@09APR2020: in the non-production version we're keeping track of the allocations and get_mpint on Mbiginteger will return what is required
+	if(_biginteger)mp_set_i64(MP_INT_POINTER(_biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
+	return disowned_biginteger(_biginteger,owner);
 }/* VALIDATED */
 
 // replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
+/**
+ * @brief creates and returns the negation of the M big integer pointed to by \p _biginteger
+ * 
+ * @param _biginteger the pointer to the M big integer to negate
+ * @return Mbiginteger* the negation of \p _biginteger
+ */
 Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){if(!_biginteger)return NULL;Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* _bigintegerNeg=(Mbiginteger*)owned_biginteger(__biginteger(),owner); // the result we will be returning
-    if(!_bigintegerNeg)return NULL;
-    if(mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerNeg,owner); return NULL;}
-    return disowned_biginteger(_bigintegerNeg,owner);
+	Mbiginteger* _bigintegerNeg=(Mbiginteger*)owned_biginteger(__biginteger(),owner); // the result we will be returning
+	if(!_bigintegerNeg)return NULL;
+	if(mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerNeg,owner); return NULL;}
+	return disowned_biginteger(_bigintegerNeg,owner);
 }// VALIDATED
 
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
+/**
+ * @brief returns a copy of the M big integer pointed to by \p _biginteger
+ * 
+ * @param _biginteger the pointer to a M big integer
+ * @return Mbiginteger* a copy of \p _biginteger
+ */
 Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger){if(!_biginteger)return NULL;Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* _bigintegerCopy=(Mbiginteger*)owned_biginteger(__biginteger(),owner);
-    if(!_bigintegerCopy)return NULL;
-    if(mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerCopy))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerCopy,owner);return NULL;}
-    return disowned_biginteger(_bigintegerCopy,owner);
+	Mbiginteger* _bigintegerCopy=(Mbiginteger*)owned_biginteger(__biginteger(),owner);
+	if(!_bigintegerCopy)return NULL;
+	if(mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerCopy))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerCopy,owner);return NULL;}
+	return disowned_biginteger(_bigintegerCopy,owner);
 }/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MI_EXECUTION,__LINE__,1};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
-const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=owned_biginteger(_getBiginteger(0),owner_biginteger);return bi0;}/* VALIDATED */
-const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=owned_biginteger(_getBiginteger(1),owner_biginteger);return bi1;}/* VALIDATED */
-const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=owned_biginteger(_getBiginteger(2),owner_biginteger);return bi2;}/* VALIDATED */
-const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=owned_biginteger(_getBiginteger(3),owner_biginteger);return bi3;}/* VALIDATED */
+/**
+ * @brief returns constant big integer representing 0
+ * 
+ * @return const Mbiginteger* 
+ */
+const Mbiginteger* getBigintegerZero(){if(bi0==NULL)bi0=owned_biginteger(_getBiginteger(0),owner_biginteger);return bi0;}/* VALIDATED */
+/**
+ * @brief returns constant big integer representing 1
+ * 
+ * @return const Mbiginteger* 
+ */
+const Mbiginteger* getBigintegerOne(){if(bi1==NULL)bi1=owned_biginteger(_getBiginteger(1),owner_biginteger);return bi1;}/* VALIDATED */
+/**
+ * @brief returns const big integer representing 2
+ * 
+ * @return const Mbiginteger* 
+ */
+const Mbiginteger* getBigintegerTwo(){if(bi2==NULL)bi2=owned_biginteger(_getBiginteger(2),owner_biginteger);return bi2;}/* VALIDATED */
+/**
+ * @brief returns const big integer representing 3
+ * 
+ * @return const Mbiginteger* 
+ */
+const Mbiginteger* getBigintegerThree(){if(bi3==NULL)bi3=owned_biginteger(_getBiginteger(3),owner_biginteger);return bi3;}/* VALIDATED */
 
+/**
+ * @brief returns long integer value 1 if the M big integer pointed to by \p biginteger equals 1, otherwise 0, or M_LL_INVALID if the \p biginteger is NULL
+ * 
+ * @param biginteger the pointer to the M big integer
+ * @return long long M_TRUE if \p biginteger points to 1, M_FALSE otherwise, or M_LL_INVALID if equal to NULL
+ */
 long long isBigintegerOne(Mbiginteger* biginteger){
     return(biginteger?(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerOne()))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
@@ -176,34 +240,57 @@ long long isBigintegerOne(Mbiginteger* biginteger){
 
 /////////mp_int* __mp_int(){return (mp_int*)MALLOC(sizeof(mp_int),'I');}
 // long double to rational or representation
+/**
+ * @brief littleEndianLongDouble represents the little endian representation of a long double
+ * 
+ */
 typedef struct {
-    uint64_t mantisse;
-    uint16_t exponent;
+	uint64_t mantisse;
+	uint16_t exponent;
 } littleEndianLongDouble;
+/**
+ * @brief bigEndianLongDouble represents the big endian internal representation of a long double
+ * 
+ */
 typedef struct {
-    uint16_t exponent;
-    uint64_t mantisse;
+	uint16_t exponent;
+	uint64_t mantisse;
 } bigEndianLongDouble;
+/**
+ * @brief littleEndianLongDoubleUnion maps a long double to its little endian internal representation
+ * 
+ */
 typedef union {
-    long double ld;
-    littleEndianLongDouble lELD;
+	long double ld;
+	littleEndianLongDouble lELD;
 } littleEndianLongDoubleUnion;
+/**
+ * @brief bigEndianLongDoubleUnion maps a long double to its big endian internal representation
+ * 
+ */
 typedef union {
-    long double ld;
-    bigEndianLongDouble bELD;
+	long double ld;
+	bigEndianLongDouble bELD;
 } bigEndianLongDoubleUnion;
+/**
+ * @brief sets the mantisse pointed to by \p mantisse and the exponent pointed to by \p exponent to the mantisse and exponent of the long double \p ld
+ * 
+ * @param ld the long double to map
+ * @param mantisse the pointer to the mantisse of \p ld on return 
+ * @param exponent the pointer to the exponent of \p ld on return
+ */
 void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent){
-    if(isLittleEndian()){
-        littleEndianLongDoubleUnion lELDU;
-        lELDU.ld=ld;
-        *mantisse=lELDU.lELD.mantisse;
-        *exponent=lELDU.lELD.exponent;
-    }else{
-        bigEndianLongDoubleUnion bELDU;
-        bELDU.ld=ld;
-        *mantisse=bELDU.bELD.mantisse;
-        *exponent=bELDU.bELD.exponent;
-    }
+	if(isLittleEndian()){
+		littleEndianLongDoubleUnion lELDU;
+		lELDU.ld=ld;
+		*mantisse=lELDU.lELD.mantisse;
+		*exponent=lELDU.lELD.exponent;
+	}else{
+		bigEndianLongDoubleUnion bELDU;
+		bELDU.ld=ld;
+		*mantisse=bELDU.bELD.mantisse;
+		*exponent=bELDU.bELD.exponent;
+	}
 }/* VALIDATED */
 
 ///////Mstring* _getBigintegerText(const Mbiginteger* const _biginteger); // prototype declaration
@@ -251,58 +338,111 @@ Mrational* _getLongDoubleRational(long double ld){
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
+
+/**
+ * @brief sets the ownership the M text pointed to by \p _text to \p owner_text
+ * 
+ * @param _text the pointer to the M text
+ * @param owner_text the new owner of the M text
+ * @return Mtext* the pointer to the M text owned by \p owner_text
+ */
 Mtext* owned_text(Mtext* _text,Mallocationowner owner_text){return(_text?(Mtext*)OWNED(_text,owner_text):NULL);}
+/**
+ * @brief disowns the M text pointed to by \p _text owned by \p owner_text
+ * 
+ * @param _text the pointer to the M text
+ * @param owner_text the current owner of the M text
+ * @return Mtext* the disowned M text pointer
+ */
 Mtext* disowned_text(Mtext* _text,Mallocationowner owner_text){return(_text?(Mtext*)DISOWNED(_text,owner_text):NULL);}
 void free_text(Mtext* _text/*,Mallocationowner owner*/){
-    // MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
-    // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
-    //                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
-    if(_text){
-        if(amVerboseDebugging())
-            output("Freeing text %c%s%c.\n",_text->presuffix,_text->_c,_text->presuffix);
-        // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
-        //                _text->_c is an array and yes strlen() can be applied to any char*
-        //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
-        // MDH@25OCT2020: given that most of the time _strdup() is used to create an Mtext instance
-        //                I suppose we should release strlen(_text->_c)+2*sizeof(char)
-        FREE(_text,sizeof(char)*(strlen(_text->_c)+2)/*sizeof(Mtext)*/,-'"'/*,owner*/); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
-        // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)FREE_STRING(_string->_m);_string->_m=NULL;free(_string);}
-    }else
-    if(amVerboseDebugging())
-        outputInfo("No text to free!");
+	// MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
+	// MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
+	//                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
+	if(_text){
+		if(amVerboseDebugging())
+				output("Freeing text %c%s%c.\n",_text->presuffix,_text->_c,_text->presuffix);
+		// MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
+		//                _text->_c is an array and yes strlen() can be applied to any char*
+		//                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
+		// MDH@25OCT2020: given that most of the time _strdup() is used to create an Mtext instance
+		//                I suppose we should release strlen(_text->_c)+2*sizeof(char)
+		FREE(_text,sizeof(char)*(strlen(_text->_c)+2)/*sizeof(Mtext)*/,-'"'/*,owner*/); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
+		// replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)FREE_STRING(_string->_m);_string->_m=NULL;free(_string);}
+	}else
+	if(amVerboseDebugging())
+		outputInfo("No text to free!");
 }/* VALIDATED */
 
+/**
+ * @brief sets the ownership of the M integer pointed to by \p _integer to \p owner_integer
+ * 
+ * @param _integer the pointer to the M integer
+ * @param owner_integer the new owner of the M integer
+ * @return Minteger* the owned M text pointer
+ */
 Minteger* owned_integer(Minteger* _integer,Mallocationowner owner_integer){return(_integer?(Minteger*)OWNED(_integer,owner_integer):NULL);}
+/**
+ * @brief disowns the M integer pointed to by \p _integer from its current owner \p owner_integer
+ * 
+ * @param _integer the pointer to the M integer
+ * @param owner_integer the current owner of the M integer
+ * @return Minteger* the disowned M integer pointer
+ */
 Minteger* disowned_integer(Minteger* _integer,Mallocationowner owner_integer){return(_integer?(Minteger*)DISOWNED(_integer,owner_integer):NULL);}
 void free_integer(Minteger* _integer/*,Mallocationowner owner*/){
-    if(_integer){
-        if(amVerboseDebugging())output("Freeing integer %llu.\n",_integer->ll);
-        FREE_1(_integer,'I'/*,owner*/);
-    }else
-    if(amVerboseDebugging())outputInfo("No integer to free!");
+	if(_integer){
+		if(amVerboseDebugging())output("Freeing integer %llu.\n",_integer->ll);
+		FREE_1(_integer,'I'/*,owner*/);
+	}else
+	if(amVerboseDebugging())outputInfo("No integer to free!");
 }/* VALIDATED */
 #define FREE_INTEGER(_integer,owner_integer) free_integer(disowned_integer(_integer,owner_integer))
 
+/**
+ * @brief sets the ownership of the M float pointed to by \p _float to \p owner_float
+ * 
+ * @param _float the pointer to the M float
+ * @param owner_float the new owner of the M float
+ * @return Mfloat* the newly owned M float pointer
+ */
 Mfloat* owned_float(Mfloat* _float,Mallocationowner owner_float){return(_float?(Mfloat*)OWNED(_float,owner_float):NULL);}
+/**
+ * @brief disowns the M float pointed to by \p _float from its current owner \p owner_float
+ * 
+ * @param _float the pointer to the M float
+ * @param owner_float the current owner of the M float
+ * @return Mfloat* the disowned M float pointer
+ */
 Mfloat* disowned_float(Mfloat* _float,Mallocationowner owner_float){return(_float?(Mfloat*)DISOWNED(_float,owner_float):NULL);}
 void free_float(Mfloat* _float/*,Mallocationowner owner*/){
-    if(_float){
-        if(amVerboseDebugging())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
-        FREE_1(_float,'F'/*,owner*/);
-    }else
-    if(amVerboseDebugging())outputInfo("No real to free!");
+	if(_float){
+		if(amVerboseDebugging())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
+		FREE_1(_float,'F'/*,owner*/);
+	}else
+	if(amVerboseDebugging())outputInfo("No real to free!");
 }/* VALIDATED */
+/**
+ * @brief the FREE_FLOAT macro that will first disown the M float pointed to and then free the pointer to the disowned M float
+ * 
+ */
 #define FREE_FLOAT(_float,owner_float) free_float(disowned_float(_float,owner_float))
 
 // ALLOCATORS (private)
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
+/**
+ * @brief returns a pointer to a M integer initialized to long integer \p ll
+ * 
+ * @param ll the initial value of the M integer
+ * @return Minteger* the pointer to the M integer initialized to \p ll
+ */
 Minteger* _getInteger(long long ll){Mallocationowner owner=getOwner(__LINE__);
-    Minteger* _integer=MALLOC_1(sizeof(Minteger),'I',owner);
-    if(!_integer)return NULL;
-    _integer->ll=ll;
-    // output("Integer: %lld.\n",_integer->ll); // DEBUG
-    return disowned_integer(_integer,owner);
+	Minteger* _integer=MALLOC_1(sizeof(Minteger),'I',owner);
+	if(!_integer)return NULL;
+	_integer->ll=ll;
+	// output("Integer: %lld.\n",_integer->ll); // DEBUG
+	return disowned_integer(_integer,owner);
 }/* VALIDATED */
 /*
 Mbiginteger*__biginteger(z_t zt){
@@ -313,25 +453,74 @@ Mbiginteger*__biginteger(z_t zt){
     return _biginteger;
 }
 */
+/**
+ * @brief returns the long double wrapped in the M float pointed to by \p _float
+ * @param _float the pointer to the M float
+ * @return the long double stored in the M float if \p _float is not NULL, or M_LD_NAN otherwise
+*/
 long double getFloatLongDouble(Mfloat const * const _float){return(_float?_float->ld:M_LD_NAN);}
 
+/**
+ * @brief returns a pointer to a new M float wrapping the long double \p ld
+ * 
+ * @param ld the long double to wrap
+ * @return Mfloat* the pointer to the new M float initialized to \p ld
+ */
 Mfloat* _getFloat(long double ld){Mallocationowner owner=getOwner(__LINE__);
-    Mfloat* _float=MALLOC_1(sizeof(Mfloat),'F',owner); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
-    if(!_float)return NULL;
-    _float->ld=ld;
-    return disowned_float(_float,owner);
+	Mfloat* _float=MALLOC_1(sizeof(Mfloat),'F',owner); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
+	if(!_float)return NULL;
+	_float->ld=ld;
+	return disowned_float(_float,owner);
 }/* VALIDATED */
 
 // special integer values to consider
+/**
+ * @brief returns M_TRUE if \p integer points to a M integer equal to 1, M_FALSE otherwise, unless \p integer equals NULL in which case M_LL_INVALID is returned
+ * 
+ * @param integer the pointer to the M integer
+ * @return long long if \p integer is NULL M_LL_INVALID is returned, otherwise M_TRUE if the M integer pointed to by \p integer equals 1, or M_FALSE otherwise
+ */
 long long isIntegerOne(Minteger* integer){return(integer?(integer->ll==1?M_TRUE:M_FALSE):M_LL_INVALID);}
 // DISCUSSION it's debatable whether a NULL integer can be tested as it is NULL but isValueUndefined() will prevent call isIntegerUndefined() with a NULL pointer!!!
+/**
+ * @brief returns M_TRUE if the M integer pointed to by \p integer equals M_LL_INVALID, M_FALSE if it does not, or M_LL_INVALID if \p integer equals NULL
+ * 
+ * @param integer the pointer to the M integer
+ * @return long long M_TRUE if the M integer pointed to equals M_LL_INVALID, M_FALSE otherwise, except when \p integer equals NULL, then M_LL_INVALID is returned
+ */
 long long isIntegerUndefined(Minteger* integer){return(integer?(integer->ll==M_LL_INVALID?M_TRUE:M_FALSE):M_TRUE);}
+/**
+ * @brief returns M_TRUE if \p integer points to a M integer equal to 0, M_FALSE otherwise, unless \p integer equals NULL in which case M_LL_INVALID is returned
+ * 
+ * @param integer the pointer to the M integer
+ * @return long long if \p integer is NULL M_LL_INVALID is returned, otherwise M_TRUE if the M integer pointed to by \p integer equals 0, or M_FALSE otherwise
+
+ */
 long long isIntegerZero(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll==0?M_TRUE:M_FALSE));}
+/**
+ * @brief if \p integer is not null and not undefined, returns M_TRUE if the M integer is positive, or M_FALSE if it is not, but M_LL_INVALID otherwise
+ * 
+ * @param integer the pointer to the M integer
+ * @return long long see @brief
+ */
 long long isIntegerPositive(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll>0?M_TRUE:M_FALSE));}
-long long isIntegerNegative(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll<0?M_TRUE:M_FALSE));}
+/**
+ * @brief if \p integer is not null and not undefined, returns M_TRUE if the M integer is negative, or M_FALSE if it is not, but M_LL_INVALID otherwise
+ * 
+ * @param integer the pointer to the M integer
+ * @return long long see @brief
+ */long long isIntegerNegative(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll<0?M_TRUE:M_FALSE));}
 
 // long double support functions (only for internal use)
+/**
+ * @brief the text representation of a M float that is not a number
+ * 
+ */
 const char* M_NAN="NaN";
+/**
+ * @brief the text representation of a M float equal to infinity
+ * 
+ */
 const char* M_INF="Inf";
 
 #ifndef FP_SUPERNORMAL
@@ -340,21 +529,83 @@ const char* M_INF="Inf";
 
 // functions that operate purely on long doubles
 // MDH@25OCT2019: subnormal numbers are considered zero
+/**
+ * @brief returns true if \p ld is a NaN value, false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
+/**
+ * @brief returns true if \p ld is infinite, false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
 // MDH@25OCT2019: a long double is invalid if it is not zero and not normal
 //                NOTE a subnormal number is considered invalid but will be treated as a zero (i.e. ldIsZero() will return true on a subnormal number)
+/**
+ * @brief returns true if \p ld is subnormal, false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsSubnormal(long double ld){return fpclassify(ld)==FP_SUBNORMAL;}/* VALIDATED */
+/**
+ * @brief returns true if \p ld is supernormal, false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsSupernormal(long double ld){return fpclassify(ld)==FP_SUPERNORMAL;}/* VALIDATED */
+/**
+ * @brief returns true if \p ld is zero, false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsZero(long double ld){return(fpclassify(ld)==FP_ZERO);}/* VALIDATED */
-
+/**
+ * @brief return true if \p ld is invalid (i.e. not normal and not zero), false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsInvalid(long double ld){return(fpclassify(ld)!=FP_NORMAL&&fpclassify(ld)!=FP_ZERO);}
+/**
+ * @brief returns true if \p ld is valid, i.e. normal or zero.
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsValid(long double ld){return(fpclassify(ld)==FP_NORMAL||fpclassify(ld)==FP_ZERO);}
 
 // MDH@18OCT2019: lettting the comparison take care of the result!!!
 // MDH@25OCT2019: consider subnormal long doubles to be zero (to test BEFORE calling ldIsValid)
 // replaced by isLongDoubleZero (see below)... bool ldIsZero(long double ld){return(fpclassify(ld)==FP_SUBNORMAL?true:(ldIsValid(ld)?ld==0?false));}/* VALIDATED */
+/**
+ * @brief returns true if \p ld is positive, false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsPositive(long double ld){return(ldIsValid(ld)?ld>0:false);}/* VALIDATED */
+/**
+ * @brief returns true if \p ld is negative, false otherwise
+ * 
+ * @param ld 
+ * @return true 
+ * @return false 
+ */
 bool ldIsNegative(long double ld){return(ldIsValid(ld)?ld<0:false);}/* VALIDATED */
 /* MDH@25OCT2019: replaced by the ...LongDouble... functions
 bool ldEqual(long double ld1,long double ld2){
@@ -374,7 +625,12 @@ bool ldIsOne(long double ld){return(ldIsValid(ld)?false:ld==1);}
 // long double helper functions
 // long doubles that classify as either subnormal or zero are considered zero, as well as all normal long doubles that equal zero
 // testing for zero is quite complicated, as theoretically it should always return either M_TRUE or M_FALSE, but we decide to return M_LL_INVALID if we cannot determine what the number is
-// 
+/**
+ * @brief returns M_TRUE if \p ld is undefined, FALSE if \p ld is not undefined, and M_LL_INVALID if \p ld is unknown classified
+ * 
+ * @param ld 
+ * @return long long 
+ */
 long long isLongDoubleUndefined(long double ld){ // returns M_TRUE or M_FALSE (never M_LL_INVALID)
     // if the sign has any meaning we should return M_TRUE otherwise M_FALSE
     switch(fpclassify(ld)){
@@ -387,135 +643,288 @@ long long isLongDoubleUndefined(long double ld){ // returns M_TRUE or M_FALSE (n
     }
     return M_LL_INVALID; // should never happen though (if we have all possible values covered!!!)
 }
+/**
+ * @brief if \p ld is not considered undefined, returns M_TRUE if \p ld is either zero or subnormal, M_FALSE otherwise
+ * 
+ * @param ld 
+ * @return long long M_LL_INVALID if \p ld is undefined, otherwise M_TRUE of M_FALSE (see @brief)
+ */
 long long isLongDoubleZero(long double ld){
-    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
-    switch(fpclassify(ld)){
-        case FP_INFINITE:return M_FALSE;
-        case FP_SUBNORMAL:case FP_ZERO:return M_TRUE;
-        default:break;
-    }
-    return(ld==0);
+if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+	switch(fpclassify(ld)){
+		case FP_INFINITE:return M_FALSE;
+		case FP_SUBNORMAL:case FP_ZERO:return M_TRUE;
+		default:break;
+	}
+	return(ld==0);
 }
+/**
+ * @brief returns M_TRUE if \p ld is positive, M_FALSE otherwise, unless ld is not defined in which case M_LL_INVALID is returned
+ * 
+ * @param ld 
+ * @return long long M_LL_INVALID if \p ld is not defined, M_TRUE or M_FALSE otherwise (see @brief)
+ */
 long long isLongDoublePositive(long double ld){
-    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
-    switch(fpclassify(ld)){
-        case FP_INFINITE:return(signbit(ld)?M_FALSE:M_TRUE);
-        case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
-        default:break;
-    }
-    return(ld>0);   
+	if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+	switch(fpclassify(ld)){
+		case FP_INFINITE:return(signbit(ld)?M_FALSE:M_TRUE);
+		case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
+		default:break;
+	}
+	return(ld>0);
 }
+/**
+ * @brief returns M_TRUE if \p ld is negative, M_FALSE otherwise, unless \p ld is not defined in which case M_LL_INVALID is returned
+ * 
+ * @param ld 
+ * @return long long M_LL_INVALID if \p ld is not defined, M_TRUE or M_FALSE otherwise (see @brief)
+ */
 long long isLongDoubleNegative(long double ld){
-    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
-    switch(fpclassify(ld)){
-        case FP_INFINITE:return(signbit(ld)?M_TRUE:M_FALSE);
-        case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
-        default:break;
-    }
-    return(ld<0);   
+	if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+	switch(fpclassify(ld)){
+		case FP_INFINITE:return(signbit(ld)?M_TRUE:M_FALSE);
+		case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
+		default:break;
+	}
+	return(ld<0);
 }
+/**
+ * @brief returns M_TRUE if \p ld equals 1, M_FALSE otherwise, unless \p ld is not defined in which case M_LL_INVALID is returned
+ * 
+ * @param ld 
+ * @return long long M_LL_INVALID if \p ld is not defined, M_TRUE or M_FALSE otherwise
+ */
 long long isLongDoubleOne(long double ld){
-    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
-    switch(fpclassify(ld)){
-        case FP_INFINITE:case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
-        default:break;
-    }
-    return(ld==1);
+	if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+	switch(fpclassify(ld)){
+		case FP_INFINITE:case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
+		default:break;
+	}
+	return(ld==1);
 }
 
 // testing for special values TODO we need to make M functions to test for these special values like zero, inf, and undefined
 // if a real is undefined, testing for a specific value or sign does not make any sense
 // isFloatUndefined() always returns either M_TRUE or M_FALSE (never M_LL_INVALID)
+/**
+ * @brief returns M_TRUE if the M float pointed to by \p afloat is undefined or \p afloat equals NULL
+ * 
+ * @param afloat the pointer to an M float
+ * @return long long returns M_TRUE if the Mfloat pointed to by \p afloat is undefined or \p afloat equals NULL
+ */
 long long isFloatUndefined(Mfloat* afloat){return(afloat?isLongDoubleUndefined(afloat->ld):M_TRUE);} // a real is undefined if it is NULL or the contained long double is undefined i.e. is NaN
 // use isFloatUndefined() first in the following specific functions
 // in general for undefined reals we cannot determine the sign, therefore one should test for undefined first, of course one can test for invalid result of the comparison of course
+/**
+ * @brief returns M_TRUE if the M float pointed to by \p afloat is zero or M_LL_INVALID if \p afloat equals NULL or the M float pointed to is undefined
+ * 
+ * @param afloat the pointer to an M float
+ * @return long long returns M_TRUE if the Mfloat pointed to by \p afloat is zero or M_LL_INVALID if \p afloat equals NULL or the M float pointed to is undefined
+ */
 long long isFloatZero(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoubleZero(afloat->ld));}
+/**
+ * @brief returns M_TRUE if the M float pointed to by \p afloat is positive or M_LL_INVALID if \p afloat equals NULL
+ * 
+ * @param afloat the pointer to an M float
+ * @return long long returns M_TRUE if the Mfloat pointed to by \p afloat is positive, or M_LL_INVALID if \p afloat equals NULL or the M float pointed to is undefined
+ */
 long long isFloatPositive(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoublePositive(afloat->ld));}
+/**
+ * @brief returns M_TRUE if the M float pointed to by \p afloat is negative or M_LL_INVALID if \p afloat equals NULL
+ * 
+ * @param afloat the pointer to an M float
+ * @return long long returns M_TRUE if the Mfloat pointed to by \p afloat is negative, or M_LL_INVALID if \p afloat equals NULL or the M float pointed to is undefined
+ */
+
 long long isFloatNegative(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoubleNegative(afloat->ld));}
+/**
+ * @brief returns M_LL_INVALID if \p afloat is undefined, or the result of testing if \p afloat equals 1
+ * 
+ * @param afloat the pointer to an M float
+ * @return long long returns M_TRUE if the Mfloat pointed to by \p afloat equals 1, or M_LL_INVALID or M_FALSE otherwise
+ */
 long long isFloatOne(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoubleOne(afloat->ld));}
+/**
+ * @brief returns M_LL_INVALID if \p afloat is undefined, or M_TRUE if \p afloat equals infinity, M_FALSE otherwise
+ * 
+ * @param afloat the pointer to an M float
+ * @return long long returns M_TRUE if the Mfloat pointed to by \p afloat equals infinity, M_FALSE or M_LL_INVALID otherwise (see @brief)
+ */
 long long isFloatInfinite(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:(ldIsInf(afloat->ld)?M_TRUE:M_FALSE));}
+
+/**
+ * @brief returns M_TRUE if the M floats pointed to by \p afloat1 and \p afloat2 are equal
+ * @details \p afloat1 and \p afloat2 are considered equal when:
+ * - when both are NULL, M_TRUE is returned
+ * - when only one is NULL, M_FALSE is returned
+ * - when their classification is different, M_FALSE is returned
+ * - when (both) subnormal or supernormal, M_LL_INVALID is returned
+ * - when (both) NaN, M_TRUE is returned
+ * - when (both) infinite, M_TRUE if the signs are the same, M_FALSE otherwise
+ * - when (both) normal, M_TRUE when the wrapped long doubles are equal, M_FALSE otherwise
+ * @param afloat1 
+ * @param afloat2 
+ * @return long long M_TRUE if the M floats pointed to are equal, M_FALSE or M_LL_INVALID otherwise
+ */
 long long areFloatsEqual(Mfloat* afloat1,Mfloat* afloat2){
-    // TODO we are considering two NULL values equal for now although that's questionable
-    if(!afloat1&&!afloat2)return M_TRUE; // both NULL
-    if(!afloat1||!afloat2)return M_FALSE; // only one of them NULL
-    // ASSERT neither NULL
-    if(fpclassify(afloat1->ld)!=fpclassify(afloat2->ld))return M_FALSE; // if they classify differently definitely not the same
-    switch(fpclassify(afloat1->ld)){
-        case FP_NAN:return M_TRUE; // both NaN TODO check for signbit as well here?????
-        case FP_INFINITE:return(signbit(afloat1->ld)==signbit(afloat2->ld)?M_TRUE:M_FALSE); // both infinite but perhaps the wrong sign
-        case FP_ZERO:return M_TRUE; // both zero or subnormal zero TODO check for signbit as well here?????
-        case FP_SUBNORMAL:case FP_SUPERNORMAL:return M_LL_INVALID; // can't tell
-        default:break;
-    }
-    return(afloat1->ld==afloat2->ld);
+	// TODO we are considering two NULL values equal for now although that's questionable
+	if(!afloat1&&!afloat2)return M_TRUE; // both NULL
+	if(!afloat1||!afloat2)return M_FALSE; // only one of them NULL
+	// ASSERT neither NULL
+	if(fpclassify(afloat1->ld)!=fpclassify(afloat2->ld))return M_FALSE; // if they classify differently definitely not the same
+	switch(fpclassify(afloat1->ld)){
+		case FP_NAN:return M_TRUE; // both NaN TODO check for signbit as well here?????
+		case FP_INFINITE:return(signbit(afloat1->ld)==signbit(afloat2->ld)?M_TRUE:M_FALSE); // both infinite but perhaps the wrong sign
+		case FP_ZERO:return M_TRUE; // both zero or subnormal zero TODO check for signbit as well here?????
+		case FP_SUBNORMAL:case FP_SUPERNORMAL:return M_LL_INVALID; // can't tell
+		default:break;
+	}
+	return(afloat1->ld==afloat2->ld?M_TRUE:M_FALSE);
 }
 // TODO for now leave these two methods return a boolean, although we should decide whether or not they are derived or not
-bool floatIsUndefined(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld));}
-bool floatIsUndefinedOrZero(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld)||isFloatZero(afloat)==M_TRUE);}
+/**
+ * @brief returns true if \p afloat is NULL or the M float pointed to is NaN, false otherwise
+ * 
+ * @param afloat 
+ * @return true 
+ * @return false 
+ */
+bool floatIsUndefined(Mfloat* afloat){return(afloat==NULL||ldIsNaN(afloat->ld));}
+/**
+ * @brief returns true if \p afloat is NULL or when the M float pointed to is NaN, or zero, false otherwise
+ * 
+ * @param afloat 
+ * @return true 
+ * @return false 
+ */
+bool floatIsUndefinedOrZero(Mfloat* afloat){return(afloat==NULL||ldIsNaN(afloat->ld)||isFloatZero(afloat)==M_TRUE);}
 
+/**
+ * @brief returns a copy of the M float pointed to by \p afloat
+ * 
+ * @param afloat 
+ * @return Mfloat* a copy of the M float pointed to by \p afloat
+ */
 Mfloat* _getFloatCopy(Mfloat* afloat){//Mallocationowner owner=getOwner(__LINE__);
-    return(floatIsUndefined(afloat)?NULL:_getFloat(afloat->ld));
+	return(floatIsUndefined(afloat)?NULL:_getFloat(afloat->ld));
 }/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
+/**
+ * @brief returns the negation of the M float pointed to by \p afloat
+ * 
+ * @param afloat 
+ * @return Mfloat* the negated M float pointer
+ */
 Mfloat* _getFloatNeg(Mfloat* afloat){//Mallocationowner owner=getOwner(__LINE__);
     return(floatIsUndefined(afloat)?NULL:_getFloat(-afloat->ld));
 }/* VALIDATED */ // just switching the sign of what _getRealCopy returns
 
-long long isBigintegerUndefined(Mbiginteger* biginteger){return(biginteger&&biginteger->_bi?M_FALSE:M_TRUE);}
-long long isTextUndefined(Mtext* text){return(text?M_FALSE:M_TRUE);}
-long long isTokenUndefined(Mtoken* token){return(token?M_FALSE:M_TRUE);}
+/**
+ * @brief return M_TRUE if \p biginteger is NULL or does not hold an integer, M_FALSE otherwise
+ * 
+ * @param biginteger 
+ * @return long long 
+ */
+long long isBigintegerUndefined(Mbiginteger const * const biginteger){return(biginteger&&biginteger->_bi?M_FALSE:M_TRUE);}
+/**
+ * @brief returns M_TRUE if \p text is NULL, M_FALSE otherwise
+ * 
+ * @param text 
+ * @return long long 
+ */
+long long isTextUndefined(Mtext const * const text){return(text!=NULL?M_FALSE:M_TRUE);}
+/**
+ * @brief returns M_TRUE if \p token is NULL, M_FALSE otherwise
+ * 
+ * @param token 
+ * @return long long 
+ */
+long long isTokenUndefined(Mtoken const * const token){return(token!=NULL?M_FALSE:M_TRUE);}
 
 // Mtext is an immutable version of Mstring* in that it cannot be changed
+/**
+ * @brief returns a M text pointer with the M text initialized with C string \p text
+ * 
+ * @param text 
+ * @return Mtext* the M text pointer
+ */
 Mtext* _getText(char const * const text){//Mallocationowner owner=getOwner(__LINE__);
-    return(text?(Mtext*)_strdup(text):NULL); // TODO assuming that _strdup will return a disowned text!!!
-    // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
-}/* VALIDATED */
-Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
-    Mtext* _charText=NULL;
-    Mstring* _charString=owned_string(_getString("\""),owner);
-    if(_charString){
-        if(string_append_char(_charString,c))_charText=owned_text(_getText(string(_charString)),owner);
-        FREE_STRING(_charString,owner);
-    }
-    return disowned_text(_charText,owner);
+	return(text!=NULL?(Mtext*)_strdup(text):NULL); // TODO assuming that _strdup will return a disowned text!!!
+	// _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
 }/* VALIDATED */
 
+/**
+ * @brief returns a M text pointer initialized to a single character C string initialized to \p c
+ * 
+ * @param c 
+ * @return Mtext* the M text pointer holding a single character C string initialized to \p c
+ */
+Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
+	Mtext* _charText=NULL;
+	Mstring* _charString=owned_string(_getString("\""),owner);
+	if(_charString){
+		if(string_append_char(_charString,c))_charText=owned_text(_getText(string(_charString)),owner);
+		FREE_STRING(_charString,owner);
+	}
+	return disowned_text(_charText,owner);
+}/* VALIDATED */
+
+/**
+ * @brief returns a M string pointer initialized to the C string \p text enclosed in \c quote characters
+ * 
+ * @param text the C string to enquote
+ * @param quote the quote character
+ * @return Mstring* the M string pointer initialized to the C string \text wrapped in \c quote characters
+ */
 Mstring* _getQuotedTextString(char const * const text,char quote){Mallocationowner owner=getOwner(__LINE__);
-    if(text){
-        Mstring* _quotedTextString=owned_string(__string("_getQuotedTextString()"),owner);
-        if(_quotedTextString){
-            if((!quote||string_append_char(_quotedTextString,quote))&&string_append(_quotedTextString,text))
-                return disowned_string(_quotedTextString,owner);
-            FREE_STRING(_quotedTextString,owner);
-        }else
-            outputError("Failed to create a quoted text string");
-    }
-    return NULL;
+	if(text!=NULL){
+			Mstring* _quotedTextString=owned_string(__string("_getQuotedTextString()"),owner);
+			if(_quotedTextString){
+				if((!quote||string_append_char(_quotedTextString,quote))&&string_append(_quotedTextString,text))
+					return disowned_string(_quotedTextString,owner);
+				FREE_STRING(_quotedTextString,owner);
+			}else
+				outputError("Failed to create a quoted text string");
+	}
+	return NULL;
 }/* VALIDATED */
 // MDH@07DEC2020: more often than not we're going to need an Mtext that starts with a certain quote character
+/**
+ * @brief returns a M text enclosing C string \p text with single quotes
+ * 
+ * @param text the C string to enquote
+ * @return Mtext* the M string pointer with \t text enquoted
+ */
 Mtext* _getSingleQuotedText(char const * const text){Mallocationowner owner=getOwner(__LINE__);
-    if(!text)return NULL;
-    Mstring* _singleQuotedTextString=owned_string(_getQuotedTextString(text,'\''),owner);
-    if(!_singleQuotedTextString)return NULL;
-    Mtext* _singleQuotedText=owned_text(_getText(string(_singleQuotedTextString)),owner);
-    FREE_STRING(_singleQuotedTextString,owner);
-    return disowned_text(_singleQuotedText,owner);
+	if(!text)return NULL;
+	Mstring* _singleQuotedTextString=owned_string(_getQuotedTextString(text,'\''),owner);
+	if(!_singleQuotedTextString)return NULL;
+	Mtext* _singleQuotedText=owned_text(_getText(string(_singleQuotedTextString)),owner);
+	FREE_STRING(_singleQuotedTextString,owner);
+	return disowned_text(_singleQuotedText,owner);
 } /* VALIDATED */
+/**
+ * @brief 
+ * 
+ * @param _char 
+ * @param quote 
+ * @return Mstring* 
+ */
 Mstring* _getQuotedTextCharString(char _char,char quote){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _quotedTextCharString=owned_string(__string("_getQuotedTextCharString()"),owner);
-    if(_quotedTextCharString){
-        if((!quote||string_append_char(_quotedTextCharString,quote))&&(!_char||string_append_char(_quotedTextCharString,_char)))
-            return disowned_string(_quotedTextCharString,owner);
-        FREE_STRING(_quotedTextCharString,owner);
-    }else
-        outputError("Failed to create a quoted character string");
-    return NULL;
+	Mstring* _quotedTextCharString=owned_string(__string("_getQuotedTextCharString()"),owner);
+	if(_quotedTextCharString){
+		if((!quote||string_append_char(_quotedTextCharString,quote))&&(!_char||string_append_char(_quotedTextCharString,_char)))
+			return disowned_string(_quotedTextCharString,owner);
+		FREE_STRING(_quotedTextCharString,owner);
+	}else
+		outputError("Failed to create a quoted character string");
+	return NULL;
 }/* VALIDATED */
 Mtext* _getSingleQuotedCharText(char _char){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _singleQuotedTextCharString=owned_string(_getQuotedTextCharString(_char,'\''),owner);
-    if(!_singleQuotedTextCharString)return NULL;
-    Mtext* _singleQuotedCharText=owned_text(_getText(string(_singleQuotedTextCharString)),owner);
-    FREE_STRING(_singleQuotedTextCharString,owner);
-    return disowned_text(_singleQuotedCharText,owner);
+	Mstring* _singleQuotedTextCharString=owned_string(_getQuotedTextCharString(_char,'\''),owner);
+	if(!_singleQuotedTextCharString)return NULL;
+	Mtext* _singleQuotedCharText=owned_text(_getText(string(_singleQuotedTextCharString)),owner);
+	FREE_STRING(_singleQuotedTextCharString,owner);
+	return disowned_text(_singleQuotedCharText,owner);
 }/* VALIDATED */
 
 /*

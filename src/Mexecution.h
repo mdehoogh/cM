@@ -292,9 +292,9 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
 Mstring* _getFloatText(Mfloat* _real);
 Mstring* _getStringText(Mtext* _string,bool dequoted);
 
-long long isBigintegerUndefined(Mbiginteger* biginteger);
-long long isTextUndefined(Mtext* text);
-long long isTokenUndefined(Mtoken* token);
+long long isBigintegerUndefined(Mbiginteger const * const biginteger);
+long long isTextUndefined(Mtext const * const text);
+long long isTokenUndefined(Mtoken const * const token);
 
 size_t outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
 size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);

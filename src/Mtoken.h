@@ -107,8 +107,8 @@
 		TOKENTYPE(TT_TERNARY_aeru) \
 		TOKENTYPE(TT_REFERENCE) \
 		TOKENTYPE(TT_VARIABLE) \
-        TOKENTYPE(TT_NEW_VARIABLE) \
-        TOKENTYPE(TT_PROPERTY) \
+		TOKENTYPE(TT_NEW_VARIABLE) \
+		TOKENTYPE(TT_PROPERTY) \
 		TOKENTYPE(TT_LISTELEMENT) \
 		TOKENTYPE(TT_INTEGER) \
 		TOKENTYPE(TT_REAL) \
@@ -126,7 +126,7 @@
 		TOKENTYPE(TT_END_OF_FUNCTION_CALL) \
 		TOKENTYPE(TT_COMMENT) \
 		TOKENTYPE(TT_ERROR) \
-        TOKENTYPE(TT_WHITESPACE)
+		TOKENTYPE(TT_WHITESPACE)
 #define GENERATE_TOKENTYPE_ENUM(ENUM) ENUM,
 #define GENERATE_STRING(STRING) #STRING,
 typedef enum TOKENTYPE_ENUM {
@@ -143,6 +143,9 @@ typedef struct{
 	unsigned int type:2; // 00=value, 01=unary operator, 02=binary operator, 03=ternary operator
 	unsigned int subtype:4; // what subtype it is, i.e. the type of operator
 }TokenType;
+*/
+/**
+ * Mtoken represents a single M command token
 */
 typedef struct Mtoken{
 	TokenType type; // actually the index into the TOKENTYPES array!!!
