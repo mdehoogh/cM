@@ -150,9 +150,9 @@ Mfloat* owned_float(Mfloat* _float,Mallocationowner owner_float);
 void free_float(Mfloat* _float/*,Mallocationowner owner*/);
 #define FREE_FLOAT(_float,owner_float) free_float(disowned_float(_float,owner_float))
 
-bool strIsZero(char* str);
-Mstring* appendll(Mstring* const ms,long long ll);
-Mstring* appendld(Mstring* const ms,long double ld);
+bool strIsZero(char const * const str);
+Mstring* appendll(Mstring * const ms,long long ll);
+Mstring* appendld(Mstring * const ms,long double ld);
 
 // MDH@20MAY2019: we need free_map to free the function argument maps!!
 /* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside
@@ -285,19 +285,19 @@ bool ldIsOne(long double ld);
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getLongLongText(long long ll);
-Mstring* _getIntegerText(Minteger* _integer);
-Mstring* _getTimeText(Mtime* _time);
-Mstring* _getBigintegerText(const Mbiginteger* const _biginteger);
-Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
-Mstring* _getFloatText(Mfloat* _real);
-Mstring* _getStringText(Mtext* _string,bool dequoted);
+Mstring* _getIntegerText(Minteger const * const _integer);
+Mstring* _getTimeText(Mtime const * const _time);
+Mstring* _getBigintegerText(Mbiginteger const * const _biginteger);
+Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
+Mstring* _getFloatText(Mfloat const * const _real);
+Mstring* _getStringText(Mtext const * const _string,bool dequoted);
 
 long long isBigintegerUndefined(Mbiginteger const * const biginteger);
 long long isTextUndefined(Mtext const * const text);
 long long isTokenUndefined(Mtoken const * const token);
 
-size_t outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
-size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);
+size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix);
+size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix);
 
 // starting with v0.1.4 we have file I/O support
 #include "sys/stat.h"

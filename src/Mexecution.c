@@ -903,11 +903,11 @@ Mtext* _getSingleQuotedText(char const * const text){Mallocationowner owner=getO
 	return disowned_text(_singleQuotedText,owner);
 } /* VALIDATED */
 /**
- * @brief 
- * 
- * @param _char 
- * @param quote 
- * @return Mstring* 
+ * @brief returns a pointer to a new M string containing \p _char enquoted with \p quote
+ * @details a quoted M string starts with the quote character but does not end with it
+ * @param _char the character to enquote
+ * @param quote the quote character
+ * @return Mstring* the quoted M string pointer
  */
 Mstring* _getQuotedTextCharString(char _char,char quote){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _quotedTextCharString=owned_string(__string("_getQuotedTextCharString()"),owner);
@@ -919,6 +919,12 @@ Mstring* _getQuotedTextCharString(char _char,char quote){Mallocationowner owner=
 		outputError("Failed to create a quoted character string");
 	return NULL;
 }/* VALIDATED */
+/**
+ * @brief returns a quoted M text \p _char single quoted
+ * 
+ * @param _char the character to enquote
+ * @return Mtext* the quoted M text pointer
+ */
 Mtext* _getSingleQuotedCharText(char _char){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _singleQuotedTextCharString=owned_string(_getQuotedTextCharString(_char,'\''),owner);
 	if(!_singleQuotedTextCharString)return NULL;
@@ -1052,10 +1058,37 @@ Minteger* _getInteger(long long ll){
 }
 */
 
+/**
+ * @brief appends the unsigned long integer \p ull to the M string pointed to by \p ms
+ * 
+ * @param ms the M string to append \p ull to
+ * @param ull the long integer to append
+ * @return Mstring* the M string pointer with \p ull appended to \p ms
+ */
 Mstring* appendull(Mstring* const ms,unsigned long long ull){return string_append_ull(ms,ull);}/* VALIDATED */
+/**
+ * @brief appends long integer \p ll to the M string pointed to by \p ms
+ * 
+ * @param ms the pointer to the M string to append \p ll to
+ * @param ll the long integer to append
+ * @return Mstring* the pointer to the M string with \p ll appended
+ */
 Mstring* appendll(Mstring* const ms,long long ll){return string_append_ll(ms,ll);}/* VALIDATED */
+/**
+ * @brief appends long double \p ld to the M string pointed to by \p ms
+ * 
+ * @param ms the M string to append \p ld to
+ * @param ld the long double to append
+ * @return Mstring* the pointer to the M string with \p ld appended to \p ms
+ */
 Mstring* appendld(Mstring* const ms,long double ld){return string_append_ld(ms,ld);}/* VALIDATED */
 
+/**
+ * @brief returns the pointer to a new M string containing the text representation of the long integer \p ll
+ * 
+ * @param ll the long integer to append
+ * @return Mstring* the pointer to the new M string containing the text representation of long integer \p ll
+ */
 Mstring* _getLongLongText(long long ll){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
 	if(!_s)return NULL;
@@ -1066,7 +1099,13 @@ Mstring* _getLongLongText(long long ll){Mallocationowner owner=getOwner(__LINE__
 }
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
-Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns the pointer to a new M string containing the text representation of M integer \p _integer
+ * 
+ * @param _integer the pointer to the M integer
+ * @return Mstring* the pointer to a new M string containing the text representation of \p _integer
+ */
+Mstring* _getIntegerText(Minteger const * const _integer){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
 	if(!_s)return NULL;
 	Mstring* p=_s;
@@ -1079,8 +1118,18 @@ Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__L
 	return disowned_string(_s,owner);
 }/* VALIDATED */
 
+/**
+ * @brief the timezone names
+ * 
+ */
 extern char** Mtimezonenames;
-Mstring* _getTimeText(Mtime* _time){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns the pointer to a new M string containing the text representation of the M time pointed to by \p _time
+ * 
+ * @param _time the pointer to a M time
+ * @return Mstring* the pointer to a new M string containing the text representation of the M time pointed to by \p _time
+ */
+Mstring* _getTimeText(Mtime const * const _time){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
 	if(!_s)return NULL;
 	Mstring* p=_s;
@@ -1122,6 +1171,12 @@ long long getInteger(Mvalue* _value){
 
 // BigInteger stuff
 // MDH@09APR2020: certain functions only know the mp_int* and not the big integer
+/**
+ * @brief returns the pointer to a new M string containing the text representation of the multiple precision integer pointed to by \p _mpint
+ * 
+ * @param _mpint the pointer to a multiple precision integer
+ * @return Mstring* the pointer to a new M string containing the text representation of the multiple precision integer pointed to by \p _mpint
+ */
 static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _mpintText=owned_string(__string(),owner);
 	////outputChar('A');
@@ -1201,12 +1256,33 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 	///outputChar('H');
 	return disowned_string(_mpintText,owner);
 }
+/**
+ * @brief returns the pointer to a new M string containing the text representation of the M big integer \p _biginteger
+ * 
+ * @param _biginteger the pointer to a M big integer
+ * @return Mstring* the pointer to a new M string containing the text representation of the M big integer \p _biginteger
+ */
 Mstring* _getBigintegerText(const Mbiginteger* _biginteger){//Mallocationowner owner=getOwner(__LINE__);
 	return(_biginteger?_getMpintText(MP_INT_POINTER(_biginteger)):__string());
 }
 
-Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;Mallocationowner owner_biLLextreme=(Mallocationowner){MI_EXECUTION,__LINE__,1};
+Mallocationowner owner_biLLextreme=(Mallocationowner){MI_EXECUTION,__LINE__,1};
+/**
+ * @brief _biLLMin is to hold the M big integer containing the long integer minimum M_LL_MIN
+ * 
+ */
+Mbiginteger *_biLLMin=NULL;
+/**
+ * @brief _biLLMax is to hold the M big integer containing the long integer maximum M_LL_MAX
+ * 
+ */
+Mbiginteger *_biLLMax=NULL;
 // MDH@11JUN2020: if we return something that is owned instead of something that is disowned we prevent external freeing (i.e. unwarned that is)
+/**
+ * @brief returns the pointer to the constant big integer representing the long integer minimum M_LL_MIN
+ * 
+ * @return Mbiginteger* 
+ */
 Mbiginteger* getBigintegerLLMin(){//Mallocationowner owner=getOwner(__LINE__);
 	if(!_biLLMin){
 		if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the smallest small integer.");
@@ -1215,6 +1291,11 @@ Mbiginteger* getBigintegerLLMin(){//Mallocationowner owner=getOwner(__LINE__);
 	}
 	return _biLLMin;
 }/* VALIDATED */
+/**
+ * @brief returns the pointer to the constant big integer containing the long integer maximum M_LL_MAX
+ * 
+ * @return Mbiginteger* 
+ */
 Mbiginteger* getBigintegerLLMax(){
 	if(!_biLLMax){
 		if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the largest small integer.");
@@ -1252,8 +1333,16 @@ void mp_set_u128(Mbiginteger* a,uint128_t b){
 // we can use the method below to come up with the numerator and denominator of a given double that matches the double exactly
 // for dealing with long double to big integer conversion
 // MDH@17JUN2019: although a typically is of type Mbiginteger, for a function that starts with mp_ we can use the primitive type mp_int instead of the alias Mbiginteger
-mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
-	if(!a)return MP_ERR;
+/**
+ * @brief sets multiple precision integer pointed to by \p a to the mantisse \p mantisse and exponent \p exponent of a long double
+ * 
+ * @param a the multiple precision integer to set
+ * @param mantisse the mantisse of the multiple precision integer
+ * @param exponent the base 2 exponent of the multiple precision integer
+ * @return mp_err MP_ERR on failure, MP_OKAY on success
+ */
+static mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
+	if(a==NULL)return MP_ERR;
 	int32_t exp=(exponent&0x7FFF); // cut off the sign
 	if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
 	if(exp!=0){
@@ -1268,43 +1357,67 @@ mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
 		mp_zero(a);
 	return MP_OKAY;
 }/* VALIDATED */
-mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief sets multiple precision integer pointed to by \p a to the mantisse times 2 to the power of \p exponent 
+ * @details the verbose version of mp_set_me
+ * @param a the multiple precision integer to set
+ * @param mantisse the mantisse of the multiple precision integer
+ * @param exponent the base 2 exponent of the multiple precision integer
+ * @return mp_err MP_ERR on failure, MP_OKAY on success
+ */
+static mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){Mallocationowner owner=getOwner(__LINE__);
 	if(!a)return MP_ERR;
 	int32_t exp=(exponent&0x7FFF); // cut off the sign
 	if(exp!=0){
 		mp_set_u64(a,mantisse);
-		if(amVerbose()){
+		///if(amVerbose()){
 			Mstring* _mantisseBigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020: ask _getMpintText(), replacing _getBigintegerText()
 			output("Value after setting the fraction: %s.\n",string(_mantisseBigIntegerText));
 			FREE_STRING(_mantisseBigIntegerText,owner);
-		}
-		if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.\n",exp,mantisse);
-		if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
+		///}
+		///if(amVerbose())
+		output("Long double exponent part: %d - mantisse: %llu.\n",exp,mantisse);
+		if(exp==0x7FFF){
+			///////if(amVerbose())
+			output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");
+			return MP_VAL;
+		} // +-inf, NaN
 		exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
 		//////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
-		if(amVerbose())output("Power of two exponent: %d.\n",exp);  
+		/////if(amVerbose())
+		output("Power of two exponent: %d.\n",exp);  
 		if(exp!=0){
 			mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
 			if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
 		}
-		if(amVerbose()){
+		///if(amVerbose()){
 			Mstring* _bigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020
 			output("Value after applying the exponent: %s.\n",string(_bigIntegerText));
 			FREE_STRING(_bigIntegerText,owner);
-		}
+		///}
 		if(exponent>>15){ // negative
 			// take over the sign from the long double (bit 15 in the signandexponent part)
 			if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
 				a->sign=MP_NEG;
-				if(amVerbose())output("Sign part of real used to set the sign of the big integer.\n");
+				///if(amVerbose())
+				output("Sign part of real used to set the sign of the big integer.\n");
 			}else
-				if(amVerbose())output("No need to set the sign on a big integer equal to zero.\n");           
+				/////if(amVerbose())
+				output("No need to set the sign on a big integer equal to zero.\n");
 		}
 	}else // all zeros in exponent
 		mp_zero(a);
 	return MP_OKAY;
 }/* VALIDATED */
+/**
+ * @brief sets the M big integer pointed to by \p a to the long double \p b
+ * 
+ * @param a the pointer to the M big integer
+ * @param b the long double
+ * @return mp_err MP_ERR on failure, MP_OKAY on success
+ */
 mp_err mp_set_longdouble(Mbiginteger *a, long double b){
+	if(a==NULL)return MP_ERR;
 	// always assume 10-byte long double (extended precision)
 	uint64_t mantisse;
 	uint16_t exponent; // including bit 63
@@ -1380,6 +1493,12 @@ double mp_get_double(const Mbiginteger *a)
 }
 */
 long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
+/**
+ * @brief returns the long double represented by the M big integer pointed to by \p a
+ * 
+ * @param a the pointer to the M big integer
+ * @return long double the long double represented by \p a
+ */
 long double mp_get_long_double(Mbiginteger const * const a){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
 	mp_int* mpi_a=MP_INT_POINTER(a); // MDH@09APR2020: get the mp_int pointer from the big integer
@@ -1415,6 +1534,13 @@ long double mp_get_long_double(Mbiginteger const * const a){
 // part of implementing _getRealText (so not present in the header)
 
 // 'shifting' a double means either doubling or halving a number of times
+/**
+ * @brief returns the long double \p ld shifted by long integer \p shift
+ * 
+ * @param ld the long double to shift
+ * @param shift the number of shift positions
+ * @return long double the shifted long double
+ */
 long double ldShift(long double ld,long long shift){
 	long double result=(shift==M_LL_INVALID?M_LD_NAN:ld); // initialize the result to what we received, unless the shift value is invalid
 	// if something to shift by, and we can expect a change to the result go ahead...
@@ -1428,6 +1554,12 @@ long double ldShift(long double ld,long long shift){
 	return result;
 }/* VALIDATED */
 
+/**
+ * @brief returns the sign of long double \p ld
+ * 
+ * @param ld 
+ * @return long long M_LL_INVALID if \p ld is NaN or infinity, M_POSITIVE if \p ld is positive, and M_NEGATIVE if \p ld is negative
+ */
 long long getLongDoubleSign(long double ld){
 	if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
 	if(ldIsPositive(ld))return M_POSITIVE;
@@ -1435,6 +1567,12 @@ long long getLongDoubleSign(long double ld){
 	return M_ZERO;
 }/* VALIDATED */
 
+/**
+ * @brief returns the long integer from the truncated value of long double \p ld
+ * 
+ * @param ld 
+ * @return long long the long integer represented by long double \p ld but M_LL_INVALID if \p ld is NaN or infinity or out of the M integer range
+ */
 long long double2long(long double ld){
 	if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
 	// TODO perhaps there are some other 
@@ -1445,7 +1583,13 @@ long long double2long(long double ld){
 }/* VALIDATED */
 
 // STRINGIFY FUNCTIONS
-Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns the pointer to a new M string containing the text representation of M float pointed to by \p _float
+ * @details preprends r in verbose debugging mode to indicate the number type
+ * @param _float 
+ * @return Mstring* the pointer to a new M string containing the text representation of M float pointed to by \p _float on success, NULL on failure
+ */
+Mstring* _getFloatText(Mfloat const * const _float){Mallocationowner owner=getOwner(__LINE__);
 	if(!_float)return NULL;
 	Mstring* _floatText=owned_string(__string(),owner);
 	if(_floatText){
@@ -1453,9 +1597,10 @@ Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__)
 		if(amVerboseDebugging())
 			p=string_append_char(p,'r');
 		if(p){
+			// DONE TODO we should distinguish between +INF and -INF
 			switch(fpclassify(_float->ld)){
 				case FP_NAN:p=string_append(p,M_NAN);break;
-				case FP_INFINITE:p=string_append(p,M_INF);break;
+				case FP_INFINITE:if(signbit(_float->ld))p=string_append_char(p,'-');p=string_append(p,M_INF);break;
 				default:p=appendld(p,_float->ld);break;
 			}
 		}
@@ -1464,13 +1609,26 @@ Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__)
 	return disowned_string(_floatText,owner);
 }/* VALIDATED */
 
+/**
+ * @brief returns the hexadecimal value (0-15) of hexadecimal character \p c
+ * 
+ * @param c 
+ * @return char the hexadecimal value that hexadecimal character \p c represents
+ */
 char hexdigit(char c){
 	if(c>=97&&c<=102)return hexdigit(c-32);
 	if(c>=65&&c<=70)return c-55;
 	if(c>=48&&c<=57)return c-48;
 	return '\0';
 }
-Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns the pointer to a new M string containing the (dequoted) text pointed to by \p _text
+ * 
+ * @param _text the M text to be store in the new M string (dequoted or not)
+ * @param dequoted the flag indicating whether or not to dequote \p _text
+ * @return Mstring* the (dequoted) text represented by the M text pointed to by \p _text, NULL on failure e.g. when \p _text is NULL
+ */
+Mstring* _getStringText(Mtext const * const _text,bool dequoted){if(!_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _stringText=owned_string(__string(),owner);
 	if(_stringText){
 		Mstring* p=_stringText;
@@ -1479,6 +1637,7 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Malloc
 		if(p){
 			// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
 			if(dequoted){
+				// TODO can we do the following using pointers somehow????
 				char c;
 				size_t lastindex=strlen(_text->_c);
 				if(lastindex>0){
@@ -1540,6 +1699,11 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Malloc
 /////////////Mstring* _UNDEFINED_VALUETEXT=NULL;
 // the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
 // we can solve that by returning a new undefined value text instance every time
+/**
+ * @brief returns the pointer to a new M string wrapping M_UNDEFINED_VALUE_TEXT
+ * 
+ * @return Mstring* the pointer to a new M string holding the M_UNDEFINED_VALUE_TEXT
+ */
 Mstring* _getUndefinedValueText(){//Mallocationowner owner=getOwner(__LINE__);
 	return _getString(M_UNDEFINED_VALUE_TEXT); // just wrapping UNDEFINED_VALUETEXT again...
 	/* replacing:
@@ -1548,6 +1712,14 @@ Mstring* _getUndefinedValueText(){//Mallocationowner owner=getOwner(__LINE__);
 	*/
 }/* VALIDATED */
 
+/**
+ * @brief outputs the M big integer pointed to by \p _biginteger, with prefix \p prefix and suffix \p postfix
+ * 
+ * @param prefix 
+ * @param _biginteger 
+ * @param postfix 
+ * @return size_t the number of characters written
+ */
 size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
 	size_t written=0;
 	if(prefix)written=output("%s",prefix);
@@ -1563,6 +1735,14 @@ size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _big
 	if(postfix)written+=output("%s",postfix);
 	return written;
 }/* VALIDATED */
+/**
+ * @brief outputs the M decimal pointed to by \p _decimal prefixed by the C string pointed to by \p prefix and suffixed by the C string pointed to by \p postfix
+ * 
+ * @param prefix 
+ * @param _decimal 
+ * @param postfix 
+ * @return size_t the number of characters written
+ */
 size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
 	size_t written=0;
 	if(prefix)written=output("%s",prefix);
@@ -1580,15 +1760,28 @@ size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,c
 }/* VALIDATED */
 
 // conversion from big integer to the long long it contains (when in range)
-long long biginteger2long(const Mbiginteger* const _biginteger){
+/**
+ * @brief returns the long integer value of the M big integer pointed to by \p _biginteger
+ * @details if something goes wrong e.g. when \p _biginteger is NULL or out of long integer range, M_LL_INVALID is returned
+ * @param _biginteger 
+ * @return long long the long integer represented by the M big integer pointed to by \p _biginteger
+ */
+long long biginteger2long(Mbiginteger const * const _biginteger){
 	return(_biginteger&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT
 		&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT?mp_get_i64(MP_INT_POINTER(_biginteger)):M_LL_INVALID);
 }/* VALIDATED */
-bool strIsZero(char* str){
+/**
+ * @brief returns true if the C string pointed to by \p str represents zero, false otherwise
+ * 
+ * @param str the C string pointer
+ * @return true 
+ * @return false 
+ */
+bool strIsZero(char const * const str){
 	size_t l=strlen(str);
 	//// NOTE do not accept integer literal postfixes when checking for 1: if(l>0&&str[l-1]=='i'||str[l-1]=='I'||str[l-1]=='q'||str[l-1]=='r')l-=1; // skip any accepted integer postfix!!
 	// if l already is zero str[0] will equal '\0' which (see below) is not considered a zero integer!!!!
-	while(l>0){l--;if(str[l]!='0')break;} // stop as soon as the character does not match '0' (any sign is only allowed at position 0)
+	while(l>0)if(str[--l]!='0')break; // stop as soon as the character does not match '0' (any sign is only allowed at position 0)
 	return(!l?false:str[l]=='-'||str[l]=='+'||str[l]=='0');
 }/* VALIDATED */
 
@@ -1605,28 +1798,59 @@ bool isDecimalZero(Mdecimal* _decimal){
 */
 
 // MDH@28SEP2020: file access
+/**
+ * @brief returns the pointer to M file \p _file disowned from its current owner \p owner_file
+ * 
+ * @param _file the pointer to a M file
+ * @param owner_file the current owner
+ * @return Mfile* the disowned \p _file
+ */
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
 	if(!_file)return NULL;
 	if(_file->_stat)DISOWNED(_file->_stat,owner_file);
 	if(_file->_name)DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
 	return DISOWNED(_file,owner_file);
 }
+/**
+ * @brief sets the ownership of the M file pointed to by \p _file to \p owner_file
+ * 
+ * @param _file 
+ * @param owner_file the new owner of \p _file
+ * @return Mfile* the owned \p _file
+ */
 Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){
-	if(!_file)return NULL;
-	if(_file->_stat)OWNED(_file->_stat,Msubowner(owner_file,1));
+	if(_file==NULL)return NULL;
+	if(_file->_stat!=NULL)OWNED(_file->_stat,Msubowner(owner_file,1));
 	return OWNED(_file,owner_file);
 }
+/**
+ * @brief returns a pointer to a new M file
+ * @details both the M file and its statistics pointer is zero initialized
+ * @return Mfile* the pointer to a new M file
+ */
 Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=CALLOC_1(sizeof(struct Mfile),'F',owner);
+	if(_file==NULL)return NULL;
 	_file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
 	return disowned_file(_file,owner);
 }
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
+/**
+ * @brief closes the M file pointed to by \p _file
+ * @details error conditions:
+ *          - \p _file is NULL
+ *          - \p _file->_name is NULL
+ *          - \p _file->_f is NULL
+ *          - Failing to close \p _file->_f using fclose
+ * @param _file 
+ * @return true on success
+ * @return false on failure
+ */
 bool closeFile(Mfile* _file){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
-	if(!_file){outputWarning("No file to close");return false;} // nothing to close
+	if(_file==NULL){outputWarning("No file to close");return false;} // nothing to close
 	assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
-	if(!_file->_f){output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));return true;} // already closed
+	if(_file->_f==NULL){output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));return true;} // already closed
 	if(report)
 		output("Closing '%s'.\n",string(_file->_name));
 	if(fclose(_file->_f)==0){
@@ -1638,24 +1862,35 @@ bool closeFile(Mfile* _file){
 	output("%sFailed to close '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 	return false;
 }
+/**
+ * @brief frees the M file pointed to by _file
+ * @details always attempts to close the M file pointed to by \p _file first
+ * @param _file 
+ */
 void free_file(Mfile* _file){
-	if(_file){
-		if(_file->_f)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
-		if(_file->_stat)FREE_1(_file->_stat,'f');
-		if(_file->_name)FREE_1(_file->_name,'S');
+	if(_file!=NULL){
+		if(_file->_f!=NULL)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
+		if(_file->_stat!=NULL){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
+		if(_file->_name!=NULL){FREE_1(_file->_name,'S');_file->_name=NULL;}
 		FREE_1(_file,'F');
 	}
 }
 // opening a file might mean that afterwards the file exists, and we then should update _file->_stat accordingly!!!
+/**
+ * @brief opens the M file pointed to by \p _file in mode \p mode
+ * 
+ * @param _file the pointer to the M file
+ * @param mode the mode in which to open the M file
+ */
 void openFile(Mfile* _file,char* mode){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
 	// only open when defined and currently not open
-	if(_file&&mode){ // valid input
-		if(!_file->_f){ // not opened yet
-			if(!_file->_stat||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
+	if(_file!=NULL&&mode){ // valid input
+		if(_file->_f==NULL){ // not opened yet
+			if(_file->_stat==NULL||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
 				assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 				_file->_f=fopen(string(_file->_name),mode);
-				if(_file->_f){ // now opened
+				if(_file->_f!=NULL){ // now opened
 					if(report)
 						output("'%s' opened!\n",string(_file->_name));
 					_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
@@ -1676,33 +1911,73 @@ void openFile(Mfile* _file,char* mode){
 }
 
 // MDH@08DEC2020: and not times
+/**
+ * @brief sets the ownership of the M time pointed to by \p _time to \p owner_time
+ * 
+ * @param _time 
+ * @param owner_time 
+ * @return Mtime* the owned \p _time
+ */
 Mtime* owned_time(Mtime* _time,Mallocationowner owner_time){
 	if(!_time)return NULL;
 	return OWNED(_time,owner_time);
 }
+/**
+ * @brief disowns the M time pointed to by \p _time from its current owner \p owner_time
+ * 
+ * @param _time 
+ * @param owner_time 
+ * @return Mtime* the disowned \p _time
+ */
 Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time){
 	if(!_time)return NULL;
 	return DISOWNED(_time,owner_time);
 }
 // __time() returns an time initialized as zero UTC (because tznindex and tzsec will be zero)
+/**
+ * @brief returns a pointer to a new M time
+ * @details the M time is zero initialized (0 UTC)
+ * 
+ * @return Mtime* the pointer to a new M time
+ */
 Mtime* __time(){Mallocationowner owner=getOwner(__LINE__);
 	Mtime* _time=CALLOC_1(sizeof(struct Mtime),'T',owner);
 	return disowned_time(_time,owner);
 }
 // NOTE _getTime() will return a result even if the tzsec and tznindex are an incorrect combination!!!
+/**
+ * @brief returns a pointer to a new M time set to \p t in the timezone with index \p tznindex with timezone offset \p tzsec
+ * @exception returns NULL on failure to allocate sufficient memory
+ * @param source the caller identification
+ * @param t the time integer
+ * @param tzsec the timezone offset in seconds
+ * @param tznindex the timezone index
+ * @return Mtime* 
+ */
 Mtime* _getTime(char const * const source,time_t t,int16_t tzsec,int16_t tznindex){Mallocationowner owner=getOwner(__LINE__);
 	Mtime* _time=owned_time(__time(),owner);
-	if(!_time)return NULL;
+	if(_time==NULL)return NULL;
 	_time->t=t;
 	_time->tzsec=tzsec; // store the timezone seconds deviation
 	_time->tznindex=tznindex;
 	return disowned_time(_time,owner);
 }
+/**
+ * @brief frees the M time pointed to by \p _time
+ * 
+ * @param _time 
+ */
 void free_time(Mtime* _time){
-	if(_time){
+	if(_time!=NULL){
 		FREE_1(_time,'T');
 	}
 }
+/**
+ * @brief returns the long integer representing the UTC seconds of the represented M time pointed to by \p _time
+ * @details returns M_LL_INVALID if \p _time is NULL
+ * @param _time 
+ * @return long long the time stored in the M time corrected by its timezone offset
+ */
 long long getTimeLongLong(Mtime* _time){
-	return(_time?_time->t-(_time->tzsec==INT16_MIN?0:_time->tzsec):M_LL_INVALID);
+	return(_time!=NULL?_time->t-(_time->tzsec==INT16_MIN?0:_time->tzsec):M_LL_INVALID);
 }
