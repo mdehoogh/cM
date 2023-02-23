@@ -632,16 +632,16 @@ bool ldIsOne(long double ld){return(ldIsValid(ld)?false:ld==1);}
  * @return long long 
  */
 long long isLongDoubleUndefined(long double ld){ // returns M_TRUE or M_FALSE (never M_LL_INVALID)
-    // if the sign has any meaning we should return M_TRUE otherwise M_FALSE
-    switch(fpclassify(ld)){
-        case FP_NAN:return M_TRUE;
-        case FP_INFINITE:return M_FALSE;
-        case FP_ZERO:return M_FALSE;
-        case FP_NORMAL:return M_FALSE;
-        case FP_SUBNORMAL:return M_FALSE;
-        case FP_SUPERNORMAL:return M_TRUE;
-    }
-    return M_LL_INVALID; // should never happen though (if we have all possible values covered!!!)
+	// if the sign has any meaning we should return M_TRUE otherwise M_FALSE
+	switch(fpclassify(ld)){
+		case FP_NAN:return M_TRUE;
+		case FP_INFINITE:return M_FALSE;
+		case FP_ZERO:return M_FALSE;
+		case FP_NORMAL:return M_FALSE;
+		case FP_SUBNORMAL:return M_FALSE;
+		case FP_SUPERNORMAL:return M_TRUE;
+	}
+	return M_LL_INVALID; // should never happen though (if we have all possible values covered!!!)
 }
 /**
  * @brief if \p ld is not considered undefined, returns M_TRUE if \p ld is either zero or subnormal, M_FALSE otherwise
@@ -650,7 +650,7 @@ long long isLongDoubleUndefined(long double ld){ // returns M_TRUE or M_FALSE (n
  * @return long long M_LL_INVALID if \p ld is undefined, otherwise M_TRUE of M_FALSE (see @brief)
  */
 long long isLongDoubleZero(long double ld){
-if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+	if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
 	switch(fpclassify(ld)){
 		case FP_INFINITE:return M_FALSE;
 		case FP_SUBNORMAL:case FP_ZERO:return M_TRUE;

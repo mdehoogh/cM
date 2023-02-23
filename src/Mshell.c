@@ -69,6 +69,8 @@ const long long M_NEGATIVE=-1;
 //const enum BOOLEAN_ENUM {M_FALSE,M_TRUE};
 //const enum SIGN_ENUM {M_NEGATIVE,M_ZERO,M_POSITIVE};
 const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
+const long double M_LD_INF=1.0/0.0; // positive infinity
+const long double M_LD_NEGINF=-1.0/0.0; // negative infinity
 const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
 const long double M_LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
 const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
