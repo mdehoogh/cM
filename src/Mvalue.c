@@ -29,16 +29,36 @@ extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (defaul
 extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 
  // MDH@10JAN2020
+ /**
+  * @brief return M_TRUE if \p _variable is immutable, M_FALSE otherwise, but M_LL_INVALID if _variable is NULL
+  * 
+  * @param _variable 
+  * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+  */
 long long isImmutable(Mvariable* _variable){
-	return(_variable?(_variable->immutable?M_TRUE:M_FALSE):M_LL_INVALID);
+	return(_variable!=NULL?(_variable->immutable?M_TRUE:M_FALSE):M_LL_INVALID);
 }
+/**
+ * @brief sets the immutable flag of \p _variable to \p immutable
+ * 
+ * @param _variable 
+ * @param immutable 
+ * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+ */
 long long setImmutable(Mvariable* _variable,bool immutable){
-	if(!_variable)return M_LL_INVALID;
+	if(NULL==_variable)return M_LL_INVALID;
 	long long result=(_variable->immutable?M_TRUE:M_FALSE);
 	_variable->immutable=immutable;
 	return result;
 }
 
+/**
+ * @brief returns \p _variable disowned by \p owner_variable
+ * 
+ * @param _variable 
+ * @param owner_variable 
+ * @return Mvariable* \p _variable disowned by \p owner_variable
+ */
 Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable){
 	if(_variable->_name){
 		// output("Disowning variable '%s'.\n",_variable->_name); // DEBUG
@@ -47,24 +67,46 @@ Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variabl
 	} // dynamically allocated (indicated by _) so we should free it...
 	return(Mvariable*)DISOWNED(_variable,owner_variable);
 }
+/**
+ * @brief returns \p _variable owned by \p owner_variable
+ * 
+ * @param _variable 
+ * @param owner_variable 
+ * @return Mvariable* \p _variable owned by \p owner_variable
+ */
 Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable){
 	if(_variable->_name)owned_chars(_variable->_name,Msubowner(owner_variable,1)); // dynamically allocated (indicated by _) so we should free it...
 	return(Mvariable*)OWNED(_variable,owner_variable);
 }
+/**
+ * @brief frees \p _variable
+ * @details when flag \p weak is not set, the reference count of the value of \p variable is decremented
+ * @param _variable 
+ * @param weak 
+ */
 void free_variable(Mvariable* _variable,bool weak){
-	if(_variable->_name)freeChars(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
-	if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
+	if(_variable==NULL)return;
+	if(_variable->_name!=NULL)freeChars(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
+	if(!weak)if(_variable->_value!=NULL)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
 	FREE_1(_variable,'V');
 }/* VALIDATED */
 
 // MDH@09JUN2020: if we want the name of the variable to be subowned by the caller, it's better to pass in a properly owned Mchars name, which we can subown
 //				it's a bit of a nuisance that we create it in such a way that the caller has to take care of the ownership of _name but that makes sense because we pass in Mchars (which is already managed)
 // MDH@11JUN2020: by allowing _name to be disowned to start with we can free it when we fail to bind it
+/**
+ * @brief returns an M variable with name \p name of value type \p valuetype with immutable flag equal to \p immutable
+ * 
+ * @param _name 
+ * @param valuetype 
+ * @param immutable 
+ * @return Mvariable* an M variable with name \p name of value type \p valuetype with immutable flag equal to \p immutable
+ */
 Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@14NOV2019: maps might have attributes with no name (i.e. the empty string)
-	if(_name){
+	if(_name!=NULL){
 		Mvariable* _variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
-		if(_variable){
+		if(_variable!=NULL){
 			_variable->_name=(Misdisowned(_name)?owned_chars(_name,Msubowner(owner,1)):_name); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
 			_variable->immutable=immutable;
 			_variable->valuetype=valuetype;
@@ -110,43 +152,80 @@ Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool imm
 	// MDH@04JUN2020: given that _variable is already disowned (as returned by CALLOC_1), no need to disown it again
 	return NULL; // replacing: return DISOWNED(_variable,owner);
 }/* VALIDATED */
-
+/**
+ * @brief returns \p _listelement owned by \p owner_listelement
+ * 
+ * @param _listelement 
+ * @param owner_listelement 
+ * @return Mlistelement* \p _listelement owned by \p owner_listelement
+ */
 Mlistelement* owned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
-	if(!_listelement)return NULL;
-	if(_listelement->_next)owned_listelement(_listelement->_next,owner_listelement);
+	if(NULL==_listelement)return NULL;
+	if(_listelement->_next!=NULL)owned_listelement(_listelement->_next,owner_listelement);
 	return OWNED(_listelement,owner_listelement);
 }
+/**
+ * @brief returns \p _listelement disowned by \p owner_listelement
+ * 
+ * @param _listelement 
+ * @param owner_listelement 
+ * @return Mlistelement* \p _listelement disowned by \p owner_listelement
+ */
 Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
-	if(!_listelement)return NULL;
-	if(_listelement->_next)disowned_listelement(_listelement->_next,owner_listelement);
+	if(NULL==_listelement)return NULL;
+	if(_listelement->_next!=NULL)disowned_listelement(_listelement->_next,owner_listelement);
 	return DISOWNED(_listelement,owner_listelement);
 }
 // MDH@18JUN2020: how about returning the number of list elements removed or perhaps the last list element removed????
 //				let's return the number of list elements freed
+/**
+ * @brief frees M list element \p _listelement (and all the list elements it points to)
+ * @details if flag \p weak is not set, the reference count of the value associated with the list element is decremented
+ * @param _listelement
+ * @returns M_LL_INVALID if \p _listelement is not defined, otherwise the number of list elements freed
+ */
 long long free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/){
 	long long result=M_LL_INVALID; // when there's nothing to free!!!!
-	if(_listelement){
+	if(_listelement!=NULL){
 		// free_listelement on a non-null next will ALWAYS return a positive value
-		result=(_listelement->_next?free_listelement(_listelement->_next,weak):0);_listelement->_next=NULL;
-		if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
+		result=(_listelement->_next!=NULL?free_listelement(_listelement->_next,weak):0);_listelement->_next=NULL;
+		if(_listelement->_value!=NULL){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
 		FREE_1(_listelement,'l'/*,owner*/);
 		result+=1;
 	}
 	return result;
 }/* VALIDATED */
-
+/**
+ * @brief returns M list \p _list owned by \p owner_list
+ * 
+ * @param _list 
+ * @param owner_list 
+ * @return Mlist* M list \p _list owned by \p owner_list
+ */
 Mlist* owned_list(Mlist* _list,Mallocationowner owner_list){
 	if(!_list)return NULL;
 	if(_list->_creator)owned_chars(_list->_creator,Msubowner(owner_list,1));
 	if(_list->_first)owned_listelement(_list->_first,owner_list);
 	return OWNED(_list,owner_list);
 }
+/**
+ * @brief returns M list \p _list disowned by \p owner_list
+ * 
+ * @param _list 
+ * @param owner_list 
+ * @return Mlist* M list \p _list disowned by \p owner_list
+ */
 Mlist* disowned_list(Mlist* _list,Mallocationowner owner_list){
 	if(!_list)return NULL;
 	if(_list->_creator)disowned_chars(_list->_creator,owner_list);
 	if(_list->_first)disowned_listelement(_list->_first,owner_list);
 	return DISOWNED(_list,owner_list);
 }
+/**
+ * @brief frees M list \p _list
+ * 
+ * @param _list 
+ */
 void free_list(Mlist* _list){
 	if(amVerboseDebugging())
 	{output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
@@ -158,6 +237,11 @@ void free_list(Mlist* _list){
 	}
 	FREE_1(_list,'L'/*,owner*/);
 }/* VALIDATED */
+/**
+ * @brief returns a new M list
+ * @param source a text describing the requestee that is stored as creator of the M list
+ * @returns a new M list
+ */
 Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner);
 	if(source){

@@ -83,7 +83,7 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
 
 Mdecimal* _getInverseDecimal(Mdecimal const * const decimal);
 
-long long decimal2long(Mdecimal* decimal);
+long long decimal2long(Mdecimal const * const decimal);
 
 // the now well-known sign and M boolean functions
 long long isDecimalUndefined(Mdecimal const * const decimal);
