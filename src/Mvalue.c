@@ -257,51 +257,103 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
 
 // MDH@04NOV2020: coming soon in this theater
 #ifndef __PRODUCTION__
+/**
+ * @brief returns \p _array owned by \p owner_array
+ * 
+ * @param _array 
+ * @param owner_array 
+ * @return Marray* \p _array owned by \p owner_array
+ */
 Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
-	if(!_array)return NULL;
-	if(_array->values)OWNED(_array->values,Msubowner(owner_array,1));
+	if(NULL==_array)return NULL;
+	if(_array->values!=NULL)OWNED(_array->values,Msubowner(owner_array,1));
 	return OWNED(_array,owner_array);
 }
+/**
+ * @brief returns \p _array disowned by \p owner_array
+ * 
+ * @param _array 
+ * @param owner_array 
+ * @return Marray* \p _array disowned by \p owner_array
+ */
 Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
-	if(!_array)return NULL;
-	if(_array->values)DISOWNED(_array->values,owner_array);
+	if(NULL==_array)return NULL;
+	if(_array->values!=NULL)DISOWNED(_array->values,owner_array);
 	return DISOWNED(_array,owner_array);
 }
 #endif
+/**
+ * @brief returns a new M array
+ * 
+ * @param source the id of the requestee
+ * @return Marray* a new M array
+ */
 Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _array=CALLOC_1(sizeof(Marray),'A',owner);
+	if(NULL==_array)return NULL;
 	return DISOWNED_ARRAY(_array,owner);
 }
+/**
+ * @brief returns a new array containing \p numberOfValues M value slots
+ * 
+ * @param source 
+ * @param numberOfValues the number of M value slots to create in the M array
+ * @return Marray* a new array containing \p numberOfValues M value slots
+ */
 Marray* _getArray(char* source,unsigned long long numberOfValues){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _array=owned_array(__array(source),owner);
-	if(!_array)return NULL;
+	if(NULL==_array)return NULL;
 	if(numberOfValues>0){ // _array->values should be initialized to accomodate the given number of values
 		_array->values=CALLOC(sizeof(Mvalue*),numberOfValues,-'a',Msubowner(owner,1));
-		if(!_array->values){FREE_DISOWNED_1(_array,'A',owner);return NULL;}
+		if(NULL==_array->values){FREE_DISOWNED_1(_array,'A',owner);return NULL;}
 		_array->numberOfElements=numberOfValues; // OOPS almost forgot this!!!!
 	}
 	return DISOWNED_ARRAY(_array,owner);
 }
+/**
+ * @brief frees the first \p numberOfValues elements from \p values
+ * @details freeing an M value pointer means assigning NULL to it, effectively decrementing the M value reference count
+ * @param values 
+ * @param numberOfValues 
+ */
 void free_values(Mvalue** values,unsigned long long numberOfValues){
-	if(!values)return;
+	if(NULL==values)return;
 	// disconnect every stored value
 	unsigned long long l=0;while(l<numberOfValues)assignValue(&values[l++],NULL);
 	FREE(values,numberOfValues,-'a');
 }
+/**
+ * @brief frees M array \p _array
+ * @param _array
+ */
 void free_array(Marray* _array/*,Mallocationowner owner*/){
-	if(!_array)return;
+	if(NULL==_array)return;
 	// if we have values, we should disconnect them from their values (see free_values)
-	if(_array->values)free_values(_array->values,_array->numberOfElements);
+	if(_array->values!=NULL)free_values(_array->values,_array->numberOfElements);
 	FREE_1(_array,'A');
 }
 
 #ifndef __PRODUCTION__
+/**
+ * @brief returns \p _mapelement owned by \p owner_mapelement
+ * 
+ * @param _mapelement 
+ * @param owner_mapelement 
+ * @return Mmapelement* returns \p _mapelement owned by \p owner_mapelement
+ */
 Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
 	if(!_mapelement)return NULL;
 	owned_mapelement(_mapelement->_next,owner_mapelement);
 	owned_variable(_mapelement->_variable,Msubowner(owner_mapelement,1));
 	return OWNED(_mapelement,owner_mapelement);
 }
+/**
+ * @brief returns \p _mapelement disowned by \p owner_mapelement
+ * 
+ * @param _mapelement 
+ * @param owner_mapelement 
+ * @return Mmapelement* returns \p _mapelement disowned by \p owner_mapelement
+ */
 Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
 	if(!_mapelement)return NULL;
 	disowned_mapelement(_mapelement->_next,owner_mapelement);
@@ -309,16 +361,21 @@ Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner
 	return DISOWNED(_mapelement,owner_mapelement);
 }
 #endif
+/**
+ * @brief frees map element \p _mapelement
+ * @details if \p weak is true, \p _mapelement  
+ * @returns the number of freed map elements, M_LL_INVALID if _mapelement is NULL
+ */
 long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	long long result=M_LL_INVALID;
-	if(_mapelement){
+	if(_mapelement!=NULL){
 		if(report)
 			output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
-		result=(_mapelement->_next?free_mapelement(_mapelement->_next,weak):0);
+		result=(_mapelement->_next!=NULL?free_mapelement(_mapelement->_next,weak):0);
 		_mapelement->_next=NULL;
-		if(_mapelement->_variable){
-			if(_mapelement->_variable->_name){
+		if(_mapelement->_variable!=NULL){
+			if(_mapelement->_variable->_name!=NULL){
 				if(report)
 					output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
 			}else
@@ -334,25 +391,49 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
 	}
 	return result;
 }/* VALIDATED */
+
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _map owned by \p owner_map
+ * 
+ * @param _map 
+ * @param owner_map 
+ * @return Mmap* \p _map owned by \p owner_map
+ */
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
 	if(!_map)return NULL; // MDH@22OCT2020: this was missing before, which was causing crashes
 	if(_map->_creator)owned_chars(_map->_creator,Msubowner(owner_map,1)); // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
 	if(_map->_first)owned_mapelement(_map->_first,Msubowner(owner_map,1));
 	return OWNED(_map,owner_map);
 }
+/**
+ * @brief returns \p _map disowned by \p owner_map
+ * 
+ * @param _map 
+ * @param owner_map 
+ * @return Mmap* \p _map disowned by \p owner_map
+ */
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
 	if(!_map)return NULL;
 	if(_map->_creator)disowned_chars(_map->_creator,owner_map); // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
 	if(_map->_first)disowned_mapelement(_map->_first,owner_map);
 	return DISOWNED(_map,owner_map);
 }
+#endif
 // MDH@01NOV2020: why wasn't this here before?
+/**
+ * @brief returns a new M map
+ * 
+ * @param source the id of the requestee stored in the creator field of the new map
+ * @return Mmap* 
+ */
 Mmap* __map(char* source){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
-	if(source){
+	if(NULL==_map)return NULL;
+	if(source!=NULL){
 		output("Creating a map of source '%s'.\n",source);
 		_map->_creator=owned_chars(_getChars(source),Msubowner(owner,1)); 
-		if(!_map->_creator)
+		if(NULL==_map->_creator)
 			output("%sFailed to register map creator '%s'.\n",M_ERROR_PREFIX,source);
 		else
 		if(amVerboseDebugging())
@@ -360,11 +441,15 @@ Mmap* __map(char* source){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return disowned_map(_map,owner);
 }
+/**
+ * @brief frees M map \p _map
+ * @param _map
+ */
 void free_map(Mmap* _map/*,Mallocationowner owner*/){
-	if(!_map)return;
+	if(NULL==_map)return;
 	if(amVerboseDebugging())
 		output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
-	if(_map->_first){
+	if(_map->_first!=NULL){
 		free_mapelement(_map->_first,_map->weak);
 		_map->_first=NULL;
 	}else
@@ -374,33 +459,61 @@ void free_map(Mmap* _map/*,Mallocationowner owner*/){
 }/* VALIDATED */
 
 // MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _valuereference owned by \p owner_valuereference
+ * 
+ * @param _valuereference 
+ * @param owner_valuereference 
+ * @return Mvaluereference* \p _valuereference owned by \p owner_valuereference
+ */
 Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
-	if(!_valuereference){outputError("No value reference to disown!");return NULL;}
+	if(NULL==_valuereference){outputError("No value reference to disown!");return NULL;}
 		//output("%s disowning a value reference!",getAllocationOwnerText(owner_valuereference));
 		////output("Disowning value reference '%s'!\n",_valuereference->_name->chars);
 	disowned_chars(_valuereference->_name,owner_valuereference);
 	return DISOWNED(_valuereference,owner_valuereference);
 }
+/**
+ * @brief returns \p _valuereference disowned by \p owner_valuereference
+ * 
+ * @param _valuereference 
+ * @param owner_valuereference 
+ * @return Mvaluereference* \p _valuereference disowned by \p owner_valuereference
+ */
 Mvaluereference* owned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
-	if(!_valuereference)return NULL;
+	if(NULL==_valuereference)return NULL;
 		////output("Owning value reference '%s'!\n",_valuereference->_name->chars);
 	owned_chars(_valuereference->_name,owner_valuereference);
 	return OWNED(_valuereference,owner_valuereference);
 }
+#endif
+/**
+ * @brief frees M value reference \p _valuereference
+ * 
+ */
 void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/){
-	if(!_valuereference)return;
-	if(_valuereference->_name){freeChars(_valuereference->_name/*,owner*/);_valuereference->_name=NULL;}
+	if(NULL==_valuereference)return;
+	if(_valuereference->_name!=NULL){freeChars(_valuereference->_name/*,owner*/);_valuereference->_name=NULL;}
 	/* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
 	if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
 	*/
-	if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
+	if(_valuereference->_itemid!=NULL){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
 	FREE_1(_valuereference,'5'/*,owner*/); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
 }/* VALIDATED */
 // #define FREE_VALUEREFERENCE(_valuereference,owner_valuereference) free_reference(disowned_valuereference(_valuereference,owner_valuereference))
 
 // manage a list of created values
 // if we make a map out of it, we can annote the value with a name????
+/**
+ * @brief the global M value list where all M values are stored susceptible to being garbage collected
+ * 
+ */
 static Mlist* _valueList=NULL;
+/**
+ * @brief the total number of values in the global M value list
+ * 
+ */
 static unsigned long long valueCount=0; // MDH@16JUN2020: keeping track of the total number of values
 // MDH@28MAY2020: in one go we can set the owner of the value list, the owner of every element in the value list, the owner of each value in every element of the value list and finally that of any data bound to the value
 static Mallocationowner owner_valueList=(Mallocationowner){MI_VALUE,__LINE__,1};
@@ -408,13 +521,29 @@ static Mallocationowner owner_valueListelement=(Mallocationowner){MI_VALUE,__LIN
 static Mallocationowner owner_value=(Mallocationowner){MI_VALUE,__LINE__-2,1,2};
 static Mallocationowner owner_value_data=(Mallocationowner){MI_VALUE,__LINE__-3,1,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
+/**
+ * @brief returns the global M value owner
+ * 
+ * @return Mallocationowner the global M value owner
+ */
 Mallocationowner getValueOwner(){return owner_value;}
+/**
+ * @brief returns the global M value data owner
+ * 
+ * @return Mallocationowner the global M value data owner
+ */
 Mallocationowner getValueDataOwner(){return owner_value_data;}
+/**
+ * @brief returns a new M value appended to the global M value list
+ * 
+ * @param descriptor the id of the requestee
+ * @return Mvalue* 
+ */
 Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _value=NULL;
-	if(!_valueList){
+	if(NULL==_valueList){
 		_valueList=owned_list(__list("global value list"),owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
-		if(!_valueList){outputBug("Failed to create the global value list.");return NULL;}
+		if(NULL==_valueList){outputBug("Failed to create the global value list.");return NULL;}
 		// MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
 		//				as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
 		long long valueIndex=appendedToList(_valueList,owner_valueList,(Mvalue*)DISOWNED(CALLOC_1(sizeof(Mvalue),'U',owner),owner),M_LL_INVALID);
@@ -423,32 +552,37 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
 		_valueList->weak=true; // MDH@11NOV2019: from now on a weak list i.e. elements are not added using assignValue but directly
 	}
 	Mlistelement* _valueListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner_valueListelement); // both pointers NULL
-	if(_valueListelement){
+	if(_valueListelement!=NULL){
 		_value=(Mvalue*)CALLOC_1(sizeof(Mvalue),'X',owner_value); // MDH@07APR2020: should be 'X' not 'Y' // MDH@18MAY2020: immediately disown the Mvalue, because we return it 
-		if(_value){
+		if(_value!=NULL){
 			// shouldn't pose a problem now...
 			_valueListelement->_value=_value;
-			if(_valueList->_last)_valueList->_last->_next=_valueListelement;else _valueList->_first=_valueListelement;
+			if(_valueList->_last!=NULL)_valueList->_last->_next=_valueListelement;else _valueList->_first=_valueListelement;
 			_valueList->_last=_valueListelement;
 			_valueList->numberOfElements++;
 			// MDH@11NOV2019: by remembering the number of elements as index, removing intermediate elements will NOT prevent informing about what element was removed!!!
 			_valueListelement->index=(++valueCount); // MDH@17JUN2020 replacing: _valueList->numberOfElements;
-			if(descriptor)
+			if(descriptor!=NULL)
 			if(amVerboseDebugging())
 			output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
 		}else // couldn't get a new value, so free the value list element immediately
 			FREE_DISOWNED_1(_valueListelement,'l',owner);
 	}
-	if(!_value)outputError("Failed to create value!"); // serious enough to report
+	if(NULL==_value)outputError("Failed to create value!"); // serious enough to report
 	return _value;
 }/* VALIDATED */
 // MDH@01MAY2019: 'local' function for freeing a value
 
 // MDH@28MAY2020: because we NEVER want anybody else then this module to call free_value, we made it static now
+/**
+ * @brief frees M value \p _value
+ * @details only the garbage collector should call free_value() that's why it's declared static
+ * @param _value
+ */
 static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
 	//////if(amVerbose()){output("Value of type '%s'",VALUETYPENAMES[_value->type]);outputValue(" to free: '",_value,"'.\n");}
 	// I do not need to free the value itself, only the pointers inside it
-	if(_value){
+	if(_value!=NULL){
 		switch(_value->type){
 			case VT_UNDEFINED:break;
 			case VT_TOKEN:if(_value->value._token){FREE_TOKEN(_value->value._token,owner_value_data);_value->value._token=NULL;}break;
@@ -474,14 +608,18 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
 		outputBug("No value to free!");
 }/* VALIDATED */
 
-extern const char* const VALUETYPENAMES[];
-
 // can be asked to remove unused values
 // TODO check whether it functions correctly (think so though)
+/**
+ * @brief returns the number of M values removed from the global M value list
+ * @details any M value whose reference count is zero will be removed (and freed)
+ * @param showInfo 
+ * @return size_t 
+ */
 size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(showInfo||(M_MODULE_DEBUGGING&MM_VALUE));
 	unsigned long long tofree=0,removed=0;
-	if(_valueList){
+	if(_valueList!=NULL){
 		if(report)
 			output("Garbage collecting unused values.\n");
 		Mallocationowner owner_valueListelement=Msubowner(owner_valueList,1);
@@ -489,10 +627,11 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 		Mlistelement* _valueListelement=_valueList->_first;
 		if(report)
 			output("Number of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
+		// 1. free all M values in the list of which the reference count is zero nulling that value list element reference to the M value
 		unsigned long long checked=0;
-		while(_valueListelement){
+		while(_valueListelement!=NULL){
 			checked++;
-			if(_valueListelement->_value){
+			if(_valueListelement->_value!=NULL){
 				if(showInfo){
 					output("\nChecking value #%llu with id %llu",checked,_valueListelement->index);
 					outputValue(": '",_valueListelement->_value,"'.\n");
@@ -501,26 +640,29 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 				if(_valueListelement->_value->count==0){ // unused
 					if(showInfo)output("Freeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
 					free_value(_valueListelement->_value);_valueListelement->_value=NULL; // essential to NULL so removing the value list elements below becomes possible
-					tofree++;
+					// MDH@15MAR2023 moved below: tofree++;
 				}else
 				if(showInfo)outputInfo("Still in use!");
 			}else
 				output("%sNo value stored in value #%llu.\n",M_BUG_PREFIX,checked); // technically a bug not an error
+			if(NULL==_valueListelement->_value)tofree++; // MDH@15MAR2023: every list element with NULL value is removable!!!
 			_valueListelement=_valueListelement->_next;
 		}
 		if(report)
 			output("Number of values checked: %llu.\nNumber of values to remove: %llu.\n",checked,tofree);
 		// the list is now intact, are we going to correct the links??????
+
+		// 2. if there are freed M values, i.e. 
 		if(tofree>0){ // some values were freed
 			Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
 			Mlistelement* _lastValueListelement=NULL; // the last value list element remaining
 			Mlistelement* _nextValueListelement;
 			_valueListelement=_valueList->_first;
-			while(_valueListelement){
+			while(_valueListelement!=NULL){
 				_nextValueListelement=_valueListelement->_next; // remember the next before freeing
 				if(_valueListelement->_value){ // this one is too remain in the list
-					if(!_firstValueListelement)_firstValueListelement=_valueListelement;
-					if(_lastValueListelement)_lastValueListelement->_next=_valueListelement;
+					if(NULL==_firstValueListelement)_firstValueListelement=_valueListelement;
+					if(_lastValueListelement!=NULL)_lastValueListelement->_next=_valueListelement;
 					_valueListelement->_next=NULL; // we can do this because we've already remembered the next one in the list at the start!!
 					_lastValueListelement=_valueListelement; // remember the last element in the list (now pointing to nothing as the last element should!!!
 				}else{ // this one is to be removed
@@ -530,13 +672,13 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 					if(_valueList->numberOfElements>0)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
 					*/
 					FREE_DISOWNED_1(_valueListelement,'l',owner_valueListelement);
-					if(showInfo)if(removed%1000==0)output("Removed values so far: %llu.\n",removed);
+					if(showInfo)if(removed%1000==0)output("M values removed so far: %llu.\n",removed);
 				}
 				// next to check!!!
 				_valueListelement=_nextValueListelement;
 			}
 			if(report)
-				output("Actual number of values removed: %llu.\n",removed);
+				output("Actual number of M values removed: %llu.\n",removed);
 			// update the first and last in the list (could both be NULL!!!)
 			_valueList->_first=_firstValueListelement;
 			_valueList->_last=_lastValueListelement;
@@ -546,7 +688,7 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 				_valueListelement=_valueList->_first;
 				while(_valueListelement){left++;_valueListelement=_valueListelement->_next;}
 				long long unaccounted=checked;unaccounted-=(left+removed);
-				output("Number of values left: %llu (unaccounted: %lld).\n",left,unaccounted);
+				output("Number of M values left: %llu (unaccounted: %lld).\n",left,unaccounted);
 			}
 		}
 	}
@@ -560,12 +702,24 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 	return removed;
 }/* VALIDATED */
 
+/**
+ * @brief returns the number of values in the global M value list
+ * 
+ * @return unsigned long long the number of M values in the global M value list
+ */
 unsigned long long getNumberOfValues(){
-	return (_valueList?_valueList->numberOfElements:0);
+	return (_valueList!=NULL?_valueList->numberOfElements:0);
 }/* VALIDATED */
 
+/**
+ * @brief decrements the reference count of M value \p _value
+ * @details will fail if \p _value is NULL
+ * @param _value 
+ * @return true on success
+ * @return false on failure
+ */
 bool decrementReferenceCount(Mvalue * const _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->count>0){(_value->count)--;return true;}
 		Mstring* _valueText=owned_string(_getValueText(_value,false),owner);
 		output("%sReference count of '%s' of type '%c' already zero.\n",M_BUG_PREFIX,string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
@@ -575,8 +729,15 @@ bool decrementReferenceCount(Mvalue * const _value){Mallocationowner owner=getOw
 		outputInfo("No value to decrement the reference count of.");
 	return false;
 }/* VALIDATED */
+/**
+ * @brief increments the reference count of M value \p _value
+ * @details will fail if \p _value is NULL
+ * @param _value 
+ * @return true on success
+ * @return false on failure
+ */
 bool incrementReferenceCount(Mvalue* _value){
-	if(_value){(_value->count)++;return true;}
+	if(_value!=NULL){(_value->count)++;return true;}
 	if(amVerbose())
 		outputInfo("No value to increment the reference count of.");
 	return false;
@@ -585,8 +746,15 @@ bool incrementReferenceCount(Mvalue* _value){
 // interface functions that use the above functions
 // wrapping the different value type instances
 // MDH@23MAY2020: why not return a global representing an undefined value (might be the first value in _valuelist)
+/**
+ * @brief returns the first M value on the global M value list which is considered the global undefined value
+ * 
+ * @return Mvalue* 
+ */
 Mvalue* _getUndefinedValue(){
-	return (_valueList?DISOWNED(_valueList->_first->_value,owner_valueList):NULL);
+	// MDH@15MAR2023: TODO should we actually disown that value, probably NOT
+	//                TODO perhaps we change this function to create the _valueList if need be (as we now do in __value), so we can call _getUndefinedValue() instead?????
+	return (_valueList!=NULL?DISOWNED(_valueList->_first->_value,owner_valueList):NULL);
 	// MDH@23MAY2020 replacing: return (Mvalue*)CALLOC_1(sizeof(Mvalue),'U',-getOwner(__LINE__));
 }/* VALIDATED */
 /*
@@ -598,8 +766,23 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 }// VALIDATED 
 */
 // MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _reference owned by \p owner_reference
+ * 
+ * @param _reference 
+ * @param owner_reference 
+ * @return Mreference* \p _reference owned by \p owner_reference
+ */
 Mreference* owned_reference(Mreference* _reference,Mallocationowner owner_reference){return DISOWNED(_reference,owner_reference);}
-Mreference* disowned_reference(Mreference* _reference,Mallocationowner owner_reference){return OWNED(_reference,owner_reference);}
+/**
+ * @brief returns \p _reference disowned by \p owner_reference
+ * 
+ * @param _reference 
+ * @param owner_reference 
+ * @return Mreference* \p _reference disowned by \p owner_reference
+ */Mreference* disowned_reference(Mreference* _reference,Mallocationowner owner_reference){return OWNED(_reference,owner_reference);}
+#endif
 void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
 	if(!reference)return;
 	if(reference->variable){
@@ -610,18 +793,31 @@ void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
 	}
 	FREE_1(reference,'Q'/*,owner_reference*/);
 }
-Mreference* _getReference(Mvariable* variable){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns a M reference to \p _variable
+ * 
+ * @param _variable 
+ * @return Mreference* a M reference to \p _variable
+ */
+Mreference* _getReference(Mvariable* _variable){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@11MAR2020: variable can now be NULL
 	Mreference* _reference=CALLOC_1(sizeof(Mreference),'Q',owner);
-	if(_reference){_reference->variable=SUBOWNED(variable,1);if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
+	if(NULL==_reference)return NULL;
+	_reference->variable=SUBOWNED(_variable,1);
+	if(_variable!=NULL)_reference->referenceindex=(++_variable->referencecount); // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
 	return DISOWNED(_reference,owner);
 }
-
+/**
+ * @brief returns a new M value wrapping M reference \p _reference
+ * @details will 
+ * @param _reference
+ * @return Mvalue* a new M value wrapping M reference \p _reference
+ */
 Mvalue* _getValueOfReference(Mreference* _reference/*,Mallocationowner owner_reference*/){
 	// MDH@19MAY2020: should we check whether _reference is ownable???????
-	if(!_reference){outputWarning("No reference to wrap.");return NULL;}
+	if(NULL==_reference){outputWarning("No reference to wrap.");return NULL;}
 	Mvalue* _referenceValue=__value("reference");
-	if(_referenceValue){
+	if(_referenceValue!=NULL){
 		_referenceValue->type=VT_REFERENCE;
 		_referenceValue->value._reference=(Misdisowned(_reference)?owned_reference(_reference,owner_value_data):_reference);
 	}else
@@ -629,10 +825,15 @@ Mvalue* _getValueOfReference(Mreference* _reference/*,Mallocationowner owner_ref
 	return _referenceValue;
 }
 // MDH@26MAY2020: new contract, if NULL is returned _decimal is NOT bound and should be freed if desirable...
+/**
+ * @brief returns a new M value wrapping M decimal \p _decimal
+ * @param _decimal
+ * return Mvalue* a new M value wrapping M decimal \p _decimal
+ */
 Mvalue* _getValueOfDecimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
-	if(!_decimal)return NULL;
+	if(NULL==_decimal)return NULL;
 	Mvalue* _decimalValue=__value("decimal");
-	if(_decimalValue){
+	if(_decimalValue!=NULL){
 		// outputDecimal("Wrapping decimal '",_decimal,"'.\n"); // DEBUG
 		_decimalValue->type=VT_DECIMAL;
 		_decimalValue->value._decimal=(Misdisowned(_decimal)?owned_decimal(_decimal,owner_value_data):_decimal);
@@ -640,9 +841,13 @@ Mvalue* _getValueOfDecimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/
 	if(Misdisowned(_decimal))free_decimal(_decimal);
 	return _decimalValue;
 }/* VALIDATED */
-
+/**
+ * @brief returns a new M value wrapping M big integer \p _biginteger
+ * @param _biginteger
+ * @return a new M value wrapping M big integer \p _biginteger
+ */
 Mvalue* _getValueOfBiginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/){
-	if(!_biginteger)return NULL;
+	if(NULL==_biginteger)return NULL;
 	Mvalue* _bigintegerValue=__value("biginteger");
 	if(_bigintegerValue){
 		_bigintegerValue->type=VT_BIGINTEGER;
@@ -652,49 +857,86 @@ Mvalue* _getValueOfBiginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_
 	return _bigintegerValue;
 }/* VALIDATED */
 
+/**
+ * @brief returns a new M value wrapping long double \p ld
+ * 
+ * @param ld 
+ * @return Mvalue* a new M value wrapping long double \p ld
+ */
 Mvalue* _getFloatValue(long double ld){
 	if(amVerboseDebugging())output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
 	Mvalue* _floatValue=__value("long double");
-	if(!_floatValue)return NULL;
+	if(NULL==_floatValue)return NULL;
 	_floatValue->type=VT_FLOAT;
 	_floatValue->value._float=owned_float(_getFloat(ld),owner_value_data);
 	return _floatValue;
 }/* VALIDATED */
-Mvalue* _getIntegerValue(long long ll){
-	if(amVerboseDebugging())output("Wrapping integer '%lld'.\n",ll);
+/**
+ * @brief returns a new M value wrapping long long \p ll
+ * 
+ * @param ll 
+ * @return Mvalue* a new M value wrapping long long \p ll
+ */
+Mvalue* _getIntegerValue(long long ll){Mallocationowner owner=getOwner(__LINE__);
+	//////if(amVerboseDebugging())output("Wrapping integer '%lld'.\n",ll);
+	Minteger* _integer=owned_integer(_getInteger(ll),owner);
+	if(NULL==_integer)return NULL;
 	Mvalue* _integerValue=__value("integer");
-	if(!_integerValue)return NULL;
+	if(NULL==_integerValue){free_integer(disowned_integer(_integer,owner));return NULL;}
 	_integerValue->type=VT_INTEGER;
-	_integerValue->value._integer=owned_integer(_getInteger(ll),owner_value_data);
+	_integerValue->value._integer=owned_integer(disowned_integer(_integer,owner),owner_value_data);
 	return _integerValue;
 }/* VALIDATED */
 // MDH@25MAY2020: s is a constant character array that does not need change ownership (because it is supposed to be owned elsewhere or not owned)
-Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){
-	if(!s)return NULL; // when no input, no go
+/**
+ * @brief returns a new M value wrapping the M text wrapping C string \p s
+ * @param s
+ * @result a new M value wrapping the M text wrapping C string \p s
+ */
+Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==s)return NULL; // when no input, no go
+	Mtext* _text=owned_text(_getText(s),owner);
+	if(NULL==_text)return NULL;
 	// output("Retrieving the text value of '%s' of length %zd.\n",s,strlen(s)); // DEBUG
 	Mvalue* _textValue=__value("text"); // the result, when NULL check freeonfailure
-	if(!_textValue)return NULL;
+	if(NULL==_textValue){free_text(disowned_text(_text,owner));return NULL;}
 	_textValue->type=VT_TEXT;
-	_textValue->value._text=owned_text(_getText(s),owner_value_data);
+	_textValue->value._text=owned_text(disowned_text(_text,owner),owner_value_data);
 	return _textValue;
 }/* VALIDATED */
-Mvalue* _getCharTextValue(char _c){
+/**
+ * @brief returns a new M value wrapping a M text wrapping the C string of character \p c
+ * 
+ * @param _c 
+ * @return Mvalue* a new M value wrapping a M text wrapping the C string of character \p c
+ */
+Mvalue* _getCharTextValue(char _c){Mallocationowner owner=getOwner(__LINE__);
+	Mtext* _text=owned_text(_getCharText(_c),owner);
+	if(NULL==_text)return NULL;
 	Mvalue* _textValue=__value("char");
-	if(!_textValue)return NULL;
+	if(NULL==_textValue){free_text(disowned_text(_text,owner));return NULL;}
 	_textValue->type=VT_TEXT;
-	_textValue->value._text=owned_text(_getCharText(_c),owner_value_data);
+	_textValue->value._text=owned_text(disowned_text(_text,owner),owner_value_data);
 	return _textValue;
 }/* VALIDATED */
 // we can force all listelements to have the same type????
+/**
+ * @brief returns a new M value wrapping a new weak or strong M list with elements of type \p listValuetype 
+ * 
+ * @param listValuetype 
+ * @param weak 
+ * @param source 
+ * @return Mvalue* a new M value wrapping a new weak or strong M list with elements of type \p listValuetype
+ */
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
-	Mlist* _list=owned_list(__list(source?source:"_getListValue"),owner);
-	if(!_list){
+	Mlist* _list=owned_list(__list(source!=NULL?source:"_getListValue"),owner);
+	if(NULL==_list){
 		// if(amVerboseDebugging())
 			outputError("Failed to create a list.\n");
 		return NULL;
 	}
 	Mvalue* _listValue=__value(weak?"weak list":"strong list");
-	if(!_listValue){
+	if(NULL==_listValue){
 		FREE_LIST(_list,owner);
 		return NULL;
 	}
@@ -704,16 +946,26 @@ Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const sour
 	_listValue->value._list=owned_list(disowned_list(_list,owner),owner_value_data);
 	return _listValue;
 }/* VALIDATED */
-
+/**
+ * @brief returns an M list containing the indices of the elements of M list \p list
+ * 
+ * @param list 
+ * @return Mlist* an M list containing the indices of the elements of M list \p list
+ */
 Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _list=owned_list(_getListOfType(VT_INTEGER),owner);
-	if(!_list)return NULL;
+	if(NULL==_list)return NULL;
 	Mlistelement* listelement=list->_first;
-	while(listelement){
+	while(listelement!=NULL){
 		Mvalue* indexValue=_getIntegerValue(listelement->index);
+		if(indexValue==NULL){
+			outputError("Failed to create a list index value.");
+			break;
+		}
 		if(appendedToList(_list,owner,indexValue,M_LL_INVALID)<=0){
 			// NO need to free indexValue because it is a Value!!!
-			outputError("Failed to append list element index");break;
+			outputError("Failed to append list element index");
+			break;
 		}
 		listelement=listelement->_next;
 	}
@@ -721,11 +973,17 @@ Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner
 }/* VALIDATED */
 
 // MDH@19JUN2020: if something goes wrong reversing the list NULL is returned!!!
-Mlist* _getReversedList(Mlist const * const list){if(!list)return NULL;Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns an M list containing the elements in M list \p list in reverse order
+ * 
+ * @param list 
+ * @return Mlist* an M list containing the elements in M list \p list in reverse order
+ */
+Mlist* _getReversedList(Mlist const * const list){if(NULL==list)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _list=owned_list(_getListOfType(list->valuetype),owner); // make a list of the same type as the list argument
-	if(!_list)return NULL;
+	if(NULL==_list){outputError("Failed to create a M list");return NULL;}
 	Mlistelement* listelement=list->_first;
-	while(listelement){
+	while(listelement!=NULL){
 		if(appendedToList(_list,owner,listelement->_value,0)<=0){FREE_LIST(_list,owner);return NULL;}
 		listelement=listelement->_next;
 	}
@@ -736,30 +994,38 @@ Mlist* _getReversedList(Mlist const * const list){if(!list)return NULL;Mallocati
 //				let's assume that NULL means something went wrong, caller should take care of situation where value is NULL unless ?TODO? we allow putting a NULL value in the list
 //				reversed tells _getFlattenedList to prepend instead of append
 // MDH@06APR2020: passing in a flatten level that is decremented on each element and when it reaches 0 no flattening has to occur
+/**
+ * @brief returns a new M list with the successive non-list elements in the M list wrapped in \p value
+ * 
+ * @param value 
+ * @param flattenLevel 
+ * @param reversed whether or not to return the elements in reverse order
+ * @return Mlist* a new M list with the successive non-list elements in the M list wrapped in \p value
+ */
 Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _list=NULL;
-	if(value){
+	if(value!=NULL){
 		if(amVerboseDebugging())
 			outputValue("Flattening '",value,"'.\n");
 		_list=owned_list(_getListOfType(VT_UNDEFINED),owner);
-		if(_list){
+		if(_list!=NULL){
 			bool success=true;
 			if(value->type==VT_LIST){
 				// we have to flatten all elements in the list obviously before we can actually add them to _list
 				// if the list is empty we do NOT consider this an error, we simply do nothing
 				Mlistelement* valueListelement=(value->value._list?value->value._list->_first:NULL);
-				while(valueListelement){
+				while(valueListelement!=NULL){
 					// if there is a value associated _getFlattenedList should NOT return NULL (so NULL would represent an error)
-					if(valueListelement->_value){
+					if(valueListelement->_value!=NULL){
 						// MDH@31MAR2020: a little more effort to check if the value is a list in which case flattening is required, otherwise it is not
 						// MDH@06APR2020: if flattenLevel>0 we need to add all list elements individually instead of all together
 						if(flattenLevel>0&&valueListelement->_value->type==VT_LIST){
 							Mlist* _subList=owned_list(_getFlattenedList(valueListelement->_value,(flattenLevel>0?flattenLevel-1:0),reversed),owner);
-							if(_subList){
+							if(_subList!=NULL){
 								Mlistelement* valueSubListelement=_subList->_first;
-								while(valueSubListelement){
+								while(valueSubListelement!=NULL){
 									// if supposed to return the prepend instead of append pass in 0 instead of M_LL_INVALID
-									if(valueSubListelement->_value)if(appendedToList(_list,owner,valueSubListelement->_value,(reversed?0:M_LL_INVALID))<=0){success=false;break;}
+									if(valueSubListelement->_value!=NULL)if(appendedToList(_list,owner,valueSubListelement->_value,(reversed?0:M_LL_INVALID))<=0){success=false;break;}
 									valueSubListelement=valueSubListelement->_next;
 								}
 								// ALWAYS free _sublist
@@ -778,37 +1044,64 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
 		}	
 	}
 	if(amVerboseDebugging()){
-		if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}
+		if(_list!=NULL){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}
 	}
 	return disowned_list(_list,owner);
 }
-
+/**
+ * @brief return the first scalar in M value \p value
+ * 
+ * @param value 
+ * @return Mvalue* the first scalar in M value \p value
+ */
 Mvalue* getFirstScalarValue(Mvalue* value){
-	if(!value)return NULL;
-	if(value->type==VT_MAP)return NULL; // can't go into a map
-	if(value->type!=VT_LIST)return value;
-	Mlistelement* listelement=(value->value._list?value->value._list->_first:NULL);
-	while(listelement){
-		Mvalue* firstScalarValue=getFirstScalarValue(listelement->_value);
-		if(firstScalarValue)return firstScalarValue; // if this element is a scalar (i.e. defined and not a map or a list)
-		listelement=listelement->_next;
+	if(value!=NULL){
+		if(value->type==VT_MAP)return NULL; // can't go into a map
+		if(value->type==VT_LIST){
+			Mlistelement* listelement=(value->value._list!=NULL?value->value._list->_first:NULL);
+			while(listelement!=NULL){
+				Mvalue* firstScalarValue=getFirstScalarValue(listelement->_value);
+				if(firstScalarValue!=NULL)return firstScalarValue; // if this element is a scalar (i.e. defined and not a map or a list)
+				listelement=listelement->_next;
+			}
+			return NULL;
+		}
+		// MDH@15MAR2023: an array is also a composite non-scalar structure
+		if(value->type==VT_ARRAY){
+			Mvalue** values=(value->value._array!=NULL?value->value._array->values:NULL);
+			if(values!=NULL){
+				unsigned long long l=0;
+				while(l<value->value._array->numberOfElements){
+					Mvalue* firstScalarValue=getFirstScalarValue(value->value._array->values[l]);
+					if(firstScalarValue!=NULL)return firstScalarValue;
+					l++;
+				}
+			}
+			return NULL;
+		}
 	}
-	return NULL;
+	return value;
 }
 
+/**
+ * @brief returns a new M list with the attributes of M map \p map
+ * 
+ * @param map 
+ * @return Mlist* a new M list with the attributes of M map \p map
+ */
 Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _list=owned_list(_getListOfType(VT_TEXT),owner);
-	if(!_list)return NULL;
+	if(NULL==_list)return NULL;
 	Mmapelement* mapelement=map->_first;
-	while(mapelement){
+	while(mapelement!=NULL){
 		// I guess we'll have to duplicate the attribute name because it will be wrapped inside a Value
 		// this is a bit of an issue because typically text should be enquoted
 		Mstring* _attributeName=owned_string(_getString("'"),owner);
-		if(!_attributeName){outputError("Failed to duplicate a map attribute name");break;}
+		if(NULL==_attributeName){outputError("Failed to duplicate a map attribute name");break;}
 		string_append(_attributeName,mapelement->_variable->_name->chars); // MDH@17APR2020: char* _name replaced by Mchars* _name // append the attribute name
 		Mvalue* attributeValue=_getTextValue(string(_attributeName));
 		FREE_STRING(_attributeName,owner);
-		if(!attributeValue){outputError("Failed to store a map attribute name");break;}
+		if(NULL==attributeValue){outputError("Failed to store a map attribute name");break;}
 		if(appendedToList(_list,owner,attributeValue,M_LL_INVALID)<=0){
 			// NO need to free indexValue because it is a Value!!!
 			outputError("Failed to append map attribute name");break;
@@ -819,11 +1112,19 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
 }
 
 // MDH@23MAY2020: although a value is (weakly but permanently) stored in _valuelist we can set its owner to the function that created it
+/**
+ * @brief returns a new M value wrapping a new M map with value elements of type \p mapValuetype
+ * 
+ * @param mapValuetype 
+ * @param weak 
+ * @param source 
+ * @return Mvalue* a new M value wrapping a new M map with value elements of type \p mapValuetype
+ */
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
-	if(!_map)return NULL;
+	if(NULL==_map)return NULL;
 	Mvalue* _mapValue=__value(weak?"weak map":"strong map");
-	if(_mapValue){
+	if(_mapValue!=NULL){
 		_map->weak=weak;
 		_map->valuetype=mapValuetype;
 		_mapValue->type=VT_MAP;
@@ -839,50 +1140,78 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,char const * const source
 // the point is that we cannot free an integer or obtain ownership if owner_integer is not correct
 // however, it should be possibly to bind _integer to the value that is created in which case we should be able to obtain ownership
 // meaning that whatever we receive should be a disowned integer unless we do a super own
+/**
+ * @brief returns a new M value wrapping M integer \p _integer
+ * @details will free \p integer if not wrapped if \p integer is currently disowned
+ * @param _integer
+ * @result a new M value wrapping M integer \p _integer
+ */
 Mvalue* _getValueOfInteger(Minteger* _integer/*,Mallocationowner owner_integer*/){
-	if(!_integer)return NULL;
+	if(NULL==_integer)return NULL;
+	bool disowned_integer=Misdisowned(_integer);
 	Mvalue* _value=__value("integer"); // make the value create have the same owner as the integer
-	if(_value)
-	{_value->value._integer=(Misdisowned(_integer)?owned_integer(_integer,owner_value_data):_integer);_value->type=VT_INTEGER;}
-	else 
-	if(Misdisowned(_integer))
+	if(_value!=NULL)
+	{_value->value._integer=(disowned_integer?owned_integer(_integer,owner_value_data):_integer);_value->type=VT_INTEGER;}
+	else
+	if(disowned_integer)
 		free_integer(_integer);
 	return _value;
 }/* VALIDATED */
+/**
+ * @brief returns a new M value wrapping M float \p _float
+ * @details will free \p _float if not wrapped if \p _float is currently disowned
+ * @param _float
+ * @result a new M value wrapping M float \p _float
+ */
 Mvalue* _getValueOfFloat(Mfloat* _float/*,Mallocationowner owner_float*/){
-	if(!_float)return NULL;
+	if(NULL==_float)return NULL;
+	bool disowned_float=Misdisowned(_float);
 	Mvalue* _value=__value("float");
-	if(_value)
-	{_value->value._float=(Misdisowned(_float)?owned_float(_float,owner_value_data):_float);_value->type=VT_FLOAT;}
+	if(_value!=NULL)
+	{_value->value._float=(disowned_float?owned_float(_float,owner_value_data):_float);_value->type=VT_FLOAT;}
 	else 
-	if(Misdisowned(_float))
+	if(disowned_float)
 		free_float(_float);
 	return _value;
 }/* VALIDATED */
+/**
+ * @brief returns a new M value wrapping M map \p _map
+ * @details will free \p _map if not wrapped if \p _map is currently disowned
+ * @param _map
+ * @result a new M value wrapping M map \p _map
+ */
 Mvalue* _getValueOfMap(Mmap* _map/*,Mallocationowner owner_map*/){
-	if(!_map)return NULL;
+	if(NULL==_map)return NULL;
+	bool disowned_map=Misdisowned(_map);
 	Mvalue* _value=__value("map");
-	if(_value)
-	{_value->value._map=(Misdisowned(_map)?owned_map(_map,owner_value_data):_map);_value->type=VT_MAP;}
+	if(_value!=NULL)
+	{_value->value._map=(disowned_map?owned_map(_map,owner_value_data):_map);_value->type=VT_MAP;}
 	else 
-	if(Misdisowned(_map))free_map(_map);
+	if(disowned_map)free_map(_map);
 	return _value;
 }/* VALIDATED */
+/**
+ * @brief returns a new M value wrapping M token \p _token
+ * @details will free \p _token if not wrapped if \p _token is currently disowned
+ * @param _token
+ * @result a new M value wrapping M token \p _token
+ */
 Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/){
-	if(!_token)return NULL;
+	if(NULL==_token)return NULL;
+	bool disowned_token=Misdisowned(_token);
 	Mvalue* _value=__value("token");
-	if(_value)
-	{_value->value._token=(Misdisowned(_token)?owned_token(_token,owner_value_data):_token);_value->type=VT_TOKEN;}
+	if(_value!=NULL)
+	{_value->value._token=(disowned_token?owned_token(_token,owner_value_data):_token);_value->type=VT_TOKEN;}
 	else 
-	if(Misdisowned(_token))free_token(_token);
+	if(disowned_token)free_token(_token);
 	return _value;
 }/* VALIDATED */
 // MDH@07DEC2020: why wasn't this defined before??????
 Mvalue* _getValueOfText(Mtext* _text){
-	if(!_text)return NULL;
+	if(NULL==_text)return NULL;
 	bool disowned_text=Misdisowned(_text); // if _text is currently disowned we're going to free it if we fail to wrap it in a value
 	Mvalue* _value=__value("text");
-	if(_value)
+	if(_value!=NULL)
 	{_value->value._text=(disowned_text?owned_text(_text,owner_value_data):_text);_value->type=VT_TEXT;}
 	else
 	if(disowned_text)free_text(_text);
@@ -898,21 +1227,41 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 }*/
 
 // MDH@09JUN2020: interface between _getVariable (now requiring a Mchars name) and all that still use a char* thing
+/**
+ * @brief returns a new M variable with name \p name and value type \p valuetype
+ * 
+ * @param name 
+ * @param valuetype 
+ * @param immutable sets the immutable flag of the new M variable returned
+ * @param owner_variable 
+ * @return Mvariable* a new M variable with name \p name and value type \p valuetype
+ */
 static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){
 	// MDH@21OCT2020: A HA we should allow the name of a variable to be empty (as in maps)
-	if(!name/*||strlen(name)==0*/)return NULL;//Mallocationowner owner=getOwner(__LINE__);
-	return owned_variable(_getVariable(_getChars(name),valuetype,immutable),owner_variable);
+	if(NULL==name/*||strlen(name)==0*/)return NULL;//Mallocationowner owner=getOwner(__LINE__);
+	Mchars* name_chars=_getChars(name);
+	if(NULL==name_chars)return NULL;
+	Mvariable* _variable=owned_variable(_getVariable(name_chars,valuetype,immutable),owner_variable);
+	if(NULL==_variable)free_chars(name_chars,1,strlen(name)+1,'\''); // MDH@15MAR2023: TODO we should change free_chars, to NOT need any arguments since we can determine these from the contained C string pointer!
+	return _variable;
 }
 // helper function to create a parameter map with a single value
 // the following is a nuisance
+/**
+ * @brief returns a new M map containing a property with name \p name and value \p _floatValue
+ * 
+ * @param name 
+ * @param _floatValue 
+ * @return Mmap* a new M map containing a property with name \p name and value \p _floatValue
+ */
 Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwner(__LINE__);
-	if(name&&_floatValue){
+	if(name!=NULL&&_floatValue!=NULL){
 		Mvariable* _realVariable=_getVariableWithName(name,VT_FLOAT,true,Msubowner(owner,2)); // MDH@11JUN2020: _getChars(name) returns a disowned pointer that we need in _getVariable()
-		if(_realVariable){
+		if(_realVariable!=NULL){
 			Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
-			if(_mapelement){
+			if(_mapelement!=NULL){
 				Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
-				if(_map){
+				if(_map!=NULL){
 					assignValue(&_realVariable->_value,_floatValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
 					_mapelement->_variable=_realVariable;
 					_map->numberOfElements=1;
@@ -932,13 +1281,19 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
 	}
 	return NULL;
 }/* VALIDATED */
-Mmap* _getMap(char* name){if(!name)return NULL;Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns a new M map containing a property with name \p name with a value of type undefined (i.e. without a value)
+ * 
+ * @param name 
+ * @return Mmap* a new M map containing a property with name \p name with a value of type undefined (i.e. without a value)
+ */
+Mmap* _getMap(char* name){if(NULL==name)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvariable* _variable=_getVariableWithName(name,VT_UNDEFINED,true,Msubowner(owner,2));
-	if(_variable){
+	if(_variable!=NULL){
 		Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
-		if(_mapelement){
+		if(_mapelement!=NULL){
 			Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
-			if(_map){
+			if(_map!=NULL){
 				_map->numberOfElements=1;
 				_mapelement->_variable=_variable; // TODO we can do this better given the new disowned_map usage
 				_map->_first=_mapelement;
@@ -952,26 +1307,31 @@ Mmap* _getMap(char* name){if(!name)return NULL;Mallocationowner owner=getOwner(_
 		output("%sFailed to create map '%s'.\n",M_ERROR_PREFIX,name);
 	return NULL;
 }/* VALIDATED */
-
+/**
+ * @brief returns a new M map copy of M map \p map
+ * 
+ * @param map 
+ * @return Mmap* a new M map copy of M map \p map
+ */
 Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
-	if(map){
+	if(map!=NULL){
 		Mmap* _map=owned_map(_getMapOfType(map->valuetype),owner);
-		if(_map){
+		if(_map!=NULL){
 			Mvariable *mapelementVariable,*_mapelementVariable=NULL;
 			Mmapelement *mapelement=map->_first,*_mapelement=NULL;
-			while(mapelement){
+			while(mapelement!=NULL){
 				mapelementVariable=mapelement->_variable;
-				if(mapelementVariable){
+				if(mapelementVariable!=NULL){
 					_mapelement=CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1)); // new map element to hold a copy
-					if(_mapelement){
+					if(_mapelement!=NULL){
 						// create a variable with the same name and value as the variable in mapelement
 						// MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
 						_mapelement->_variable=_getVariableWithName(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/,Msubowner(owner,2));
-						if(_mapelement->_variable){
+						if(_mapelement->_variable!=NULL){
 							assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the value over
-							if(_map->_last)_map->_last->_next=_mapelement; // make the current last point to the new last
+							if(_map->_last!=NULL)_map->_last->_next=_mapelement; // make the current last point to the new last
 							_map->_last=_mapelement; // replace current last by the new last
-							if(!_map->_first)_map->_first=_map->_last; // initialize first if necessary
+							if(NULL==_map->_first)_map->_first=_map->_last; // initialize first if necessary
 							_map->numberOfElements++; // count one more
 						}else
 							output("%sFailed to copy the map attribute name '%s'.\n",M_ERROR_PREFIX,mapelementVariable->_name->chars);
@@ -986,21 +1346,27 @@ Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE
 	}
 	return NULL;
 }
+/**
+ * @brief returns a new M list copy of M list \p list
+ * 
+ * @param list 
+ * @return Mlist* a new M list copy of M list \p list
+ */
 Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
-	if(list){
+	if(list!=NULL){
 		Mlist* _list=owned_list(_getListOfType(list->valuetype),owner);
-		if(_list){
+		if(_list!=NULL){
 			Mlistelement *listelement=list->_first,*_listelement=NULL;
-			while(listelement){
+			while(listelement!=NULL){
 				_listelement=CALLOC_1(sizeof(Mlistelement),'l',Msubowner(owner,1));
-				if(_listelement){
+				if(_listelement!=NULL){
 					// 'copy' the value over, here we have the same problem as with copying any other value: if the value to copy is composite (a list or a map) we should copy by value i.e. point to a new map or list and not to the original
 					// technically we could let assignValue() take care of that 
 					assignValue(&_listelement->_value,listelement->_value); // no need to 'copy' the value itself, we only need to make another (strong) reference to that value
 					_listelement->index=listelement->index;
-					if(_list->_last)_list->_last->_next=_listelement;
+					if(_list->_last!=NULL)_list->_last->_next=_listelement;
 					_list->_last=_listelement;
-					if(!_list->_first)_list->_first=_list->_last;
+					if(NULL==_list->_first)_list->_first=_list->_last;
 					_list->numberOfElements++;
 				}else 
 					outputError("Failed to copy a list element");
@@ -1012,11 +1378,17 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
 	}
 	return NULL;
 }
+/**
+ * @brief returns a new M array copy from M array \p array
+ * 
+ * @param array 
+ * @return Marray* a new M array copy from M array \p array
+ */
 Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
-	if(array){
+	if(array!=NULL){
 		register unsigned long long arrayindex=array->numberOfElements; // MDH@24NOV2020: HOORAY my first time use of 'register'
 		Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex),owner);
-		if(_array){
+		if(_array!=NULL){
 			if(arrayindex>0){
 				Mvalue **newvalueholder=_array->values+arrayindex,**valueholder=array->values+arrayindex;
 				do assignValue(--newvalueholder,*(--valueholder));while(--arrayindex>0);
@@ -1029,15 +1401,22 @@ Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwne
 }
 
 // MDH@24MAY2020: more convenient to be able to make any map with a certain number of arguments with names and types
+/**
+ * @brief returns a one argument map with name \p name and attribute value type \p valuetype
+ * 
+ * @param name 
+ * @param valuetype 
+ * @return Mmap* a one argument map with name \p name and attribute value type \p valuetype
+ */
 static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE wait with filling the single integer value map until we have all the ingredients
-	if(name&&strlen(name)>0){
+	if(name!=NULL&&strlen(name)>0){
 		Mvariable* _variable=_getVariableWithName(name,valuetype,true,Msubowner(owner,2));
-		if(_variable){
+		if(_variable!=NULL){
 			Mmapelement* _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
-			if(_mapelement){
+			if(_mapelement!=NULL){
 				Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
-				if(_map){
+				if(_map!=NULL){
 					_mapelement->_variable=_variable;
 					_map->numberOfElements=1;
 					_map->_first=_mapelement;
@@ -1054,26 +1433,40 @@ static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowne
 	}
 	return NULL;
 }
+/**
+ * @brief returns a new M map of type VT_INTEGER initialized to contain an attribute with name \p name and value \p _integerValue
+ * 
+ * @param name 
+ * @param _integerValue 
+ * @return Mmap* a new M map of type VT_INTEGER initialized to contain an attribute with name \p name and value \p _integerValue
+ */
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE wait with filling the single integer value map until we have all the ingredients
-	if(!name||strlen(name)==0)return NULL;
+	if(NULL==name||strlen(name)==0)return NULL;
 	Mmap* _integerMap=owned_map(_getOneArgumentMap(name,VT_INTEGER),owner);
-	if(_integerMap&&_integerValue){
+	if(_integerMap!=NULL&&_integerValue!=NULL){
 		assignValue(&_integerMap->_first->_variable->_value,_integerValue);
 		return disowned_map(_integerMap,owner);
 	}
-	if(_integerMap)FREE_MAP(_integerMap,owner);
+	if(_integerMap!=NULL)FREE_MAP(_integerMap,owner);
 	return NULL;
 }/* VALIDATED */
+/**
+ * @brief returns a new M map of type VT_LIST initialized with an attribute with name \p name and value \p _listValue
+ * 
+ * @param name 
+ * @param _listValue 
+ * @return Mmap* a new M map of type VT_LIST initialized with an attribute with name \p name and value \p _listValue
+ */
 Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__);
-	if(!name||strlen(name)==0)return NULL;
-	if(!_listValue){
+	if(NULL==name||strlen(name)==0)return NULL;
+	if(NULL==_listValue){
 		// if(amVerboseDebugging())
 			output("Unable to create list map: no list value to put in list.\n");
 		return NULL;
 	}
 	Mmap* _listMap=owned_map(_getOneArgumentMap(name,VT_LIST),owner);
-	if(!_listMap){
+	if(NULL==_listMap){
 		// if(amVerboseDebugging())
 		   output("%sFailed to create a one argument list map.\n",M_ERROR_PREFIX);
 		return NULL;
@@ -1081,15 +1474,22 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
 	assignValue(&_listMap->_first->_variable->_value,_listValue);
 	return disowned_map(_listMap,owner);
 }/* VALIDATED */
+/**
+ * @brief returns a new map of type VT_MAP initialized with an attribute with name \p name and value \p _mapValue
+ * 
+ * @param name 
+ * @param _mapValue 
+ * @return Mmap* a new map of type VT_MAP initialized with an attribute with name \p name and value \p _mapValue
+ */
 Mmap* _getMapMap(char* name,Mvalue* _mapValue){Mallocationowner owner=getOwner(__LINE__);
-	if(!name||strlen(name)==0)return NULL;
-	if(!_mapValue){
+	if(NULL==name||strlen(name)==0)return NULL;
+	if(NULL==_mapValue){
 		// if(amVerboseDebugging())
 			output("Unable to create map map: no map value to put in map.\n");
 		return NULL;
 	}
 	Mmap* _mapMap=owned_map(_getOneArgumentMap(name,VT_MAP),owner);
-	if(!_mapMap){
+	if(NULL==_mapMap){
 		// if(amVerboseDebugging())
 		   output("%sFailed to create a one argument map map.\n",M_ERROR_PREFIX);
 		return NULL;
@@ -1098,17 +1498,26 @@ Mmap* _getMapMap(char* name,Mvalue* _mapValue){Mallocationowner owner=getOwner(_
 	return disowned_map(_mapMap,owner);
 }/* VALIDATED */
 
+/**
+ * @brief returns a two argument M map with attributes with name \p name1 and \p name2 with value of value types \p valuetype1 and \p valuetype2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @param valuetype1 
+ * @param valuetype2 
+ * @return Mmap* a two argument M map with attributes with name \p name1 and \p name2 with value of value types \p valuetype1 and \p valuetype2 respectively
+ */
 static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);
-	if(name1&&name2){
+	if(name1!=NULL&&name2!=NULL){
 		if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
 			Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 			Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
-			if(_mapelement1&&_mapelement2){
+			if(_mapelement1!=NULL&&_mapelement2!=NULL){
 				Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
-				if(_map){
+				if(_map!=NULL){
 					_mapelement1->_variable=_getVariableWithName(name1,valuetype1,true,Msubowner(owner,2));
 					_mapelement2->_variable=_getVariableWithName(name2,VT_INTEGER,true,Msubowner(owner,2));
-					if(_mapelement1->_variable&&_mapelement2->_variable){
+					if(_mapelement1->_variable!=NULL&&_mapelement2->_variable!=NULL){
 						_map->_first=_mapelement1;
 						_mapelement1->_next=_mapelement2;
 						_map->_last=_mapelement2;
@@ -1130,28 +1539,89 @@ static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mv
 		outputError("Not both two map element names defined");
 	return NULL;	
 }
+/**
+ * @brief returns a two argument M map containing an integer and a boolean attribute with name \p name1 and \p name2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @return Mmap* a two argument M map containing an integer and a boolean attribute with name \p name1 and \p name2 respectively
+ */
 Mmap* _getIntegerBooleanMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_INTEGER,VT_INTEGER);}/* VALIDATED */
+/**
+ * @brief returns a two argument M map containing two string value attributes with name \p name1 and \p name2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @return Mmap* a two argument M map containing two string value attributes with name \p name1 and \p name2 respectively
+ */
 Mmap* _getStringStringMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_TEXT,VT_TEXT);}/* VALIDATED */
+/**
+ * @brief returns a two argument M map containing two float value attributes with name \p name1 and \p name2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @return Mmap* a two argument M map containing two float value attributes with name \p name1 and \p name2 respectively
+ */
 Mmap* _getFloatFloatMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_FLOAT,VT_FLOAT);}/* VALIDATED */
+/**
+ * @brief returns a two argument M map containing a map and a token attribute with name \p name1 and \p name2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @return Mmap* a two argument M map containing a map and a token attribute with name \p name1 and \p name2 respectively
+ */
 Mmap* _getMapTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_MAP,VT_TOKEN);}/* VALIDATED */
+/**
+ * @brief returns a two argument M map containing two token value attributes with name \p name1 and \p name2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @return Mmap* a two argument M map containing two token attribute with name \p name1 and \p name2 respectively
+
+ */
 Mmap* _getTokenTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
+/**
+ * @brief returns a two argument M map containing a list and a function attribute with name \p name1 and \p name2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @return Mmap* a two argument M map containing a list and a function attribute with name \p name1 and \p name2 respectively
+ */
 Mmap* _getListFunctionMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_LIST,VT_FUNCTION);}/* VALIDATED */
 // MDH@03NOV2020: allowing to specify the sort method to use (now 't' for timsort, 'm' for mergesort and 'q' (default) for quicksort)
+/**
+ * @brief returns a two argument M map containing a list and a text attribute with name \p name1 and \p name2 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @return Mmap* a two argument M map containing a list and a text attribute with name \p name1 and \p name2 respectively
+ */
 Mmap* _getListTextMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_LIST,VT_TEXT);}/* VALIDATED */
 
+/**
+ * @brief returns a new M map containing three attributes with names \p name1 , \p name2 and \p name3 with values of type \p valuetype1 , \p valuetype2 and \p valuetype3 respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @param valuetype1 
+ * @param valuetype2 
+ * @param valuetype3 
+ * @return Mmap* a new M map containing three attributes with names \p name1 , \p name2 and \p name3 with values of type \p valuetype1 , \p valuetype2 and \p valuetype3 respectively
+ */
 Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3){Mallocationowner owner=getOwner(__LINE__);
-	if(name1&&name2&&name3){
+	if(name1!=NULL&&name2!=NULL&&name3!=NULL){
 		if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
 			Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 			Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 			Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
-			if(_mapelement1&&_mapelement2&&_mapelement3){
+			if(_mapelement1!=NULL&&_mapelement2!=NULL&&_mapelement3!=NULL){
 				Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
-				if(_map){
+				if(_map!=NULL){
 					_mapelement1->_variable=_getVariableWithName(name1,VT_TEXT,true,Msubowner(owner,2));
 					_mapelement2->_variable=_getVariableWithName(name2,VT_MAP,true,Msubowner(owner,2));
 					_mapelement3->_variable=_getVariableWithName(name3,VT_TOKEN,true,Msubowner(owner,2));
-					if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable){
+					if(_mapelement1->_variable!=NULL&&_mapelement2->_variable!=NULL&&_mapelement3->_variable!=NULL){
 						_map->_first=_mapelement1;
 						_mapelement1->_next=_mapelement2;
 						_mapelement2->_next=_mapelement3;
@@ -1171,30 +1641,91 @@ Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuet
 	}
 	return NULL;
 }
+/**
+ * @brief returns a new three attributes M map with values of type string, map and token respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @return Mmap* a new three attributes M map with values of type string, map and token respectively
+ */
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_TEXT,VT_MAP,VT_TOKEN);}/* VALIDATED */
 //Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
+/**
+ * @brief returns a new three attributes M map with integer values
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @return Mmap* a new three attributes M map with integer values
+ */
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_INTEGER,VT_INTEGER,VT_INTEGER);}/* VALIDATED */
+/**
+ * @brief returns a new three attributes M map with values of type list, value and integer respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @return Mmap* a new three attributes M map with values of type list, value and integer respectively
+ */
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_UNDEFINED,VT_INTEGER);}/* VALIDATED */
+/**
+ * @brief returns a new three attributes M map with undefined values
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @return Mmap* a new three attributes M map with undefined values
+ */
 Mmap* _getValueValueValueMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_UNDEFINED,VT_UNDEFINED);}/* VALIDATED */
+/**
+ * @brief returns a new three attributes M map with values of type map, map and list respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @return Mmap* a new three attributes M map with values of type map, map and list respectively
+ */
 Mmap* _getMapMapListMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_MAP,VT_MAP,VT_LIST);}/* VALIDATED */
+/**
+ * @brief returns a new three attributes M map with values of type list, function and value respectively
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @return Mmap* a new three attributes M map with values of type list, function and value respectively
+ */
 Mmap* _getListFunctionValueMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_FUNCTION,VT_UNDEFINED);}/* VALIDATED */
 
+/**
+ * @brief returns a new four attributes M map with values of the given value types
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @param name4
+ * @param valuetype1
+ * @param valuetype2
+ * @param valuetype3
+ * @param valuetype4
+ * @return Mmap* a new four attributes M map with values of the given value types
+ */
 Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3,Mvaluetype valuetype4){Mallocationowner owner=getOwner(__LINE__);
-	if(name1&&name2&&name3&&name4){
+	if(name1!=NULL&&name2!=NULL&&name3!=NULL&&name4!=NULL){
 		if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
 			strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name3,name4)){
 			Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 			Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 			Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 			Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
-			if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4){
+			if(_mapelement1!=NULL&&_mapelement2!=NULL&&_mapelement3!=NULL&&_mapelement4!=NULL){
 				Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
-				if(_map){
+				if(_map!=NULL){
 					_mapelement1->_variable=_getVariableWithName(name1,valuetype1,true,Msubowner(owner,2));
 					_mapelement2->_variable=_getVariableWithName(name2,VT_TOKEN,true,Msubowner(owner,2));
 					_mapelement3->_variable=_getVariableWithName(name3,VT_TOKEN,true,Msubowner(owner,2));
 					_mapelement4->_variable=_getVariableWithName(name4,VT_TOKEN,true,Msubowner(owner,2));
-					if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable){
+					if(_mapelement1->_variable!=NULL&&_mapelement2->_variable!=NULL&&_mapelement3->_variable!=NULL&&_mapelement4->_variable!=NULL){
 						_map->_first=_mapelement1;
 						_mapelement1->_next=_mapelement2;
 						_mapelement2->_next=_mapelement3;
@@ -1215,11 +1746,44 @@ Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvalue
 	}
 	return NULL;
 }
+/**
+ * @brief returns a new four attribute M map with given names containing four token values
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @param name4 
+ * @return Mmap* a new four attribute M map with given names containing four token values
+ */
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4){return _getFourArgumentMap(name1,name2,name3,name4,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
+/**
+ * @brief returns a new four attribute M map with given names containing one ordinary and three token values
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @param name4 
+ * @return Mmap* a new four attribute M map with given names containing one ordinary and three token values
+ */
 Mmap* _getValueTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4){return _getFourArgumentMap(name1,name2,name3,name4,VT_UNDEFINED,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 
+/**
+ * @brief returns a new five attribute M map with given names with values of the given value types
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @param name4 
+ * @param name5 
+ * @param valuetype1 
+ * @param valuetype2 
+ * @param valuetype3 
+ * @param valuetype4 
+ * @param valuetype5 
+ * @return Mmap* a new five attribute M map with given names with values of the given value types
+ */
 Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *name5,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3,Mvaluetype valuetype4,Mvaluetype valuetype5){Mallocationowner owner=getOwner(__LINE__);
-	if(name1&&name2&&name3&&name4&&name5){
+	if(name1!=NULL&&name2!=NULL&&name3!=NULL&&name4!=NULL&&name5!=NULL){
 		if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
 			strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name1,name5)&&
 			strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name2,name5)&&
@@ -1231,16 +1795,16 @@ Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *
 			Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
 			Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
 			Mmapelement* _mapelement5=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
-			if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4&&_mapelement5){
+			if(_mapelement1!=NULL&&_mapelement2!=NULL&&_mapelement3!=NULL&&_mapelement4!=NULL&&_mapelement5!=NULL){
 				Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
-				if(_map){
+				if(_map!=NULL){
 					Mallocationowner owner_variable=Msubowner(owner,2);
 					_mapelement1->_variable=_getVariableWithName(name1,VT_TOKEN,true,owner_variable);
 					_mapelement2->_variable=_getVariableWithName(name2,VT_TOKEN,true,owner_variable);
 					_mapelement3->_variable=_getVariableWithName(name3,VT_TOKEN,true,owner_variable);
 					_mapelement4->_variable=_getVariableWithName(name4,VT_TOKEN,true,owner_variable);
 					_mapelement5->_variable=_getVariableWithName(name5,VT_TOKEN,true,owner_variable);
-					if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable&&_mapelement5->_variable){
+					if(_mapelement1->_variable!=NULL&&_mapelement2->_variable!=NULL&&_mapelement3->_variable!=NULL&&_mapelement4->_variable!=NULL&&_mapelement5->_variable!=NULL){
 						_map->_first=_mapelement1;
 						_mapelement1->_next=_mapelement2;
 						_mapelement2->_next=_mapelement3;
@@ -1263,17 +1827,32 @@ Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *
 	}
 	return NULL;
 }
+/**
+ * @brief returns a new five attribute M map with five token value attributes of the given names
+ * 
+ * @param name1 
+ * @param name2 
+ * @param name3 
+ * @param name4 
+ * @param name5 
+ * @return Mmap* a new five attribute M map with five token value attributes of the given names
+ */
 Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5){return _getFiveArgumentMap(name1,name2,name3,name4,name5,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 // end helper functions 
 
 // ARRAY STUFF
+/**
+ * @brief returns a new M value wrapping M array \p _array
+ * @details if \p _array is disowned and wrapping fails, \p _array is freed
+ * @return a new M value wrapping M array \p _array
+ */
 Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
-	if(!_array)return NULL;
+	if(NULL==_array)return NULL;
 	bool disowned_array=Misdisowned(_array);
 	if(amVerboseDebugging())
 		output("Wrapping a %s array.\n",(disowned_array?"disowned":"owned"));
 	Mvalue* _value=__value(_array->weak?"weak array":"strong array");
-	if(!_value){
+	if(NULL==_value){
 		if(disowned_array)free_array(_array);
 		return NULL;
 	}
@@ -1287,13 +1866,18 @@ Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallo
 }/* TODO VALIDATED */
 
 // LIST STUFF
+/**
+ * @brief returns a new M value wrapping M list \p _list
+ * @param _list
+ * @return a new M value wrapping M list \p _list
+ */
 Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
-	if(!_list)return NULL;
+	if(NULL==_list)return NULL;
 	bool disowned_list=Misdisowned(_list);
 	if(amVerbose())
 		output("Wrapping a %s list.\n",(disowned_list?"disowned":"owned"));
 	Mvalue* _value=__value(_list->weak?"weak list":"strong list");
-	if(!_value){
+	if(NULL==_value){
 		if(disowned_list)free_list(_list);
 		return NULL;
 	}
@@ -1303,13 +1887,17 @@ Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocat
 		output("%s list wrapped.\n",(disowned_list?"Disowned":"Owned"));
 	return _value;
 }/* VALIDATED */
-
+/**
+ * @brief checks whether \p _list is correct
+ * 
+ * @param _list 
+ */
 void checkList(Mlist* _list){
-	if(_list){
+	if(_list!=NULL){
 		long long l=_list->numberOfElements;
 		if(l>0){
 			Mlistelement* _listelement=_list->_first;
-			if(_listelement){
+			if(_listelement!=NULL){
 				// the number of elements in the list should match the number of counted elements
 				long long listelementindex=0;
 				while(true){
@@ -1317,7 +1905,7 @@ void checkList(Mlist* _list){
 					l--;
 					if(_listelement->index<=listelementindex)output("%sList element index (%lld) below the expected list element index (%lld).\n",M_ERROR_PREFIX,_listelement->index,listelementindex);
 					listelementindex=_listelement->index;
-					if(!_listelement->_next){
+					if(NULL==_listelement->_next){
 						if(_list->_last!=_listelement)outputError("Registered last list element not equal to the actual last list element");
 						break;						
 					}
@@ -1329,20 +1917,27 @@ void checkList(Mlist* _list){
 			}else
 				output("%sList with %lld elements does not have a first element!\n",M_ERROR_PREFIX,l);
 		}else{
-			if(_list->_first)outputError("Empty list with first element");
-			if(_list->_last)outputError("Empty list with last element");
+			if(_list->_first!=NULL)outputError("Empty list with first element");
+			if(_list->_last!=NULL)outputError("Empty list with last element");
 		}
 	}
 }/* VALIDATED */
 
 // MDH@27DEC2020: for now static (as it's called from mfreadlines() only for now)
+/**
+ * @brief appends and returns the list element appended to \p _list owned by \p owner_list
+ * 
+ * @param _list 
+ * @param owner_list 
+ * @return Mlistelement* 
+ */
 static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner owner_list){Mallocationowner owner=getOwner(__LINE__);
-	if(_list){
+	if(_list!=NULL){
 		// NOTE it's a bit of a shortcut to immediately use Msubowner(owner_list,1) as owner
 		//	  we can do that if nothing can go wrong in linking it to the end of _list which is (almost) certain
 		Mlistelement* _appendedListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',Msubowner(owner_list,1));
-		if(_appendedListelement){
-			if(_list->_last){ // a last element to connect to!!!!
+		if(_appendedListelement!=NULL){
+			if(_list->_last!=NULL){ // a last element to connect to!!!!
 				_appendedListelement->index=_list->_last->index;
 				_list->_last->_next=_appendedListelement;
 				_list->_last=_list->_last->_next;
@@ -1367,11 +1962,20 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 //				NOTE: index==0 means prepend, index==M_LL_INVALID means append, index<0 means insert from the back (i.e. relative to the maximum index)
 //				TODO: determine the situations where we want to return either M_LL_INVALID or 0 or a negative value to indicate failure
 //				DOING: I suppose returning M_LL_INVALID when there's something wrong with the input, 0 when unable to comply somehow (e.g. when the list is immutable)
+/**
+ * @brief appends or inserts M value \p _value to M list \p _list owned by \p owner_list
+ * @details if \p index is not equal to M_LL_INVALID \p value is inserted at position \p index
+ * @param _list 
+ * @param owner_list
+ * @param _value
+ * @param index
+ * @return the index of the element wrapping \p _value appended or inserted, zero or negative on failure (M_LL_INVALID which is negative indicating undefined \p _list)
+ */
 /*unsigned*/ long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
-	if(!_list){outputError("No list to append to");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
+	if(NULL==_list){outputError("No list to append to");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
 	if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
-	if(_value&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
+	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
 		output(M_ERROR_PREFIX);
 		outputValue("Unable to add '",_value,"'");
@@ -1390,22 +1994,22 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	// MDH@23MAY2019: let's allow inserting or replacing as well
 	// determine _listelement as element to host the value, store the successor in _nextlistelement
 	Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index>0&&index<=lastindex?_list->_first:NULL);
-	if(_listelement){ // we are not appending and we have a first element, so this might be an insert or replace
+	if(_listelement!=NULL){ // we are not appending and we have a first element, so this might be an insert or replace
 		// NOTE testing _listelement is just a fail-safe as that should never happen
 		while(index>_listelement->index){
 			_prevListelement=_listelement;
-			if(!_listelement->_next){output("%sIndex (%llu) ",M_BUG_PREFIX,_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
+			if(NULL==_listelement->_next){output("%sIndex (%llu) ",M_BUG_PREFIX,_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
 			_listelement=_listelement->_next;
 		}
 		// if we're going to insert there will be a successor
-		if(_listelement->index!=index){_nextListelement=(_prevListelement?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
+		if(_listelement->index!=index){_nextListelement=(_prevListelement!=NULL?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
 	}else // we'll be insertingappending/prepending, so the current last is the predecessor (and no successor)
 	if(index>0) // MdH@17OCT2019: when not prepending...
 		_prevListelement=_list->_last;
 	// if we do not have a list element ascertain to have one
-	if(!_listelement){ // not yet present in list, so we have to create a new element
+	if(NULL==_listelement){ // not yet present in list, so we have to create a new element
 		_listelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
-		if(!_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
+		if(NULL==_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
 	}
 	// MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
 	if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
@@ -1414,27 +2018,37 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	// if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
 	if(_listelement->index!=index){ // insert or append
 		SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
+
+		// MDH@15MAR2023: Typically any MValue is owned by the global MValue list, and perhaps therefore any list referencing it can never own it
+		//                if the list is weak, _value is stored in _listelement->_value as is without incrementing the value's reference count
+		//                if the list is not weak, the assignment will create a copy of composite values but simple values are assigned as is with incrementing their reference count
+		// DECISION: NOT taking over the ownership of Mvalue as it is owned globally and should remain owned globally as such, the list itself should never free it itself, therefore commenting the following!!!!
+		/*
 		// MDH@24JAN2023: OOPS Have to take over the ownership of the _value as well!!!!!! TODO check whether this is ok to do!!!!!
-		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else outputValue("List element value '",_listelement->_value,"' is not disowned!\n");
+		if(Misowned(_listelement->_value))outputValue("List element value '",_listelement->_value,"' is not disowned!\n");else SUBOWNED(OWNED(_listelement->_value,owner_list),2); 
+		*/
+
 		_listelement->index=index;
 		// linking
-		if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
-		if(!_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
+		if(_prevListelement!=NULL)_prevListelement->_next=_listelement;else _list->_first=_listelement;
+		if(NULL==_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
 		(_list->numberOfElements)++; // an additional element
 	}else
 	if(index==0){ // prepending
 		SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
+		/* MDH@15MAR2023: don't think ownership of the value should be taken over!!!!!
 		// MDH@24JAN2023: OOPS Have to take over the ownership of the _value as well!!!!!! TODO check whether this is ok to do!!!!!
 		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else outputValue("New list element value '",_listelement->_value,"' is not disowned!\n");
+		*/
 		// linking into the list
 		_listelement->_next=_list->_first;
 		_list->_first=_listelement;
-		if(!_list->_last)_list->_last=_list->_first;
+		if(NULL==_list->_last)_list->_last=_list->_first;
 		(_list->numberOfElements)++;
 		// if(amVerboseDebugging())outputValue("\tPrepending '",_listelement->_value,"'.\n");
 		// we should increment the index of all elements (consuming _listelement on the go which is OK)
 		_nextListelement=_listelement;
-		while(_nextListelement){
+		while(_nextListelement!=NULL){
 			// if(amVerboseDebugging())
 			// {outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
 			(_nextListelement->index)++;
@@ -1448,11 +2062,20 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	return _listelement->index;
 }/* VALIDATED */
 // MDH@23NOV2020: inserting is similar to appending except that it should NOT replace a value but put it in front of it
+/**
+ * @brief inserts M value \p _value in list \p _list owned by \p owner_list at index \p index
+ * 
+ * @param _list 
+ * @param owner_list 
+ * @param _value 
+ * @param index 
+ * @return long long the index of the inserted element (zero or negative on failure)
+ */
 long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
-	if(!_list){outputError("No list to insert into");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
+	if(NULL==_list){outputError("No list to insert into");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
 	if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
-	if(_value&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
+	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
 		output(M_ERROR_PREFIX);
 		outputValue("Unable to insert '",_value,"'");
@@ -1472,17 +2095,17 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 	// MDH@23MAY2019: let's allow inserting or replacing as well
 	// determine _listelement as element to host the value, store the successor in _nextlistelement
 	Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index>0&&index<=lastindex?_list->_first:NULL);
-	if(_listelement){ // we are not appending and we have a first element, so this might be an insert or replace
+	if(_listelement!=NULL){ // we are not appending and we have a first element, so this might be an insert or replace
 		// NOTE testing _listelement is just a fail-safe as that should never happen
 		while(index>_listelement->index){
 			_prevListelement=_listelement;
-			if(!_listelement->_next){output("%sIndex (%llu) ",M_BUG_PREFIX,_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
+			if(NULL==_listelement->_next){output("%sIndex (%llu) ",M_BUG_PREFIX,_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
 			_listelement=_listelement->_next;
 		}
 		// if we're going to insert there will be a successor
 		// MDH@23NOV2020: insertedIntoList() is ALWAYS inserting even if the index values are the same, 
 		// therefore removing the test: if(_listelement->index!=index)
-		{_nextListelement=(_prevListelement?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
+		{_nextListelement=(_prevListelement!=NULL?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
 	}else // we'll be insertingappending/prepending, so the current last is the predecessor (and no successor)
 	//  MDH@23NOV2020 no need to test the following as we know it will always be true: if(index>0) // MdH@17OCT2019: when not prepending...
 		_prevListelement=_list->_last;
@@ -1490,7 +2113,7 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 	// MDH@23NOV2020: _listelement will always be NULL, so no need to actually test that
 	// removing: if(!_listelement){ // not yet present in list, so we have to create a new element
 		_listelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
-		if(!_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
+		if(NULL==_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
 	// removing:}
 	// MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
 	if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
@@ -1502,8 +2125,8 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 		SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
 		_listelement->index=index;
 		// linking
-		if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
-		if(!_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
+		if(_prevListelement!=NULL)_prevListelement->_next=_listelement;else _list->_first=_listelement;
+		if(NULL==_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
 		(_list->numberOfElements)++; // an additional element
 	/* removing
 	}else
@@ -1529,7 +2152,7 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 	}
 	*/
 	// MDH@23NOV2020: if we have a nextlistelement we should increment the index until it's no longer the same, i.e. all elements are shifted one position up
-	while(_nextListelement&&_nextListelement->index==index){
+	while(_nextListelement!=NULL&&_nextListelement->index==index){
 		_nextListelement->index=(++index);
 		_nextListelement=_nextListelement->_next;
 	}
@@ -1537,6 +2160,13 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 	return _listelement->index;
 }/* VALIDATED */
 
+/**
+ * @brief returns the M value stored in the element with index \p index in M list \p list
+ * 
+ * @param _list 
+ * @param index 
+ * @return Mvalue* the M value stored in the element with index \p index in M list \p list
+ */
 Mvalue* getValueAtIndex(Mlist* _list,long long index){
 	// NOTE if index is equal to zero definitely no value there!!!
 	if(_list&&index){
@@ -1558,18 +2188,25 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index){
 	}
 	return NULL;
 }/* VALIDATED */
+/**
+ * @brief returns the value holder of the element with index \p index in M list \p _list
+ * @details can be used to change the value being referenced
+ * @param _list 
+ * @param index 
+ * @return Mvalue** the value holder of the element with index \p index in M list \p _list
+ */
 Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
 	// NOTE if index is equal to zero definitely no value there!!!
-	if(_list&&index){
+	if(_list!=NULL&&index!=0){
 		// if(amVerboseDebugging()){outputList("Determining the value holder in '",_list,"'");output(" at index %lld.\n",index);}
-		if(_list->_last){
+		if(_list->_last!=NULL){
 			long long maxindex=_list->_last->index;
 			if(index<0)index+=(maxindex+1);
 			if(index>0){
 				if(index==maxindex)return &(_list->_last->_value);
 				if(index<maxindex){
 					Mlistelement* _listelement=_list->_first;
-					while(_listelement){
+					while(_listelement!=NULL){
 						if(_listelement->index==index){
 							// if(amVerboseDebugging())outputValue("\tFound with value '",_listelement->_value,"'.\n");
 							return &(_listelement->_value);
@@ -1585,38 +2222,54 @@ Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
 }/* VALIDATED */// END LIST STUFF
 
 // MAP STUFF
-// MDH@22OCT2020: useful to know if a map contains a certain attribute 
+// MDH@22OCT2020: useful to know if a map contains a certain attribute
+/**
+ * @brief returns the map element with name \p attributeName in map \p map
+ * 
+ * @param map 
+ * @param attributeName 
+ * @return * Mmapelement* the map element with name \p attributeName in map \p map
+ */
 Mmapelement* getMapelement(Mmap const * const map,char const * const attributeName){
-	Mmapelement* mapelement=(map&&attributeName?map->_first:NULL); // if both map and attribute name are defined, initialize map element to the first map element
+	Mmapelement* mapelement=(map!=NULL&&attributeName!=NULL?map->_first:NULL); // if both map and attribute name are defined, initialize map element to the first map element
 	// as long as the map element is defined, and either it does not hold a variable or the variable's name does not match the given attribute name, select the next map element
-	while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,attributeName)))mapelement=mapelement->_next;
+	while(mapelement!=NULL&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,attributeName)))mapelement=mapelement->_next;
 	return mapelement;
 }
 // MDH@24MAY2019: if already in the map should replace the current value
+/**
+ * @brief appends a new attribute with name \p attributeName and value \p _attributeValue to M map \p _map owned by \p owner_map
+ * 
+ * @param _map 
+ * @param owner_map 
+ * @param attributeName 
+ * @param _attributeValue 
+ * @return long long M_TRUE on success, M_FALSE on failure, M_LL_INVALID on invalid input 
+ */
 long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
-	long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
+	long long result=(_map!=NULL&&attributeName!=NULL?M_FALSE:M_LL_INVALID);
 	if(result!=M_LL_INVALID){
 		if(!_map->immutable){ // the map is mutable
 			// MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
-			if(!_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
+			if(NULL==_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
 				if(report)
 				{output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
-				// MDH@22OCT2020: get the map element associated with the given attribute name
+				// MDH@22OCT2020: get the map element associated with the given attribute name (without creating it)
 				Mmapelement* _mapelement=getMapelement(_map,attributeName);
 				/* replacing:
 				Mmapelement* _mapelement=_map->_first;
 				while(_mapelement&&(!_mapelement->_variable||strcmp(_mapelement->_variable->_name->chars,attributeName)))_mapelement=_mapelement->_next;
 				*/
-				if(!_mapelement){ // not found
+				if(NULL==_mapelement){ // not found
 					if(report)outputInfo("Attribute not found");
 					_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
-					if(_mapelement){
+					if(_mapelement!=NULL){
 						// MDH@09JUN2020: we can immediately set the owner of _variable to be in the map because if we succeed in creating it that's where it will go
 						// MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
 						// MDH@25MAY2020: we're disowning _variable because we 
 						Mvariable* _variable=_getVariableWithName(attributeName,VT_UNDEFINED,false,Msubowner(owner_map,2)); // TODO why would this 'variable' be mutable, and allowing all values????
-						if(_variable){ // the variable was created so attach in map
+						if(_variable!=NULL){ // the variable was created so attach in map
 							if(report)outputInfo("Map element created");
 							 // pass ownership of _mapelement to _map at the first sublevel
 							_mapelement->_variable=_variable; // pass ownership of _variable to the mapelement at the second sublevel in the map
@@ -1631,7 +2284,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 					}else
 						outputError("Failed to create new map element");
 				}
-				if(_mapelement){
+				if(_mapelement!=NULL){
 					if(_map->weak)
 						_mapelement->_variable->_value=_attributeValue;
 					else // MDH@02NOB2019: if the map is weak assign directly!!
@@ -1648,14 +2301,22 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 	if(report)output("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
 	return result;
 }/* VALIDATED */
+/**
+ * @brief removes the attribute with name \p attributeName from M map \p _map with owner \p owner_map
+ * 
+ * @param _map 
+ * @param owner_map 
+ * @param attributeName 
+ * @return long long M_TRUE on success, M_FALSE or M_LL_INVALID on failure
+ */
 long long removedFromMap(Mmap* _map,Mallocationowner owner_map,char const * const attributeName){
-	long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
+	long long result=(_map!=NULL&&attributeName!=NULL?M_FALSE:M_LL_INVALID);
 	if(result!=M_LL_INVALID){
 		if(!_map->immutable){ // the map is mutable
 			Mmapelement *mapelement=_map->_first,*previousmapelement=NULL;
-			while(mapelement&&mapelement->_variable&&strcmp(mapelement->_variable->_name->chars,attributeName)){previousmapelement=mapelement;mapelement=previousmapelement->_next;}
-			if(mapelement){ // found
-				if(previousmapelement)previousmapelement->_next=mapelement->_next;else _map->_first=mapelement->_next; // disconnect the map element
+			while(mapelement!=NULL&&mapelement->_variable&&strcmp(mapelement->_variable->_name->chars,attributeName)){previousmapelement=mapelement;mapelement=previousmapelement->_next;}
+			if(mapelement!=NULL){ // found
+				if(previousmapelement!=NULL)previousmapelement->_next=mapelement->_next;else _map->_first=mapelement->_next; // disconnect the map element
 				if(mapelement->_next==NULL)_map->_last=previousmapelement;else mapelement->_next=NULL;
 				_map->numberOfElements--; // one less element in the map now
 				FREE_MAPELEMENT(mapelement,_map->weak,owner_map); // free (all parts of) the map element
@@ -1666,6 +2327,13 @@ long long removedFromMap(Mmap* _map,Mallocationowner owner_map,char const * cons
 	return result;
 }/* VALIDATED */
 
+/**
+ * @brief returns the value of attribute \p attributeName in M map \p _map
+ * 
+ * @param _map 
+ * @param attributeName 
+ * @return Mvalue* the value of attribute \p attributeName in M map \p _map
+ */
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
 	// MDH@14NOV2019: there's no reason why the map couldn't have an attribute with an empty name!!!!
 	if(_map&&attributeName){
@@ -1680,6 +2348,13 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
 	return NULL;
 }/* VALIDATED */
 // MDH@25MAR2020: sometimes we need the value holder
+/**
+ * @brief returns the value holder of attribute \p attributeName of M map \p _map
+ * 
+ * @param _map 
+ * @param attributeName 
+ * @return Mvalue** the value holder of attribute \p attributeName of M map \p _map
+ */
 Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName){
 	// MDH@14NOV2019: there's no reason why the map couldn't have an attribute with an empty name!!!!
 	if(_map&&attributeName){
@@ -1696,6 +2371,11 @@ Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName){
 
 // END MAP STUFF
 
+/**
+ * @brief returns a new M value wrapping M rational \p _rational
+ * @param _rational
+ * @return a new M value wrapping M rational \p _rational
+ */
 Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_rational*/){
 	if(!_rational)return NULL;
 	Mvalue* _rationalValue=__value("rational");
@@ -1707,11 +2387,18 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
 	return _rationalValue;
 }/* VALIDATED */
 
+/**
+ * @brief returns the new M string containing the text representation of (some) elements of M array \p _array
+ * @param _array 
+ * @param showAtStart the maximum number of initial elements to show
+ * @param showAtEnd the maximum number of final elements to show
+ * @return Mstring* the new M string containing the text representation of M array \p _array
+ */
 Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
 	// as this is more like a tuple than a list (Python equivalent data structures)
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	Mstring* result=owned_string(__string(),owner);
-	if(result){
+	if(result!=NULL){
 		Mstring* p=result;
 		unsigned long long l=(_array?_array->numberOfElements:0);
 		if(report){
@@ -1745,7 +2432,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 					}
 					// replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
 					Mstring* _arrayelementValueText=owned_string(_getValueText(_array->values[arrayelementindex],false),owner); // to be freed asap
-					if(_arrayelementValueText){
+					if(_arrayelementValueText!=NULL){
 						p=string_append(p,string(_arrayelementValueText));
 						FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
 					}
@@ -1753,12 +2440,12 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 					if(arrayelementindex!=lastarrayelementindex)p=string_append_char(p,',');
 				}
 				// output("(%llu)",listindex); // DEBUG
-			}while(p&&(++arrayelementindex)<=lastarrayelementindex);
+			}while(p!=NULL&&(++arrayelementindex)<=lastarrayelementindex);
 		}
 		p=string_append_char(p,')');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
-		if(!p){FREE_STRING(result,owner);result=NULL;}
+		if(NULL==p){FREE_STRING(result,owner);result=NULL;}
 	}
 	return disowned_string(result,owner);	
 }
@@ -1766,11 +2453,20 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 //				number of elements to display from the start and at the end
 // MDH@03NOV2020: showing all elements but prefixing the index when it differs from the expected list index (which is one above the last one shown)
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
+
+/**
+ * @brief returns the new M string containing the text representation of some elements of the M list \p _list
+ * 
+ * @param _list 
+ * @param showAtStart the number of initial list elements to represent
+ * @param showAtEnd the maximum number of final list elements to represent
+ * @return Mstring* the new M string containing the text representation of some elements of the M list \p _list
+ */
 Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
 	///////output("List to output.");char c;inputCharRead(&c);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE);
 	Mstring* result=owned_string(__string(),owner);
-	if(result){
+	if(result!=NULL){
 		Mstring* p=result;
 		if(report){p=string_append_char(p,'l');p=string_append_char(p,'(');p=appendll(p,_list->numberOfElements);p=string_append_char(p,')');}
 		p=string_append_char(p,'['); // switch to using p in appends
@@ -1781,7 +2477,7 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 		long long firstAtEnd=_list->numberOfElements+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
 		long long elementsNotIncluded=firstAtEnd-showAtStart-1;
 		// output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
-		while(p&&_listelement){
+		while(p!=NULL&&_listelement!=NULL){
 			listelementindex++;
 			if(elementsNotIncluded>0&&listelementindex>=firstAtEnd){ // the first to show at the end coming up next
 				p=string_append(p,"(");
@@ -1806,12 +2502,12 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 				}
 				// replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
 				Mstring* _listelementValueText=owned_string(_getValueText(_listelement->_value,false),owner); // to be freed asap
-				if(_listelementValueText){
+				if(_listelementValueText!=NULL){
 					p=string_append(p,string(_listelementValueText));
 					FREE_STRING(_listelementValueText,owner); // release AFTER copying over
 				}
 				// if there's more coming write a comma
-				if(_listelement->_next)p=string_append_char(p,',');
+				if(_listelement->_next!=NULL)p=string_append_char(p,',');
 			}
 			expectedlistindex=_listelement->index+1; // expected next
 			_listelement=_listelement->_next;
@@ -1838,38 +2534,62 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 		p=string_append_char(p,']');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
-		if(!p){FREE_STRING(result,owner);result=NULL;}
+		if(NULL==p){FREE_STRING(result,owner);result=NULL;}
 	}
 	return disowned_string(result,owner);
 }/* VALIDATED */
 
 // MDH@02MAR2020: utility function to output a list
 // MDH@02NOV2020: outputList() is typically used in debugging and we want it to show all elements
+/**
+ * @brief outputs M list \p list prefixed by \p prefix and suffixed by \p suffix
+ * 
+ * @param prefix 
+ * @param list 
+ * @param suffix 
+ */
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _listText=owned_string(_getListText(list,LLONG_MAX,LLONG_MAX),owner);
 	output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
 	FREE_STRING(_listText,owner);
 }/* VALIDATED */
+
+/**
+ * @brief outputs M array \p array prefixed by \p prefix and suffixed by \p suffix
+ * 
+ * @param prefix 
+ * @param array 
+ * @param suffix 
+ */
 void outputArray(char const * const prefix,Marray const * const array,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _arrayText=owned_string(_getArrayText(array,LLONG_MAX,LLONG_MAX),owner);
 	output("%s%s%s",(prefix?prefix:""),string(_arrayText),(suffix?suffix:""));
 	FREE_STRING(_arrayText,owner);
 }/* VALIDATED */
 
+/**
+ * @brief returns the new M string containing the text representation of M map \p _map
+ * 
+ * @param _map 
+ * @param showcurlybraces 
+ * @param showquotes 
+ * @param showmissings 
+ * @return Mstring* the new M string containing the text representation of M map \p _map
+ */
 Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquotes,bool showmissings){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* result=owned_string(__string(),owner);
-	if(result){
+	if(result!=NULL){
 		Mstring* p=result;
 		if(amDebugging())p=string_append_char(p,'m');
-		if(_map){
+		if(_map!=NULL){
 			if(showcurlybraces)p=string_append_char(p,'{');
 			if(_map->numberOfElements>0){
 				//////output("%s",string(p));
 				Mmapelement* _mapelement=_map->_first;
-				while(p&&_mapelement){
+				while(p!=NULL&&_mapelement!=NULL){
 					//////output("%s","start");
 					Mvariable* _mapVariable=_mapelement->_variable;
-					if(_mapVariable){
+					if(_mapVariable!=NULL){
 						// MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
 						if(showquotes)p=string_append_char(p,'\'');
 						p=string_append(p,_mapVariable->_name->chars);
@@ -1881,29 +2601,38 @@ Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquote
 							Mstring* _mapelementValueText=owned_string(_getValueText(_mapVariable->_value,false),owner); // free asap
 							/////output("Map element: %s",string(p));
 							// TODO technically NULL is also a value, so shouldn't be use the undefined value text????
-							if(_mapelementValueText){
+							if(_mapelementValueText!=NULL){
 								p=string_append(p,string(_mapelementValueText)); // append 
 								FREE_STRING(_mapelementValueText,owner); // release AFTER copying over
 							}
 						}
 					}
 					_mapelement=_mapelement->_next;
-					if(!_mapelement)break;
+					if(NULL==_mapelement)break;
 					p=string_append(p,","); // only when there's a next map element to process
 					////output("%s","next");
 				}
 			}else
-			if(_map->_first)p=string_append_char(p,'?');
+			if(_map->_first!=NULL)p=string_append_char(p,'?');
 			//////output("%s(%d)",string(p),string_length(p));
 			if(showcurlybraces)p=string_append_char(p,'}');
 		}
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){FREE_STRING(result,owner);result=NULL;}
+		if(NULL==p){FREE_STRING(result,owner);result=NULL;}
 	}
 	return disowned_string(result,owner);
 }/* VALIDATED */
+
 // MDH@02MAR2020: utility function to output a map
+/**
+ * @brief outputs the M map \p _map prefixed by \p prefix and suffixed by \p suffix
+ * 
+ * @param prefix 
+ * @param map 
+ * @param suffix 
+ */
+
 void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _mapText=owned_string(_getMapText(map,true,true,true),owner);
 	output("%s%s%s",(prefix?prefix:""),(_mapText?string(_mapText):""),(suffix?suffix:""));
@@ -1915,21 +2644,30 @@ void outputMap(char const * const prefix,Mmap const * const map,char const * con
 static Mstring* _nullValueTextRepresentation=NULL;
 Mstring* _getNullValueTextRepresentation(){if(!_nullValueTextRepresentation)_nullValueTextRepresentation=_getString(M_NULL_VALUE_TEXT_REPRESENTATION);return _getNullValueTextRepresentation;}
 */
+
 Mmap* getFilePropertyMap(Mfile* _file); // prototype
+
+/**
+ * @brief returns the new M string containing the text representation of M value \p _value
+ * @details this is the function used by M to show the result of command evaluation (with \p dequoted equal to true)
+ * @param _value 
+ * @param dequoted 
+ * @return Mstring* the new M string containing the text representation of M value \p _value
+ */
 Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE whatever is returned should be freed
 	Mstring* valueText=NULL;
 	////outputChar('.');
-	if(_value){
+	if(_value!=NULL){
 		////outputChar('+');
 		////output("TYPE: %d\n",_value->type);
 		switch(_value->type){
-	  case VT_UNDEFINED:valueText=owned_string(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
+	  	case VT_UNDEFINED:valueText=owned_string(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
 			case VT_INTEGER:valueText=owned_string(_getIntegerText(_value->value._integer),owner);break;
 			case VT_TIME:valueText=owned_string(_getTimeText(_value->value._time),owner);break; // MDH@08DEC2020: simply?
 			case VT_BIGINTEGER:valueText=owned_string(_getBigintegerText(_value->value._biginteger),owner);break; // how many characters do we need????
   		case VT_DECIMAL:valueText=owned_string(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
-		case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
+			case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
 			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
 			case VT_TEXT:valueText=owned_string(_getStringText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
@@ -1938,14 +2676,14 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 			case VT_TOKEN:
 				{ // can't just show the single token because we could have following ones
 					valueText=owned_string(__string(),owner);
-					if(valueText){
+					if(valueText!=NULL){
 						Mstring* p=valueText;
 						Mtoken* token=_value->value._token;
-						while(p&&token){
-							if(token->text)p=string_append(p,string(token->text));
+						while(p!=NULL&&token!=NULL){
+							if(token->text!=NULL)p=string_append(p,string(token->text));
 							token=token->next;
 						}
-						if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
+						if(NULL==p){FREE_STRING(valueText,owner);valueText=NULL;}
 					}
 					// replacing: valueText=_stringCopy(_value->value._token->text,0);
 				}
@@ -1953,10 +2691,10 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 			case VT_REFERENCE:
 				{
 					valueText=owned_string(__string(),owner);
-					if(valueText){
+					if(valueText!=NULL){
 						Mstring* p=valueText;
 						p=string_append_char(p,M_DEREFERENCE_CHARACTER);
-						if(_value->value._reference&&_value->value._reference->variable){ // MDH@11MAR2020: possibly a reference without a variable yet associated (typically used with reference function parameters)
+						if(_value->value._reference!=NULL&&_value->value._reference->variable!=NULL){ // MDH@11MAR2020: possibly a reference without a variable yet associated (typically used with reference function parameters)
 							p=string_append(p,_value->value._reference->variable->_name->chars);
 							// append the reference index so we know which one it is
 							p=string_append_char(p,':');
@@ -1976,21 +2714,21 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 							if(_valueText){p=string_append(p,string(_valueText));FREE_STRING(_valueText);}
 						}
 						*/
-						if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
+						if(NULL==p){FREE_STRING(valueText,owner);valueText=NULL;}
 					}
 				}
 				break;
 			case VT_FUNCTION:
 				{
 					valueText=owned_string(_getString("function"),owner);
-					if(valueText){
+					if(valueText!=NULL){
 						Mstring* p=valueText;
 						Mfunction* function=_value->value._function;
-						if(function){
+						if(function!=NULL){
 							p=string_append_char(p,'(');
 							if(p&&function->_parameterMap){
 								Mmapelement* _parameterMapelement=function->_parameterMap->_first;
-								while(p&&_parameterMapelement){
+								while(p!=NULL&&_parameterMapelement!=NULL){
 									if(_parameterMapelement->_variable){
 										p=string_append(p,_parameterMapelement->_variable->_name->chars);
 										p=string_append_char(p,':');
@@ -1999,23 +2737,23 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 										FREE_STRING(_parameterValueText,owner);
 									}
 									_parameterMapelement=_parameterMapelement->_next;
-									if(_parameterMapelement)p=string_append_char(p,',');
+									if(_parameterMapelement!=NULL)p=string_append_char(p,',');
 								}
 							}
 							p=string_append_char(p,')');
 							// TODO perhaps write the body only when amVerboseDebugging()?
 							Mlist* functionBodyList=(function->type==FT_USER&&function->functionunion._userfunction?function->functionunion._userfunction->_bodyCommandList:NULL);
-							if(p&&functionBodyList){
+							if(p!=NULL&&functionBodyList!=NULL){
 								size_t l=string_length(p);
 								Mlistelement* functionBodyListelement=functionBodyList->_first;
-								if(functionBodyListelement){
+								if(functionBodyListelement!=NULL){
 									do{
 										p=string_append_char(p,',');
 										Mstring* _bodyCommandValueText=owned_string(_getValueText(functionBodyListelement->_value,true),owner);
-										p=string_append(p,string(_bodyCommandValueText));
+										if(_bodyCommandValueText!=NULL)p=string_append(p,string(_bodyCommandValueText));
 										FREE_STRING(_bodyCommandValueText,owner);
 										functionBodyListelement=functionBodyListelement->_next;
-									}while(p&&functionBodyListelement);
+									}while(p!=NULL&&functionBodyListelement!=NULL);
 									p=string_setchar(p,'[',l);	  
 								}else
 									p=string_append_char(p,'[');
@@ -2023,27 +2761,29 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 							}
 						}else
 							p=string_append_char(p,'?');
-						if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
+						if(NULL==p){FREE_STRING(valueText,owner);valueText=NULL;}
 					}
 				}
 				break;
 			case VT_ENVIRONMENT:
 				{
 					valueText=owned_string(_getString("environment"),owner);
-					if(valueText){
+					if(valueText!=NULL){
 						Mstring* p=valueText;
 						Menvironment* environment=_value->value._environment;
-						if(environment){
+						if(environment!=NULL){
 							p=string_append_char(p,'(');
 							p=string_append_char(p,'\'');
 							Mstring* _environmentName=owned_string(_getEnvironmentName(environment),owner);
-							p=string_append(p,string(_environmentName));
-							FREE_STRING(_environmentName,owner);
+							if(_environmentName!=NULL){
+								p=string_append(p,string(_environmentName));
+								FREE_STRING(_environmentName,owner);
+							}
 							p=string_append_char(p,'\'');
 							p=string_append_char(p,')');
 						}else
 							p=string_append_char(p,'?');
-						if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
+						if(NULL==p){FREE_STRING(valueText,owner);valueText=NULL;}
 					}
 				}
 				break;
@@ -2055,9 +2795,9 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 		}
 	}else // the text we use for an value that is NULL!
 		valueText=owned_string(_getString(M_NULL_VALUE_TEXT),owner);
-	if(_value)if(amAssisting())if(valueText)valueText=owned_string(appendll(string_append_char(valueText,'#'),_value->count),owner); // show the reference count as well
+	if(_value!=NULL)if(amAssisting())if(valueText)valueText=owned_string(appendll(string_append_char(valueText,'#'),_value->count),owner); // show the reference count as well
 	/////outputChar('.');
-	return(valueText?disowned_string(valueText,owner):_getUndefinedValueText());
+	return(valueText!=NULL?disowned_string(valueText,owner):_getUndefinedValueText());
 	/* replacing:
 	if(valueText)return valueText;
 	////////if(amVerbose())if(valueText)output("Value text: '%s'.",string(valueText));else output("Value not represented.");
@@ -2065,23 +2805,38 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 	return _UNDEFINED_VALUETEXT;
 	*/
 }/* VALIDATED */
+
 // MDH@13MAR2020: now returning the number of characters written
+/**
+ * @brief outputs the (dequoted) text representation of M value \p value prefixed by \p prefix and suffixed by \p suffix
+ * 
+ * @param prefix 
+ * @param value 
+ * @param suffix 
+ * @return size_t the number of characters written
+ */
 size_t outputValue(char const * const prefix,Mvalue const * const value,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	size_t written=0;
-	if(prefix)written=output("%s",prefix);
-	if(value){
+	if(prefix!=NULL)written=output("%s",prefix);
+	if(value!=NULL){
 		// output("(%s)%u",TOKENTYPE_STRING[value->type],value->type); // DEBUG
 		Mstring* _valueText=owned_string(_getValueText(value,false),owner); // free asap
-		if(_valueText){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
+		if(_valueText!=NULL){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
 	}else
 		written+=outputChar('-');
-	if(suffix)written+=output("%s",suffix);
+	if(suffix!=NULL)written+=output("%s",suffix);
 	return written;
 }/* VALIDATED */
 
+/**
+ * @brief returns the integer stored in M value \p _value
+ * @details returns M_LL_INVALID if \p _value cannot be converted to an integer
+ * @param _value 
+ * @return long long the integer stored in M value \p _value
+ */
 long long getValueInteger(const Mvalue* const _value){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERTION if _value can be converted to an integer,it should not equal invalid!!!!
-	if(_value){
+	if(_value!=NULL){
 		switch(_value->type){
 			case VT_INTEGER:return _value->value._integer->ll;
 			case VT_FLOAT:return double2long(_value->value._float->ld);
@@ -2108,7 +2863,7 @@ long long getValueInteger(const Mvalue* const _value){Mallocationowner owner=get
 			case VT_RATIONAL:
 				{
 					Mbiginteger* _biginteger=owned_biginteger(_rational2biginteger(_value->value._rational),owner);
-					if(_biginteger){
+					if(_biginteger!=NULL){
 						long long ll=biginteger2long(_biginteger);
 						FREE_BIGINTEGER(_biginteger,owner);
 						return ll;
@@ -2124,6 +2879,12 @@ long long getValueInteger(const Mvalue* const _value){Mallocationowner owner=get
 }/* VALIDATED */
 
 // MDH@09OCT2019: TODO=DONE is there a better way than through parsing?????
+/**
+ * @brief returns the real of the big integer \p biginteger
+ * 
+ * @param biginteger 
+ * @return long double the real of the big integer \p biginteger
+ */
 long double getBigintegerLongDouble(Mbiginteger* biginteger){
 	return mp_get_long_double(biginteger); // MDH@28OCT2019: definitely
 	/* replacing:
@@ -2133,12 +2894,24 @@ long double getBigintegerLongDouble(Mbiginteger* biginteger){
 	return ldBiginteger;
 	*/
 }
-long double getRealLongDouble(const Mfloat* const _real){return(_real?_real->ld:M_LD_NAN);}/* VALIDATED */
+/**
+ * @brief returns the long double stored in M float \p _float
+ * @details returns M_LD_NAN if \p _float is NULL
+ * @param _float
+ * @return long double the long double stored in M float \p _float
+ */
+long double getRealLongDouble(const Mfloat* const _float){return(_float!=NULL?_float->ld:M_LD_NAN);}/* VALIDATED */
 
+/**
+ * @brief returns the long double stored in M value \p _value
+ * @details returns M_LD_NAN if \p _value cannot be converted to a long double
+ * @param _value 
+ * @return long double 
+ */
 long double getValueLongDouble(const Mvalue* const _value){
 	// MDH@09OCT2019: a little more complicated then just getting out the real in that all scalar numeric values are convertable
 	long double valueLongDouble=M_LD_NAN;
-	if(_value)
+	if(_value!=NULL)
 	switch(_value->type){ // all scalar types should be convertible
 		case VT_INTEGER:valueLongDouble=_value->value._integer->ll;break;
 		case VT_BIGINTEGER:valueLongDouble=getBigintegerLongDouble(_value->value._biginteger);break;
@@ -2154,8 +2927,14 @@ long double getValueLongDouble(const Mvalue* const _value){
 	return valueLongDouble;
 }/* VALIDATED */
 
+/**
+ * @brief returns the big integer stored in M value \p _value
+ * @details returns NULL if \p _value cannot be converted as a big integer
+ * @param _value 
+ * @return Mbiginteger* the big integer stored in M value \p _value
+ */
 Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value)return NULL;
+	if(NULL==_value)return NULL;
 	if(_value&&_value->type==VT_BIGINTEGER)return _value->value._biginteger;
 	Mbiginteger* _resultBiginteger=NULL;
 	switch(_value->type){
@@ -2193,6 +2972,15 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
 }/* VALIDATED */
 
 // (map) list conversions
+/**
+ * @brief appends M list \p _list to M map \p _map owned by \p owner_map
+ * 
+ * @param _map 
+ * @param owner_map 
+ * @param _list 
+ * @return true on success
+ * @return false on failure
+ */
 bool listAppendedToMap(Mmap* const _map,Mallocationowner owner_map,const Mlist* const _list){Mallocationowner owner=getOwner(__LINE__); // appends a list to a (possibly empty) map using the indices as attribute name
 	bool result=(_map!=NULL); // no map, no result!
 	if(result){
@@ -2214,17 +3002,27 @@ bool listAppendedToMap(Mmap* const _map,Mallocationowner owner_map,const Mlist* 
 	}
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief appends M list \p _list to the M map list \p _maplist owned by \p owner_maplist
+ * 
+ * @param _maplist 
+ * @param owner_maplist 
+ * @param _list 
+ * @return true on success
+ * @return false on failure
+ */
 bool listAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,Mlist const * const _list){Mallocationowner owner=getOwner(__LINE__);
 	bool result=(_maplist&&_maplist->valuetype==VT_LIST); // the destination list should only allow for list elements
 	if(result){
-		if(_list){
+		if(_list!=NULL){
 			Mlistelement* _listelement=_list->_first;
-			while(result&&_listelement){
+			while(result&&_listelement!=NULL){
 				// index and value of the list element are stored in a new list!!
 				Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false,"listAppendedToMapList"); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
-				if(!_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
+				if(NULL==_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
 				Mlist* _maplistelement=_maplistelementValue->value._list;
-				if(!_maplistelement)result=false;else
+				if(NULL==_maplistelement)result=false;else
 				if(appendedToList(_maplistelement,owner,_getIntegerValue(_listelement->index),M_LL_INVALID)<=0)result=false;else
 				if(appendedToList(_maplistelement,owner,_listelement->_value,M_LL_INVALID)<=0)result=false;else
 				if(appendedToList(_maplist,owner_maplist,_maplistelementValue,M_LL_INVALID)<=0)result=false;
@@ -2238,22 +3036,32 @@ bool listAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,
 					result=false;
 				}else
 				*/
-					_listelement=_listelement->_next;
+				_listelement=_listelement->_next;
 			}
 		}
 	}
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief appends M map list \p _maplist to M list \p _list owned by \p owner_list
+ * 
+ * @param _list 
+ * @param owner_list 
+ * @param _maplist 
+ * @return true on success
+ * @return false on failure
+ */
 bool maplistAppendedToList(Mlist* const _list,Mallocationowner owner_list,const Mlist* const _maplist){
 	bool result=(_list!=NULL); // no list, no result!
 	if(result){
-		if(_maplist){ // something to copy
+		if(_maplist!=NULL){ // something to copy
 			Mlistelement* _maplistelement=_maplist->_first;
 			Mvalue* _maplistelementValue;
-			while(result&&_maplistelement){
+			while(result&&_maplistelement!=NULL){
 				_maplistelementValue=_maplistelement->_value;
 				// each map list element should be a list with at least two elements
-				if(_maplistelementValue&&_maplistelementValue->type==VT_LIST&&_maplistelementValue->value._list->numberOfElements>1){
+				if(_maplistelementValue!=NULL&&_maplistelementValue->type==VT_LIST&&_maplistelementValue->value._list->numberOfElements>1){
 					// the first element in the map list element should be a positive integer that we can use as index
 					long long index=getValueInteger(_maplistelementValue->value._list->_first->_value);
 					// if the index is positive AND we fail to copy the second list element over, we failed!!!
@@ -2267,16 +3075,26 @@ bool maplistAppendedToList(Mlist* const _list,Mallocationowner owner_list,const 
 	}
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief appends M map list \p _maplist to the M map \p _map owned by \p owner_map
+ * 
+ * @param _map 
+ * @param owner_map 
+ * @param _maplist 
+ * @return true on success
+ * @return false on failure
+ */
 bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist const * const _maplist){Mallocationowner owner=getOwner(__LINE__);
 	bool result=(_map!=NULL);
 	if(result){
-		if(_maplist){
+		if(_maplist!=NULL){
 			Mlistelement* _maplistelement=_maplist->_first;
 			Mvalue* _maplistelementValue;
-			while(result&&_maplistelement){
+			while(result&&_maplistelement!=NULL){
 				_maplistelementValue=_maplistelement->_value;
 				// each map list element should be a list with at least two elements
-				if(_maplistelementValue&&_maplistelementValue->type==VT_LIST&&_maplistelementValue->value._list->numberOfElements>1){
+				if(_maplistelementValue!=NULL&&_maplistelementValue->type==VT_LIST&&_maplistelementValue->value._list->numberOfElements>1){
 					// the first element becomes the key the second element the attribute value
 					// BUT I suppose composite keys (maps or lists) are not allowed
 					Mvalue* _attributeNameValue=_maplistelementValue->value._list->_first->_value;
@@ -2288,7 +3106,7 @@ bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist con
 						if(_attributeNameValue->type==VT_TEXT)_attributeNameValueText=_getStringText(_attributeNameValue->value._text,true); // effectively cutting of the presuffix character TODO other solution????????
 					}
 					*/
-					if(_attributeNameValueText){
+					if(_attributeNameValueText!=NULL){
 						// TODO again the value is appended as is, but 
 						// DONE that should be OK, because values are essentially immutable!!!
 						if(!string_length(_attributeNameValueText)||!appendedToMap(_map,owner_map,string(_attributeNameValueText),_maplistelementValue->value._list->_first->_next->_value)){
@@ -2306,7 +3124,17 @@ bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist con
 	}
 	return result;
 }/* VALIDATED */
+
 // map to (map) list conversions
+/**
+ * @brief appends M map \p _map to M list \p _list owned by \p owner_list
+ * 
+ * @param _list 
+ * @param owner_list 
+ * @param _map 
+ * @return true 
+ * @return false 
+ */
 bool mapAppendedToList(Mlist* const _list,Mallocationowner owner_list,const Mmap* const _map){
 	bool result=(_list!=NULL);
 	if(result){
@@ -2325,28 +3153,38 @@ bool mapAppendedToList(Mlist* const _list,Mallocationowner owner_list,const Mmap
 	}
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief appends M map \p _map to M map list \p _maplist owned by \p owner_maplist
+ * 
+ * @param _maplist 
+ * @param owner_maplist 
+ * @param _map 
+ * @return true on success
+ * @return false on failure
+ */
 bool mapAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,const Mmap* const _map){Mallocationowner owner=getOwner(__LINE__);
-	bool result=(_maplist&&_maplist->valuetype==VT_LIST);
+	bool result=(_maplist!=NULL&&_maplist->valuetype==VT_LIST);
 	if(result){
 		Mallocationowner owner_maplistelement=Msubowner(owner_maplist,1);
-		if(_map&&_map->_first){
+		if(_map!=NULL&&_map->_first!=NULL){
 			Mmapelement* _mapelement=_map->_first;
-			while(result&&_mapelement){
+			while(result&&_mapelement!=NULL){
 			   // index and value of the list element are stored in a new list!!
 				Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false,"mapAppededToMapList");
 				Mlist* _maplistelement=(_maplistelementValue?_maplistelementValue->value._list:NULL);
-				if(_maplistelement){
+				if(_maplistelement!=NULL){
 					// if we fail to construct the maplist element or to add it
 					// NOTE the attribute name does not start with a quote character wich we need to call _getTextValue
 					// TODO the following could be restructured I suppose
 					Mstring* _attributeName=owned_string(__string(),owner);
-					if(_attributeName){ // should be freed
+					if(_attributeName!=NULL){ // should be freed
 						Mstring* p=_attributeName;
 						p=string_append_char(p,'\'');
 						p=string_append(p,_mapelement->_variable->_name->chars);
-						if(p){
+						if(p!=NULL){
 							Mvalue* _attributeNameValue=_getTextValue(string(_attributeName));
-							if(_attributeNameValue&&appendedToList(_maplistelement,owner_maplistelement,_attributeNameValue,M_LL_INVALID)>0){
+							if(_attributeNameValue!=NULL&&appendedToList(_maplistelement,owner_maplistelement,_attributeNameValue,M_LL_INVALID)>0){
 								if(appendedToList(_maplistelement,owner_maplist,_mapelement->_variable->_value,M_LL_INVALID)<=0||appendedToList(_maplist,owner_maplist,_maplistelementValue,M_LL_INVALID)<=0){
 									result=false;
 									outputError("Failed to append the attribute value in constructing a map list element");
@@ -2376,16 +3214,22 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,c
 }/* VALIDATED */
 
 // DECIMAL EXTRACTION
+/**
+ * @brief returns the M decimal represented by M value \p value
+ * 
+ * @param value 
+ * @return Mdecimal* 
+ */
 Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@09OCT2019: delegating to _getTextDecimal() is preferable over doing it ourselves
 	Mdecimal* _valueTextDecimal=NULL;
-	if(value){
+	if(value!=NULL){
 		if(value->type!=VT_DECIMAL){
-					// MDH@14APR2022: we're in trouble if we're not using the C locale in turning the given value into a text
-					char* locale=setlocale(LC_ALL,NULL);setlocale(LC_ALL,"C"); // replace the current locale
+			// MDH@14APR2022: we're in trouble if we're not using the C locale in turning the given value into a text
+			char* locale=setlocale(LC_ALL,NULL);setlocale(LC_ALL,"C"); // replace the current locale
 			Mstring* _valueText=owned_string(_getValueText(value,true),owner); // TODO will there be any brackets around a repeating part of a 
-					setlocale(LC_ALL,locale);
-			if(_valueText){
+			setlocale(LC_ALL,locale);
+			if(_valueText!=NULL){
 				_valueTextDecimal=owned_decimal(_getTextDecimal(string(_valueText),0),owner);
 				FREE_STRING(_valueText,owner);
 			}else
@@ -2413,9 +3257,15 @@ Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__
 
 // the work horse of converting any value (if possible) to a decimal
 // TODO shouldn't we use this function in d()???????
+/**
+ * @brief returns the M decimal represented by M value \p value
+ * 
+ * @param value 
+ * @return Mdecimal* the M decimal represented by M value \p value
+ */
 Mdecimal* _getValueDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
-	if(value){
+	if(value!=NULL){
 		if(value->type!=VT_LIST&&value->type!=VT_MAP){
 			switch(value->type){
 				case VT_DECIMAL:_decimal=owned_decimal(_getDecimalCopy(value->value._decimal),owner);break;
@@ -2430,7 +3280,7 @@ Mdecimal* _getValueDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE
 						Mrational* _rational=_getRational(_numerator,NULL,M_LD_NAN,false);
 						FREE_BIGINTEGER(_numerator,owner);
 						*/
-						if(_rational){
+						if(_rational!=NULL){
 							_decimal=owned_decimal(_getRationalDecimal(_rational),owner);
 							FREE_RATIONAL(_rational,owner);
 						}
@@ -2447,22 +3297,47 @@ Mdecimal* _getValueDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE
 	}
 	return disowned_decimal(_decimal,owner);
 }
+
+/**
+ * @brief returns the M decimal stored in M value \p value
+ * @details returns NULL if \p value does not wrap an M decimal
+ * @param value 
+ * @return Mdecimal* the M decimal stored in M value \p value
+ */
 Mdecimal* getValueDecimal(Mvalue* value){
 	return(value?(value->type==VT_DECIMAL?value->value._decimal:_getValueDecimal(value)):NULL);
 }
 // END DECIMAL EXTRACTION
 
 // MDH@03FEB2020: extract specific data elements wrapped in values
+/**
+ * @brief returns the M environment stored in M value \p value
+ * @details returns NULL if \p value does not wrap a M environment
+ * @param value 
+ * @return Menvironment* the M environment stored in M value \p value
+ */
 Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_ENVIRONMENT?value->value._environment:NULL);}
 
+/**
+ * @brief returns a new M list of type \p valuetype
+ * 
+ * @param valuetype 
+ * @return Mlist* a new M list of type \p valuetype
+ */
 Mlist* _getListOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
 	// output("Allocating list (size: %zd).\n",sizeof(Mlist));
 	Mlist* _list=owned_list(__list("getListOfType"),owner);
-	if(!_list)return NULL;
+	if(NULL==_list)return NULL;
 	_list->valuetype=valuetype;
 	return disowned_list(_list,owner);
 }/* VALIDATED */
 
+/**
+ * @brief returns a new M map of type \p valuetype
+ * 
+ * @param valuetype 
+ * @return Mmap* a new M map of type \p valuetype
+ */
 Mmap* _getMapOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
 	if(!_map)return NULL;
@@ -2470,10 +3345,35 @@ Mmap* _getMapOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE
 	return disowned_map(_map,owner);
 }/* VALIDATED */
 
-Mlist* listMadeWeak(Mlist* list){if(list)list->weak=true;return list;}
+/**
+ * @brief returns the \p list made weak
+ * 
+ * @param list 
+ * @return Mlist* \p list made weak
+ */
+Mlist* listMadeWeak(Mlist* list){if(list!=NULL)list->weak=true;return list;}
+
+/**
+ * @brief returns \p map made weak
+ * 
+ * @param map 
+ * @return Mmap* \p map made weak
+ */
 Mmap* mapMadeWeak(Mmap* map){if(map)map->weak=true;return map;}
 
+/**
+ * @brief returns the sign integer of \p integer
+ * @details returns 1 if \p integer is positive, 0 if \p integer is zero and -1 if \p integer is negative
+ * @param integer 
+ * @return long long -1, 0 or 1
+ */
 long long getIntegerSign(long long integer){return(integer>0?1:(integer<0?-1:0));}
+/**
+ * @brief returns the sign of \p value
+ * @details returns M_LL_INVALID if \p value is not a single numeric value
+ * @param value 
+ * @return long long the sign of \p value
+ */
 long long getValueSign(Mvalue const * const value){
 	if(value){
 		if(value->type==VT_INTEGER)return getIntegerSign(value->value._integer->ll);
@@ -2484,10 +3384,17 @@ long long getValueSign(Mvalue const * const value){
 	}
 	return M_LL_INVALID;
 }
+
 // TODO turn the result type of isValueZero() into long long
+/**
+ * @brief returns M_TRUE if \p value is zero, M_FALSE if \p value is not zero
+ * @details returns M_LL_INVALID if value is NULL or is not a numeric single value
+ * @param value 
+ * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+ */
 long long isValueZero(Mvalue* value){
 	long long result=M_LL_INVALID;
-	if(value){
+	if(value!=NULL){
 		if(amVerboseDebugging())
 			outputValue("Checking whether '",value,"' is zero");
 		if(value->type==VT_INTEGER)result=isIntegerZero(value->value._integer);else
@@ -2500,9 +3407,16 @@ long long isValueZero(Mvalue* value){
 		output(": %s.\n",(result==M_TRUE?"YES":"NO"));
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief returns M_TRUE if \p value equals 1, M_FALSE if \p value does not equal 1
+ * @details returns M_LL_INVALID if value is NULL or is not a numeric single value
+ * @param value 
+ * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+ */
 long long isValueOne(Mvalue* value){
 	long long result=M_LL_INVALID;
-	if(value){
+	if(value!=NULL){
 		if(amVerboseDebugging())
 			outputValue("Checking whether '",value,"' equals one");
 		if(value->type==VT_INTEGER)result=isIntegerOne(value->value._integer);else
@@ -2515,6 +3429,13 @@ long long isValueOne(Mvalue* value){
 	}
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief returns M_TRUE if \p value is positive, M_FALSE if \p is not positive
+ * @details returns M_LL_INVALID if \p value does not store a numeric value
+ * @param value 
+ * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+ */
 long long isValuePositive(Mvalue* value){
 	long long result=M_LL_INVALID;
 	if(value){
@@ -2530,6 +3451,13 @@ long long isValuePositive(Mvalue* value){
 	}
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief returns M_TRUE if \p value is negative, M_FALSE if \p is not negative
+ * @details returns M_LL_INVALID if \p value does not store a numeric value
+ * @param value 
+ * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+ */
 long long isValueNegative(Mvalue* value){
 	long long result=M_LL_INVALID;
 	if(value){
@@ -2545,49 +3473,77 @@ long long isValueNegative(Mvalue* value){
 	}
 	return result;
 }/* VALIDATED */
+
+/**
+ * @brief returns M_TRUE if \p value is scalar, M_FALSE if \p is not scalar
+ * @details if \p is NULL M_FALSE is returned
+ * @param value 
+ * @return long long M_TRUE or M_FALSE
+ */
 long long isValueScalar(Mvalue* value){
-	if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_FLOAT:case VT_TEXT:case VT_TOKEN:return M_TRUE;default:return M_FALSE;}
-	return M_FALSE;
+	if(value!=NULL)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_FLOAT:case VT_TEXT:case VT_TOKEN:return M_TRUE;default:return M_FALSE;}
+	return M_LL_INVALID; // MDH@15MAR2023: better to return M_LL_INVALID if \p value is NULL
 }/* VALIDATED */
 
 // MDH@26OCT2019: TODO perhaps a reference is invalid if it is no longer pointing somewhere??????
+/**
+ * @brief returns M_TRUE if \p valuereference is undefined, M_FALSE otherwise
+ * 
+ * @param valuereference 
+ * @return long long M_TRUE if \p valuereference is undefined, M_FALSE otherwise
+ */
 long long isReferenceUndefined(Mvaluereference* valuereference){
-	return(valuereference?M_FALSE:M_TRUE);
+	return(valuereference!=NULL?M_FALSE:M_TRUE);
 }
 
 // null test for the value to be considered NULL
+/**
+ * @brief returns M_TRUE if \p value holds a NULL or it's type is VT_UNDEFINED, M_FALSE otherwise
+ * 
+ * @param value 
+ * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+ */
 long long isValueNull(Mvalue* value){
 	long long result=M_LL_INVALID;
-	if(value)
+	if(value!=NULL)
 	switch(value->type){
-		case VT_INTEGER:result=(value->value._integer?M_FALSE:M_TRUE);break;
-		case VT_BIGINTEGER:result=(value->value._biginteger?M_FALSE:M_TRUE);break;
-		case VT_DECIMAL:result=(value->value._decimal?M_FALSE:M_TRUE);break;
-		case VT_RATIONAL:result=(value->value._rational?M_FALSE:M_TRUE);break;
-		case VT_FLOAT:result=(value->value._float?M_FALSE:M_TRUE);break;
-		case VT_TEXT:result=(value->value._text?M_FALSE:M_TRUE);break;
-		case VT_ARRAY:result=(value->value._array?M_FALSE:M_TRUE);break;
-		case VT_LIST:result=(value->value._list?M_FALSE:M_TRUE);break;
-		case VT_MAP:result=(value->value._map?M_FALSE:M_TRUE);break;
-		case VT_TOKEN:result=(value->value._token?M_FALSE:M_TRUE);break;
+		case VT_INTEGER:result=(value->value._integer!=NULL?M_FALSE:M_TRUE);break;
+		case VT_BIGINTEGER:result=(value->value._biginteger!=NULL?M_FALSE:M_TRUE);break;
+		case VT_DECIMAL:result=(value->value._decimal!=NULL?M_FALSE:M_TRUE);break;
+		case VT_RATIONAL:result=(value->value._rational!=NULL?M_FALSE:M_TRUE);break;
+		case VT_FLOAT:result=(value->value._float!=NULL?M_FALSE:M_TRUE);break;
+		case VT_TEXT:result=(value->value._text!=NULL?M_FALSE:M_TRUE);break;
+		case VT_ARRAY:result=(value->value._array!=NULL?M_FALSE:M_TRUE);break;
+		case VT_LIST:result=(value->value._list!=NULL?M_FALSE:M_TRUE);break;
+		case VT_MAP:result=(value->value._map!=NULL?M_FALSE:M_TRUE);break;
+		case VT_TOKEN:result=(value->value._token!=NULL?M_FALSE:M_TRUE);break;
 		case VT_UNDEFINED:result=M_TRUE;break;
-		case VT_REFERENCE:result=(value->value._reference?M_FALSE:M_TRUE);break;
-		case VT_FUNCTION:result=(value->value._function?M_FALSE:M_TRUE);break;
-		case VT_ENVIRONMENT:result=(value->value._environment?M_FALSE:M_TRUE);break;
-		case VT_FILE:result=(value->value._file?M_FALSE:M_TRUE);break; // MDH@28SEP2020
-		case VT_TIME:result=(value->value._time?M_FALSE:M_TRUE);break; // MDH@08DEC2020
+		case VT_REFERENCE:result=(value->value._reference!=NULL?M_FALSE:M_TRUE);break;
+		case VT_FUNCTION:result=(value->value._function!=NULL?M_FALSE:M_TRUE);break;
+		case VT_ENVIRONMENT:result=(value->value._environment!=NULL?M_FALSE:M_TRUE);break;
+		case VT_FILE:result=(value->value._file!=NULL?M_FALSE:M_TRUE);break; // MDH@28SEP2020
+		case VT_TIME:result=(value->value._time!=NULL?M_FALSE:M_TRUE);break; // MDH@08DEC2020
 	}
 	return result;
 }/* VALIDATED */
 
-long long isArrayUndefined(Marray* array){return(array?M_FALSE:M_TRUE);}
-long long isListUndefined(Mlist* list){return(list?M_FALSE:M_TRUE);}
-long long isMapUndefined(Mmap* map){return(map?M_FALSE:M_TRUE);}
+long long isArrayUndefined(Marray* array){return(array!=NULL?M_FALSE:M_TRUE);}
+long long isListUndefined(Mlist* list){return(list!=NULL?M_FALSE:M_TRUE);}
+long long isMapUndefined(Mmap* map){return(map!=NULL?M_FALSE:M_TRUE);}
+
 // MDH@25FEB2021
+/**
+ * @brief returns M_TRUE if \p propertyName is an attribute of M map \p map
+ * 
+ * @param map 
+ * @param propertyName 
+ * @return true on success
+ * @return false on failure
+ */
 bool isMapProperty(Mmap* map,char* propertyName){
-	if(map&&propertyName){
+	if(map!=NULL&&propertyName!=NULL){
 		Mmapelement* mapelement=map->_first;
-		while(mapelement){
+		while(mapelement!=NULL){
 			if(!strcmp(mapelement->_variable->_name->chars,propertyName))return true; // found
 			mapelement=mapelement->_next;
 		}
@@ -2597,6 +3553,12 @@ bool isMapProperty(Mmap* map,char* propertyName){
 
 // MDH@18JUL2019: we consider certain non-null values as undefined, this is to fill the gap between non-null values that represent missings
 //				TODO is a map or list undefined when empty???????
+/**
+ * @brief returns M_TRUE if \p value is undefined, M_FALSE otherwise
+ * @details returns M_LL_INVALID if \p value is NULL
+ * @param value 
+ * @return long long M_TRUE, M_FALSE or M_LL_INVALID
+ */
 long long isValueUndefined(Mvalue* value){
 	long long result=M_LL_INVALID;
 	// values that are considered NULL are also undefined (even if value is NULL)
@@ -2623,10 +3585,17 @@ long long isValueUndefined(Mvalue* value){
 }/* VALIDATED */
 
 // MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
+/**
+ * @brief returns all \p maxiter rational approximations to long double \p ld
+ * 
+ * @param ld 
+ * @param maxiter 
+ * @return Mlist* all \p maxiter rational approximations to long double \p ld
+ */
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationowner owner=getOwner(__LINE__);
 	// if iterations, you're supposed to return all iteration results
 	Mlist* _iterationsList=owned_list(_getListOfType(VT_UNDEFINED),owner);
-	if(_iterationsList){ // should be freed when NOT returned!!
+	if(_iterationsList!=NULL){ // should be freed when NOT returned!!
 		Mrational* _rational=NULL; // the last (computed) rational
 		if(isLongDoubleUndefined(ld)!=M_TRUE){ // not a NaN (might still be Infinity though), but Infinity has a sign too   
 			long long ldSign=getLongDoubleSign(ld);
@@ -2650,14 +3619,14 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
 							   ,*_denominator=owned_biginteger(_getBiginteger(q),owner);
 					_rational=_getRational(_numerator,_denominator,delta,false/*,true*/); // construct the intermediate result without normalizing
 					FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner); // MDH@26MAY2020 now always!!!
-					if(!_rational){
+					if(NULL==_rational){
 						output("%sFailed to construct the rational approximation %lld/%lld.\n",M_ERROR_PREFIX,p,q);
 						break;
 					}
 					// NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
 					// NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
 					Mvalue* _rationalValue=_getValueOfRational(disowned_rational(_rational,owner));
-					if(!_rationalValue){FREE_RATIONAL(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
+					if(NULL==_rationalValue){FREE_RATIONAL(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
 					// NOTE probably best to break if we can't append approximations!!
 					// NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
 					if(appendedToList(_iterationsList,owner,_rationalValue,i)<=0)
@@ -2684,7 +3653,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
 				Mrational* _rational=(Mrational*)OWNED(_getRational(_numerator,NULL,M_LD_NAN,false),owner);
 				FREE_BIGINTEGER(_numerator,owner); // ALWAYS!!
 				Mvalue* _rationalValue=_getValueOfRational(disowned_rational(_rational,owner)); // OK free __biginteger() if failing to get that _rational
-				if(!_rationalValue)FREE_RATIONAL(_rational,owner);else 
+				if(NULL==_rationalValue)FREE_RATIONAL(_rational,owner);else 
 				if(appendedToList(_iterationsList,owner,_rationalValue,0)<=0)
 					outputError("Failed to append rational approximation to the result list"); // no need to free _rational because it's value wrapper will be garbage collected!!
 			}
@@ -2710,12 +3679,19 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
 	return disowned_list(_iterationsList,owner);
 }/* VALIDATED */
 
+/**
+ * @brief assigns M value \p _value to M value holder \p _valueholder
+ * @details on success the reference count of the assigned value is incremented by 1
+ *          but if \p value holds a map, array or list \p value is copied before being assigned
+ * @param _valueholder 
+ * @param _value 
+ */
 void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowner owner=getOwner(__LINE__);
 	// {outputValue("Storing '",_value,"'");output(" in %p.\n",_valueholder);} // DEBUG
 	// ASSERT not a composite value (so like an end node)
-	if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
+	if(*_valueholder!=NULL)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
 	// MDH@01NOV2019: it's a leap of faith to let assignValue() create copies of composite values i.e. instead of assigning _value to the *_valueholder we assign a new map or list value
-	if(_value){
+	if(_value!=NULL){
 		// MDH@03NOV2020 (US president election day): we can prevent unnecesary duplications by not copying unbound values (which would be literals most likely)
 		if(_value->count>0){
 			// create a copy of the map or list and assign it to the value holder however it would then copy the map again, and that's not what should happen!!!
@@ -2737,72 +3713,101 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowne
 		}
 	}
 	*_valueholder=_value; // replace what's being pointed to
-	if(*_valueholder)incrementReferenceCount(*_valueholder); // increment what it's pointing to now (if not NULL)
+	if(*_valueholder!=NULL)incrementReferenceCount(*_valueholder); // increment what it's pointing to now (if not NULL)
 }/* VALIDATED */
 
 // functions
+/**
+ * @brief returns the new M array containing the result of applying one argument function \p oneArgumentFunction to each element of M array \p _array
+ * 
+ * @param _array 
+ * @param oneArgumentFunction 
+ * @return Marray* the new M array containing the result of applying one argument function \p oneArgumentFunction to each element of M array \p _array
+ */
 Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _result=NULL;
-	if(_array){
+	if(_array!=NULL){
 		unsigned long long l=_array->numberOfElements;
 		if(l>0){
 			_result=owned_array(_getArray("appliedToArray",_array->numberOfElements),owner);
-			if(_result){
-				do{
-					l--;
-					assignValue(&_result->values[l],oneArgumentFunction(_array->values[l]));
-				}while(l>0);
-			}
+			if(_result==NULL)return NULL;
+			do{
+				l--;
+				assignValue(&_result->values[l],oneArgumentFunction(_array->values[l]));
+			}while(l>0);
 		}
 	}
 	return disowned_array(_result,owner);	
 }
 // helpers
+/**
+ * @brief returns the new M list containing the result of applying one argument function \p oneArgumentFunction to each element of M list \p _list
+ * 
+ * @param _list
+ * @param oneArgumentFunction 
+ * @return Mlist* the new M list containing the result of applying one argument function \p oneArgumentFunction to each element of M list \p _list
+ */
 Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _result=NULL;
-	if(_list){
+	if(_list!=NULL){
 		_result=owned_list(_getListOfType(_list->valuetype),owner);
+		if(NULL==_result)return NULL;
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,owner,oneArgumentFunction(_listelement->_value),_listelement->index)>0)_listelement=_listelement->_next;
+		while(_listelement!=NULL&&appendedToList(_result,owner,oneArgumentFunction(_listelement->_value),_listelement->index)>0)_listelement=_listelement->_next;
 	}
 	return disowned_list(_result,owner);
 }/* VALIDATED */
+
+/**
+ * @brief returns the new M map containing the result of applying one argument function \p oneArgumentFunction to each attribute value of M map \p _map
+ * 
+ * @param _map
+ * @param oneArgumentFunction 
+ * @return Mmap* the new M map containing the result of applying one argument function \p oneArgumentFunction to each attribute value of M map \p _map
+ */
 Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _result=NULL;
-	if(_map){
+	if(_map!=NULL){
 		_result=owned_map(_getMapOfType(_map->valuetype),owner);
+		if(NULL==_result)return NULL;
 		Mmapelement* _mapelement=_map->_first;
-		while(_mapelement&&appendedToMap(_result,owner,_mapelement->_variable->_name->chars,oneArgumentFunction(_mapelement->_variable->_value))==1)_mapelement=_mapelement->_next;
+		while(_mapelement!=NULL&&appendedToMap(_result,owner,_mapelement->_variable->_name->chars,oneArgumentFunction(_mapelement->_variable->_value))==1)_mapelement=_mapelement->_next;
 	}
 	return disowned_map(_result,owner);
 }/* VALIDATED */
 
+/**
+ * @brief returns the new M big integer of the rounded value of M rational \p _rational
+ * 
+ * @param _rational 
+ * @return Mbiginteger* the new M big integer of the rounded value of M rational \p _rational
+ */
 Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner owner=getOwner(__LINE__);
 	// we have to multiply the numerator by 2 and add the denominator
 	// NO we should compare the remainder with the denominator divided by two
 	// BUT if we multiply the numerator with 2 we can divide and compare with 
 	// TODO ignores delta for now
-	if(_rational){
+	if(_rational!=NULL){
 		// denominator equal to 1?
-		if(!_rational->den||mp_cmp(MP_INT_POINTER(_rational->den),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return disowned_biginteger(owned_biginteger(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1),owner),owner);
+		if(NULL==_rational->den||mp_cmp(MP_INT_POINTER(_rational->den),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return disowned_biginteger(owned_biginteger(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1),owner),owner);
 		// if the numerator equals 1, the result is 0
-		if(!_rational->num||mp_cmp(MP_INT_POINTER(_rational->num),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return disowned_biginteger(owned_biginteger(_getBiginteger(0),owner),owner); // with the numerator at least equal to 2 the result will always be 0
+		if(NULL==_rational->num||mp_cmp(MP_INT_POINTER(_rational->num),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return disowned_biginteger(owned_biginteger(_getBiginteger(0),owner),owner); // with the numerator at least equal to 2 the result will always be 0
 		bool neg=mp_isneg(MP_INT_POINTER(_rational->num)); // determine whether negative or not
 		// get the absolute value of the numerator
 		Mbiginteger* _dividend=NULL;
 		Mbiginteger* _absnum=owned_biginteger(__biginteger(),owner); // to be freed asap
-		if(_absnum){ // freeable
+		if(_absnum!=NULL){ // freeable
 			if(mp_abs(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_absnum))==MP_OKAY){
 				Mbiginteger* _twicenum=owned_biginteger(__biginteger(),owner);
-				if(_twicenum){ // freeable
+				if(_twicenum!=NULL){ // freeable
 					if(mp_mul_2(MP_INT_POINTER(_absnum),MP_INT_POINTER(_twicenum))==MP_OKAY){
 						Mbiginteger* _twiceden=owned_biginteger(__biginteger(),owner);
-						if(_twiceden){
+						if(_twiceden!=NULL){
 							if(mp_mul_2(MP_INT_POINTER(_rational->den),MP_INT_POINTER(_twiceden))==MP_OKAY){
 								Mbiginteger* _remainder=owned_biginteger(__biginteger(),owner);
-								if(_remainder){
+								if(_remainder!=NULL){
 									_dividend=owned_biginteger(__biginteger(),owner);
-									if(_dividend){
+									if(_dividend!=NULL){
 										bool success=(mp_div(MP_INT_POINTER(_twicenum),MP_INT_POINTER(_twiceden),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
 										// increment _dividend if _remainder larger than denominator
 										if(success&&mp_cmp(MP_INT_POINTER(_remainder),MP_INT_POINTER(_rational->den))==MP_GT&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
@@ -2830,15 +3835,30 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner o
 	}
 	return NULL;
 }/* VALIDATED */
+
 /*
  * \parameter floor  when true, returns the integer part of the rational, which actually is the trunc value
  * \parameter towardszero is true, returns the integer part of the rational, which actually is the trunc version
  */
+
+/**
+ * @brief returns the new M big integer 'near' to M rational \p _rational
+ * @details if \p floor is set, truncates the rational, rounds otherwise
+ *          if \p towardszero is set, truncates towards zero, truncates to minus infinity otherwise
+ * @param _rational 
+ * @param floor 
+ * @param towardszero 
+ * @return Mbiginteger* the new M big integer 'near' to M rational \p _rational
+ */
 Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero){Mallocationowner owner=getOwner(__LINE__);
 	// TODO ignores delta for now
-	if(_rational){
-		if(!_rational->num)return NULL; // if the numerator is undefined, the rational is undefined!!!!
-		if(!_rational->den)return _getBigintegerCopy(_rational->num); // cannot get it much simpler if the rational already is integer
+	if(_rational!=NULL){
+		// TODO if the numerator is NULL which is possible now, we can still round
+		if(isBigintegerOne(_rational->den)!=0)return _getBigintegerCopy(_rational->num); // if the denominator equals 1, return the numerator...
+		if(NULL==_rational->num){
+			// the denominator is at least two
+			return _getBiginteger(0); // TODO check if this is correct!!!!!
+		}
 		// ASSERT both numerator and denominator are NOT NULL
 		bool neg=mp_isneg(MP_INT_POINTER(_rational->num)); // determine whether negative or not
 		// get the absolute value of the numerator
@@ -2877,16 +3897,24 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
 // MDH@18OCT2019: same for decimals
 // TODO should we store the result in a big integer or an integer (if possible????)
 //	  theoretically we should return a decimal!!!
+/**
+ * @brief returns the M decimal integer 'nearest' to M decimal \p _decimal
+ * 
+ * @param _decimal 
+ * @param floor 
+ * @param towardszero 
+ * @return Mdecimal* the M decimal integer 'nearest' to M decimal \p _decimal
+ */
 Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE decimals can have repeating parts BUT those repeating digits are only behind the decimal comma, so won't have effect on the integers
 	// ceil: false,false / trunc: true,true / floor: true,false / ?: false,true
-	if(_decimal){
+	if(_decimal!=NULL){
 		Mdecimalcontext* decimalcontext=getDecimalcontext(_decimal->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-		if(mpd_context){
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+		if(mpd_context!=NULL){
 			if(towardszero){ // always means truncing!!!
 				Mdecimal* _truncDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
-				if(_truncDecimal){
+				if(_truncDecimal!=NULL){
 					uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
 					mpd_qtrunc(_truncDecimal->mpd,_decimal->mpd,mpd_context,&status);
 					if((status&0xEFBF)==0)return disowned_decimal(_truncDecimal,owner);
@@ -2896,7 +3924,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 			}else
 			if(floor){
 				Mdecimal* _floorDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
-				if(_floorDecimal){
+				if(_floorDecimal!=NULL){
 					uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
 					mpd_qfloor(_floorDecimal->mpd,_decimal->mpd,mpd_context,&status);
 					if((status&0xEFBF)==0)return disowned_decimal(_floorDecimal,owner);
@@ -2905,7 +3933,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 				}					
 			}else{
 				Mdecimal* _ceilDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
-				if(_ceilDecimal){
+				if(_ceilDecimal!=NULL){
 					uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
 					mpd_qceil(_ceilDecimal->mpd,_decimal->mpd,mpd_context,&status);
 					if((status&0xEFBF)==0)return disowned_decimal(_ceilDecimal,owner);
@@ -2919,13 +3947,19 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 	return NULL;
 }
 
+/**
+ * @brief returns the new M decimal of \p _decimal rounded to the nearest integer
+ * 
+ * @param _decimal 
+ * @return Mdecimal* the new M decimal of \p _decimal rounded to the nearest integer
+ */
 Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){Mallocationowner owner=getOwner(__LINE__);
-	if(_decimal){
+	if(_decimal!=NULL){
 		Mdecimalcontext* decimalcontext=getDecimalcontext(_decimal->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-		if(mpd_context){
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+		if(mpd_context!=NULL){
 			Mdecimal* _roundDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
-			if(_roundDecimal){
+			if(_roundDecimal!=NULL){
 				uint32_t status=0;
 				mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
 				if((status&0xEFBF)==0)return disowned_decimal(_roundDecimal,owner);
@@ -2940,10 +3974,18 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){Mallocationowner owner=getOwner
 
 // MDH@24OCT2019: when representing variable values the value might match the value of a constant in which case we use the name of that constant variable instead (which is like a symbol)
 //				obviously the type of the value should match as well
+/**
+ * @brief returns true if the M values \p value1 and \p value2 are equal
+ * 
+ * @param value1 
+ * @param value2 
+ * @return true when \p value1 equals \p value2
+ * @return false when \p value1 does not equal \p value2
+ */
 bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
-	if(!value1&&!value2)return false; // if both NULL not considered to be the same
+	if(NULL==value1&&NULL==value2)return false; // if both NULL not considered to be the same TODO is this correct????
 	if(value1==value2)return true; // the same value pointed to
-	if(!value1||!value2)return false; // if either is NULL, not the same of course
+	if(NULL==value1||NULL==value2)return false; // if either is NULL, not the same of course
 	// ASSERT both not NULL
 	if(value1->type==value2->type) // if the types are different definitely not the same
 	switch(value1->type){
@@ -2966,13 +4008,23 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
 }
 
 // MDH@03MAR2020: moved over from Menvironment.c
+/**
+ * @brief frees \p _expressionlistelement
+ * 
+ * @param _expressionlistelement 
+ */
 void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
-	if(_expressionlistelement){
+	if(_expressionlistelement!=NULL){
 		free_expressionlistelement(_expressionlistelement->_next);
 		free_value(_expressionlistelement->_value);
 		free(_expressionlistelement);
 	}
 }/* VALIDATED */
+/**
+ * @brief frees \p _expressionlist
+ * 
+ * @param _expressionlist 
+ */
 void free_expressionlist(Mexpressionlist* _expressionlist){
 	if(_expressionlist){
 		free_expressionlistelement(_expressionlist->_next);
@@ -2983,17 +4035,32 @@ void free_expressionlist(Mexpressionlist* _expressionlist){
 
 // NOTE typically you're not supposed to free internal functions safe M function definitions 
 // TODO if a function map is freed, we shouldn't free internal functions BUT those are only present in the main environment which is never released!!
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _functions owned by \p owner_function
+ * 
+ * @param _function 
+ * @param owner_function 
+ * @return Mfunction* \p _functions owned by \p owner_function
+ */
 Mfunction* owned_function(Mfunction* _function,Mallocationowner owner_function){
-	if(!_function)return NULL;
+	if(NULL==_function)return NULL;
 	/////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
-	if(_function->_parameterMap)owned_map(_function->_parameterMap,Msubowner(owner_function,1)); // MDH@22OCT2020: with a parameter map possibly missing, testing might help
+	if(_function->_parameterMap!=NULL)owned_map(_function->_parameterMap,Msubowner(owner_function,1)); // MDH@22OCT2020: with a parameter map possibly missing, testing might help
 	if(_function->type==FT_USER)owned_userfunction(_function->functionunion._userfunction,Msubowner(owner_function,1)); // TODO ?????
 	return OWNED(_function,owner_function);
 }
+/**
+ * @brief returns \p _function disowned by \p owner_function
+ * 
+ * @param _function 
+ * @param owner_function 
+ * @return Mfunction* \p _function disowned by \p owner_function
+ */
 Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function){
-	if(!_function)return NULL;
+	if(NULL==_function)return NULL;
 	/////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
-	if(_function->_parameterMap)disowned_map(_function->_parameterMap,owner_function);
+	if(_function->_parameterMap!=NULL)disowned_map(_function->_parameterMap,owner_function);
 	//if(amVerboseDebugging())
 		output("\t\tFunction parameter map disowned.\n");
 	if(_function->type==FT_USER){
@@ -3003,6 +4070,11 @@ Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_functio
 	}
 	return DISOWNED(_function,owner_function);
 }
+#endif
+/**
+ * @brief frees M function \p _function
+ * @param _function
+ */
 void free_function(Mfunction* _function/*,Mallocationowner owner_function*/){
 	if(!_function)return;
 		/////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
@@ -3011,6 +4083,14 @@ void free_function(Mfunction* _function/*,Mallocationowner owner_function*/){
 	FREE_1(_function,'F');
 }/* VALIDATED */
 
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _functionmapelement owned by \p owner_functionmapelement
+ * 
+ * @param _functionmapelement 
+ * @param owner_functionmapelement 
+ * @return Mfunctionmapelement* \p _functionmapelement owned by \p owner_functionmapelement
+ */
 Mfunctionmapelement* owned_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocationowner owner_functionmapelement){
 	if(!_functionmapelement)return NULL;
 	owned_functionmapelement(_functionmapelement->_next,owner_functionmapelement);
@@ -3018,6 +4098,13 @@ Mfunctionmapelement* owned_functionmapelement(Mfunctionmapelement* _functionmape
 	owned_string(_functionmapelement->_name,Msubowner(owner_functionmapelement,1));
 	return OWNED(_functionmapelement,owner_functionmapelement);
 }
+/**
+ * @brief returns \p _functionmapelement disowned by \p owner_functionmapelement
+ * 
+ * @param _functionmapelement 
+ * @param owner_functionmapelement 
+ * @return Mfunctionmapelement* \p _functionmapelement disowned by \p owner_functionmapelement
+ */
 Mfunctionmapelement* disowned_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocationowner owner_functionmapelement){
 	if(!_functionmapelement)return NULL;
 	disowned_functionmapelement(_functionmapelement->_next,owner_functionmapelement);
@@ -3029,6 +4116,12 @@ Mfunctionmapelement* disowned_functionmapelement(Mfunctionmapelement* _functionm
 	output("\tDisowning the function map element!\n");
 	return DISOWNED(_functionmapelement,owner_functionmapelement);
 }
+#endif
+/**
+ * @brief frees \p _functionmapelement
+ * 
+ * @param _functionmapelement 
+ */
 void free_functionmapelement(Mfunctionmapelement* _functionmapelement){
 	if(!_functionmapelement)return;
 	free_functionmapelement(_functionmapelement->_next);
@@ -3038,6 +4131,14 @@ void free_functionmapelement(Mfunctionmapelement* _functionmapelement){
 }// VALIDATED
 #define FREE_FUNCTIONMAPELEMENT(_functionmapelement,owner_functionmapelement) free_functionmapelement(disowned_functionmapelement(_functionmapelement,owner_functionmapelement))
 
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _functionmap owned by \p owner_functionmap
+ * 
+ * @param _functionmap 
+ * @param owner_functionmap 
+ * @return Mfunctionmap* \p _functionmap owned by \p owner_functionmap
+ */
 Mfunctionmap* owned_functionmap(Mfunctionmap* _functionmap,Mallocationowner owner_functionmap){
 	if(!_functionmap)return NULL;
 	owned_functionmapelement(_functionmap->_first,Msubowner(owner_functionmap,1));
@@ -3048,6 +4149,12 @@ Mfunctionmap* disowned_functionmap(Mfunctionmap* _functionmap,Mallocationowner o
 	disowned_functionmapelement(_functionmap->_first,owner_functionmap);
 	return DISOWNED(_functionmap,owner_functionmap);
 }
+#endif
+/**
+ * @brief frees \p _functionmap
+ * 
+ * @param _functionmap 
+ */
 void free_functionmap(Mfunctionmap* _functionmap){
 	if(!_functionmap)return;
 	free_functionmapelement(_functionmap->_first);
@@ -3056,18 +4163,39 @@ void free_functionmap(Mfunctionmap* _functionmap){
 #define FREE_FUNCTIONMAP(_functionmap,owner_functionmap) free_functionmap(disowned_functionmap(_functionmap,owner_functionmap))
 
 // MDH@20JUL2019: might never get called, wel perhaps on internal functions when it goes out of scope???????
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _userfunction owned by \p owner_userfunction
+ * 
+ * @param _userfunction 
+ * @param owner_userfunction 
+ * @return Muserfunction* \p _userfunction owned by \p owner_userfunction
+ */
 Muserfunction* owned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction){
 	if(!_userfunction)return NULL;
 	owned_list(_userfunction->_bodyCommandList,Msubowner(owner_userfunction,1));
 	// replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
 	return OWNED(_userfunction,owner_userfunction);
 }
+/**
+ * @brief returns \p _userfunction disowned by \p owner_userfunction
+ * 
+ * @param _userfunction 
+ * @param owner_userfunction 
+ * @return Muserfunction* \p _userfunction disowned by \p owner_userfunction
+ */
 Muserfunction* disowned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction){
 	if(!_userfunction)return NULL;
 	disowned_list(_userfunction->_bodyCommandList,owner_userfunction);
 	// replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
 	return DISOWNED(_userfunction,owner_userfunction);
 }
+#endif
+/**
+ * @brief frees \p _userfunction
+ * 
+ * @param _userfunction 
+ */
 void free_userfunction(Muserfunction* _userfunction){
 	if(!_userfunction)return;
 	///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
@@ -3079,16 +4207,31 @@ void free_userfunction(Muserfunction* _userfunction){
 // END RELEASERS
 
 // Menvironment stuff
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _environment owned by \p owner_environment
+ * 
+ * @param _environment 
+ * @param owner_environment 
+ * @return Menvironment* \p _environment owned by \p owner_environment
+ */
 Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owner_environment){
-	if(!_environment)return NULL;
+	if(NULL==_environment)return NULL;
 	if(amVerboseDebugging())output("Taking over ownership environment.\n");
 	owned_chars(_environment->_name,Msubowner(owner_environment,1));
 	owned_map(_environment->_variableMap,Msubowner(owner_environment,1));
 	owned_functionmap(_environment->_functionMap,Msubowner(owner_environment,1)); // all functions also need to change their ownership
 	return OWNED(_environment,owner_environment);
 }
+/**
+ * @brief returns \p _environment disowned by \p owner_environment
+ * 
+ * @param _environment 
+ * @param owner_environment 
+ * @return Menvironment* \p _environment disowned by \p owner_environment
+ */
 Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment){
-	if(!_environment)return NULL;
+	if(NULL==_environment)return NULL;
 	//if(amVerboseDebugging())
 		output("Releasing ownership environment '%s'.\n",_environment->_name->chars);
 	disowned_chars(_environment->_name,owner_environment);
@@ -3104,9 +4247,10 @@ Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner o
 	// disowned_map(_environment->_functionMap);
 	return DISOWNED(_environment,owner_environment);
 }
+#endif
 void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/){
-	if(_environment){
-		if(_environment->_name){
+	if(_environment!=NULL){
+		if(_environment->_name!=NULL){
 				// output("Freeing environment name '%s'.\n",_environment->_name->chars); // DEBUG
 				freeChars(_environment->_name/*,owner_environment*/);
 				_environment->_name=NULL;
@@ -3127,49 +4271,77 @@ void free_environment(Menvironment* _environment/*,Mallocationowner owner_enviro
 		FREE_1(_environment,'E'/*,owner_environment*/);
 	}
 }/* VALIDATED */
+/**
+ * @brief returns a new M environment
+ * 
+ * @return Menvironment* a new M environment
+ */
 Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
 	Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
-	if(!_environment){outputError("Failed to create an environment");return NULL;}
+	if(NULL==_environment){outputError("Failed to create an environment");return NULL;}
 	_environment->_variableMap=CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
-	if(!_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
+	if(NULL==_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
 	return disowned_environment(_environment,owner);
 }/* VALIDATED */
 // MDH@25FEB2021: on occasion it's useful to be able to initialize a new environment with a variable map somehow
 //				NOTE _variableMap essentially needs to be a disowned map, otherwise we cannot take over membership
+/**
+ * @brief returns a new M environment containing M variable map \p _variableMap
+ * 
+ * @param _variableMap 
+ * @return Menvironment* 
+ */
 Menvironment* _getEnvironment(Mmap* _variableMap){Mallocationowner owner=getOwner(__LINE__);
 	Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
-	if(!_environment){outputError("Failed to create an environment");return NULL;}
+	if(NULL==_environment){outputError("Failed to create an environment");return NULL;}
 	_environment->_variableMap=(_variableMap?owned_map(_variableMap,Msubowner(owner,1)):CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)));
-	if(!_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
+	if(NULL==_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
 	return disowned_environment(_environment,owner);
 }/* VALIDATED */
 
+/**
+ * @brief returns the immediate parent of M environment \p _environment
+ * 
+ * @param _environment 
+ * @return Menvironment* the immediate parent of M environment \p _environment
+ */
 Menvironment* getEnvironmentParent(Menvironment* _environment){
 	return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
 }/* VALIDATED */
+/**
+ * @brief returns the new M string containing the full name of M environment \p _environment
+ * 
+ * @param _environment 
+ * @return Mstring* the new M string containing the full name of M environment \p _environment
+ */
 Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _environmentName=owned_string(__string(),owner);
-	if(_environmentName){
+	if(_environmentName!=NULL){
 		Mstring* p=_environmentName;
-		while(p&&_environment){
-			if(_environment->_name)p=string_prepend(p,_environment->_name->chars);
+		while(p!=NULL&&_environment!=NULL){
+			if(_environment->_name!=NULL)p=string_prepend(p,_environment->_name->chars);
 			/////// printf("Prepending '%s'.\n",_environment->_name);
 			_environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
-			if(_environment)p=string_insert_char(p,0,'.');
+			if(_environment!=NULL)p=string_insert_char(p,0,'.');
 		}
-		if(!p){FREE_STRING(_environmentName,owner);_environmentName=NULL;}
+		if(NULL==p){FREE_STRING(_environmentName,owner);_environmentName=NULL;}
 	}
 	return disowned_string(_environmentName,owner);
 }
 
 // additional function for wrapping environments and functions
+/**
+ * @brief returns a new M value hosting M function \p _function
+ * @param _function
+ * @return a new M value hosting M function \p _function
+ */
 Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_function*/){
-	if(!_function)return NULL;
+	if(NULL==_function)return NULL;
 	bool disowned_function=Misdisowned(_function);
 	if(amVerbose())
 		output("Wrapping a %s function.\n",(disowned_function?"disowned":"owned"));
 	Mvalue* _value=__value("function");
-	if(!_value){
+	if(NULL==_value){
 		if(disowned_function)free_function(_function);
 		return NULL;
 	}
@@ -3182,39 +4354,50 @@ Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_functi
 	return _value;
 }/* VALIDATED */
 
+/**
+ * @brief returns a new M value hosting M environment \p _environment
+ * @param _environment
+ * @return a new M value hosting M environment \p _environment
+ */
 Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/){
-	if(!_environment)return NULL;
+	if(NULL==_environment)return NULL;
+	bool disowned_environment=Misdisowned(_environment);
 	Mvalue* _value=__value("environment");
-	if(!_value){
-		if(Misdisowned(_environment))free_environment(_environment);
+	if(NULL==_value){
+		if(disowned_environment)free_environment(_environment);
 		return NULL;
 	}
 	_value->type=VT_ENVIRONMENT;
 	// MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
-	_value->value._environment=(Misdisowned(_environment)?owned_environment(_environment,owner_value_data):_environment);
+	_value->value._environment=(disowned_environment?owned_environment(_environment,owner_value_data):_environment);
 	return _value;
 }/* VALIDATED */
 
 // Mfile support
 #include "unistd.h"
 #include "time.h"
+/**
+ * @brief returns a new M map containing the properties of M file \p _file
+ * 
+ * @param _file 
+ * @return Mmap* a new M map containing the properties of M file \p _file
+ */
 Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__);
-	if(_file){
+	if(_file!=NULL){
 		Mmap* _map=owned_map(_getMapOfType(VT_UNDEFINED),owner);
-		if(_map){
-			if(_file->_name){
+		if(_map!=NULL){
+			if(_file->_name!=NULL){
 				Mstring* _filename=owned_string(_getString("'"),owner);
-				if(_filename){
+				if(_filename!=NULL){
 					string_append(_filename,string(_file->_name));
 					appendedToMap(_map,owner,"name",_getTextValue(string(_filename)));
 					FREE_STRING(_filename,owner);
 				}
 			}
-
-			if(_file->_f){ // the file is currently open
+			if(_file->_f!=NULL){ // the file is currently open
 				// show the mode the file was opened in
 				Mstring* _openmode=owned_string(_getString("'"),owner);
-				if(_openmode){
+				if(_openmode!=NULL){
 					if(_file->mode[0])string_append_char(_openmode,_file->mode[0]);
 					if(_file->mode[1])string_append_char(_openmode,_file->mode[1]);
 					if(_file->mode[2])string_append_char(_openmode,_file->mode[2]);
@@ -3228,7 +4411,7 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 
 			struct stat* stats=_file->_stat;
 
-			if(stats){
+			if(stats!=NULL){
 
 				struct tm dt;
 
@@ -3245,24 +4428,28 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 
 				// File size property
 				Minteger* _integer=owned_integer(_getInteger(stats->st_size),owner);
-				appendedToMap(_map,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)));
+				if(_integer!=NULL)appendedToMap(_map,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)));
 
 				// Get file creation time in seconds and convert seconds to date and time format
 				dt = *(gmtime(&stats->st_ctime));
 				Mstring* _created=owned_string(__string(),owner);
-				if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
-				string_insert_char(_created,0,'\'');
-				appendedToMap(_map,owner,"created",_getTextValue(string(_created)));
-				FREE_STRING(_created,owner);
+				if(_created!=NULL){
+					if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+					string_insert_char(_created,0,'\'');
+					appendedToMap(_map,owner,"created",_getTextValue(string(_created)));
+					FREE_STRING(_created,owner);
+				}
 				// from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
 
 				// File modification time
 				dt = *(gmtime(&stats->st_mtime));
 				Mstring* _modified=owned_string(__string(),owner);
-				if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
-				string_insert_char(_modified,0,'\'');
-				appendedToMap(_map,owner,"modified",_getTextValue(string(_modified)));
-				FREE_STRING(_modified,owner);
+				if(_modified!=NULL){
+					if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+					string_insert_char(_modified,0,'\'');
+					appendedToMap(_map,owner,"modified",_getTextValue(string(_modified)));
+					FREE_STRING(_modified,owner);
+				}
 			}
 
 				// from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
@@ -3274,16 +4461,28 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 
 }
 
+/**
+ * @brief returns a new M file with name \p filename 
+ * @details return NULL on failure
+ * @param filename 
+ * @return Mfile* a new M file with name \p filename
+ */
 static Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
 	// the file might not exist in which case we could get rid of _file->_stat???
-	if(_file){
+	if(_file!=NULL){
 		_file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
 		if(stat(string(_file->_name),_file->_stat)!=0){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
 		return disowned_file(_file,owner);
 	}
 	return NULL;
 }
+/**
+ * @brief returns the M file wrapped in M value \p file_value
+ * 
+ * @param file_value 
+ * @return Mfile* the M file wrapped in M value \p file_value
+ */
 static Mfile* _getValueFile(Mvalue const * const file_value){
 	if(file_value){
 		if(file_value->type==VT_FILE)
@@ -3294,18 +4493,33 @@ static Mfile* _getValueFile(Mvalue const * const file_value){
 	}
 	return NULL;
 }
+/**
+ * @brief returns the new M value wrapping M file \p _file
+ * 
+ * @param _file 
+ * @return Mvalue* the new M value wrapping M file \p _file
+ */
 static Mvalue* _getValueOfFile(Mfile* _file){
-	if(!_file)return NULL;
+	if(NULL==_file)return NULL;
+	bool disowned_file=Misdisowned(_file);
 	Mvalue* _value=__value("file");
-	if(!_value){
-		if(Misdisowned(_file))free_file(_file);
-			return NULL;
+	if(NULL==_value){
+		if(disowned_file)free_file(_file);
+		return NULL;
 	}
 	_value->type=VT_FILE;
 	// MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
-	_value->value._file=(Misdisowned(_file)?owned_file(_file,owner_value_data):_file);
+	_value->value._file=(disowned_file?owned_file(_file,owner_value_data):_file);
 	return _value;
 }
+
+/**
+ * @brief returns true if M file \p _file is readable, false otherwise
+ * 
+ * @param _file 
+ * @return true 
+ * @return false 
+ */
 static bool isFileReadable(Mfile* _file){
 	if(_file){
 		if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='w'); // an open file is readable if it can be read from
@@ -3315,6 +4529,13 @@ static bool isFileReadable(Mfile* _file){
 	}
 	return false;
 }
+/**
+ * @brief returns true if \p _file is writable, false otherwise
+ * 
+ * @param _file 
+ * @return true 
+ * @return false 
+ */
 static bool isFileWriteable(Mfile* _file){
 	if(_file){
 		if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='r');
@@ -3324,10 +4545,22 @@ static bool isFileWriteable(Mfile* _file){
 	// a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
 }
 // end file helper functions
+/**
+ * @brief returns a new M value wrapping the M file stored or represented by \p file_value
+ * 
+ * @param file_value 
+ * @return Mvalue* a new M value wrapping the M file stored or represented by \p file_value
+ */
 Mvalue* mfile(Mvalue* file_value){
-	return(!file_value||file_value->type==VT_FILE?file_value:_getValueOfFile(_getValueFile(file_value)));
+	return(NULL==file_value||file_value->type==VT_FILE?file_value:_getValueOfFile(_getValueFile(file_value)));
 }
 // delete a file
+/**
+ * @brief returns M boolean M_TRUE when the file hosted in \p file_value is delete, M_FALSE otherwise
+ * @details returns M_LL_INVALID if \p file_value does not host an existing file
+ * @param file_value 
+ * @return Mvalue* wrapping M_TRUE or M_FALSE
+ */
 Mvalue* mfdelete(Mvalue* file_value){
 	if(file_value!=NULL&&file_value->type==VT_FILE){
 		// can only delete an existing file that is not currently open
@@ -3343,12 +4576,19 @@ Mvalue* mfdelete(Mvalue* file_value){
 	return NULL;
 }
 // things we can do with a Mfile
+/**
+ * @brief returns information on opening the M file hosted in \p file_value in mode \p mode_value
+ * 
+ * @param file_value 
+ * @param mode_value 
+ * @return Mvalue* 
+ */
 Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-	if(_file){ // there's a Mfile 
+	if(_file!=NULL){ // there's a Mfile 
 		Mstring* mode_str=owned_string(_getString("'"),owner);
-		if(mode_str){
-			if(!_file->_f){
+		if(mode_str!=NULL){
+			if(NULL==_file->_f){
 				// how about checking whether the mode_value argument is correct first??????
 				char openmode=(mode_value?(mode_value->type==VT_TEXT?mode_value->value._text->_c[0]:'\0'):(_file->_stat?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
 				// let's NOT allow overwriting an existing file!!!
@@ -3371,7 +4611,7 @@ Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){Mallocationowner owner=get
 					}
 				}
 			}
-			if(_file->_f){ // the file is (now) open
+			if(_file->_f!=NULL){ // the file is (now) open
 				if(_file->mode[0])string_append_char(mode_str,_file->mode[0]);
 				if(_file->mode[1])string_append_char(mode_str,_file->mode[1]);
 				if(_file->mode[2])string_append_char(mode_str,_file->mode[2]);
@@ -3396,28 +4636,35 @@ static void openFileForReadingText(Mfile* _file){
 	}
 }*/
 // to allow for continued reading we should keep track of the position in the file?????? I guess we can keep a reference to the FILE pointer I suppose
+/**
+ * @brief returns at most the number of bytes hosted in \p numberofbytes_value bytes read from the M file hosted in \p file_value
+ * @details reads the bytes one at a time using fgetc()
+ * @param file_value 
+ * @param numberofbytes_value 
+ * @return Mvalue* the new M string containing the read bytes
+ */
 Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner owner=getOwner(__LINE__);
-	Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-	if(_file){
+	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
+	if(_file!=NULL){
 		long long numberofbytes=(numberofbytes_value?getValueInteger(numberofbytes_value):1); // the default is to read a single byte
 		if(numberofbytes>=0){ // only non-negative values are considered valid
 			// before checking the mode to see if the file can be read from, we might need to open it
 			// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
-			if(_file->_stat){ // an existing file
+			if(_file->_stat!=NULL){ // an existing file
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
-				if(!_file->_f)openFile(_file,"r+");
+				if(NULL==_file->_f)openFile(_file,"r+");
 				// if the file can be read from, we do
 				if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
-					if(_bytesread){
+					if(_bytesread!=NULL){
 						Mstring* p=_bytesread;
 						// the file could be empty to start with
 						while(numberofbytes!=0&&!feof(_file->_f)){
 								p=string_append_char(p,fgetc(_file->_f));
-								if(!p)break;
+								if(NULL==p)break;
 								if(numberofbytes>0)numberofbytes--;
 						}
-						Mvalue* result=(p?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
+						Mvalue* result=(p!=NULL?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
 						FREE_STRING(_bytesread,owner);
 						return result;
 					}
@@ -3427,20 +4674,26 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
 	}
 	return NULL; // some error
 }
+/**
+ * @brief returns a new M string value containing a full text line read from the M file hosted in \p file_value 
+ * 
+ * @param file_value 
+ * @return Mvalue* a full text line M styring value read from the M file hosted in \p file_value
+ */
 Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
 	// MDH@27DEC2020: file_value really needs to be a file, although theoretically one
 	//				might want to read the first line of a file only???????
 	//				for now let's allow both although using the filename is not recommended
 	Mfile* _file=_getValueFile(file_value);
-	if(_file){
+	if(_file!=NULL){
 		Mvalue* result=NULL;
-		if(_file->_stat){ // an existing file
-			if(!_file->_f)openFile(_file,"r+");
+		if(_file->_stat!=NULL){ // an existing file
+			if(NULL==_file->_f)openFile(_file,"r+");
 			// if the file is not binary and can be read from
-			if(_file->_f&&_file->mode[2]!='b'&&(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
+			if(_file->_f!=NULL&&_file->mode[2]!='b'&&(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
 				if(!feof(_file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
 					Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
-					if(_bytesread){
+					if(_bytesread!=NULL){
 						Mstring* p=_bytesread;
 						// the file could be empty to start with
 						int c=0;
@@ -3454,11 +4707,11 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
 							}
 							if(c=='\n'||c=='\r')break; // either LF or CR would stop the reading
 							p=string_append_char(p,c);
-							if(!p)break;
+							if(NULL==p)break;
 						}
 						// skip the optional linefeed following any carriage return, if something else push back again
 						if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
-						result=(p?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
+						result=(p!=NULL?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
 						FREE_STRING(_bytesread,owner);
 					}
 				}
@@ -3475,12 +4728,19 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
 }
 // MDH@01OCT2020: how about allowing to read a number of lines in one go??????
 // MDH@27DEC2020: if the list returned ends with NULL we failed
+/**
+ * @brief reads and returns at most \p numberoflines_value lines from \p file_value
+ * 
+ * @param file_value 
+ * @param numberoflines_value 
+ * @return Mvalue* a list containing all lines read from \p file_value
+ */
 Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	Mvalue* result=NULL;
 	Mfile* _file=_getValueFile(file_value);
-	if(_file){
-		if(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)){ // an existing (non directory) file
+	if(_file!=NULL){
+		if(_file->_stat!=NULL&&!S_ISDIR(_file->_stat->st_mode)){ // an existing (non directory) file
 			if(report)
 				output("'%s' is a file.\n",_file);
 			long long numberoflines=(numberoflines_value?getValueInteger(numberoflines_value):1); // the default is to read a single byte
@@ -3488,12 +4748,12 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 				// before checking the mode to see if the file can be read from, we might need to open it
 				// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
-				if(!_file->_f)openFile(_file,"r+");
+				if(NULL==_file->_f)openFile(_file,"r+");
 				// if the file can be read from, we do
 				if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(_file->mode[2]!='b'){
 						Mlist* lines_list=owned_list(_getListOfType(VT_TEXT),owner);
-						if(lines_list){
+						if(lines_list!=NULL){
 							char buffer[128]; // the buffer to use with fgets
 							size_t buffer_length;
 							bool eoln;
@@ -3505,9 +4765,9 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 								// if storing the line text fails, listelement must be NULLed so that the
 								// entire list will be freed (and nothing is returned)
 								listelement=getAppendedListelement(lines_list,owner);
-								if(!listelement)break;
+								if(NULL==listelement)break;
 								Mstring* _line=owned_string(_getString("'"),owner);
-								if(!_line)break;
+								if(NULL==_line)break;
 								eoln=false;
 								char* newbuffer;
 								 // keep reading until all of the line is read (or some error occurs)
@@ -3515,7 +4775,7 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 									buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
 									newbuffer=fgets(buffer,128,_file->_f);
 									// detect read error
-									if(!newbuffer&&!feof(_file->_f)){
+									if(NULL==newbuffer&&!feof(_file->_f)){
 										FREE_STRING(_line,owner);
 										_line=NULL;
 										output("%sSome error reading text from '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
@@ -3528,8 +4788,8 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 											buffer[buffer_length]='\0';
 											eoln=true;
 										}
-										if(!newbuffer)eoln=true; // we do want to add the last buffer
-										if(!string_append(_line,buffer)){ // error appending the buffer
+										if(NULL==newbuffer)eoln=true; // we do want to add the last buffer
+										if(NULL==string_append(_line,buffer)){ // error appending the buffer
 											FREE_STRING(_line,owner);
 											_line=NULL;
 										}else{
@@ -3539,8 +4799,8 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 											if(eoln)break;
 										}
 									}
-								}while(_line&&newbuffer);
-								if(!_line)break;
+								}while(_line!=NULL&&newbuffer!=NULL);
+								if(NULL==_line)break;
 								// register this line
 								assignValue(&listelement->_value,_getTextValue(string(_line)));
 								if(report)
@@ -3548,7 +4808,7 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 								FREE_STRING(_line,owner);
 							}
 							// if we have a listelement we succeeded, well mostly
-							if(listelement)
+							if(listelement!=NULL)
 								result=_getValueOfList(disowned_list(lines_list,owner));
 							else
 								FREE_LIST(lines_list,owner);
@@ -3560,7 +4820,7 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 			}else
 				outputError("No lines to be read!");
 		}else
-		if(!_file->_stat)
+		if(NULL==_file->_stat)
 			output("%s'$s' does not exist.\n",M_ERROR_PREFIX,string(_file->_name));
 		else
 			output("%s'%s' is a directory not a file.\n",M_ERROR_PREFIX,string(_file->_name));
@@ -3569,9 +4829,15 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
 	return result;
 }
 
+/**
+ * @brief closes the M file hosted in \p file_value
+ * 
+ * @param file_value 
+ * @return Mvalue* M_TRUE on success, M_FALSE on failure, or M_LL_INVALID if \p file_value does not host a file
+ */
 Mvalue* mfclose(Mvalue* file_value){
-	Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-	return _getIntegerValue(_file?(closeFile(_file)?M_TRUE:M_FALSE):M_LL_INVALID);
+	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
+	return _getIntegerValue(_file!=NULL?(closeFile(_file)?M_TRUE:M_FALSE):M_LL_INVALID);
 }
 /*
 static void openFileForWriting(Mfile* _file){
@@ -3582,12 +4848,19 @@ static void openFileForWriting(Mfile* _file){
 		if(_file->_f)if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
 	}
 }*/
+/**
+ * @brief writes the text hosted in \p write_value to the M file hosted in \p file_value
+ * 
+ * @param file_value 
+ * @param write_value 
+ * @return Mvalue* the number of characters NOT written, M_LL_INVALID if writing failed
+ */
 Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
 	// how about returning the number of bytes NOT written...
-	Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-	if(_file){ // something to write to
+	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
+	if(_file!=NULL){ // something to write to
 		if(write_value&&write_value->type==VT_TEXT&&write_value->value._text->_c[0]){ // something to write
-			if(!_file->_f)openFile(_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
+			if(NULL==_file->_f)openFile(_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
 			if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 				long long notwritten=0;
 				char* p=write_value->value._text->_c; // _c is an array so a pointer
@@ -3598,7 +4871,7 @@ Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=g
 					}else{ // text write (i.e. as characters)
 						// in case there are escape sequences in the text, we need to resolve these which _getStringText() does
 						Mstring* _towrite=_getStringText(write_value->value._text,true);
-						if(_towrite){
+						if(_towrite!=NULL){
 							char* p=string(_towrite);
 							while(*p){if(fputc(*p,_file->_f)==EOF)break;p++;}
 							while(*p){notwritten++;p++;}
@@ -3614,40 +4887,59 @@ Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=g
 }
 // for persisting variables, we need to be able to load and save values
 // the values will be written as text but in such a way that they can be read ('loaded') without loss of precision
-Mvalue* mfsave(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief saves \p writeValue to the M file hosted in \p file_value
+ * 
+ * @param file_value 
+ * @param write_value 
+ * @return Mvalue* the number of bytes written
+ */
+Mvalue* mfsave(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__);
 	long long result=M_LL_INVALID;
-	Mfile* _file=(fileValue&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-	if(_file){ // something to write to
+	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
+	if(_file!=NULL){ // something to write to
 		// delegate as much as possible to _getValueText()
 	}
 	return _getIntegerValue(result); 
 }
+/**
+ * @brief loads a M value from the M file hosted by \p file_value
+ * 
+ * @param file_value 
+ * @return Mvalue* the M value loaded
+ */
 Mvalue* mfload(Mvalue* file_value){
 	Mvalue* _result=NULL;
-	Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-	if(_file){ // something to read from which should currently be open for reading text from
+	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
+	if(_file!=NULL){ // something to read from which should currently be open for reading text from
 	}	
 	return _result;
 }
 
+/**
+ * @brief returns a new M value hosting a list of file names in \p file_value
+ * @details \p file_value is supposed to host a directory name
+ * @param file_value 
+ * @return Mvalue* a new M value hosting a list of file names in \p file_value
+ */
 Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
 	// let's allow either a text or a file, in any case we need a foldername
-	if(file_value){
+	if(file_value!=NULL){
 		char* directoryname=NULL;
 		if(file_value->type==VT_FILE){
-			if(file_value->value._file)
-				if(file_value->value._file->_name)
+			if(file_value->value._file!=NULL)
+				if(file_value->value._file->_name!=NULL)
 					directoryname=string(file_value->value._file->_name);
 		}else
 		if(file_value->type==VT_TEXT)directoryname=file_value->value._text->_c;
-		if(directoryname&&strlen(directoryname)){
+		if(directoryname!=NULL&&strlen(directoryname)){
 			DIR* dr=opendir(directoryname);
-			if(dr){
+			if(dr!=NULL){
 				Mlist* files_list=owned_list(_getListOfType(VT_TEXT),owner);
 				struct dirent *en;
 				while((en=readdir(dr))!=NULL){
 					Mstring* _filename=owned_string(_getString("'"),owner);
-					if(_filename){
+					if(_filename!=NULL){
 						// let's NOT prepend the directory name!!!! string_append(_filename,directoryname);
 						string_append(_filename,en->d_name);
 						appendedToList(files_list,owner,_getTextValue(string(_filename)),M_LL_INVALID);
@@ -3682,16 +4974,22 @@ Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
    }*/
    return NULL;
 }
-
+/**
+ * @brief returns a new M value wrapping M time \p _time
+ * 
+ * @param _time 
+ * @return Mvalue* a new M value wrapping M time \p _time
+ */
 Mvalue* _getValueOfTime(Mtime* _time){
-	if(!_time)return NULL;
+	if(NULL==_time)return NULL;
+	bool disowned_time=Misdisowned(_time);
 	Mvalue* _value=__value("time");
-	if(!_value){
-		if(Misdisowned(_time))free_time(_time);
+	if(NULL==_value){
+		if(disowned_time)free_time(_time);
 		return NULL;
 	}
 	_value->type=VT_TIME;
 	// MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
-	_value->value._time=(Misdisowned(_time)?owned_time(_time,owner_value_data):_time);
+	_value->value._time=(disowned_time?owned_time(_time,owner_value_data):_time);
 	return _value;
 }
