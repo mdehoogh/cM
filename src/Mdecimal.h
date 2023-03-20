@@ -95,3 +95,7 @@ long long isDecimalOne(Mdecimal const * const decimal);
 
 Mstring* _getDecimalJSON(Mdecimal const * const _decimal);
 Mdecimal* _getJSONDecimal(Mstring const * const _decimalJSON);
+
+void outputDecimalStatus(uint32_t status);
+
+Mdecimal* _getDecimalSqrt(Mdecimal const * const _decimal);

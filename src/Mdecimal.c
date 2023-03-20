@@ -3628,3 +3628,49 @@ long long decimal2long(Mdecimal const * const decimal){
 	}
 	return M_LL_INVALID;
 }
+
+/**
+ * @brief outputs decimal status \p status
+ * 
+ * @param status 
+ */
+void outputDecimalStatus(uint32_t status){
+	if(status>0){
+		outputInfo("Decimal computations error report.");
+		if(status&MPD_IEEE_Invalid_operation)outputInfo("\tIEEE Invalid operation error.");
+		if(status&MPD_Clamped)outputInfo("\tClamped error.");
+		if(status&MPD_Division_by_zero)outputInfo("\tDivision by zero error.");
+		if(status&MPD_Fpu_error)outputInfo("\tFPU error.");
+		if(status&MPD_Inexact)outputInfo("\tInexact error.");
+		if(status&MPD_Not_implemented)outputInfo("\tNot implemented error.");
+		if(status&MPD_Overflow)outputInfo("\tOverflow error.");
+		if(status&MPD_Rounded)outputInfo("\tRounding error.");
+		if(status&MPD_Subnormal)outputInfo("\tSubnormal error.");
+		if(status&MPD_Underflow)outputInfo("\tUnderflow error.");
+	}else
+		outputInfo("No decimal context errors.");
+}
+
+/**
+ * @brief returns the square root of \p decimal
+ * 
+ * @param decimal 
+ * @return Mdecimal* the square root of \p decimal
+ */
+Mdecimal* _getDecimalSqrt(Mdecimal const * const decimal){Mallocationowner owner=getOwner(__LINE__);
+	if(decimal!=NULL){
+		// I suppose we should use the same context as that of the given decimal????
+		Mdecimalcontext* decimalcontext=getExistingDecimalcontext(decimal->prec);
+		if(NULL==decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		Mdecimal* _result=owned_decimal(__decimal(decimalcontext->mpd_context,0,0),owner);
+		if(_result){
+			uint32_t status=0;
+			mpd_qsqrt(_result->mpd,decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
+			if((status&0xEFBF)==0)return disowned_decimal(_result,owner);
+			FREE_DECIMAL(_result,owner); /////_result=NULL;
+			outputError("Failed to compute the square root of a decimal");
+			outputDecimalStatus(status);
+		}
+	}
+	return NULL;
+}

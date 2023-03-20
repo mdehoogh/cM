@@ -13,23 +13,6 @@ extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_NE
 extern const long double M_LD_NAN,M_LD_PI;
 extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
 
-void outputDecimalStatus(uint32_t status){
-	if(status>0){
-		outputInfo("Decimal computations error report.");
-		if(status&MPD_IEEE_Invalid_operation)outputInfo("\tIEEE Invalid operation error.");
-		if(status&MPD_Clamped)outputInfo("\tClamped error.");
-		if(status&MPD_Division_by_zero)outputInfo("\tDivision by zero error.");
-		if(status&MPD_Fpu_error)outputInfo("\tFPU error.");
-		if(status&MPD_Inexact)outputInfo("\tInexact error.");
-		if(status&MPD_Not_implemented)outputInfo("\tNot implemented error.");
-		if(status&MPD_Overflow)outputInfo("\tOverflow error.");
-		if(status&MPD_Rounded)outputInfo("\tRounding error.");
-		if(status&MPD_Subnormal)outputInfo("\tSubnormal error.");
-		if(status&MPD_Underflow)outputInfo("\tUnderflow error.");
-	}else
-		outputInfo("No decimal context errors.");
-}
-
 // applying unary operators by means of functions
 // math functions: independent of the execution environment but still receive it...
 // TODO how about applying the functions to decimals and rationals
@@ -413,20 +396,9 @@ Mvalue* Msqrt(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		// TODO although for rationals we could divide the square root of the numerator by the square root of the denominator
 		// we've got a function in Mdecimal.h/c to explicitly convert a value (if possible) to a decimal (if the value wraps a decimal that is returned (instead of a new copy of this wrapped decimal) and that decimal should NOT be freed (see below))
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
-		if(_decimal){
-			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
-			if(_result){
-				uint32_t status=0;
-				mpd_qsqrt(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
-				if(status&0xEFBF){
-					FREE_DECIMAL(_result,owner);_result=NULL;
-					outputError("Failed to compute the square root of a decimal");
-					outputDecimalStatus(status);
-				}
-			}
-			if(_value->type!=VT_DECIMAL)FREE_DECIMAL(_decimal,owner);
-			return _getValueOfDecimal(disowned_decimal(_result,owner));
-		}
+		Mdecimal* _result=owned_decimal(_getDecimalSqrt(_decimal),owner); // MDH@20MAR2023: delegate to _getDecimalSqrt added to Mdecimal.c, and take ownership!!
+		if(_value->type!=VT_DECIMAL)FREE_DECIMAL(_decimal,owner);
+		return _getValueOfDecimal(disowned_decimal(_result,owner));
 	}
 	return NULL;
 }
