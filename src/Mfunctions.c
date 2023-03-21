@@ -21,8 +21,14 @@ returns the largest integer equal to or smaller than \p _value
 \parameter _value the value to floor
 */
 // MDH@28MAY2020: we can either return a new value but preferably we should return the same value NOTE we can do that because values are immutable but can be reused
+/**
+ * @brief returns the floor of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the floor of \p _value
+ */
 Mvalue* Mfloor(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
 		/* replacing:
 		if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
@@ -38,8 +44,14 @@ Mvalue* Mfloor(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
+/**
+ * @brief returns the trunc of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the trunc of \p _value
+ */
 Mvalue* Mtrunc(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
 		/* replacing:
 		if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
@@ -53,11 +65,14 @@ Mvalue* Mtrunc(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
-/*
- * returns integer equal to or larger than
+/**
+ * @brief returns the ceil of \p _value
+ * 
+ * @param _value 
+ * @return the ceil of \p _value
  */
 Mvalue* Mceil(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
 		/* replacing:
 		if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
@@ -72,17 +87,20 @@ Mvalue* Mceil(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	return NULL;
 }
 
-/*
- * returns nearest integer value
+/**
+ * @brief returns the big integer nearest to M decimal \p _decimal
+ * 
+ * @param _decimal 
+ * @return Mbiginteger* the big integer nearest to M decimal \p _decimal
  */
 static Mbiginteger* _getRoundedDecimalInteger(Mdecimal* _decimal){Mallocationowner owner=getOwner(__LINE__);
 	Mbiginteger* _roundedDecimalInteger=NULL;
-	if(_decimal){
+	if(_decimal!=NULL){
 		Mdecimalcontext* decimalcontext=getDecimalcontext(_decimal->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-		if(mpd_context){
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+		if(mpd_context!=NULL){
 			Mdecimal* _roundDecimal=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner);
-			if(_roundDecimal){
+			if(_roundDecimal!=NULL){
 				uint32_t status=0;
 				mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
 				if((status&0xEFBF)==0){
@@ -99,8 +117,14 @@ static Mbiginteger* _getRoundedDecimalInteger(Mdecimal* _decimal){Mallocationown
 	}
 	return disowned_biginteger(_roundedDecimalInteger,owner); 
 }
+/**
+ * @brief returns the round of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the round of \p _value
+ */
 Mvalue* Mround(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
 		/* replacing:
 		if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
@@ -114,12 +138,18 @@ Mvalue* Mround(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
-
+/**
+ * @brief returns the sine of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the sine of \p _value
+ */
 Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msin));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin));
 		if(_value->type==VT_RATIONAL)return _getValueOfRational(_qsinorcos(_value->value._rational,true));
@@ -210,19 +240,32 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }/* NOT VALIDATED */
+/**
+ * @brief returns the cordic sine of \p value
+ * 
+ * @param _value 
+ * @return Mvalue* the cordic sine of \p value
+ */
 Mvalue* Mcordicsin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(amVerbose()){outputValue("Applying cordicsin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
 		/* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
 		*/
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcordicsin));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_dcordicsine(NULL,_value->value._decimal));
 	}
 	return NULL;
 }/* NOT VALIDATED */
+/**
+ * @brief returns the cordic cosine of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* 
+ */
 Mvalue* Mcordiccos(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value){
 		if(amVerbose()){outputValue("Applying cordiccos() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
@@ -230,17 +273,25 @@ Mvalue* Mcordiccos(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
 		*/
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcordiccos));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordiccos));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordiccos));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_dcordiccosine(NULL,_value->value._decimal));
 	}
 	return NULL;
 }/* NOT VALIDATED */
 
+/**
+ * @brief returns the cosine of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the cosine of \p _value
+ */
 Mvalue* Mcos(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(cosl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(cos(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcos));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcos));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcos));
 		if(_value->type==VT_RATIONAL)return _getValueOfRational(_qsinorcos(_value->value._rational,false));
@@ -248,9 +299,16 @@ Mvalue* Mcos(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }/* VALIDATED */
+/**
+ * @brief returns the tangens of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the tangens of \p _value
+ */
 Mvalue* Mtan(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		// composite application
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mtan));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtan));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtan));
 		// scalar arguments
@@ -268,37 +326,59 @@ Mvalue* Mtan(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }/* VALIDATED */
+/**
+ * @brief returns the hyperbolic cosine of \p _value 
+ * 
+ * @param _value 
+ * @return Mvalue* the hyperbolic cosine of \p _value 
+ */
 Mvalue* Mcosh(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(coshl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(cosh(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcosh));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcosh));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcosh));
 	}
 	return NULL;
 }/* VALIDATED */
+/**
+ * @brief returns the hyperbolic sine of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the hyperbolic sine of \p _value
+ */
 Mvalue* Msinh(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinhl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sinh(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msinh));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msinh));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msinh));
 	}
 	return NULL;
 }/* VALIDATED */
 Mvalue* Mtanh(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(tanhl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(tanh(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mtanh));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtanh));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtanh));
 	}
 	return NULL;
 }/* VALIDATED */
+/**
+ * @brief returns the exp of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the exp of \p _value
+ */
 Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mexp));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp));
 		// use decimal conversion
@@ -321,15 +401,22 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	return NULL;
 }
 // internal approximation by series expansion
+/**
+ * @brief returns the decimal exp of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the decimal exp of \p _value
+ */
 Mvalue* Mdexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mexp));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp));
 		// use decimal conversion
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
-		if(_decimal){
+		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(_dexp(NULL,_decimal),owner);
 			if(_value->type!=VT_DECIMAL)FREE_DECIMAL(_decimal,owner);
 			return _getValueOfDecimal(disowned_decimal(_result,owner));
@@ -337,16 +424,23 @@ Mvalue* Mdexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
+/**
+ * @brief returns the natural logarithm of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* returns the natural logarithm of \p _value
+ */
 Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(logl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(log(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog));
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
-		if(_decimal){
+		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
-			if(_result){
+			if(_result!=NULL){
 				uint32_t status=0;
 				mpd_qln(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
 				if(status&0xEFBF){
@@ -361,16 +455,23 @@ Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
+/**
+ * @brief returns the log10 of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the log10 of \p _value
+ */
 Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(log10l(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(log10(_value->value._integer->ll));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog10));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10));
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
-		if(_decimal){
+		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
-			if(_result){
+			if(_result!=NULL){
 				uint32_t status=0;
 				mpd_qlog10(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
 				if(status&0xEFBF){
@@ -385,9 +486,14 @@ Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
-
+/**
+ * @brief returns the sqrt of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the sqrt of \p _value
+ */
 Mvalue* Msqrt(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(sqrtl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sqrt(_value->value._integer->ll));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msqrt));
@@ -405,11 +511,18 @@ Mvalue* Msqrt(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 // two-argument power function (complicates things considerably)
 // TODO check different types convert to long double and use powl to compute the power!!
 // theoretically we could always return a rational???
+/**
+ * @brief returns \p ll1 to the power of \p ll2
+ * 
+ * @param ll1 
+ * @param ll2 
+ * @return Mvalue* \p ll1 to the power of \p ll2
+ */
 static Mvalue* powll(long long ll1,long long ll2){
 	// essentially we may either return an integer, or a big integer, or possibly a rational depending
 	if(ll1==M_LL_INVALID||ll2==M_LL_INVALID)return _getIntegerValue(M_LL_INVALID);
-	if(!ll1)return _getIntegerValue(0LL);
-	if(!ll2)return _getIntegerValue(1LL);
+	if(ll1==0)return _getIntegerValue(0LL);
+	if(ll2==0)return _getIntegerValue(1LL);
 	// ASSERT both non-zero
 	// negative exponents should return 1/powll as a rational
 	if(ll2<0){
@@ -441,10 +554,17 @@ static Mvalue* powll(long long ll1,long long ll2){
 	}
 	free_biginteger(_bi1);free_biginteger(_multiplier);
 	// can we return a long long or should we return the big integer instead????
-	return(_power?_getValueOfBiginteger(_power):NULL);
+	return(_power!=NULL?_getValueOfBiginteger(_power):NULL);
 }
+/** TODO
+ * @brief returns \p _value to the power of \p _exponentValue
+ * 
+ * @param _value 
+ * @param _exponentValue 
+ * @return Mvalue* \p _value to the power of \p _exponentValue
+ */
 Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){Mallocationowner owner=getOwner(__LINE__);
-	if(_value&&_exponentValue){
+	if(_value!=NULL&&_exponentValue!=NULL){
 		if(_value->type==VT_INTEGER&&_exponentValue->type==VT_INTEGER)return powll(_value->value._integer->ll,_exponentValue->value._integer->ll);
 		if(_value->type==VT_FLOAT&&_exponentValue->type==VT_FLOAT)return _getFloatValue(powl(_value->value._float->ld,_exponentValue->value._float->ld));
 	}
@@ -452,20 +572,27 @@ Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){Mallocationowner owner=getOw
 }
 // end math functions
 
+/**
+ * @brief returns the negated value of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the negated value of \p _value
+ */
 Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negate a value
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
 		if(_value->type==VT_FLOAT)return _getFloatValue(-_value->value._float->ld);
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._list,Mneg));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg));
 		if(_value->type==VT_BIGINTEGER)return _getValueOfBiginteger(_getNegatedBiginteger(_value->value._biginteger));
 		if(_value->type==VT_RATIONAL){
 			// this is done by negating the numerator but if the numerator equals NULL we should use -1
 			Mrational* rational=_value->value._rational;
-			if(rational){
+			if(rational!=NULL){
 				/////////outputValue("Negating rational '",_value,"'.\n");
 				Mbiginteger* _biNumerator=owned_biginteger(rational->num?_getNegatedBiginteger(rational->num):_getBiginteger(-1),owner); // negating the numerator
-				if(_biNumerator){
+				if(_biNumerator!=NULL){
 					////////outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
 					Mrational* _negRational=_getRational(_biNumerator,rational->den,(isFloatUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false);
 					FREE_BIGINTEGER(_biNumerator,owner);
@@ -476,9 +603,9 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 		}else
 		if(_value->type==VT_DECIMAL){
 			Mdecimal* decimal=_value->value._decimal;
-			if(decimal){
+			if(decimal!=NULL){
 				Mdecimal* _negDecimal=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
-				if(_negDecimal){
+				if(_negDecimal!=NULL){
 					uint32_t status=0;
 					mpd_qcopy_negate(_negDecimal->mpd,decimal->mpd,&status);
 					if(status&0xEFBF){
@@ -487,7 +614,7 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 						outputDecimalStatus(status);
 					}else // success, ascertain to copy the repeating field over as that remains the same on negating (assumedly)
 						_negDecimal->repeating=decimal->repeating;
-					if(_negDecimal)return _getValueOfDecimal(disowned_decimal(_negDecimal,owner));
+					if(_negDecimal!=NULL)return _getValueOfDecimal(disowned_decimal(_negDecimal,owner));
 				}
 			}
 		}
@@ -495,54 +622,129 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 	return NULL;
 }/* VALIDATED */
 
+/**
+ * @brief returns the logical not of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the logical not of \p _value
+ */
 Mvalue* Mnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not a value
-	if(_value){
+	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(!_value->value._integer->ll);
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._list,Mnot));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot));
 	}
 	return NULL;
 }/* VALIDATED */
 // TODO can we not a string??????
+/**
+ * @brief returns the binary not of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the binary not of \p _value
+ */
 Mvalue* Mbnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not a value
-	if(!_value)return NULL;
-	if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
-	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot));
-	if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot));
+	if(!_value!=NULL){
+		if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._list,Mbnot));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot));
+	}
 	return NULL;
 }/* VALIDATED */
 
+/**
+ * @brief returns M_TRUE if \p _value equals null, M_FALSE otherwise
+ * 
+ * @param _value 
+ * @return Mvalue* 
+ */
 Mvalue* Mnull(Mvalue* _value){
 	return _getIntegerValue(isValueNull(_value)?M_TRUE:M_FALSE);
 }/* VALIDATED */
+/**
+ * @brief returns M_TRUE if \p _value is undefined, M_FALSE otherwise
+ * 
+ * @param _value 
+ * @return Mvalue* 
+ */
 Mvalue* Mundefined(Mvalue* _value){
 	return _getIntegerValue(isValueUndefined(_value)?M_TRUE:M_FALSE);
 }/* VALIDATED */ // MDH@18JUL2019: isUndefined() now comes in handy
+/**
+ * @brief returns the sign of \p _value
+ * 
+ * @param value 
+ * @return Mvalue* the sign of \p _value
+ */
 Mvalue* Msign(Mvalue* value){
 	return(_getIntegerValue(getValueSign(value)));
 } /* VALIDATED */
 // TODO use the sign in Mzero, Mpositive and Mnegative
+/**
+ * @brief returns M_TRUE if \p value equals 0, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @return Mvalue* M_TRUE if \p value equals 0, M_FALSE or M_LL_INVALID otherwise
+ */
 Mvalue* Mzero(Mvalue* _value){
 	return(_getIntegerValue(_value?(isValueZero(_value)==M_TRUE?M_TRUE:M_FALSE):M_LL_INVALID));
 }/* VALIDATED */
+/**
+ * @brief returns M_TRUE if \p _value is positive, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @return Mvalue* M_TRUE if \p _value is positive, M_FALSE or M_LL_INVALID otherwise
+ */
 Mvalue* Mpositive(Mvalue* _value){
-	return _getIntegerValue(_value?(isValuePositive(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
+	return _getIntegerValue(isValuePositive(_value)); ///// replacing: _value!=NULL?(isValuePositive(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
+/**
+ * @brief returns M_TRUE if \p _value is negative, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @return Mvalue* M_TRUE if \p _value is negative, M_FALSE or M_LL_INVALID otherwise
+ */
 Mvalue* Mnegative(Mvalue* _value){
-	return _getIntegerValue(_value?(isValueNegative(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
+	return _getIntegerValue(isValueNegative(_value)); // replacing: _value!=NULL?(isValueNegative(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
+/**
+ * @brief returns M_TRUE if \p _value is a scalar, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @return Mvalue* M_TRUE if \p _value is a scalar, M_FALSE or M_LL_INVALID otherwise
+ */
 Mvalue* Mscalar(Mvalue* _value){
-	return _getIntegerValue(_value?(isValueScalar(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
+	return _getIntegerValue(isValueScalar(_value)); /// replacing: _value!=NULL?(isValueScalar(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
 
 // MDH@29OCT2020: might come in handy
+/**
+ * @brief returns M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @return long long M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
+ */
 long long isnumeric(Mvalue* _value){
 	return(_value?(_value->type==VT_BIGINTEGER||_value->type==VT_DECIMAL||_value->type==VT_FLOAT||_value->type==VT_INTEGER||_value->type==VT_RATIONAL?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
+/**
+ * @brief returns M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @return long long M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
+ */
 Mvalue* Misnumeric(Mvalue* _value){
 	// MDH@04DEC2020: delegate to local helper function isnumeric 
 	return _getIntegerValue(isnumeric(_value));
 }/* VALIDATED */
+/**
+ * @brief returns M_TRUE if \p _value wraps a list, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @return Mvalue* M_TRUE if \p _value wraps a list, M_FALSE or M_LL_INVALID otherwise
+ */
 Mvalue* Misalist(Mvalue* _value){
 	return _getIntegerValue(_value?(_value->type==VT_LIST?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
@@ -551,9 +753,16 @@ Mvalue* Misalist(Mvalue* _value){
 // MDH@17OCT2019: the length of a list should now return the index of the last element (instead of the number of non-null values)
 //				because doing so means appending a value with l[len(l)+1] will do so, instead of overwriting some value!!!!
 // MDH@20NOV2020: for lists, also return the number of elements
+/**
+ * @brief returns the length of \p _value
+ * @details the length of an array or list or map is its number of elements
+ *          the length of a text is the number of characters it contains
+ * @param _value 
+ * @return Mvalue* the length of \p _vakue
+ */
 Mvalue* Mlen(Mvalue* _value){
 	long long result=M_LL_INVALID;
-	if(_value){
+	if(_value!=NULL){
 		switch(_value->type){
 			case VT_ARRAY:result=_value->value._array->numberOfElements;break;
 			case VT_LIST:result=_value->value._list->numberOfElements;break; //(_value->value._list->_last?_value->value._list->_last->index:0);break;
@@ -565,10 +774,17 @@ Mvalue* Mlen(Mvalue* _value){
 	return _getIntegerValue(result);
 }/* VALIDATED */
 // MDH@30NOV2020: convenient if we can change the length of an array of string
+/**
+ * @brief returns M_TRUE if the length of \p _value was successfully set to \p newlength_value, M_FALSE or M_LL_INVALID otherwise
+ * 
+ * @param _value 
+ * @param newlength_value 
+ * @return Mvalue* M_TRUE if the length of \p _value was successfully set to \p newlength_value, M_FALSE or M_LL_INVALID otherwise
+ */
 Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=getOwner(__LINE__);
 	// a length should always be a nonnegative integer
 	long long result=M_LL_INVALID;
-	if(_value){
+	if(_value!=NULL){
 		long long newlength=getValueInteger(newlength_value);
 		if(newlength>=0){
 			switch(_value->type){
@@ -582,7 +798,7 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 							result=newlength;
 							if(newlength>0){
 								Mvalue** newvalues=CALLOC(sizeof(Mvalue*),newlength,-'a',owner);
-								if(newvalues){
+								if(newvalues!=NULL){
 									do{
 										l--;
 										// all values ABOVE newlength will not be used anymore
@@ -639,7 +855,7 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 						if(length!=newlength){
 							// we're going to copy the text out of it, change it and reset it
 							Mstring* _text=owned_string(__string(),owner);
-							if(_text){
+							if(_text!=NULL){
 								Mstring* p=_text;
 								result=newlength;
 								result-=length;
@@ -649,7 +865,7 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 									while(length<newlength){p=string_append_char(p,' ');if(!p)break;length++;}
 								}else
 									p=string_setlength(p,newlength);
-								if(p){ // text successfully lengthened or shortened
+								if(p!=NULL){ // text successfully lengthened or shortened
 									// now that we've copied the current text content over, we can free it BEFORE replacing it!!!
 									free_text(_value->value._text);
 									_value->value._text=owned_text(_getText(string(_text)),Msubowner(getValueOwner(),1));
@@ -667,6 +883,13 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 	return _getIntegerValue(result);
 }
 // MDH@06JAN2020: split string(s) by separator(s)
+/**
+ * @brief returns the C strings splitting \p textsValue and the number of texts returned in \p *textcount
+ * 
+ * @param textsValue 
+ * @param textcount 
+ * @return char** the C strings splitting \p textsValue and the number of texts returned in \p *textcount
+ */
 static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallocationowner owner=getOwner(__LINE__);
 	char** _texts=NULL;
 	if(textcount){
@@ -681,12 +904,12 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 						Mvalue** textValues=textArray->values;
 						if(textValues){
 							_texts=MALLOC(sizeof(char*),*textcount,'c',owner);
-							if(_texts){
+							if(_texts!=NULL){
 								unsigned long long textindex=*textcount;
 								do{
 									textindex--;
 									Mstring* _valueText=owned_string(_getValueText(textValues[textindex],true),owner);
-									if(_valueText){
+									if(_valueText!=NULL){
 										_texts[textindex]=OWNED(_strdup(string(_valueText)),Msubowner(owner,1));
 										FREE_STRING(_valueText,owner);
 									}else
@@ -704,19 +927,19 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 			}else
 			if(textsValue->type==VT_LIST){
 				Mlist* textList=textsValue->value._list;
-				if(textList){
+				if(textList!=NULL){
 					// we may decide to maintain sparseness????? in which case we should use the index of the last element!!!!
 					// although technically we could split the texts and take over the index values later on (let's do that)
 					*textcount=textList->numberOfElements;
 					if(*textcount>0){
 						_texts=CALLOC(sizeof(char*),*textcount,'c',owner);
-						if(_texts){
+						if(_texts!=NULL){
 							unsigned long long textindex=0;
 							Mlistelement* listelement=textList->_first;
-							while(listelement){
+							while(listelement!=NULL){
 								if(textindex>=*textcount){outputBug("Number of elements of list incorrect trying to split texts");break;}
 								Mstring* _valueText=owned_string(_getValueText(listelement->_value,true),owner);
-								if(_valueText){
+								if(_valueText!=NULL){
 									_texts[textindex++]=OWNED(_strdup(string(_valueText)),Msubowner(owner,1));
 									FREE_STRING(_valueText,owner);
 								}else
@@ -726,15 +949,15 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 						}else{
 							*textcount=0;
 							outputError("Failed to allocate memory for storing texts");
-						}						
+						}
 					}
 				}else 
 					outputBug("Missing value list");
 			}else
 			if(textsValue->type==VT_TEXT){ // only a single text!
-				if(textsValue->value._text){
+				if(textsValue->value._text!=NULL){
 					_texts=MALLOC_1(sizeof(char*),'c',owner);
-					if(_texts){
+					if(_texts!=NULL){
 						*textcount=1;
 						output("Duplicating '%s'.\n",textsValue->value._text->_c);
 						_texts[0]=OWNED(_strdup(textsValue->value._text->_c),Msubowner(owner,1));
@@ -744,38 +967,57 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 					outputBug("Missing value text");
 			}else 
 				outputError("Cannot split a value that is not a text (or list and array with texts)");
-			if(_texts)return DISOWNED(_texts,owner);
+			if(_texts!=NULL)return DISOWNED(_texts,owner);
 			outputError("Failed to extract text(s)");
 		}
 	}
 	return NULL;
 }
+/**
+ * @brief frees \p texts containing \p textcount C strings
+ * 
+ * @param texts 
+ * @param textcount 
+ * @param owner 
+ */
 static void freetexts(char** const texts,unsigned long long textcount,Mallocationowner owner){
-	if(!texts)return;
-	for(register unsigned long long textindex=0;textindex<textcount;textindex++)if(texts[textindex]){
+	if(NULL==texts)return;
+	for(register unsigned long long textindex=0;textindex<textcount;textindex++)
+	if(texts[textindex]!=NULL){
 		output("Freeing text '%s'.\n",texts[textindex]); // DEBUGGING
 		FREE_DISOWNED(texts[textindex],strlen(texts[textindex])+1,-'"',owner); // the reverse of the allocation by _strdup()
 	}
 	FREE_DISOWNED(texts,textcount,'c',owner);
 }
+/** TODO
+ * @brief splits \p textcount C strings in \p texts using \p separatorcount C string separators in \p separators
+ * @details if there are itemwrappers defined in \p itemwrappers
+ * @param texts 
+ * @param textcount 
+ * @param separators 
+ * @param separatorcount 
+ * @param itemwrappers 
+ * @param itemwrappercount 
+ * @return Mlist* 
+ */
 static Mlist* splits(char** const texts,unsigned long long textcount,char** const separators,unsigned long long separatorcount,char** const itemwrappers,unsigned long long itemwrappercount){Mallocationowner owner=getOwner(__LINE__);
-	if(texts&&textcount&&separators&&separatorcount){
+	if(texts!=NULL&&textcount>0&&separators!=NULL&&separatorcount>0){
 		// every element in the split text list will be a list (of texts)
 		Mlist* _splitTextsList=owned_list(_getListOfType(VT_LIST),owner);
-		if(_splitTextsList){
+		if(_splitTextsList!=NULL){
 			unsigned long long textindex=textcount;
 			long long separatorindex;
 			// if there are item wrappers splitting will be slow
-			if(itemwrappers&&itemwrappercount){
-
+			if(itemwrappers!=NULL&&itemwrappercount>0){
+				// TODO split around itemwrappers
 			}else{
 				char* *_text=texts;
 				do{
-					if(*_text){ // something to split
+					if(*_text!=NULL){ // something to split
 						Mlist* _splitTextList=owned_list(_getListOfType(VT_TEXT),owner);
-						if(_splitTextList){
+						if(_splitTextList!=NULL){
 							Mstring* _splitText=owned_string(_getString("'"),owner); // local!!!
-							if(_splitText){
+							if(_splitText!=NULL){
 								// we can reuse _splitText by setting it's length to 1 every next time
 								// MDH@07JAN2021: instead of iterating over the text myself I could simply try to detect the next occurrence of any of the separators?
 								char* textStart=*_text; // initialize the pointer to the start of the text to search for the next separator
@@ -795,9 +1037,9 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 									if(!string_append(_splitText,textStart)){output("%sFailed to collect split text '%s'.\n",M_ERROR_PREFIX,textStart);break;}
 									// ready to append _splitText to the split text list
 									Mtext* splitText=owned_text(_getText(string(_splitText)),owner);
-									if(splitText){
+									if(splitText!=NULL){
 										Mvalue* splitTextValue=_getValueOfText(disowned_text(splitText,owner));
-										if(splitTextValue){
+										if(splitTextValue!=NULL){
 											if(appendedToList(_splitTextList,owner,splitTextValue,M_LL_INVALID)<=0)
 												output("%sFailed to add split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
 										}else
@@ -852,12 +1094,20 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 		outputError("Input to the split function undefined or incomplete");
 	return NULL;
 }
+/**
+ * @brief splits \p _textValue using separators in \p _separatorValue and item wrappers in \p _itemwrapperValue
+ * 
+ * @param _textValue 
+ * @param _separatorValue 
+ * @param _itemwrapperValue 
+ * @return Mvalue* \p _textValue split using separators in \p _separatorValue and item wrappers in \p _itemwrapperValue
+ */
 Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_FUNCTIONS));
-	if(_textValue&&_separatorValue){
+	if(_textValue!=NULL&&_separatorValue!=NULL){
 		Mlist* _splitTextsList=NULL;
 		unsigned long long textcount;char** _texts=OWNED(_getTexts(_textValue,&textcount),owner);
-		if(_texts){
+		if(_texts!=NULL){
 			// if(report)
 			{
 				output("Splitting texts:\n");
@@ -878,18 +1128,18 @@ Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperVa
 			}
 			freetexts(_texts,textcount,owner);
 		}
-		if(_splitTextsList){
+		if(_splitTextsList!=NULL){
 			// if a single type return the first value in the list
 			if(_textValue->type==VT_TEXT){
-				Mvalue* splitValue=(_splitTextsList->_first?_splitTextsList->_first->_value:NULL);
+				Mvalue* splitValue=(_splitTextsList->_first!=NULL?_splitTextsList->_first->_value:NULL);
 				FREE_LIST(_splitTextsList,owner); // NOTE although the reference count of splitValue might become 0, it will remove not be removed from the global value list until gc'ed
 				return splitValue;
 			}
 			if(_textValue->type==VT_LIST){ // we'll have to update the index values of the returned list with the index values of the original list (if 'sparse')
-				if(_textValue->value._list->_last){
+				if(_textValue->value._list->_last!=NULL){
 					if(_textValue->value._list->numberOfElements<_textValue->value._list->_last->index){
 						Mlistelement *textValueListelement=_textValue->value._list->_first,*splitTextValueListelement=_splitTextsList->_first;
-						while(textValueListelement&&splitTextValueListelement){
+						while(textValueListelement!=NULL&&splitTextValueListelement!=NULL){
 							splitTextValueListelement->index=textValueListelement->index;
 							textValueListelement=textValueListelement->_next;
 							splitTextValueListelement=splitTextValueListelement->_next;
@@ -900,18 +1150,18 @@ Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperVa
 			}
 			if(_textValue->type==VT_ARRAY){
 				Marray* _splitTextsArray=owned_array(_getArray("Msplit",_splitTextsList->numberOfElements),owner);
-				if(!_splitTextsArray){outputError("Not enough memory to return the split texts in an array");return _getValueOfList(disowned_list(_splitTextsList,owner));}
+				if(NULL==_splitTextsArray){outputError("Not enough memory to return the split texts in an array");return _getValueOfList(disowned_list(_splitTextsList,owner));}
 				// move the values in the split text list over to splitTextArray
 				unsigned long long splittextindex=0;
 				Mlistelement* splitTextsListelement=_splitTextsList->_first;
 				Mvalue** splitTextsArrayelement=_splitTextsArray->values;
-				while(splitTextsListelement){
+				while(splitTextsListelement!=NULL){
 					if(++splittextindex>_splitTextsList->numberOfElements)break; // the number of elements in the split texts list is too small (and therefore incorrect!!!)
 					assignValue(splitTextsArrayelement,splitTextsListelement->_value);
 					splitTextsListelement=splitTextsListelement->_next;
 					splitTextsArrayelement++;
 				}
-				if(splitTextsListelement)outputBug("Number of split text list elements incorrect");
+				if(splitTextsListelement!=NULL)outputBug("Number of split text list elements incorrect");
 				FREE_LIST(_splitTextsList,owner); // no need for the list anymore after moving its values over to the split text array
 				return _getValueOfArray(disowned_array(_splitTextsArray,owner));
 			}
@@ -921,6 +1171,12 @@ Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperVa
 }
 
 // 25OCT2019: get the length of a text with M's tl function
+/**
+ * @brief returns the token length of \p _value
+ * @details returns M_LL_INVALID if \p _value does not denote a token
+ * @param _value 
+ * @return Mvalue* the token length of \p _value
+ */
 Mvalue* Mtl(Mvalue* _value){
 	long long result=M_LL_INVALID;
 	if(_value){if(_value->type==VT_TEXT)result=strlen(_value->value._text->_c);else if(_value->type==VT_TOKEN)result=string_length(_value->value._token->text);}
@@ -928,6 +1184,12 @@ Mvalue* Mtl(Mvalue* _value){
 }/* VALIDATED */
 
 // MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
+/**
+ * @brief returns the number of digits in the factorial of \p _value 
+ * @details uses the Stirling formula
+ * @param _value 
+ * @return Mvalue* the number of digits in the factorial of \p _value 
+ */
 Mvalue* Mfacd(Mvalue* _value){
 	// Stirling formula to compute the number of factorial digits in n!: return 
 	// get the integer out of the value
@@ -936,8 +1198,14 @@ Mvalue* Mfacd(Mvalue* _value){
 }/* VALIDATED */
 
 // TODO remember intermediate values in some list, that we can use as starting point
+/**
+ * @brief returns the factorial of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* 
+ */
 Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value){
+	if(NULL==_value){
 		if(amVerboseDebugging())
 			outputInfo("No argument to factorial() function!");
 		return NULL;
@@ -961,19 +1229,19 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 			return _getValueOfBiginteger(_getBigintegerCopy(_value->value._biginteger));
 		_finalmultiplier=owned_biginteger(_getBigintegerCopy(_value->value._biginteger),owner);
 	}
-	if(!_finalmultiplier){
+	if(NULL==_finalmultiplier){
 		output("%s",M_ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");
 		return NULL;
 	}
 	if(amVerboseDebugging())
 		outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
 	Mbiginteger* _result=owned_biginteger(_getBiginteger(6),owner);
-	if(_result){
+	if(_result!=NULL){
 		clock_t then=(amVerbose()?clock():0);
 		// we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
 		// we could start at some intermediate value????
 		Mbiginteger *_multiplier=owned_biginteger(_getBiginteger(3),owner);
-		if(_multiplier){
+		if(_multiplier!=NULL){
 			while(mp_cmp(MP_INT_POINTER(_multiplier),MP_INT_POINTER(_finalmultiplier))==MP_LT){
 				if(mp_incr(MP_INT_POINTER(_multiplier))!=MP_OKAY)
 				{outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
@@ -992,7 +1260,7 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	FREE_BIGINTEGER(_finalmultiplier,owner);
 	if(amVerboseDebugging())
 		outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
-	return (_result?_getValueOfBiginteger(disowned_biginteger(_result,owner)):NULL);
+	return (_result!=NULL?_getValueOfBiginteger(disowned_biginteger(_result,owner)):NULL);
 	/* replacing:
 	// 39 is about the maximum that we can store in a long long
 	if(n<40){
@@ -1006,6 +1274,12 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 }/* VALIDATED */
 
 // method for writing a value to standard out
+/**
+ * @brief outputs \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the number of characters written
+ */
 Mvalue* Mout(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _valueText=owned_string(_getValueText(_value,true),owner);
 	size_t result=string_length(_valueText);
@@ -1015,6 +1289,14 @@ Mvalue* Mout(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // or by defining an rgb value
+/**
+ * @brief returns the background RGB defined by \p _value1 \p _value2 and \p _value3
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @param _value3 
+ * @return Mvalue* the background RGB defined by \p _value1 \p _value2 and \p _value3
+ */
 Mvalue* Mbrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
 	long long ll1=getValueInteger(_value1),ll2=getValueInteger(_value2),ll3=getValueInteger(_value3);
 	if(ll1<0||ll2<0||ll3<0)return NULL;
@@ -1023,6 +1305,14 @@ Mvalue* Mbrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
 	////////output("ANSI foreground color code: '%s'.\n",s);
 	return _getTextValue(s);
 }
+/**
+ * @brief returns the foreground RGB defined by \p _value1 \p _value2 and \p _value3
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @param _value3 
+ * @return Mvalue* the foreground RGB defined by \p _value1 \p _value2 and \p _value3
+ */
 Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
 	long long ll1=getValueInteger(_value1),ll2=getValueInteger(_value2),ll3=getValueInteger(_value3);
 	if(ll1<0||ll2<0||ll3<0)return NULL;
@@ -1035,21 +1325,31 @@ Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
 // random functions
 static Mbiginteger *birandmax_1=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MI_FUNCTIONS,__LINE__,1};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
+/**
+ * @brief returns the global M big integer equal to RAND_MAX plus 1
+ * 
+ * @return const Mbiginteger* the M big integer equal to RAND_MAX plus 1
+ */
 const Mbiginteger* getBigintegerRandMaxPlusOne(){
-	if(!birandmax_1){
+	if(NULL==birandmax_1){
 		birandmax_1=owned_biginteger(_getBiginteger(RAND_MAX),owner_biginteger);
-		if(birandmax_1)if(mp_incr(MP_INT_POINTER(birandmax_1))!=MP_OKAY)
+		if(birandmax_1!=NULL)if(mp_incr(MP_INT_POINTER(birandmax_1))!=MP_OKAY)
 		{FREE_BIGINTEGER(birandmax_1,owner_biginteger);birandmax_1=NULL;}
 	}
 	return birandmax_1;
 }/* VALIDATED */
+/**
+ * @brief returns a random M big integer in [0,RAND_MAX]
+ * 
+ * @return Mvalue* a random M big integer in [0,RAND_MAX]
+ */
 Mvalue* Mrand(){Mallocationowner owner=getOwner(__LINE__); // to return a random value between 0 and 1
 	Mbiginteger* _randmaxplusone=getBigintegerRandMaxPlusOne();
-	if(_randmaxplusone){
+	if(_randmaxplusone!=NULL){
 		Mbiginteger* _num=owned_biginteger(_getBiginteger(rand()),owner);
-		if(_num){
+		if(_num!=NULL){
 			Mrational* _rational=owned_rational(_getRational(_num,_randmaxplusone,M_LD_NAN,false),owner);
-			if(_rational)return _getValueOfRational(disowned_rational(_rational,owner));
+			if(_rational!=NULL)return _getValueOfRational(disowned_rational(_rational,owner));
 			FREE_BIGINTEGER(_num,owner); // not bound to the returned rational
 		}else
 			outputError("Failed to create the numerator of the rational random number");
@@ -1061,34 +1361,41 @@ static long long randominteger(long long upper){Mallocationowner owner=getOwner(
 	// ASSERT upper should be in (0,RAND_MAX]
 	long long r=M_LL_INVALID;
 	Mbiginteger* _randmaxplusone=getBigintegerRandMaxPlusOne(); // will remain owned so the rational will not free it
-	if(_randmaxplusone){
+	if(_randmaxplusone!=NULL){
 		// the same as what we did in Mrand() but now multiplying the numerator with upper
 		Mbiginteger *_mult=owned_biginteger(_getBiginteger(upper),owner),*_rand=owned_biginteger(_getBiginteger(rand()),owner);
-		if(_mult&&_rand){
+		if(_mult!=NULL&&_rand!=NULL){
 			Mbiginteger* _num=owned_biginteger(__biginteger(),owner);
-			if(_num){
+			if(_num!=NULL){
 				Mrational* _rational=NULL;
 				if(mp_mul(MP_INT_POINTER(_mult),MP_INT_POINTER(_rand),MP_INT_POINTER(_num))==MP_OKAY){
 					_rational=owned_rational(_getRational(_num,_randmaxplusone,M_LD_NAN,false),owner);
-					if(_rational){
+					if(_rational!=NULL){
 						Mbiginteger* _biginteger=owned_biginteger(_rational2biginteger(_rational),owner);
-						if(_biginteger){
+						if(_biginteger!=NULL){
 							r=biginteger2long(_biginteger);
 							FREE_BIGINTEGER(_biginteger,owner);
 						}else
 							outputError("Failed to determine the integer part of the rational random number");
 					}
 				}
-				if(_rational)FREE_RATIONAL(_rational,owner);else FREE_BIGINTEGER(_num,owner);
+				if(_rational!=NULL)FREE_RATIONAL(_rational,owner);else FREE_BIGINTEGER(_num,owner);
 			}else
 				outputError("Failed to create the random rational numerator");
 		}
-		if(_mult)FREE_BIGINTEGER(_mult,owner);if(_rand)FREE_BIGINTEGER(_rand,owner);
+		if(_mult!=NULL)FREE_BIGINTEGER(_mult,owner);if(_rand!=NULL)FREE_BIGINTEGER(_rand,owner);
 	}
 	return r;
 }
+/**
+ * @brief returns a random integer in [0,_upperValue]
+ * @details _upperValue needs to be positive and not exceed RAND_MAX
+ *          if _upperValue is a list or array, this function is applied to each element
+ * @param _upperValue 
+ * @return Mvalue* a random integer in [0,_upperValue], or M_LL_INVALID on failure
+ */
 Mvalue* Mirand(Mvalue* _upperValue){Mallocationowner owner=getOwner(__LINE__);
-	if(_upperValue){
+	if(_upperValue!=NULL){
 		if(_upperValue->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_upperValue->value._array,Mirand));
 		if(_upperValue->type==VT_LIST)return _getValueOfList(appliedToList(_upperValue->value._list,Mirand));
 		long long upper=getValueInteger(_upperValue);
@@ -1101,11 +1408,17 @@ Mvalue* Mirand(Mvalue* _upperValue){Mallocationowner owner=getOwner(__LINE__);
 }
 // if you want a list of random values call Mrands()
 // switched to returning an array instead of a list
+/**
+ * @brief returns a list with \p _countValue random values in [0,1)
+ * @details \p countValue should be positive
+ * @param _countValue 
+ * @return Mvalue* a list with \p _countValue random integer values
+ */
 Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
 	long long count=getValueInteger(_countValue);
 	if(count>0){
 		Marray* _randarray=owned_array(_getArray("Mrands",count),owner);
-		if(_randarray){
+		if(_randarray!=NULL){
 			Mvalue** valueholder=_randarray->values;
 			while(--count>=0){assignValue(valueholder,Mrand());valueholder++;}
 			return _getValueOfArray(disowned_array(_randarray,owner));
@@ -1119,13 +1432,20 @@ Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
+/**
+ * @brief returns an array of \p _countValue random integers in [0,_upperValue]
+ * 
+ * @param _countValue 
+ * @param _upperValue 
+ * @return Mvalue* an array of \p _countValue random integers in [0,_upperValue]
+ */
 Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue){Mallocationowner owner=getOwner(__LINE__);
 	long long count=getValueInteger(_countValue);
 	if(count>0){
 		long long upper=getValueInteger(_upperValue);
 		if(upper>0&&upper<=RAND_MAX){
 			Marray* _randarray=owned_array(_getArray("Mrands",count),owner);
-			if(_randarray){
+			if(_randarray!=NULL){
 				Mvalue** valueholder=_randarray->values;
 				while(--count>=0){
 					long long r=randominteger(upper);
@@ -1143,9 +1463,17 @@ Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue){Mallocationowner owner=
 	}
 	return NULL;
 }
+/**
+ * @brief sets the seed of the pseudorandom number generator to \p _seedValue
+ * @details if \p _seedValue is undefined, time(NULL) is used as seed
+ *          calls srand(seed) to set the seed
+ *          M_LL_INVALID is returned when the seed is invalid (not positive or larger than UINT_MAX)
+ * @param _seedValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE or M_LL_INVALID on failure
+ */
 Mvalue* Msrand(Mvalue* _seedValue){
 	long long result=M_LL_INVALID;
-	long long seed=(_seedValue?getValueInteger(_seedValue):time(NULL));
+	long long seed=(_seedValue!=NULL?getValueInteger(_seedValue):time(NULL));
 	long long seedmax=UINT_MAX;
 	if(seed>0&&seed<=seedmax){
 		srand(seed);
