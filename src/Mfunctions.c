@@ -582,7 +582,7 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
 		if(_value->type==VT_FLOAT)return _getFloatValue(-_value->value._float->ld);
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._list,Mneg));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mneg));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg));
 		if(_value->type==VT_BIGINTEGER)return _getValueOfBiginteger(_getNegatedBiginteger(_value->value._biginteger));
@@ -631,7 +631,7 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 Mvalue* Mnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not a value
 	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(!_value->value._integer->ll);
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._list,Mnot));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mnot));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot));
 	}
@@ -645,9 +645,9 @@ Mvalue* Mnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not
  * @return Mvalue* the binary not of \p _value
  */
 Mvalue* Mbnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not a value
-	if(!_value!=NULL){
+	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._list,Mbnot));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mbnot));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot));
 	}
