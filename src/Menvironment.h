@@ -13,11 +13,13 @@ Mvalue* popExecutionEnvironment(); // should never go wrong (a bug is reported i
 Menvironment* getExecutionEnvironment(); // the current environment
 Mallocationowner getOwnerExecutionEnvironment(); // MDH@31MAY2020
 Mstring* _getExecutionEnvironmentName();
-void outputExecutionEnvironmentName(char* prefix,char* suffix);
+size_t outputExecutionEnvironmentName(char* prefix,char* suffix);
 
 // MDH@17JUL2019: getting and updating the environment expression token
 Mtoken* getEnvironmentExpressionToken();
 Mtoken* nextEnvironmentExpressionToken();
+
+///////bool allArrayElementsAreOfType(Marray* array,Mvaluetype valuetype);
 
 unsigned long long getNumberOfFunctionCommands(char const * const functionName);
 // bool registerFunctionCommand(char const * const functionName,Mtoken* _command,Mallocationowner owner_command);
@@ -69,7 +71,7 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
 
 Mmap* _getVariableNamesMap(Menvironment const * const environment); // MDH@14NOV2019: returns a map with the names of all local variables (in attribute '') and the names of the variables in the parent environment with the name of the parent environment!
 
-void outputTable(Mlist* table); // MDH@25NOV2019: certain lists are now constructed and recognized as 'tables'
+size_t outputTable(Mlist const * const table); // MDH@25NOV2019: certain lists are now constructed and recognized as 'tables'
 
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue);
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue); // MDH@25NOV2019: storing the memory allocations in a table makes it more displayable
