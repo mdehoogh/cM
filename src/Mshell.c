@@ -130,6 +130,10 @@ unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized i
 //								-------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
 // MDH@26OCT2020: all the i input characters can be associated with a macro, e.g. Ctrl-G (7) will insert get() into the command
 // MDH@28OCT2020: type of \ changed from W to e (i.e. the escape character), see what I can do with that elsewhere
+/**
+ * @brief for each possible input character the associated type
+ * 
+ */
 const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[e]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~b";
 
@@ -197,6 +201,10 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 // MDH@04NOV2019: the reference token type added, so we can pass references to functions wrapped inside a value
 /*
  "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","REF" ,"VAR"  ,"NEWVAR","PROP" ,"L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
+/**
+ * @brief token type + input character type -> new token type
+ * 
+ */
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
 {"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,""	  ,""  ,"` ; C  % )&*  , >?:	] }="}, /* EXPRESSION */ \
 {"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,""	,"LE"   ,""	  ,""	 ,""	,"N"  ,"."   ,""		,""		,""	   ,""	   ,"["   ,""	 ,""   ,""   ,""	 ,""		,""	  ,""	  ,""  ,"`R; CDS% )&*  , >?:	]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
@@ -227,20 +235,33 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","" ,""	 ,""	 ,""	 ,""	  ,""	 ,""	 ,"R"   ,"LE"   ,""	  ,""	 ,","   ,"N"  ,"."   ,"D"	   ,"S"	   ,""	   ,""	   ,"["   ,""	 ,"{"  ,""   ,""	 ,""		,""	  ,")"	 ,""  ,"` ; C  %&  *	>?:	] }="}, /* FUNCTION_CALL ( following the name of a function */ \
 {";"   ,""	,"" ,"?:"   ,"!="   ,"&*"   ,">"	 ,"-+%E" ,"?"	,""	,""	 ,""	  ,"."	,","   ,""   ,""	,""		,""		,""	   ,""	   ,"["   ,"]"	,""   ,":"  ,"}"	,""		,""	  ,")"	 ,"C" ,"`R   DS  (		 L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
-
+/**
+ * @brief the token type ids
+ * 
+ */
 const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,0b1000000,0b11111111};
 
 // MDH@25FEB2021: in certain cases we need to register local variables
+/**
+ * @brief register the variables in @p variableMap in M environment \p environment owned by \p owner_environment
+ * 
+ * @param environment 
+ * @param owner_environment 
+ * @param variableMap 
+ * @param defaultVariableName 
+ * @return true on success
+ * @return false on failure
+ */
 bool registerVariables(Menvironment * environment,Mallocationowner owner_environment,Mmap const * const variableMap,char const * const defaultVariableName){
-	if(!environment)return false;
-	Mmapelement* variableMapelement=(variableMap?variableMap->_first:NULL);
+	if(NULL==environment)return false;
+	Mmapelement* variableMapelement=(variableMap!=NULL?variableMap->_first:NULL);
 	Mvariable* variableMapelementVariable;
-	while(variableMapelement){
+	while(variableMapelement!=NULL){
 		variableMapelementVariable=variableMapelement->_variable;
-		if(variableMapelementVariable&&variableMapelementVariable->_name){
+		if(variableMapelementVariable!=NULL&&variableMapelementVariable->_name!=NULL){
 			char *variableName=variableMapelementVariable->_name->chars;
-			if(variableName){
-				if(strlen(variableName)==0)if(defaultVariableName)variableName=defaultVariableName; // use the default variable name if the name of the variable is empty
+			if(variableName!=NULL){
+				if(strlen(variableName)==0)if(defaultVariableName!=NULL)variableName=defaultVariableName; // use the default variable name if the name of the variable is empty
 				// if(strlen(variableName)>0){
 					// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
 					if(!addVariable(environment,owner_environment,variableName,variableMapelementVariable->valuetype,false)){
@@ -263,6 +284,16 @@ bool registerVariables(Menvironment * environment,Mallocationowner owner_environ
 
 // MDH@22OCT2020: in order to be able to use any number of function arguments we now allow moving the list of variables that does not have a name to be placed in the variable that starts with _
 //				it's up to the argument map creator to put all arguments that are not expected in the function and put them in the '' argument
+/**
+ * @brief initializes execution environment \p _executionEnvironment owned by \p owner_executionEnvironment with the variables from \p _variableMap
+ * @details delegates to registerVariables()
+ * @param _executionEnvironment 
+ * @param owner_executionEnvironment 
+ * @param _variableMap 
+ * @param defaultVariableName 
+ * @return true 
+ * @return false 
+ */
 bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap,char const * const defaultVariableName){
 	if(amVerboseDebugging())
 		outputMap("Execution environment variable map: ",_variableMap,".\n");
@@ -273,12 +304,20 @@ bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallo
 \p functionName the name of the function to execute
 obviously when defining the function body there will be no commands to execute
  */
+/**
+ * @brief returns the new M environment for executing M function \p _function called \p functionName
+ * 
+ * @param _function 
+ * @param functionName 
+ * @param _argumentMap 
+ * @return Menvironment* 
+ */
 Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 	if(amVerbose())
 		outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=owned_environment(_getNewEnvironment(),owner); // free asap
-	if(_functionExecutionEnvironment){
+	if(_functionExecutionEnvironment!=NULL){
 		if(amVerboseDebugging())
 			outputInfo("Registering the name of the function execution environment");
 		_functionExecutionEnvironment->_name=owned_chars(_getChars(functionName),Msubowner(owner,1)); // store the name of the function as environment name!!!
@@ -341,14 +380,24 @@ void setOutputCommandInfoFunction(OutputCommandInfoFunction* _outputCommandInfoF
 	outputCommandInfoFunction=_outputCommandInfoFunction;
 }
 */
+
+/**
+ * @brief the function to read a single input character
+ * 
+ */
 static InputCharReadFunction* inputCharReadFunction=NULL;
 
 // MDH@04MAR2020: the default version outputs the command the same way as within a session except without the colors
+/**
+ * @brief outputs M command \p command
+ * 
+ * @param command 
+ */
 void outputCommandInfo(Mcommand const * const command){
-	if(!command||!command->_lastToken)return;
+	if(NULL==command||NULL==command->_lastToken)return;
 	// MDH@12AUG2019: identifiers first
 	Mtoken* identifierToken=command->_lastToken->prevIdentifier;
-	if(identifierToken){
+	if(identifierToken!=NULL){
 		output("%s","Identifiers:");
 		while(1){
 			//if(identifierToken==TT_VARIABLE||identifierToken==TT_NEW_VARIABLE){
@@ -357,7 +406,7 @@ void outputCommandInfo(Mcommand const * const command){
 				output("(%u)",identifierToken->offset);
 			//}
 			identifierToken=identifierToken->prevIdentifier;
-			if(!identifierToken)break;
+			if(NULL==identifierToken)break;
 		}
 		outputChar('\n');
 	}
@@ -368,31 +417,57 @@ void outputCommandInfo(Mcommand const * const command){
 	while(token!=NULL){
 		tokenIndex++;
 		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,getTokenSignificantCharacterCount(token),string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
-		if(token->expr)
+		if(token->expr!=NULL)
 			output("\n%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
 		else
 			output("\t%s\n","Not part of another expression!");
-		if(token->prevIdentifier)
+		if(token->prevIdentifier!=NULL)
 			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
 		token=token->next;
 	}
 }
+/**
+ * @brief the function to output command info
+ * 
+ */
 static OutputCommandInfoFunction* outputCommandInfoFunction=outputCommandInfo;
 
 /**
- * freeToken() frees the memory @_userInputCommand->_lastToken points to and returns true on successfully removing the entire chain of tokens it points to
- * @returns the previous token (as we need that )  
+ * @brief frees the M token \p _token owned by \p owner_token
+ * @return the predecessor token of \p _token 
  */
 static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
 	// MDH@30APR2019: let's delegate to FREE_TOKEN()
-	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;FREE_TOKEN(_token,owner_token);}return _prevToken;
+	Mtoken* _prevToken=NULL;
+	if(_token!=NULL){_prevToken=_token->prev;FREE_TOKEN(_token,owner_token);}
+	return _prevToken;
 }
 
 // MDH@25FEB2021: a helper function that can be called both for testing the validity of a command or a part of a command given the first and last token
 //				taken as is from the original isValidCommandIndicator() (see below)
+/**
+ * @brief determines and returns the indicator of validity of M token \p lastCommandToken 
+ * @details returns 0 when \p lastCommandToken is NULL
+ *          returns -1 when \p lastCommandToken is of type TT_ERROR
+ *          returns -2 when \p lastCommandToken is some sort of operator (with token type <= 8)
+ *          returns -3 when a list is not ended
+ *          returns -4 when a function call is not ended
+ *          returns -5 when a map is not ended
+ *          returns -6 when an unknown expression is not ended
+ *          returns -7
+ *          returns -8
+ *          returns -9
+ *          returns -10
+ *          returns -11
+ *          returns -12
+ * @param lastCommandToken 
+ * @param expressionTokenTypeToIgnore 
+ * @param report 
+ * @return int8_t 1 on success, a non positive integer on failure
+ */
 int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
 
-	if(!lastCommandToken){if(report)outputError("Empty command");return 0;}
+	if(NULL==lastCommandToken){if(report)outputError("Empty command");return 0;}
 	
 	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
 	//	in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
@@ -424,8 +499,10 @@ int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,T
 	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
 	//////////// already noticed while entering the expression!!!!: if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
 	Mtoken* expressionToken=lastCommandToken->expr; // the token pointed to by the last command token
-	if(expressionToken)if(lastCommandToken->type==TT_END_OF_LIST||lastCommandToken->type==TT_END_OF_FUNCTION_CALL||lastCommandToken->type==TT_END_OF_MAP)expressionToken=expressionToken->expr;
-	if(expressionToken){ // could be a problem
+	if(expressionToken!=NULL)
+		if(lastCommandToken->type==TT_END_OF_LIST||lastCommandToken->type==TT_END_OF_FUNCTION_CALL||lastCommandToken->type==TT_END_OF_MAP)
+			expressionToken=expressionToken->expr;
+	if(expressionToken!=NULL){ // could be a problem
 		// MDH@16OCT2019: I made ] ) and } again point to the associated [ ( and {, which of course should be pointing to NULL if it does not the command is incomplete
 		if(amVerbose())
 			if(report)
@@ -489,6 +566,13 @@ int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,T
 // MDH@28FEB2020: we NO longer NULL Mcommand* (we can't because that would require Mcommand**) BUT that would only be required 
 //				I suppose this also means that we do not need to return true or false anymore, any caller can check for a last token itself (i.e. an empty command!!!!)
 //				now returning the new last command token
+/**
+ * @brief removes and returns the last M token in M command \p command owned by \p owner_command
+ * 
+ * @param command 
+ * @param owner_command 
+ * @return Mtoken* 
+ */
 Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command){
 	// NOTE we can still remove the pointer although you cannot use it anymore (except for testing) because free_token would have released the associated memory!!!
 	if(command&&command->_lastToken){
@@ -498,16 +582,33 @@ Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command
 	}
 	return(command?command->_lastToken:NULL);
 }
+/**
+ * @brief returns the validity indicator (positive on success) of M command \p command owned by \p owner_command
+ * @details cuts off any last command token that is a comment before returning the validity of the last command token
+ * @param command 
+ * @param owner_command 
+ * @param report 
+ * @return int8_t 
+ */
 int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report){
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return 0;}
+	if(NULL==command||NULL==command->_firstToken){if(report)outputError("Undefined or empty command");return 0;}
 	Mtoken* lastCommandToken=command->_lastToken;
-	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
+	if(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
 	// MDH@25FEB2021: inspecting the last command token now delegated to isAValidLastCommandTokenIndicator()!
 	return isAValidLastCommandTokenIndicator(lastCommandToken,TT_EXPRESSION,report);
 }
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
+/**
+ * @brief evaluates \p command owned by \p owner_command returning the result
+ * 
+ * @param command 
+ * @param owner_command 
+ * @param commandType 
+ * @return Mvalue* the result of the evaluation of \p command
+ */
 Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char commandType){
+	if(NULL==command)return NULL;
 	// if(amVerboseDebugging())
 		if(outputCommandInfoFunction)(*outputCommandInfoFunction)(command); // MDH@04MAR2020: using the given output command info function
 	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,owner_command,amVerboseDebugging());
@@ -524,8 +625,15 @@ Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char co
 				  if we were to keep using DP_value we should have called assignValue() to assign the value and not DP_value=_getIntegerValue() (see initEnvironment())
 Mvalue* DP_value=NULL; 
 */
+/**
+ * @brief the global default decimal context
+*/
 Mdecimalcontext* M_DECIMALCONTEXT=NULL; // the application-wide decimal context
-
+/**
+ * @brief returns the precision of the default decimal context
+ * 
+ * @return long long the precision of the default decimal context
+ */
 long long getDP(){
 	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
@@ -534,13 +642,19 @@ long long getDP(){
 	return dp;
 }
 // MDH@18OCT2019: if someone wants to know about the decimal context
+/**
+ * @brief returns the decimal context of the decimal wrapped in \p value
+ * 
+ * @param value 
+ * @return Mvalue* the decimal context information of the decimal wrapped in \p value
+ */
 Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value&&value->type==VT_DECIMAL){
 		Mdecimalcontext* decimalcontext=getDecimalcontext(value->value._decimal->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
-		if(mpd_context){
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:NULL);
+		if(mpd_context!=NULL){
 			Mmap* _contextMap=owned_map(_getMapOfType(VT_INTEGER),owner);
-			if(_contextMap){
+			if(_contextMap!=NULL){
 				appendedToMap(_contextMap,owner,"status",_getIntegerValue(mpd_context->status));
 				appendedToMap(_contextMap,owner,"precision",_getIntegerValue(mpd_context->prec));
 				appendedToMap(_contextMap,owner,"round",_getIntegerValue(mpd_context->round));
@@ -556,20 +670,32 @@ Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return NULL;
 }
+/**
+ * @brief returns the decimal precision of the M decimal wrapped in \p value
+ * @details returns NULL if \p value does not wrap a M decimal
+ * @param value 
+ * @return Mvalue* 
+ */
 Mvalue* getdp(Mvalue* value){
 	return(value&&value->type==VT_DECIMAL?_getIntegerValue(value->value._decimal->prec):NULL);
 }
+/**
+ * @brief sets the current decimal precision to the integer wrapped in \p value
+ * 
+ * @param value 
+ * @return Mvalue* 
+ */
 Mvalue* setdp(Mvalue* value){
 	// how about returning the current value, no matter what the argument is????
 	long long olddecimalprecision=getDP();
 	// ignore if NO value specified...
-	if(value&&value->type==VT_INTEGER){
+	if(value!=NULL&&value->type==VT_INTEGER){
 		long long decimalprecision=value->value._integer->ll;
 		if(decimalprecision!=M_LL_INVALID){ // if not the default!!!
 			if(decimalprecision>=6){
 				// if I fail to create the associated decimal context, no go
 				Mdecimalcontext* _newDecimalContext=getDecimalcontext(decimalprecision);
-				if(_newDecimalContext){
+				if(_newDecimalContext!=NULL){
 					M_DECIMALCONTEXT=_newDecimalContext;
 					M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
 					////DP_value->value._integer->ll=_decimalContext->prec;
@@ -583,13 +709,30 @@ Mvalue* setdp(Mvalue* value){
 }
 
 // convenience method to obtain the wrapped mpd_context pointer
-mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context:NULL);}
+/**
+ * @brief returns the mpd_context wrapped in M_DECIMAL_CONTEXT
+ * 
+ * @return mpd_context_t* the mpd_context wrapped in M_DECIMAL_CONTEXT
+ */
+mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT!=NULL?M_DECIMALCONTEXT->mpd_context:NULL);}
 
 // end Decimal support
 
 // very special M functions
 // MDH@20DEC2020: added the _invalidTokenValue to be evaluated when the condition is negative
 //				and changed the evaluation of the condition to a sign
+/**
+ * @brief returns the result of evaluation of the if function with condition value \p _conditionValue and then clause \p _thenTokenValue and else clause \p _elseTokenValue and undefined clause _undefinedTokenValue
+ * @details the sign of _conditionValue is used to determine which clause to evaluate
+ *          when _conditionValue equals M_LL_INVALID, the result of the evaluation of \p _undefinedTokenValue is returned
+ *          when _conditionValue is positive, the result of the evaluation of \p _thenTokenValue is returned
+ *          otherwise (not positive), the result of the evaluation of \p _elseTokenValue is returned
+  * @param _conditionValue 
+ * @param _thenTokenValue 
+ * @param _elseTokenValue 
+ * @param _undefinedTokenValue 
+ * @return Mvalue* the result of the evaluation of _thenTokenValue, _elseTokenValue or _undefinedTokenValue (see details)
+ */
 Mvalue* Miffunction(Mvalue* _conditionValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue,Mvalue* _undefinedTokenValue){
 	Mvalue* _result=NULL;
 	// MDH@23DEC2020:
@@ -601,18 +744,18 @@ Mvalue* Miffunction(Mvalue* _conditionValue,Mvalue* _thenTokenValue,Mvalue* _els
 	// currently exactly one out of three possible arguments is evaluated
 	long long conditionSign=getValueSign(_conditionValue);
 	if(conditionSign==M_LL_INVALID){
-		if(_undefinedTokenValue&&_undefinedTokenValue->type==VT_TOKEN){
+		if(_undefinedTokenValue!=NULL&&_undefinedTokenValue->type==VT_TOKEN){
 			getExecutionEnvironment()->expressionToken=_undefinedTokenValue->value._token;
 			_result=getValueOfExpression("undefined clause",'e',NULL,0);
 		}
 	}else
 	if(conditionSign>0){ 
-		if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
+		if(_thenTokenValue!=NULL&&_thenTokenValue->type==VT_TOKEN){
 			getExecutionEnvironment()->expressionToken=_thenTokenValue->value._token;
 			_result=getValueOfExpression("then clause",'t',NULL,0);
 		}
 	}else{ // all non-positive values (except M_LL_INVALID)
-		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
+		if(_elseTokenValue!=NULL&&_elseTokenValue->type==VT_TOKEN){
 			getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
 			_result=getValueOfExpression("else clause",'e',NULL,0);
 		}
@@ -621,17 +764,23 @@ Mvalue* Miffunction(Mvalue* _conditionValue,Mvalue* _thenTokenValue,Mvalue* _els
 }
 
 // MDH@21DEC2020: a new way to do a while is by receiving a single token list (just like do does!!)
+/**
+ * @brief executes the while loop stored in the M list wrapped in \p _whileTokenlistValue
+ * 
+ * @param _whileTokenlistValue 
+ * @return Mvalue* the result of the execution of the last list command
+ */
 Mvalue* Mwhilefunction(Mvalue* _whileTokenlistValue){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	Mvalue* _result=NULL;
-	if(_whileTokenlistValue&&_whileTokenlistValue->type==VT_LIST&&_whileTokenlistValue->value._list){
+	if(_whileTokenlistValue!=NULL&&_whileTokenlistValue->type==VT_LIST&&_whileTokenlistValue->value._list!=NULL){
 		Mlist* whileTokenlist=_whileTokenlistValue->value._list;
 		if(whileTokenlist->numberOfElements>1){
 			Mlistelement* conditiontokenlistelement=whileTokenlist->_first;
 			// we need the condition token and its successor
-			if(conditiontokenlistelement&&conditiontokenlistelement->_next){
-				Mtoken* conditiontoken=(conditiontokenlistelement&&conditiontokenlistelement->_value&&conditiontokenlistelement->_value->type==VT_TOKEN?conditiontokenlistelement->_value->value._token:NULL);
-				if(conditiontoken){
+			if(conditiontokenlistelement!=NULL&&conditiontokenlistelement->_next!=NULL){
+				Mtoken* conditiontoken=(conditiontokenlistelement!=NULL&&conditiontokenlistelement->_value!=NULL&&conditiontokenlistelement->_value->type==VT_TOKEN?conditiontokenlistelement->_value->value._token:NULL);
+				if(conditiontoken!=NULL){
 					Mlistelement* looptokenlistelement;
 					Mtoken* looptoken;
 					while(1){
@@ -645,10 +794,10 @@ Mvalue* Mwhilefunction(Mvalue* _whileTokenlistValue){
 						if(conditionSign<=0)break;
 						// evaluate the body
 						looptokenlistelement=conditiontokenlistelement->_next;
-						while(looptokenlistelement){
-							if(looptokenlistelement->_value&&looptokenlistelement->_value->type==VT_TOKEN){
+						while(looptokenlistelement!=NULL){
+							if(looptokenlistelement->_value!=NULL&&looptokenlistelement->_value->type==VT_TOKEN){
 								looptoken=looptokenlistelement->_value->value._token;
-								if(looptoken){
+								if(looptoken!=NULL){
 									getExecutionEnvironment()->expressionToken=looptoken;
 									_result=getValueOfExpression("while loop",'l',NULL,0);
 									if(report)
@@ -692,15 +841,21 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 // MDH@23OCT2021: I had a marvelous idea i.e. to simply return the environment do creates
 //				as we can wrap it in a value, this way it can be retained by assigning it
 //				and therefore become an 'object' that can be accessed (and have 'methods')
+/**
+ * @brief returns the do function call on the list of do commands in the M list wrapped in \p _doTokenValue
+ * 
+ * @param _doTokenValue 
+ * @return Mvalue* 
+ */
 Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
-	if(_doTokenValue&&_doTokenValue->type==VT_LIST){
+	if(_doTokenValue!=NULL&&_doTokenValue->type==VT_LIST){
 		Mlist* doList=_doTokenValue->value._list;
-		if(doList&&doList->_first){ // something to do
+		if(doList!=NULL&&doList->_first!=NULL){ // something to do
 			// essentially all arguments are not evaluated
 			// CAREFUL if we fail to create the environment so _doVariableMap was not bound to it, we have to free it with free_map explicitly
 			Menvironment* _doEnvironment=owned_environment(__environment(),owner);
-			if(_doEnvironment){
+			if(_doEnvironment!=NULL){
 				_doEnvironment->_name=owned_chars(_getChars("do"),Msubowner(owner,1));
 				// let's add variable $ as result variable and ! as exit flag variable
 				// MDH@10JAN2020: ! is replaced by making "$" immutable to indicate being done
@@ -722,13 +877,13 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 						if(amVerboseDebugging())
 							outputValue("First do function call argument: '",tokenValueListelement->_value,"'.\n");
 						Mvalue *tokenExpressionValue=tokenValueListelement->_value;
-						if(tokenExpressionValue){
+						if(tokenExpressionValue!=NULL){
 							expressionValue=NULL;
 							if(tokenExpressionValue->type==VT_TOKEN){
 								// execute it in the do environment
 								_doEnvironment->expressionToken=tokenExpressionValue->value._token;
 								expressionValue=getValueOfExpression("do",'d',(TokenType[]){},0); // evaluate the expression
-								if(expressionValue){
+								if(expressionValue!=NULL){
 									if(expressionValue->type==VT_MAP){
 										if(!registerVariables(_doEnvironment,getValueDataOwner(),expressionValue->value._map,NULL))
 											outputError("Failed to initialize the do function call environment!");
@@ -743,11 +898,11 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 						// now ready to process the 'body'
 						tokenValueListelement=tokenValueListelement->_next; // skip the local variable map
 						expressionValue=NULL; // to store the last evaluated argument value to be used as result when $ was not set
-						while(tokenValueListelement){
+						while(tokenValueListelement!=NULL){
 							tokenExpressionValue=tokenValueListelement->_value;
 							if(tokenExpressionValue&&tokenExpressionValue->type==VT_TOKEN){ // some token to interpret
 								_doEnvironment->expressionToken=tokenExpressionValue->value._token;
-								if(_doEnvironment->expressionToken){
+								if(_doEnvironment->expressionToken!=NULL){
 									expressionValue=getValueOfExpression("do",'d',(TokenType[]){},0); // evaluate the expression
 									// if the exit flag was set, exit
 									if(isImmutable(getVariable(NULL,"$",false))==M_TRUE)break;
@@ -778,14 +933,24 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 }
 // MDH@11MAR2020: the value of the result token is assigned to $ so that will become the result of the application of the Mforfunction
 // MDH@23DEC2020: Mforfunction renamed to Mforwithfunction because that's what it actually is, this will save the user from wrapping the for call in a with statement
+/**
+ * @brief returns the result of executing a for with loop
+ * 
+ * @param _initializationTokenValue the initialization clause 
+ * @param _conditionTokenValue the condition clause
+ * @param _incrementTokenValue the increment clause
+ * @param _bodyTokenValue the body clause
+ * @param _resultTokenValue the result clause
+ * @return Mvalue* the result of executing a for with loop
+ */
 Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	Mvalue* _result=NULL;
-	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
-		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
-		(!_incrementTokenValue||_incrementTokenValue->type==VT_TOKEN)&&
-		(_bodyTokenValue&&_bodyTokenValue->type==VT_TOKEN)&&
-		(!_resultTokenValue||_resultTokenValue->type==VT_TOKEN)){
+	if( (NULL==_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
+		(_conditionTokenValue!=NULL&&_conditionTokenValue->type==VT_TOKEN)&&
+		(NULL==_incrementTokenValue||_incrementTokenValue->type==VT_TOKEN)&&
+		(_bodyTokenValue!=NULL&&_bodyTokenValue->type==VT_TOKEN)&&
+		(NULL==_resultTokenValue||_resultTokenValue->type==VT_TOKEN)){
 		if(report){
 			output("For loop:");
 			outputValue(" Initialization=",_initializationTokenValue,NULL);
@@ -795,12 +960,13 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 			outputValue(" Result=",_resultTokenValue,NULL);
 			newline();
 		}
+		// create a new M environment to run the for with loop in
 		Menvironment* _forEnvironment=owned_environment(__environment(),owner);
-		if(_forEnvironment){
+		if(_forEnvironment!=NULL){
 			_forEnvironment->_name=owned_chars(_getChars("for loop"),Msubowner(owner,1));
 			// better wait with pushing until _forEnvironment is initialized appropriately
 			// MDH@11MAR2020: $ is NOT needed when there's an explicit result token value!!
-			bool forEnvironmentInitialized=(_resultTokenValue?true:false);
+			bool forEnvironmentInitialized=(_resultTokenValue!=NULL?true:false);
 			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"$",VT_UNDEFINED,false))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"_",VT_INTEGER,false))forEnvironmentInitialized=false;
 			// MDH@21DEC2020: TODO we will need to change "_" to something else because _ is used in functions
@@ -809,7 +975,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 			if(forEnvironmentInitialized){
 				if(pushExecutionEnvironment(_forEnvironment)){
 					// evaluate the initialization inside the for environment once
-					if(_initializationTokenValue){
+					if(_initializationTokenValue!=NULL){
 						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
 						// MDH@11MAR2020: to force the creation of all identifiers that are assigned in the initialization token value, we have to ascertain that they are considered TT_NEW_VARIABLE
 						//				essentially this means you cannot set an outside variable in the first for loop expression
@@ -820,7 +986,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
 						// although perhaps we should exclude using $ and _ well especially _
 						// MDH@08NOV2019: a list is also allowed actually anything
-						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,getOwnerExecutionEnvironment(),initializationValue->value._map,NULL)){
+						if(initializationValue!=NULL&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,getOwnerExecutionEnvironment(),initializationValue->value._map,NULL)){
 							outputError("Failed to initialize the for loop local variables");
 							forEnvironmentInitialized=false;
 						}
@@ -852,7 +1018,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
 								outputValue(" evaluates to '",_conditionValue,"'.\n");
 							}
-							if(_bodyTokenValue){
+							if(_bodyTokenValue!=NULL){
 								// evaluate the for body
 								_forEnvironment->expressionToken=_bodyTokenValue->value._token;
 								/*
@@ -868,7 +1034,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 							}
 							// MDH@10JAN2021: break if "$" is now immutable
 							if(isImmutable(getVariable(NULL,"$",false))==M_TRUE)break;
-							if(_incrementTokenValue){
+							if(_incrementTokenValue!=NULL){
 								// evaluate the increment
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
 								/*
@@ -890,12 +1056,12 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 						}
 						// MDH@11MAR2020: if there's a result token value, we use that value as the result of the for loop (in which case we would not need $ at all)
 						//				of course we could let $ take precedence over the result token BUT the general idea is that any result token replaces the implicit result (which would be the number of times the loop is executed)
-						if(_resultTokenValue){
+						if(_resultTokenValue!=NULL){
 							_forEnvironment->expressionToken=_resultTokenValue->value._token;
 							_result=getValueOfExpression("for loop",'l',(TokenType[]){},0);
 						}else{ // no explicit result token which value denotes the result
 							_result=getValue(_forEnvironment,"$"); // get the result
-							if(!_result){
+							if(NULL==_result){
 								_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
 								if(report)
 									outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
@@ -925,32 +1091,38 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 	return _result;
 }
 // MDH@23DEC2020: Mforfunction now implements the first choice Mforwithfunction for executing a for loop from a token list (of indefinite number of tokens just like while and do)
+/**
+ * @brief returns the result of executing a for token list wrapped in \p _forTokenlistValue
+ * 
+ * @param _forTokenlistValue 
+ * @return Mvalue* 
+ */
 Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	Mvalue* _result=NULL;
-	if(_forTokenlistValue&&_forTokenlistValue->type==VT_LIST&&_forTokenlistValue->value._list){
+	if(_forTokenlistValue!=NULL&&_forTokenlistValue->type==VT_LIST&&_forTokenlistValue->value._list!=NULL){
 		Mlist* forTokenlist=_forTokenlistValue->value._list;
 		if(forTokenlist->numberOfElements>3){ // at least four elements required
 			// extracting valid initialization, condition and increment list element (of type VT_TOKEN)
 			Mlistelement* initializationTokenlistelement=forTokenlist->_first;
 			// NOTE ascertaining that the condition is NULL if the initialization token is not of the right type (or undefined)
-			Mlistelement* conditionTokenlistelement=(initializationTokenlistelement
+			Mlistelement* conditionTokenlistelement=(initializationTokenlistelement!=NULL
 														&&(!initializationTokenlistelement->_value||initializationTokenlistelement->_value->type==VT_TOKEN)
 													?initializationTokenlistelement->_next
 													:NULL);
 			// NOTE let's allow the increment token list element to be NULL as well although this is not recommended
-			Mlistelement* incrementTokenlistelement=(conditionTokenlistelement&&conditionTokenlistelement->_value&&conditionTokenlistelement->_value->type==VT_TOKEN
+			Mlistelement* incrementTokenlistelement=(conditionTokenlistelement!=NULL&&conditionTokenlistelement->_value!=NULL&&conditionTokenlistelement->_value->type==VT_TOKEN
 													?conditionTokenlistelement->_next
 													:NULL);
 			// we can suffice with testing the increment token
-			if(incrementTokenlistelement&&incrementTokenlistelement->_next){
+			if(incrementTokenlistelement!=NULL&&incrementTokenlistelement->_next!=NULL){
 				Mtoken* conditionToken=conditionTokenlistelement->_value->value._token;
-				if(conditionToken){
+				if(conditionToken!=NULL){
 					// allowing the increment to be NULL although this is not recommended, as otherwise the user could forget to make the condition change!!
 					Mtoken* incrementToken=(incrementTokenlistelement->_value&&incrementTokenlistelement->_value->type==VT_TOKEN?incrementTokenlistelement->_value->value._token:NULL);
 					// initialize
 					Mtoken* initializationToken=(initializationTokenlistelement&&initializationTokenlistelement->_value?initializationTokenlistelement->_value->value._token:NULL);
-					if(initializationToken){
+					if(initializationToken!=NULL){
 						getExecutionEnvironment()->expressionToken=initializationToken;
 						Mvalue* _initializationValue=getValueOfExpression("for loop initialization",'v',NULL,0);
 						if(report)
@@ -968,10 +1140,10 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 						if(conditionSign<=0)break; // condition is not met
 						// evaluate the body elements
 						loopTokenlistelement=incrementTokenlistelement->_next;
-						while(loopTokenlistelement){
-							if(loopTokenlistelement->_value&&loopTokenlistelement->_value->type==VT_TOKEN){
+						while(loopTokenlistelement!=NULL){
+							if(loopTokenlistelement->_value!=NULL&&loopTokenlistelement->_value->type==VT_TOKEN){
 								loopToken=loopTokenlistelement->_value->value._token;
-								if(loopToken){
+								if(loopToken!=NULL){
 									getExecutionEnvironment()->expressionToken=loopToken;
 									_result=getValueOfExpression("for loop body",'l',NULL,0);
 									if(report)
@@ -987,7 +1159,7 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 							loopTokenlistelement=loopTokenlistelement->_next;
 						}
 						// finish with evaluating the increment token (if defined)
-						if(initializationToken){
+						if(initializationToken!=NULL){
 							getExecutionEnvironment()->expressionToken=incrementToken;
 							Mvalue* _initializationValue=getValueOfExpression("for loop increment",'i',NULL,0);
 							if(report)
@@ -1006,20 +1178,40 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 }
 
 // the input info and error function default to shellInputInfo and shellInputError that write the text to the console  (and are replaced in M.c by functions that output above the user input lines and use colors)
+/**
+ * @brief displays input info 
+ * 
+ * @param fmt the format string for displaying all arguments using the format string \p fmt
+ * @param ... 
+ */
 static void inputInfo(const char* const fmt,...){
-	if(fmt&&strlen(fmt)){ // we have a format
+	if(fmt!=NULL&&strlen(fmt)){ // we have a format
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
 		newline();
 	}
 }
+/**
+ * @brief displays input error
+ * 
+ * @param fmt the format string for displaying all arguments using the format string \p fmt
+ * @param ... 
+ */
 static void inputError(const char* const fmt,...){
-	if(fmt&&strlen(fmt)){ // we have a format
+	if(fmt!=NULL&&strlen(fmt)){ // we have a format
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
 		newline();
 	}
 }
 // MDH@10MAR2020: initialized in shellInitialized() so shellInitialized() must be called prior to any input processing
+/**
+ * @brief the plugged in input info function (see shellInitialized)
+ * 
+ */
 static InputResponseFunction* inputInfoFunction=NULL;
+/**
+ * @brief the plugged in input error function (see shellInitialized)
+ * 
+ */
 static InputResponseFunction* inputErrorFunction=NULL;
 // void setInputInfoFunction(InputResponseFunction* _inputResponseFunction){inputInfoFunction=_inputResponseFunction;}
 // void setInputErrorFunction(InputResponseFunction* _inputResponseFunction){inputErrorFunction=_inputResponseFunction;}
@@ -1029,6 +1221,13 @@ static InputResponseFunction* inputErrorFunction=NULL;
 
 // MDH@05JUN2019: it's prudent to return the negative value of the input token type if the given input character type ends the token 
 //				i.e. when NO_TRANSITIONS is a match, so that the caller can set the significantCharacterCount
+/**
+ * @brief returns the next token type having receive an input character of type \p inputCharacterType when in a token of type \p inputTokenType
+ * 
+ * @param inputTokenType 
+ * @param inputCharacterType 
+ * @return int8_t 
+ */
 int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
 		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
@@ -1053,6 +1252,15 @@ int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 // TODO we could call the following function from tokenCheckedForBeingAFunction
 // an identifier with a certain name in a certain special function call (to which it might be local)
 // instead of requiring a specialFunctionCallToken it suffices to know the environment id
+/**
+ * @brief returns true if identifier \p identifierName exists in M command \p command
+ * 
+ * @param command 
+ * @param identifierName 
+ * @param identifierEnvironmentId 
+ * @return true when the identifier with name \p identifierName exists in M command \p command
+ * @return false otherwise
+ */
 bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId){ // replacing: const Mtoken* const specialFunctionCallToken){
 	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
 	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
@@ -1110,21 +1318,47 @@ bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierE
 	//////////if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
 	return found;
 }
-
+/**
+ * @brief the plugged in update last token auto completion text function
+ * 
+ */
 static UpdateLastTokenAutocompletionTextFunction* updateLastTokenAutocompletionTextFunction=NULL;
 // void setUpdateLastTokenAutocompletionTextFunction(UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction){updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;}
+/**
+ * @brief the plugged in reoutput token function (argument to shellInitialized)
+ * 
+ */
 static ReoutputTokenFunction* reoutputTokenFunction=NULL;
 // void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){reoutputTokenFunction=_reoutputTokenFunction;}
-
+/**
+ * @brief returns true if M variable \p variable represents a function, false otherwise
+ * 
+ * @param variable 
+ * @return true 
+ * @return false 
+ */
 static bool representsAFunction(Mvariable* variable){
 	// ASSERT variable should NOT be NULL
 	if(variable->valuetype==VT_FUNCTION)return true; // TODO this is questionable BUT ok
 	return(variable->_value?variable->_value->type==VT_FUNCTION:false);
 }
+
 // MDH@12MAR2020: because containsVariable() is not called in Menvironment.h/c itself, and it uses inputInfoFunction I moved it over here today just before it is getting used
+/**
+ * @brief 
+ * @details returns 0 if \p name is NULL or an empty string
+ *          returns -2, -3 or -4 if \p name is not a valid full property name 
+ *          returns -1 if \p name does not exist in M environment \p _environment
+ *          returns 1 if M environment \p _environment contains a function with name \p name
+ *          returns 2 if M environment \p _environment contains a function with name \p name 
+ * @param _environment
+ * @param name
+ * @param report
+ * 
+ */
 int8_t containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
 	// MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
-	if(!name)return 0; // invalid input
+	if(NULL==name)return 0; // invalid input
 	// MDH@12MAR2020: when using dot notation to access properties in maps it is essential that the part in front of the period references an existing map if it does not the 'dot' is basically NOT allowed
 	//				because getVariable() would also return NULL if the map does not yet contain the '' property (to indicate the '' property to be set) it cannot distinguish that situation in getVariable so we do it here
 	//				and we can return -2 as well to indicate invalid input in which case a TT_ERROR token should be started
@@ -1134,24 +1368,26 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 	// MDH@12MAR2020: with dot notation it starts with also determining whether or not the dot notation is valid 
 	//				ok the essential thing here is that the thing holding the last property must be a variable that has a map value
 	char* lastPropertySeparator=strrchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
-	if(lastPropertySeparator){
+	if(lastPropertySeparator!=NULL){
 		name[lastPropertySeparator-name]='\0'; // pretend the name to end at the last property separator
 		if(report>0)output("Looking for map variable '%s'.\n",name);else if(report<0)(*inputInfoFunction)("Looking for map variable '%s'.\n",name);
 		variable=getVariable(_environment,name,report>0); // getVariable() uses output() and we can only use that when report>0
 		name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER; // put the last property separator back
-		if(!variable)return -2; // if this happens the part in front of the period does not denote an existing variable (and it should)
-		if(!variable->_value)return -3; // the part in front of it does not contain a value
+		if(NULL==variable)return -2; // if this happens the part in front of the period does not denote an existing variable (and it should)
+		if(NULL==variable->_value)return -3; // the part in front of it does not contain a value
 		if(variable->_value->type!=VT_MAP)return -4; // the part in front of it is not a map
 		// if the map contains property '' it's an existing property otherwise it's a non-existing property
 		Mmap* map=variable->_value->value._map;
-		if(!map)return -5;
-		Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,lastPropertySeparator+1)))mapelement=mapelement->_next;
+		if(NULL==map)return -5;
+		Mmapelement* mapelement=map->_first;
+		while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,lastPropertySeparator+1)))
+			mapelement=mapelement->_next;
 		// point variable to the _variable in the map element
-		variable=(mapelement?mapelement->_variable:NULL);
+		variable=(mapelement!=NULL?mapelement->_variable:NULL);
 	}else // ASSERT not a property reference!!!!!
 		variable=getVariable(_environment,name,false);
 	// if variable is undefined, return -1
-	if(!variable){
+	if(NULL==variable){
 		if(report>0)output("'%s' does not exist.",name);else if(report<0)(*inputInfoFunction)("'%s' does not exist.",name);
 		return -1;
 	}
@@ -1171,35 +1407,61 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 // MDH@25FEB2021: because we now evaluate any special function first argument, we may decide to register this map during the processing of the rest of the command to check whether a variable used exists
 //				which means that there will be exactly one local variable map per (active) special function call so essentially we keep a stack of these local variables
 //				NOTE we don't have to bother about the stored localvariablesMapValue because it will be garbage collected after the command is executed and therefore this reference is to be considered a weak reference
+/**
+ * @brief Mlocalvariables stores local variables defined in the first argument of do's and forwith's
+ * 
+ */
 typedef struct Mlocalvariables{
 	Mvalue* mapValue;
 	uint64_t envid;
 	struct Mlocalvariables* _prev;
 }Mlocalvariables;
 Mlocalvariables *_lastLocalvariables=NULL;Mallocationowner owner_localvariables=(Mallocationowner){MI_SHELL,__LINE__,1};
+/**
+ * @brief pushes the local variables defined in the M map wrapped in \p localvariablesMapValue on the stack of local variables
+ * 
+ * @param localvariablesMapValue 
+ * @param envid 
+ * @return true 
+ * @return false 
+ */
 static bool pushLocalvariables(Mvalue* localvariablesMapValue,uint64_t envid){
 	Mlocalvariables* _localvariables=CALLOC_1(sizeof(Mlocalvariables),'L',owner_localvariables);
-	if(!_localvariables){if(inputErrorFunction)(*inputErrorFunction)("Failed to store the local variables.\n");return false;}
+	if(NULL==_localvariables){if(inputErrorFunction)(*inputErrorFunction)("Failed to store the local variables.\n");return false;}
 	_localvariables->mapValue=localvariablesMapValue;
 	_localvariables->envid=envid;
 	_localvariables->_prev=_lastLocalvariables;
 	_lastLocalvariables=_localvariables;
 	return true;
 }
+/**
+ * @brief frees local variables \p _localvariables
+ * 
+ * @param _localvariables 
+ */
 static void freeLocalvariables(Mlocalvariables* _localvariables){
 	if(!_localvariables)return;
 	if(_localvariables->_prev)freeLocalvariables(_localvariables->_prev);
 	FREE_DISOWNED_1(_localvariables,'L',owner_localvariables);
 }
+/**
+ * @brief (re)initializes the global linked list of local variables
+ * 
+ */
 static void initializeLocalvariables(){
 	if(_lastLocalvariables){freeLocalvariables(_lastLocalvariables);_lastLocalvariables=NULL;}
 }
-// pop the local variables at the end of the special function call
+/**
+ * @brief pop the local variable with environment id \p envid
+ * 
+ * @param envid 
+ * @return size_t the number of local variables popped
+ */
 static size_t popLocalvariables(uint64_t envid){
 	size_t popped=0;
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	Mlocalvariables *prevlocalvariables,*localvariables=_lastLocalvariables;
-	while(localvariables){
+	while(localvariables!=NULL){
 		if(localvariables->envid!=envid)break;
 		prevlocalvariables=localvariables->_prev; // remember the predecessor (to check next)
 		FREE_DISOWNED_1(localvariables,'L',owner_localvariables);
@@ -1210,6 +1472,14 @@ static size_t popLocalvariables(uint64_t envid){
 	return popped;
 }
 // TODO might become local again
+/**
+ * @brief returns true if a local variable with name \p identifierName exists in environment with id \p envid, false otherwise
+ * 
+ * @param identifierName 
+ * @param envid 
+ * @return true 
+ * @return false 
+ */
 bool existsAsLocalVariable(char* identifierName,uint64_t envid){
 	// if(inputInfoFunction)(*inputInfoFunction)("Checking the existence of '%s' in environment '%llu'.\n",identifierName,envid);
 	if(!_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
@@ -1219,6 +1489,12 @@ bool existsAsLocalVariable(char* identifierName,uint64_t envid){
 }
 
 // MDH@11MAR2020: Ok, need to be careful here
+/**
+ * @brief changes the last (function) token in \p command into a variable or new variable token
+ * 
+ * @param command 
+ * @param endOfInput 
+ */
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	Mtoken* functionToken=command->_lastToken;
 	char* _identifierName=_getSignificantTokenCharacters(functionToken); // same as: =_stringstart(functionToken->text,getTokenSignificantCharacterCount(functionToken)); // free asap
@@ -1264,6 +1540,13 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 // MDH@19OCT2020: sometimes we want to know whether or not a certain character will finish the current token or start a new token (like when tabbing through the suggested text)
 //				for that we would need a way to ask for that information
 //				NOTE we're keeping commandCharacterAppended() as it is now although we're replicating code here
+/**
+ * @brief corrects the type of input character \p inputChar pointed to in \p inputCharacterType
+ * 
+ * @param token 
+ * @param inputChar 
+ * @param inputCharacterType 
+ */
 static void correctInputCharacterType(Mtoken const * const token,char inputChar,char* inputCharacterType){
 	if((TOKENTYPE_IDS[token->type]&0x62)==0x62)if(inputChar==string_char(token->text,0))*inputCharacterType='r'; // MDH@04NOV2019: changed into lowercase r as we're now using R for token of type reference!!!
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
@@ -1276,6 +1559,15 @@ static void correctInputCharacterType(Mtoken const * const token,char inputChar,
 		if(token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
 	}
 }
+/** TODO
+ * @brief returns the new token type of token \p token on appending \p inputChar of type \p inputCharacterType
+ * 
+ * @param token 
+ * @param inputChar 
+ * @param inputCharacterType 
+ * @param tokenType 
+ * @return int8_t 
+ */
 static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inputCharacterType,int8_t *tokenType){
 	*tokenType=token->type;
 	int8_t newTokenType=nextTokenType(*tokenType,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
@@ -1344,7 +1636,17 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 	}
 	return newTokenType;
 }
+
 // MDH@19OCT2020: this is a first approximation
+/**
+ * @brief returns true if input character \p inputChar of type \p inputCharacterType continues token \p token, false otherwise
+ * 
+ * @param token 
+ * @param inputChar 
+ * @param inputCharacterType 
+ * @return true 
+ * @return false 
+ */
 bool characterContinuesToken(Mtoken const * const token,char inputChar,char inputCharacterType){
 	if(!token)return false;
 	if(token->type==TT_ERROR||token->type==TT_COMMENT)return true;
@@ -1364,12 +1666,21 @@ bool characterContinuesToken(Mtoken const * const token,char inputChar,char inpu
 //				NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
 //				NOTE we have to use the pointer to the last command token because if we used the last command token itself, we wouldn't be able to change the last command token!!!!
 //				NOTE instead we're returning the last command token (which will change if starting a new token!!!!)
+/**
+ * @brief appends input character \p inputChar of type \p inputCharacterType to M command \p command
+ * 
+ * @param command 
+ * @param inputChar 
+ * @param inputCharacterType 
+ * @param endOfInput whether or not the character is entered at the end of input
+ * @return Mtoken* 
+ */
 Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput){
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
-	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
+	Mtoken* lastCommandToken=(command!=NULL?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
-	if(!lastCommandToken){(*inputErrorFunction)("%sNo last command token.",M_BUG_PREFIX);return NULL;}
+	if(NULL==lastCommandToken){(*inputErrorFunction)("%sNo last command token.",M_BUG_PREFIX);return NULL;}
 	// if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
@@ -1705,6 +2016,14 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 }
 
 // MDH@25FEB2021: how about allowing the evaluation of a part of a subcommand (in its own evaluation environment), called by Mevalfunction() as well as the tokenizer for evaluating special function call arguments (that initialize local variables)
+/**
+ * @brief returns the text representation of the subcommand that starts with token \p firstSubcommandToken and ends with token \p lastSubcommandToken
+ * 
+ * @param firstSubcommandToken 
+ * @param lastSubcommandToken 
+ * @param defaultSubcommandText 
+ * @return Mstring* 
+ */
 static Mstring* getSubcommandText(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,Mstring const * const defaultSubcommandText){
 	if(defaultSubcommandText)return defaultSubcommandText;
 	Mallocationowner owner=getOwner(__LINE__);
@@ -1718,6 +2037,18 @@ static Mstring* getSubcommandText(Mtoken const * const firstSubcommandToken,Mtok
 	}
 	return disowned_string(_subcommandText,owner);
 }
+/**
+ * @brief returns the evaluated value of the sub command that starts with token \p firstSubcommandToken and ends with token \p lastSubcommandToken
+ * 
+ * @param firstSubcommandToken 
+ * @param lastSubcommandToken 
+ * @param expressionTypeToIgnore 
+ * @param endTokenTypes 
+ * @param endTokenTypeCount 
+ * @param commandText 
+ * @param source 
+ * @return Mvalue* 
+ */
 Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,TokenType expressionTypeToIgnore,TokenType endTokenTypes[],uint8_t endTokenTypeCount,Mstring const * const commandText,char* source){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _subcommandValue=NULL;
 	if(firstSubcommandToken&&lastSubcommandToken){
@@ -1752,14 +2083,20 @@ Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken cons
 
 // MDH@25OCT2020: tokenization consist of converting a text to a command so an immutable commandText is provided to be converted into a command
 //				NOTE that the text is tokenized within the current execution environment whatever that may be at this moment
+/**
+ * @brief returns the command represented by text \p commandText
+ * 
+ * @param commandText 
+ * @return Mcommand* 
+ */
 Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOwner(__LINE__);
 	Mcommand* _command=NULL;
-	char commandCharacter=(commandText?*commandText:'\0');
+	char commandCharacter=(commandText!=NULL?*commandText:'\0');
 	if(commandCharacter){ // commandText should not be NULL and the first character in it should not be '\0'
 		if(amVerboseDebugging())
 			output("%s","Parsing '");
 		_command=owned_command(_getNewCommand(true),owner);
-		if(_command){
+		if(_command!=NULL){
 			Mtoken* _commandToken=_command->_firstToken;
 			/* already set: 
 			_evalCommandToken->expr=NULL; // MDH@28OCT2019: essential bto'
@@ -1775,7 +2112,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 				// MDH@28MAY2020: take over ownership of the new token returned
 				if(newCommandToken!=_command->_lastToken)
 					_command->_lastToken=owned_token(newCommandToken,Msubowner(owner,1)); // update our eval command's last token TODO do we need to test here????
-				if(!_command->_lastToken)break;
+				if(NULL==_command->_lastToken)break;
 				commandCharacter=*(++commandText); // increment the char pointer to point to the next character to consume
 			}
 			if(commandCharacter){FREE_COMMAND(_command,owner);_command=NULL;} // some error occurred
@@ -1787,14 +2124,20 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 }
 
 // this is a fun method, allowing us to parse and evaluate any command (which we're gonna need when running M starting with commands to execute from a file)
+/**
+ * @brief returns the result of evaluating the text wrapped in \p value
+ * 
+ * @param value 
+ * @return Mvalue* 
+ */
 Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _evalValue=NULL;
 	Mstring* _evalValueText=owned_string(_getValueText(value,true),owner);
-	if(_evalValueText){
+	if(_evalValueText!=NULL){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
 		///*
 		Mcommand* _evalCommand=owned_command(_getTextCommand(string(_evalValueText)),owner);
-		if(_evalCommand){
+		if(_evalCommand!=NULL){
 			// MDH@25FEB2021: delegate to getSubcommandValue, which accepts a first and last command token, and the command text (TODO which we could make it construct itself)
 			_evalValue=getSubcommandValue(_evalCommand->_firstToken->next,_evalCommand->_lastToken,TT_EXPRESSION,NULL,0,_evalValueText,"eval");
 			/* replacing (and embedded (somewhat adapted) now in getSubcommandValue):
@@ -1873,16 +2216,35 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 // end very special M functions
 
 // MCommand stuff
+/**
+ * @brief returns \p _command owned by \p owner_command
+ * 
+ * @param _command 
+ * @param owner_command 
+ * @return Mcommand* \p _command owned by \p owner_command
+ */
 Mcommand* owned_command(Mcommand* _command,Mallocationowner owner_command){
 	if(!_command)return NULL;
 	if(_command->_firstToken)owned_token(_command->_firstToken,Msubowner(owner_command,1));
 	return OWNED(_command,owner_command);
 }
+/**
+ * @brief returns \p command disowned by \p owner_command
+ * 
+ * @param _command 
+ * @param owner_command 
+ * @return Mcommand* \p command disowned by \p owner_command
+ */
 Mcommand* disowned_command(Mcommand* _command,Mallocationowner owner_command){
 	if(!_command)return NULL;
 	if(_command->_firstToken)disowned_token(_command->_firstToken,Msubowner(owner_command,1));
 	return DISOWNED(_command,owner_command);
 }
+/**
+ * @brief frees M command \p _command
+ * 
+ * @param _command 
+ */
 void free_command(Mcommand* _command){
 	if(!_command)return;
 	if(_command->_firstToken)free_token(_command->_firstToken); //Msubowner(owner_command,1)); // will free ALL connected tokens!!!
@@ -1892,6 +2254,11 @@ void free_command(Mcommand* _command){
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
 //				therefore it is best to set the last token type using a separate function
 // MDH@03OCT2019: every time the token type changes we need to sync the immediate feed forward text as well!!!!
+/**
+ * @brief sets the type of token \p token to \p tokenType
+ * @param token
+ * @param tokenType
+ */
 void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 	if(token){
 		if(tokenType!=token->type){
@@ -1904,12 +2271,19 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 }
 // MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
 //				this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
+/**
+ * @brief returns a new token following \p prevToken of type \p newTokenType
+ * 
+ * @param prevToken 
+ * @param newTokenType 
+ * @return Mtoken* a new token following \p prevToken of type \p newTokenType
+ */
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* pNewToken=owned_token(__token(),owner);
-	if(pNewToken){
+	if(pNewToken!=NULL){
 		/////if(amDebugging())inputInfo("E1");
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
-		if(prevToken){
+		if(prevToken!=NULL){
 			// finish the previous token
 			prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
 			if(isTokenUnfinished(prevToken))
@@ -1955,7 +2329,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
 				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
 				//				TODO this is checked afterwards, so perhaps we should do that here?????
-				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
+				if(pNewToken->expr!=NULL)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
 			}
 			// we still have to recognize an error
 			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)if(!pNewToken->expr)newTokenType=TT_ERROR;
@@ -2190,8 +2564,15 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 	pNewToken->type=newTokenType;
 	return disowned_token(pNewToken,owner);
 }
+
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
+/**
+ * @brief returns a new command token following \p lastCommandToken of type \p tokenType
+ * @param lastCommandToken
+ * @param tokenType
+ * @return a new command token following \p lastCommandToken of type \p tokenType
+ */
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//				but we should remove any identifier continuation
@@ -2204,13 +2585,19 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
 	return disowned_token(_newCommandToken,owner);
 }
+/**
+ * @brief returns a new M command with or without first token as determined by \p withFirstToken
+ * 
+ * @param withFirstToken 
+ * @return Mcommand* returns a new M command with or without first token as determined by \p withFirstToken
+ */
 Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__LINE__);
 	Mcommand* _command=(Mcommand*)CALLOC_1(sizeof(Mcommand),'K',owner);
-	if(_command){
+	if(_command!=NULL){
 		// if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
 			_command->_firstToken=owned_token(_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/),Msubowner(owner,1)); // MDH@24MAY2020: obtain ownership immediately
-			if(_command->_firstToken){ // we've got a first token allocated
+			if(_command->_firstToken!=NULL){ // we've got a first token allocated
 				// if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
@@ -2235,13 +2622,20 @@ Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__
 /////const char* M_QDEN_PI100="125532772013612015195543173729505082616186012726141";
 
 // MDH@24MAY2020: because _Iadd is currently only called with freeonfailure equal to false we removed that argument otherwise we would have needed to provide the two owners!!!
+
+/**
+ * @brief returns the result of adding big integers \p a and \p b
+ * @param a
+ * @param b
+ * @return the big integer sum of big integers \p a and \p b
+ */
 Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT do NOT call with either a or b NULL
 	Mbiginteger* _sum=NULL;
-	if(a&&b){
+	if(a!=NULL&&b!=NULL){
 		if(!isBigintegerZero(a)&&!isBigintegerZero(b)){
 			_sum=owned_biginteger(__biginteger(),owner);
-			if(mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_sum))!=MP_OKAY){FREE_BIGINTEGER(_sum,owner);_sum=NULL;} // if the addition fails return 0
+			if(_sum!=NULL&&mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_sum))!=MP_OKAY){FREE_BIGINTEGER(_sum,owner);_sum=NULL;} // if the addition fails return 0
 		}else
 			_sum=owned_biginteger(_getBigintegerCopy(isBigintegerZero(a)?b:a),owner);
 	}
@@ -2249,12 +2643,19 @@ Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Malloca
 	// if(!sum)if(freeonfailure){FREE_BIGINTEGER(a);FREE_BIGINTEGER(b);}
 	return disowned_biginteger(_sum,owner);
 } // adding two big integers, if either is NULL return NULL
+
+/**
+ * @brief returns the result of multiplying big integers \p a and \p b
+ * @param a
+ * @param b
+ * @return the big integer product of big integers \p a and \p b
+ */
 Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
 	Mbiginteger* _product=NULL;
-	if(a&&b){
+	if(a!=NULL&&b!=NULL){
 		if(!isBigintegerOne(a)&&!isBigintegerOne(b)){
 			_product=owned_biginteger(__biginteger(),owner); // defaults to zero, which would be the result as well if either big integer is zero!!!
-			if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){FREE_BIGINTEGER(_product,owner);_product=NULL;}
+			if(_product!=NULL&&mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){FREE_BIGINTEGER(_product,owner);_product=NULL;}
 		}else
 			_product=owned_biginteger(_getBigintegerCopy(isBigintegerOne(a)?b:a),owner);
 	}
@@ -2264,12 +2665,19 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Ma
 } // multiplying two big integers, if either is NULL return NULL
 
 // _Imul is special big integer multiplier that assumes a NULL big integer equals 1
+/**
+ * @brief returns the big integer product of big integers \p a and \p b
+ * @details an input value equal to NULL is considered to equal 1 (not both)
+ * @param a 
+ * @param b 
+ * @return Mbiginteger* the big integer product of big integers \p a and \p b
+ */
 Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){Mallocationowner owner=getOwner(__LINE__);
-	if(!a&&!b)return NULL;
-	if(!a)return _getBigintegerCopy(b);
-	if(!b)return _getBigintegerCopy(a);
+	if(NULL==a&&NULL==b)return NULL;
+	if(NULL==a)return _getBigintegerCopy(b);
+	if(NULL==b)return _getBigintegerCopy(a);
 	Mbiginteger* _product=owned_biginteger(__biginteger(),owner);
-	if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){FREE_BIGINTEGER(_product,owner);_product=NULL;}
+	if(_product!=NULL&&mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){FREE_BIGINTEGER(_product,owner);_product=NULL;}
 	return disowned_biginteger(_product,owner);
 }
 
