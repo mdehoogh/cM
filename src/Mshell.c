@@ -3991,6 +3991,12 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 }
 
 // TODO how many iterations would we accept at most?????
+/**
+ * @brief 
+ * 
+ * @param _value 
+ * @return Mvalue* 
+ */
 Mvalue* MQ(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
 	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,MQ));
