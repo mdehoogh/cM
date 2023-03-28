@@ -1299,7 +1299,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 			if(_rational->delta==NULL){FREE_RATIONAL(_rational,owner);_rational=NULL;outputError("Failed to create the rational delta");}
 		}
 		if(_rational!=NULL){
-			Mbiginteger* _nonnullnumerator=owned_biginteger(_numerator?_getBigintegerCopy(_numerator):_getBiginteger(1),owner); // MDH@25MAY2020: now making a copy, so _numerator itself will not end up 
+			Mbiginteger* _nonnullnumerator=owned_biginteger(_numerator!=NULL?_getBigintegerCopy(_numerator):_getBiginteger(1),owner); // MDH@25MAY2020: now making a copy, so _numerator itself will not end up 
 			if(_nonnullnumerator!=NULL){
 				// MDH@15AUG2019: we prefer the numerator to be negative instead of the denominator
 				// MDH@10OCT2019: TODO wouldn't it be better to be able to toggle the signs???? YES but I can't find a function in tommath to do so!!!!

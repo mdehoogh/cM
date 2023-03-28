@@ -2935,7 +2935,7 @@ long double getValueLongDouble(const Mvalue* const _value){
  */
 Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value)return NULL;
-	if(_value&&_value->type==VT_BIGINTEGER)return _value->value._biginteger;
+	if(_value!=NULL&&_value->type==VT_BIGINTEGER)return _value->value._biginteger;
 	Mbiginteger* _resultBiginteger=NULL;
 	switch(_value->type){
 		case VT_INTEGER:_resultBiginteger=owned_biginteger(_getBiginteger(_value->value._integer->ll),owner);break;
