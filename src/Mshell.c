@@ -3992,85 +3992,113 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 
 // TODO how many iterations would we accept at most?????
 /**
- * @brief 
+ * @brief returns the wrapped rational equivalent of \p value
  * 
- * @param _value 
- * @return Mvalue* 
+ * @param value 
+ * @return Mvalue* the wrapped rational equivalent of \p value
  */
-Mvalue* MQ(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value)return NULL;
-	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,MQ));
-	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,MQ));
-	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
+Mvalue* MQ(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==value)return NULL;
+	if(value->type==VT_RATIONAL)return value; // if the value holds a rational itself, return just that
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,MQ));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,MQ));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,MQ));
 	Mvalue* _rationalValue=NULL;
-	if(_value->type==VT_FLOAT)
-		_rationalValue=_getValueOfList(_getLongDoubleRationalList(_value->value._float->ld,250));
+	if(value->type==VT_FLOAT)
+		_rationalValue=_getValueOfList(_getLongDoubleRationalList(value->value._float->ld,250));
 	else
-		_rationalValue=_getValueOfRational(_getValueRational(_value));
+		_rationalValue=_getValueOfRational(_getValueRational(value));
 	if(amVerboseDebugging())
-		if(_rationalValue)
+		if(_rationalValue!=NULL)
 			outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
 }
 // MDH@09OCT2019: TODO=DONE how about turning a unpure rational into a pure rational???? yes, that's a good idea
-Mvalue* Mq(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value)return NULL;
-	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mq));
-	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mq));
-	if(_value->type==VT_RATIONAL){
-		Mrational* rational=_value->value._rational;
-		if(!rational||floatIsUndefinedOrZero(rational->delta))return _value;
+/**
+ * @brief returns the wrapped (purified) rational equivalent of \p value
+ * @details if \p value wraps a rational, the purified rational is returned
+ * @param value 
+ * @return Mvalue* the wrapped (purified) rational equivalent of \p value
+ */
+Mvalue* Mq(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==value)return NULL;
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mq));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mq));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mq));
+	if(value->type==VT_RATIONAL){
+		Mrational* rational=value->value._rational;
+		if(rational==NULL||floatIsUndefinedOrZero(rational->delta))return value;
 		long double rationaldelta=getReal(rational->delta);
-		Mrational* _purifiedRational=NULL;
+		// MDH@29MAR2023: TODO since _getRational copies num and den input there's no need to create copies here!!!!!
+		//                DONE no need to create _num and _den anymore!!!!!
+		Mrational* _pureRational=owned_rational(_getRational(rational->num,rational->den,M_LD_NAN,true),owner); // MDH@29MAR2023: _num can be NULL as well
+		/* replacing:
 		// create a copy of the numerator and denominator of the provided rational
-		Mbiginteger* _num=owned_biginteger(_getBigintegerCopy(rational->num),owner),*_den=owned_biginteger(_getBigintegerCopy(rational->den),owner);
-		Mrational* _pureRational=(_num?owned_rational(_getRational(_num,_den,M_LD_NAN,true),owner):NULL);
-		if(_pureRational){
+		Mbiginteger *_num=owned_biginteger(_getBigintegerCopy(rational->num),owner);
+		if(rational->num!=NULL&&_num==NULL){outputError("Failed to copy the rational numerator");return NULL;}
+		Mbiginteger *_den=owned_biginteger(_getBigintegerCopy(rational->den),owner);
+		if(rational->den!=NULL&&_den==NULL){outputError("Failed to copy the rational denominator");FREE_BIGINTEGER(_num,owner);return NULL;}
+		Mrational* _pureRational=owned_rational(_getRational(_num,_den,M_LD_NAN,true),owner); // MDH@29MAR2023: _num can be NULL as well
+		*/
+		Mrational* _purifiedRational=NULL;
+		if(_pureRational!=NULL){
 			_purifiedRational=owned_rational(_getPurifiedRational(_pureRational,rationaldelta),owner);
 			FREE_RATIONAL(_pureRational,owner);
 		}else
 			outputError("Failed to create a pure rational");
-		if(!_purifiedRational){ // failed to wrap the numerator and denominator (copy), so considered unbound, and so to be freed!!!!
-			FREE_BIGINTEGER(_num,owner);FREE_BIGINTEGER(_den,owner);
+		if(NULL==_purifiedRational){ // failed to wrap the numerator and denominator (copy), so considered unbound, and so to be freed!!!!
+			// MDH@29MAR2023 removing (see above): FREE_BIGINTEGER(_num,owner);FREE_BIGINTEGER(_den,owner);
 			outputError("Failed to purify a rational");
-			return NULL;
+			return value; // MDH@29MAR2023: better to return the value if we fail to purify it!!!
 		}
 		return _getValueOfRational(disowned_rational(_purifiedRational,owner));
 	}
-	if(_value->type==VT_FLOAT)
-		return _getValueOfRational(_getLongDoubleRational(_value->value._float->ld,250));
+	if(value->type==VT_FLOAT)
+		return _getValueOfRational(_getLongDoubleRational(value->value._float->ld,250));
 	// all remaining value types
-	return _getValueOfRational(_getValueRational(_value));
+	return _getValueOfRational(_getValueRational(value));
 }
-
-// TODO complete with conversion from big integer and rational
-Mvalue* Mf(Mvalue* _value){
-	if(!_value||_value->type==VT_FLOAT)return _value;
-	if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mf));
-	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mf));
+/**
+ * @brief returns the wrapped M float equivalent of \p value
+ * 
+ * @param value 
+ * @return Mvalue* the wrapped M float equivalent of \p value
+ */
+Mvalue* Mf(Mvalue* value){
+	if(NULL==value||value->type==VT_FLOAT)return value;
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mf));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mf));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mf));
 	bool report=amVerboseDebugging(); //||(M_MODULE_DEBUGGING&MM_SHELL);
 	long double ld=M_LD_NAN;
-	if(report){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
-	switch(_value->type){
-		case VT_INTEGER:ld=(long double)_value->value._integer->ll;break;
-		case VT_BIGINTEGER:if(_value->value._biginteger)ld=mp_get_long_double(_value->value._biginteger);break;
-		case VT_DECIMAL:ld=getDecimalLongDouble(_value->value._decimal);break;
-		case VT_RATIONAL:ld=getRationalLongDouble(_value->value._rational);break;
-		case VT_TEXT:ld=_strtold(_value->value._text->_c,getNAR());break;
+	if(report){outputValue("Converting '",value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[value->type]);}
+	switch(value->type){
+		case VT_INTEGER:ld=(long double)value->value._integer->ll;break;
+		case VT_BIGINTEGER:if(value->value._biginteger)ld=mp_get_long_double(value->value._biginteger);break;
+		case VT_DECIMAL:ld=getDecimalLongDouble(value->value._decimal);break;
+		case VT_RATIONAL:ld=getRationalLongDouble(value->value._rational);break;
+		case VT_TEXT:ld=_strtold(value->value._text->_c,getNAR());break;
 		default:return NAF_value; // if NAF_value is returned, we do NOT disown it as we would with _floatValue being created here!!!
 	}
 	return(isLongDoubleUndefined(ld)==M_FALSE?_getFloatValue(ld):NULL);
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
-Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns the wrapped M text equivalent of \p value
+ * @details if \p format is defined and not an integer wrapper, NULL is returned
+ * @param value 
+ * @param format a wrapped integer determining whether to left-align or right-align the text representation
+ * @return Mvalue* the wrapped M text equivalent of \p value
+ */
+Mvalue* Mt(Mvalue* value,Mvalue* format){if(format!=NULL&&format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	// MDH@10DEC2020: this is a bit of an issue with time values in that _getValueText technically returns the epoch time text representation
 	//				and not the timestamp (calendar time)
 	Mstring* _valueText=owned_string(_getValueText(value,true),owner); // typically dequoted
-	if(_valueText){
+	if(_valueText!=NULL){
 		if(amVerbose())
-			{outputValue("Text representation of '",value,"' before formatting: ");output("'%s'.\n",string(_valueText));}
-		if(format){
+		{outputValue("Text representation of '",value,"' before formatting: ");output("'%s'.\n",string(_valueText));}
+		if(format!=NULL){
 			if(format->type==VT_INTEGER){
 				long long ll=format->value._integer->ll;
 				if(ll>0){ // left-aligned in ll positions
@@ -4085,7 +4113,7 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)re
 		}
 		if(string_insert_char(_valueText,0,(value->type==VT_TEXT?value->value._text->presuffix:'\''))){ // prepend a quote character otherwise we're in trouble in _getTextValue
 			if(amVerbose())
-				{outputValue("Text representation of '",value,"': ");output("'%s'.\n",string(_valueText));}
+			{outputValue("Text representation of '",value,"': ");output("'%s'.\n",string(_valueText));}
 			_result=_getTextValue(string(_valueText));
 		}else
 			outputError("Failed to prepend a quote character to a text representation");
@@ -4094,29 +4122,35 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)re
 	return _result;
 }
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
-Mvalue* Msum(Mvalue* _value){
+/**
+ * @brief returns the sum of the elements of the list or array wrapped in \p value
+ * 
+ * @param value 
+ * @return Mvalue* the sum of the elements of the list or array wrapped in \p value
+ */
+Mvalue* Msum(Mvalue* value){
 	Mvalue* _sumValue=NULL;
-	if(_value){
-		if(amVerbose())outputValue("Computing the sum of '",_value,"'.\n");
-		if(_value->type==VT_LIST){
+	if(value!=NULL){
+		if(amVerbose())outputValue("Computing the sum of '",value,"'.\n");
+		if(value->type==VT_LIST){
 			// all the values in the list could be integer
-			Mlist* list=_value->value._list;
+			Mlist* list=value->value._list;
 			if(list){
 				Mlistelement* listelement=list->_first;
-				if(listelement){
+				if(listelement!=NULL){
 					// how about adding as decimals????
 					assignValue(&_sumValue,listelement->_value);
-					while(listelement->_next){
+					while(listelement->_next!=NULL){
 						listelement=listelement->_next;
 						assignValue(&_sumValue,add(_sumValue,listelement->_value));
 					}
 				}
 			}
 		}else
-		if(_value->type==VT_ARRAY){
+		if(value->type==VT_ARRAY){
 			_sumValue=NULL;
-			Marray* array=_value->value._array;
-			if(array&&array->numberOfElements>0){
+			Marray* array=value->value._array;
+			if(array!=NULL&&array->numberOfElements>0){
 				register unsigned long long arrayindex=1;
 				// TODO how about skipping all NULL values??????
 				assignValue(&_sumValue,array->values[0]);
@@ -4125,30 +4159,47 @@ Mvalue* Msum(Mvalue* _value){
 				// outputValue("Sum: ",_sumValue,".\n");
 			}
 		}else // if not something that can be summed, returning the original value
-			_sumValue=_value;
+			_sumValue=value;
 	}
 	return _sumValue;
 }
 
 // MDH@10OCT2019: applying unary operator (=function) to all elements in a list
+/**
+ * @brief returns the wrapped M list with M function \p function applied to the elements of \p _list
+ * 
+ * @param _list 
+ * @param function 
+ * @param maintainsValuetype whether or not to maintain the list value type
+ * @return Mvalue* the wrapped M list with M function \p function applied to the elements of \p _list
+ */
 Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
-	if(function&&_list){ // we need both a function and a list
+	if(function!=NULL&&_list!=NULL){ // we need both a function and a list
 		_result=owned_list(_getListOfType(maintainsValuetype?_list->valuetype:VT_UNDEFINED),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,owner,function(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+		while(_listelement!=NULL&&appendedToList(_result,owner,function(_listelement->_value),_listelement->index))
+			_listelement=_listelement->_next;
 	}
-	return(_result?_getValueOfList(disowned_list(_result,owner)):NULL);
+	return(_result!=NULL?_getValueOfList(disowned_list(_result,owner)):NULL);
 }
+/**
+ * @brief returns the wrapped M array with M function \p function applied to the elements of \p _array
+ * 
+ * @param _array 
+ * @param function 
+ * @param maintainsValuetype 
+ * @return Mvalue* the wrapped M array with M function \p function applied to the elements of \p _array
+ */
 Mvalue* _functionAppliedToArray(Marray* _array,OneArgumentFunction function,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Marray* _result=NULL;
-	if(function&&_array){ // we need both a function and a list
+	if(function!=NULL&&_array!=NULL){ // we need both a function and a list
 		_result=owned_array(_getArray("_functionAppliedToArray",_array->numberOfElements),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
-		if(_result){
+		if(_result!=NULL){
 			if(maintainsValuetype)_result->valuetype=_array->valuetype;
 			// using pointer arithmetic is the way to go
 			long long arrayindex=_array->numberOfElements;
@@ -4163,26 +4214,63 @@ Mvalue* _functionAppliedToArray(Marray* _array,OneArgumentFunction function,bool
 			}
 		}
 	}
-	return(_result?_getValueOfArray(disowned_array(_result,owner)):NULL);
+	return(_result!=NULL?_getValueOfArray(disowned_array(_result,owner)):NULL);
+}
+// MDH@29MAR2023: implementation of function applied to map
+/**
+ * @brief returns the wrapped M map with function \p function applied to all values in \p _map
+ * 
+ * @param _map 
+ * @param function 
+ * @param maintainsValuetype whether or not to maintain the value type
+ * @return Mvalue* the wrapped M map with function \p function applied to all values in \p _map
+ */
+Mvalue* _functionAppliedToMap(Mmap* _map,OneArgumentFunction function,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _result=NULL;
+	if(_map!=NULL&&function!=NULL){
+		_result=owned_map(__map("_functionAppliedToMap"),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
+		if(_result!=NULL){
+			if(maintainsValuetype)_result->valuetype=_map->valuetype;
+			unsigned long long numberOfMapElements=_map->numberOfElements;
+			Mmapelement* mapelement=_map->_first;
+			while(numberOfMapElements-->0&&mapelement!=NULL){
+				Mvariable* variable=mapelement->_variable;
+				if(variable!=NULL&&!appendedToMap(_map,owner,variable->_name->chars,function(variable->_value))){
+					outputError("Failed to append a map element");break;
+				}
+				mapelement=mapelement->_next;
+			}
+		}
+	}
+	return(_result!=NULL?_getValueOfMap(disowned_map(_result,owner)):NULL);
 }
 
 // MDH@10OCT2019: a special function to compute a reciprocal value
+/**
+ * @brief returns the reciprocal of \p value
+ * 
+ * @param value 
+ * @return Mvalue* the reciprocal of \p value
+ */
 Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _reciprocalValue=NULL;
-	if(value)
+	if(value!=NULL)
 	switch(value->type){
 		// composite types
 		case VT_ARRAY:_reciprocalValue=_functionAppliedToArray(value->value._array,Mreciprocal,false);break;
 		case VT_LIST:_reciprocalValue=_functionAppliedToList(value->value._list,Mreciprocal,false);break;
-		case VT_MAP:/*_reciprocalValue=_functionAppliedToMap(value->value._map,Mreciprocal); TODO where is it?*/break;
+		case VT_MAP:_reciprocalValue=_functionAppliedToMap(value->value._map,Mreciprocal,false);break;
 		// scalar types
 		case VT_FLOAT:_reciprocalValue=_getFloatValue(1/value->value._float->ld);break; // TODO check what happens when the real equals 0
 		case VT_RATIONAL:_reciprocalValue=_getValueOfRational(_getInverseRational(value->value._rational));break;
 		case VT_INTEGER:
 			{
 				Mbiginteger* _denominator=owned_biginteger(_getBiginteger(value->value._integer->ll),owner); // create the big integer denominator
-				_reciprocalValue=_getValueOfRational(_getRational(NULL,_denominator,M_LD_NAN,true));
-				FREE_BIGINTEGER(_denominator,owner); // free the created big integer used to create the rational
+				if(_denominator!=NULL){
+					_reciprocalValue=_getValueOfRational(_getRational(NULL,_denominator,M_LD_NAN,true));
+					FREE_BIGINTEGER(_denominator,owner); // free the created big integer used to create the rational
+				}else
+					outputMemoryError("Failed to create a big integer");
 			}
 			break;
 		case VT_BIGINTEGER:_reciprocalValue=_getValueOfRational(_getRational(NULL,value->value._biginteger,M_LD_NAN,true));break; // same as with VT_INTEGER but without freeing the to remain bound big integer
@@ -4192,22 +4280,29 @@ Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	return _reciprocalValue;
 }
 // MDH@29OCT2019: concatenate textual, typically used for lists
+/**
+ * @brief returns the M string wrapping the text representation of all elements of \p list separated by \p separator
+ * 
+ * @param list 
+ * @param separator 
+ * @return Mstring* the M string wrapping the text representation of all elements of \p list separated by \p separator
+ */
 static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _concatenated=owned_string(__string(),owner);
-	if(_concatenated){
+	if(_concatenated!=NULL){
 		Mlistelement* listelement=list->_first;
 		Mvalue* listelementValue=NULL;
-		while(listelement){
+		while(listelement!=NULL){
 			listelementValue=listelement->_value;
 			Mstring* _listelementText=NULL;
-			if(listelementValue){
+			if(listelementValue!=NULL){
 				if(listelementValue->type==VT_LIST)
 					_listelementText=owned_string(_getConcatenated(listelementValue->value._list,separator),owner);
 				else
 					_listelementText=owned_string(_getValueText(listelementValue,true),owner);
 			}
-			if(_listelementText){
-				if(separator)if(string_length(_concatenated)>0)string_append(_concatenated,separator);
+			if(_listelementText!=NULL){
+				if(separator!=NULL)if(string_length(_concatenated)>0)string_append(_concatenated,separator);
 				string_append(_concatenated,string(_listelementText));
 				FREE_STRING(_listelementText,owner);
 			}
@@ -4217,17 +4312,24 @@ static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner o
 		outputError("Failed to initialize the concatenation result text");
 	return disowned_string(_concatenated,owner);
 }
+/**
+ * @brief returns the wrapped M text representation of wrapped M list \p value1 using \p value2 as separator
+ * 
+ * @param value1 
+ * @param value2 
+ * @return Mvalue* the wrapped M text representation of wrapped M list \p value1 using \p value2 as separator
+ */
 Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _concatValue=NULL;
 	// the first value would be the list of things to concatenate, the second value the separator text (if any)
-	if(value1){
-		Mstring* _separator=(value2?owned_string(_getValueText(value2,true),owner):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
+	if(value1!=NULL){
+		Mstring* _separator=(value2!=NULL?owned_string(_getValueText(value2,true),owner):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
 		Mstring* _concat;
 		if(value1->type==VT_LIST)
-			_concat=owned_string(_getConcatenated(value1->value._list,(_separator?string(_separator):NULL)),owner);
+			_concat=owned_string(_getConcatenated(value1->value._list,(_separator!=NULL?string(_separator):NULL)),owner);
 		else
 			_concat=owned_string(_getValueText(value1,true),owner);
-		if(_concat){
+		if(_concat!=NULL){
 			// _result itself won't contain quotes, so in order to make it usable we need to prepend either a single quote or a double quote
 			if(string_insert_char(_concat,0,'\''))
 				_concatValue=_getTextValue(string(_concat));
@@ -4235,30 +4337,38 @@ Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(_
 				outputError("Failed to construct the concatenation text");
 			FREE_STRING(_concat,owner);
 		}
-		if(_separator)FREE_STRING(_separator,owner);
+		if(_separator!=NULL)FREE_STRING(_separator,owner);
 	}
 	return _concatValue;
 }
+/**
+ * @brief returns the Fibonacci number at integer index \p value
+ * 
+ * @param value 
+ * @return Mvalue* the Fibonacci number at integer index \p value
+ */
 Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	// are we allowing big integers?
-	if(!value||value->type==VT_MAP)return NULL;
+	if(NULL==value)return NULL;
 	if(value->type==VT_ARRAY)return _functionAppliedToArray(value->value._array,Mfibonacci,false);
 	if(value->type==VT_LIST)return _functionAppliedToList(value->value._list,Mfibonacci,false);
+	if(value->type==VT_MAP)return _functionAppliedToMap(value->value._map,Mfibonacci,false);
 	Mvalue* _fibonnacciValue=NULL;
 	// ASSERT assuming scalars
 	Mbiginteger* _biginteger=owned_biginteger(_getValueBiginteger(value),owner);
-	if(_biginteger){
+	if(_biginteger!=NULL){
 		mp_err status=MP_OKAY; // keep track of the result status
 		Mbiginteger* _fibonacciBiginteger=NULL;
 		if(isBigintegerUndefined(_biginteger)==M_FALSE){ // not an undefined big integer
 			if(isBigintegerNegative(_biginteger)!=M_TRUE){ // not a negative big integer
 				Mbiginteger *_counterBiginteger=owned_biginteger(_getBigintegerCopy(_biginteger),owner); // the number of times we will have to do an addition
 				_fibonacciBiginteger=owned_biginteger(__biginteger(),owner); // where the result should be stored
-				if(_fibonacciBiginteger&&_counterBiginteger)status=mp_decr(MP_INT_POINTER(_counterBiginteger));else status=MP_ERR;
+				if(_fibonacciBiginteger!=NULL&&_counterBiginteger!=NULL)status=mp_decr(MP_INT_POINTER(_counterBiginteger));
+				else status=MP_ERR;
 				if(status==MP_OKAY){
 					if(isBigintegerPositive(_counterBiginteger)==M_TRUE){ // at least one addition to do
 						Mbiginteger *_firstBiginteger=owned_biginteger(_getBiginteger(0),owner),*_secondBiginteger=owned_biginteger(_getBiginteger(1),owner);
-						if(_firstBiginteger&&_secondBiginteger){
+						if(_firstBiginteger!=NULL&&_secondBiginteger!=NULL){
 							// NOTE _counterBiginteger defines the number of times we need to add the first and second big integer
 							while(isBigintegerZero(_counterBiginteger)!=M_TRUE){ // the counter is not zero yet
 								if((status=mp_decr(MP_INT_POINTER(_counterBiginteger)))!=MP_OKAY)break;
@@ -4414,19 +4524,22 @@ Mtoken* expressionToken=NULL; // the current evaluation token
  * returns: the last token processed (which should be one of the end tokens) or NULL if all tokens were processed, and the Mvalue the expression evaluates to
  */
 
-/*
- * \brief makes a copy useful for evaluation (not for editing)
+/**
+ * @brief returns a copy of \p _token ready for evaluation
+ * 
+ * @param _token 
+ * @return Mtoken* a copy of \p _token ready for evaluation
  */
 Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner(__LINE__);
-	Mtoken* _tokenCopy=(_token?owned_token(__token(),owner):NULL);
-	if(_tokenCopy){
+	Mtoken* _tokenCopy=(_token!=NULL?owned_token(__token(),owner):NULL);
+	if(_tokenCopy!=NULL){
 		if(amVerbose()){
 			output("Copying token '%s' of type '%s'.\n",string(_token->text),TOKENTYPE_STRING[_token->type]);
 			if(_token->expr)output("\tpointing to token '%s' of type '%s'.\n",string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]);
 		}
 		_tokenCopy->type=_token->type;
 		setTokenSignificantCharacterCount(_tokenCopy,getTokenSignificantCharacterCount(_token));
-		if(_token->text)_tokenCopy->text=owned_string(_getTokenText(_token),Msubowner(owner,1)); // copy the entire token text
+		if(_token->text!=NULL)_tokenCopy->text=owned_string(_getTokenText(_token),Msubowner(owner,1)); // copy the entire token text
 		_tokenCopy->expr=_token->expr; // TODO do I need to do this??? this is also an issue because if we start comparing expr (on evaluation)
 		_tokenCopy->argument=_token->argument; // MDH@11AUG2019: we need the argument as well bro' TODO how about the envid?????
 		// we're NOT copying _next, _prev, _offset
@@ -4436,6 +4549,15 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner
 }
 
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
+/**
+ * @brief evaluates a list in the current expression being evaluated
+ * 
+ * @param endTokenType ends the list being evaluated
+ * @param maximumNumberOfElements the maximum number of elements to evaluate
+ * @param numberOfElementsToNotEvaluate the number of elements not to evaluate at the start of the list
+ * @param weak whether or not the result list should be flagged as weak
+ * @return Mvalue* the evaluated list from the current expression being evaluated
+ */
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
 	if(amVerboseDebugging())
@@ -4443,7 +4565,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//				then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mlist* _list=owned_list(__list("getValueOfList"),owner);
-	if(!_list){
+	if(NULL==_list){
 		outputError("Failed to create a list to return");
 		return NULL;
 	}
@@ -4452,7 +4574,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	Mvalue* _listValue=_getListValue(VT_UNDEFINED,weak,"getValueOfList"); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	*/
-	if(_list->_first||_list->_last){
+	if(_list->_first!=NULL||_list->_last!=NULL){
 		outputError("Supposedly empty list not initialized correctly");
 		return NULL;
 	}
@@ -4466,7 +4588,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		output("First element not to evaluate: %u.\n",firstElementToNotEvaluate);
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
-	while((expressionToken=nextEnvironmentExpressionToken())){
+	while((expressionToken=nextEnvironmentExpressionToken())!=NULL){
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
 		if(amVerboseDebugging())
@@ -4477,16 +4599,16 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			// however this would require passing the bool argument along to every function getValueOfExpression calls
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
 			Mtoken* _firstUnevaluatedToken=owned_token(_getEvaluatableTokenCopy(expressionToken),owner);
-			if(_firstUnevaluatedToken){
+			if(_firstUnevaluatedToken!=NULL){
 				if(amVerboseDebugging())
 					output("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
-				while(unevaluatedToken){
+				while(unevaluatedToken!=NULL){
 					if(amVerboseDebugging())
 						output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
-					if(!expressionToken)break; // NOTE shouldn't happen though
-					if(!expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
+					if(NULL==expressionToken)break; // NOTE shouldn't happen though
+					if(NULL==expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
 					unevaluatedToken->next=owned_token(_getEvaluatableTokenCopy(expressionToken),owner); // set next to the copy of the expression token
 					unevaluatedToken=unevaluatedToken->next;
 				}
@@ -4501,13 +4623,13 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			if(amVerboseDebugging())
 				outputValue("List element value: '",_listElementValue,"'.\n");
 		}
-		if(!_listElementValue){
+		if(NULL==_listElementValue){
 			if(amVerboseDebugging())
 				outputInfo("List element missing!");
 			continue;
 		} // undefined list elements should NEVER be added to the list
 		if(amVerboseDebugging())
-			if(expressionToken)
+			if(expressionToken!=NULL)
 				output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		// if we already have the maximum number of elements, we do not append this list element!!!
@@ -4527,7 +4649,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		}else
 		if(amVerboseDebugging())
 			output("Maximum number of elements reached.\n");
-		if(!expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
+		if(NULL==expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
 	Mvalue* _listValue=_getValueOfList(disowned_list(_list,owner));
@@ -4535,7 +4657,11 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
-
+/**
+ * @brief returns the evaluated value of a map in the expression being evaluated
+ * 
+ * @return Mvalue* the evaluated value of a map in the expression being evaluated
+ */
 Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // MDH@17JUL2019: one of five functions that use and advance the current expression token
 	Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
@@ -4546,7 +4672,7 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
 	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
 	// NOTE a map can be empty in which case _firstToken will immediately be of type TT_END_OF_MAP
-	while((expressionToken=nextEnvironmentExpressionToken())){
+	while((expressionToken=nextEnvironmentExpressionToken())!=NULL){
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(expressionToken->type==TT_LISTELEMENT)continue; // missing attribute name-value pair
 		// get the next attribute name, value pair
@@ -4564,14 +4690,14 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 			_attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		}
-		if(!_attributeName)continue; // unable to parse the attribute name expression value into a string
+		if(NULL==_attributeName)continue; // unable to parse the attribute name expression value into a string
 		// MDH@22JUL2019: let's allow empty attribute name as well (why not!)
 		////////if(string_length(_attributeName)>0)
-		if(!appendedToMap(_map,owner,string(_attributeName),_attributeValueValue)){
+		if(_map==NULL||!appendedToMap(_map,owner,string(_attributeName),_attributeValueValue)){
 			output("%s",M_ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
 		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
 		FREE_STRING(_attributeName,owner); // ALWAYS free the name text
-		if(!expressionToken)break;
+		if(NULL==expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(amVerboseDebugging())output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
@@ -4581,6 +4707,14 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // a function call needs a function and a map of arguments (defining the values to use for the formal parameters of the function)
+/**
+ * @brief returns the evaluated value of a function call in the expression being evaluated
+ * 
+ * @param _function 
+ * @param functionName 
+ * @param _argumentMap 
+ * @return Mvalue* the evaluated value of a function call in the expression being evaluated
+ */
 Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
 	////////Mvalue* _resultValue=NULL;
 	switch(_function->type){
@@ -4589,7 +4723,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				// TODO replace following by calling getFunctionExecutionEnvironment
 				// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 				Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(_function,functionName,_argumentMap),owner);
-				if(_functionExecutionEnvironment){
+				if(_functionExecutionEnvironment!=NULL){
 					// ASSERT now it exists I ALWAYS need to free it 
 					// MDH@21OCT2020: it makes sense to pass a disowned version of environment to pushExecutionEnvironment() so it can take over ownership
 					//				NO because I want to free this given environment push should not take over ownership
@@ -4598,9 +4732,9 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 						// execute ALL the commands in _bodyCommandList
 						Mlist* functionBodyCommandList=_function->functionunion._userfunction->_bodyCommandList;
 						Mvalue *functionEvaluationValue=NULL,*functionBodyCommandValue=NULL;
-						if(functionBodyCommandList){
+						if(functionBodyCommandList!=NULL){
 							Mlistelement* functionBodyCommandListelement=functionBodyCommandList->_first;
-							while(functionBodyCommandListelement){
+							while(functionBodyCommandListelement!=NULL){
 								// MDH@22JUL2019: ALWAYS skip the initial dummy TT_EXPRESSION token of any command!!
 								_functionExecutionEnvironment->expressionToken=functionBodyCommandListelement->_value->value._token->next;
 								// evaluate the body command and remember the result
@@ -4625,7 +4759,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 						if(amVerboseDebugging())output("Exiting the environment of executing function '%s'.\n",functionName);
 						popExecutionEnvironment();
 						// the function result value (if set) takes precedence over the function evaluation value
-						return (functionResultValue?functionResultValue:functionEvaluationValue);
+						return (functionResultValue!=NULL?functionResultValue:functionEvaluationValue);
 					}
 					// ASSERT failed to push the created function execution environment which also means it failed to be bound in a value, and thus I need to free it as it will not be garbage-collected like any value would
 					output("%sFailed to create the function execution environment of function '%s'.\n",M_ERROR_PREFIX,functionName);
@@ -4644,73 +4778,73 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 		case FT_INTERNAL_TWO_ARGUMENTS:
 			{
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
-				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
 					output("Applying two-argument function '%s'",functionName);
-					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
-					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					if(_firstArgumentmapelement!=NULL)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement!=NULL)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
 					outputChar('.');outputChar('\n');
 				}
-				return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
-																	  ,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL));
+				return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
+																	  ,(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_variable->_value:NULL));
 			}
 		case FT_INTERNAL_THREE_ARGUMENTS:
 			{
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
-				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
-				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_next:NULL);
+				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
 					output("Applying three-argument function '%s'",functionName);
-					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
-					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
-					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
+					if(_firstArgumentmapelement!=NULL)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement!=NULL)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					if(_thirdArgumentmapelement!=NULL)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
 					outputChar('.');outputChar('\n');
 				}
-				return (*_function->functionunion.threeArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
-																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
-																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL));
+				return (*_function->functionunion.threeArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
+																		,(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_variable->_value:NULL)
+																		,(_thirdArgumentmapelement!=NULL?_thirdArgumentmapelement->_variable->_value:NULL));
 			}
 		case FT_INTERNAL_FOUR_ARGUMENTS:
 			{
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
-				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
-				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
-				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement?_thirdArgumentmapelement->_next:NULL);
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_next:NULL);
+				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_next:NULL);
+				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement!=NULL?_thirdArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
 					output("Applying four-argument function '%s'",functionName);
-					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
-					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
-					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
-					if(_fourthArgumentmapelement)outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
+					if(_firstArgumentmapelement!=NULL)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement!=NULL)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					if(_thirdArgumentmapelement!=NULL)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
+					if(_fourthArgumentmapelement!=NULL)outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
 					outputChar('.');outputChar('\n');
 				}
-				return (*_function->functionunion.fourArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
-																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
-																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL)
-																		,(_fourthArgumentmapelement?_fourthArgumentmapelement->_variable->_value:NULL));
+				return (*_function->functionunion.fourArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
+																		,(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_variable->_value:NULL)
+																		,(_thirdArgumentmapelement!=NULL?_thirdArgumentmapelement->_variable->_value:NULL)
+																		,(_fourthArgumentmapelement!=NULL?_fourthArgumentmapelement->_variable->_value:NULL));
 			}
 			break;
 		case FT_INTERNAL_FIVE_ARGUMENTS:
 			{
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
-				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
-				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
-				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement?_thirdArgumentmapelement->_next:NULL);
-				Mmapelement* _fifthArgumentmapelement=(_fourthArgumentmapelement?_fourthArgumentmapelement->_next:NULL);
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_next:NULL);
+				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_next:NULL);
+				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement!=NULL?_thirdArgumentmapelement->_next:NULL);
+				Mmapelement* _fifthArgumentmapelement=(_fourthArgumentmapelement!=NULL?_fourthArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
 					output("Applying five-argument function '%s'",functionName);
-					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
-					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
-					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
-					if(_fourthArgumentmapelement)outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
-					if(_fifthArgumentmapelement)outputValue(" and '",_fifthArgumentmapelement->_variable->_value,"'");
+					if(_firstArgumentmapelement!=NULL)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement!=NULL)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					if(_thirdArgumentmapelement!=NULL)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
+					if(_fourthArgumentmapelement!=NULL)outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
+					if(_fifthArgumentmapelement!=NULL)outputValue(" and '",_fifthArgumentmapelement->_variable->_value,"'");
 					outputChar('.');newline();
 				}
-				return (*_function->functionunion.fiveArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
-																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
-																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL)
-																		,(_fourthArgumentmapelement?_fourthArgumentmapelement->_variable->_value:NULL)
-																		,(_fifthArgumentmapelement?_fifthArgumentmapelement->_variable->_value:NULL));
+				return (*_function->functionunion.fiveArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
+																		,(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_variable->_value:NULL)
+																		,(_thirdArgumentmapelement!=NULL?_thirdArgumentmapelement->_variable->_value:NULL)
+																		,(_fourthArgumentmapelement!=NULL?_fourthArgumentmapelement->_variable->_value:NULL)
+																		,(_fifthArgumentmapelement!=NULL?_fifthArgumentmapelement->_variable->_value:NULL));
 			}
 	}
 	return NULL;
@@ -4719,13 +4853,19 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 // MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
 // requests can come out of a single command containing multiple function definitions
 // _firstFunctionBodyRequest represents the first one to execute
+/**
+ * @brief returns a new function body request of the function with name \p functionName
+ * 
+ * @param functionName 
+ * @return FunctionBodyRequest* a new function body request of the function with name \p functionName
+ */
 FunctionBodyRequest* __functionbodyrequest(char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
 	FunctionBodyRequest* _functionBodyRequest=NULL;
-	if(functionName&&strlen(functionName)){
+	if(functionName!=NULL&&strlen(functionName)>0){
 		_functionBodyRequest=CALLOC_1(sizeof(FunctionBodyRequest),'9',owner);
-		if(_functionBodyRequest){
+		if(_functionBodyRequest!=NULL){
 			_functionBodyRequest->_functionName=owned_chars(_getChars(functionName),Msubowner(owner,1));
-			if(!_functionBodyRequest->_functionName){
+			if(NULL==_functionBodyRequest->_functionName){
 				FREE_DISOWNED_1(_functionBodyRequest,'9',owner);_functionBodyRequest=NULL;
 			}
 		}
@@ -4735,44 +4875,91 @@ FunctionBodyRequest* __functionbodyrequest(char const * const functionName){Mall
 	if(Misowned(_functionBodyRequest))output("\nERROR: Function body request still owned!");
 	return _functionBodyRequest;
 }
+/**
+ * @brief frees function body request \p _functionBodyRequest
+ * 
+ * @param _functionBodyRequest 
+ * @param owner_functionBodyRequest 
+ */
 void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocationowner owner_functionBodyRequest){
 	if(!_functionBodyRequest)return;
 	FREECHARS(_functionBodyRequest->_functionName,owner_functionBodyRequest);
 	FREE_DISOWNED_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
+/**
+ * @brief the global pointer to the first and last function body request respectively
+ * 
+ */
 static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
 Mallocationowner owner_functionBodyRequest=(Mallocationowner){MI_SHELL,__LINE__,1};
+/**
+ * @brief returns the registered function body request with name \p functionName
+ * 
+ * @param functionName 
+ * @return FunctionBodyRequest* the registered function body request with name \p functionName
+ */
 static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
 	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
-	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName->chars))functionBodyRequest=functionBodyRequest->_next;
+	while(functionBodyRequest!=NULL&&strcmp(functionName,functionBodyRequest->_functionName->chars))functionBodyRequest=functionBodyRequest->_next;
 	return functionBodyRequest;
 }
+/**
+ * @brief returns the global first function body request
+ * 
+ * @return FunctionBodyRequest* the global first function body request
+ */
 FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
 // MDH@02MAR2020 NOTE: there's no need to return the new function body request instance as it is not used
+/**
+ * @brief registers a new function body request with name \p functionName
+ * 
+ * @param functionName 
+ * @return FunctionBodyRequest* a new function body request with name \p functionName
+ */
 static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
-	if(!functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
+	if(NULL==functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
 	// ASSERT a 'valid' function name
-	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",M_ERROR_PREFIX,functionName);return NULL;} // already have it
+	if(getFunctionBodyRequest(functionName)!=NULL){output("%sDuplicate function name '%s'.",M_ERROR_PREFIX,functionName);return NULL;} // already have it
 	// technically it should not have been requested already (or exist)
 	FunctionBodyRequest* _functionBodyRequest=__functionbodyrequest(functionName); // guarantees that functionName is defined
-	if(_functionBodyRequest){ 
+	if(_functionBodyRequest!=NULL){ 
 		// check for being disowned (originally we OWNED it immediately in creating it, but we got a bug saying it was not disowned!!!)
 		if(!Misdisowned(_functionBodyRequest))outputBug("Function body request not currently disowned!");
-		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
+		if(_lastFunctionBodyRequest!=NULL)_lastFunctionBodyRequest->_next=_functionBodyRequest;
 		_lastFunctionBodyRequest=OWNED(_functionBodyRequest,owner_functionBodyRequest); // replace _lastFunctionBodyRequest taking over the ownership
-		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
+		if(NULL==_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
 		if(amVerbose())
 			output("The request for the body of function '%s' was created.\n",functionName);
 	}else
 		output("%sFailed to create the request for the body of function '%s'.\n",M_ERROR_PREFIX,functionName);
 	return _functionBodyRequest;
 }
-
+/**
+ * @brief the global pointers to the first and ladt function body input
+ * 
+ */
 static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL;static Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MI_SHELL,__LINE__,1}; // the stack of function bodies being constructed
+/**
+ * @brief returns the current function body input
+ * 
+ * @return FunctionBodyInput* the current function body input
+ */
 FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
+/**
+ * @brief returns the global function body input owner
+ * 
+ * @return Mallocationowner the global function body input owner
+ */
 Mallocationowner getCurrentFunctionBodyInputOwner(){return owner_currentFunctionBodyInput;}
 // MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
+/**
+ * @brief creates a new function body input of the function body request \p _functionBodyRequest
+ * 
+ * @param _functionBodyRequest 
+ * @return true on success
+ * @return false on failure
+ */
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
@@ -4780,20 +4967,20 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 	_currentFunctionBodyInput=CALLOC_1(sizeof(FunctionBodyInput),'8',owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
 	// replacing: _currentFunctionBodyInput=OWNED(CALLOC_1(sizeof(FunctionBodyInput),'8',owner),owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
 	
-	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
+	if(NULL==_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName->chars);
-	if(function&&function->type==FT_USER){
+	if(function!=NULL&&function->type==FT_USER){
 		// it's better to put the next request in, so after finishing with this request we can do the following if any
 		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
 		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
-		if(!_functionBodyInputStack){_functionBodyInputStack=_currentFunctionBodyInput;if(amVerbose())output("%s\n.","Function body input stack created.");}
+		if(NULL==_functionBodyInputStack){_functionBodyInputStack=_currentFunctionBodyInput;if(amVerbose())output("%s\n.","Function body input stack created.");}
 		if(amVerbose()){output("Parameter map of new function '%s'",_functionBodyRequest->_functionName);outputMap(": ",function->_parameterMap,".\n");}
 		// if we succeed in activating the execution environment of the new function we're good to go
 		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
 		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
 		// MDH@03MAR2020 TODO can we pass function->_parameterMap like this or should we pass _getFunctionArgumentMap(function,NULL)????????
 		Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName->chars,function->_parameterMap),owner);
-		if(_functionExecutionEnvironment){
+		if(_functionExecutionEnvironment!=NULL){
 			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(disowned_environment(_functionExecutionEnvironment,owner)))return true;
 			outputError("Failed to register the function execution environment.");
@@ -4806,6 +4993,12 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 	_currentFunctionBodyInput=NULL; // TODO is this a good idea then?????
 	return false;
 }
+/**
+ * @brief starts function body input
+ * 
+ * @return true on success
+ * @return false on failure
+ */
 bool startFunctionBodyInput(){
 	// ASSERT only call with _firstFunctionBodyRequest not NULL
 	// move out of the queue into the stack
@@ -4828,8 +5021,11 @@ bool startFunctionBodyInput(){
 	// MDH@02MAR2020: forgot to do the following so here we go
 	return result;
 }
-/*
- \brief will only fail when we fail to start the next one
+/**
+ * @brief ends function body input
+ * 
+ * @return true on success
+ * @return false on failure
  */
 bool endFunctionBodyInput(){
 	// ASSERT do NOT call with _currentFunctionBodyInput equal to NULL
@@ -4845,7 +5041,7 @@ bool endFunctionBodyInput(){
 	FREE_DISOWNED_1(_currentFunctionBodyInput,'8',owner_currentFunctionBodyInput); // replacing: free(_currentFunctionBodyInput);
 	_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
 	output(" done!\n");
-	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
+	if(NULL==_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
 	return startFunctionBodyInput(); // will NULL _firstFunctionBodyInput to ascertain not to get called in the main user input loop
 }
 // MDH@19JUL2019 END
@@ -4868,13 +5064,14 @@ bool endFunctionBodyInput(){
  */
 
 /**
- * \brief wraps \p _value
- * \param _value the Mvalue to wrap
+ * @brief returns the new M value reference of M value \p _value
+ * @param _value the Mvalue to wrap
+ * @return the created M value reference
  */
 Mvaluereference* _getValuereference(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(amVerboseDebugging())outputValue("Wrapping value '",_value,"'.\n");
 	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',owner);
-	if(_valuereference){
+	if(_valuereference!=NULL){
 		_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
 		if(amVerboseDebugging())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	}
@@ -4892,6 +5089,14 @@ void free_valuereference(Mvaluereference* _valuereference){
 	}
 }
 */
+
+/**
+ * @brief outputs M value reference \p _valuereference with prefix \p prefix and suffix \p suffix
+ * 
+ * @param prefix 
+ * @param _valuereference 
+ * @param suffix 
+ */
 void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* suffix){
 	if(prefix)output("%s",prefix);
 	if(_valuereference){
@@ -4904,30 +5109,36 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 // two essential methods for getting and setting referenced values
 // MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
 // MDH@19OCT2020: I thought I had it in here somewhere that if the item id list contains a single element that the result would also be a single value instead of a list
+/**
+ * @brief returns the M value referenced by M value reference \p _valuereference
+ * 
+ * @param _valuereference 
+ * @return Mvalue* the M value referenced by M value reference \p _valuereference
+ */
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
-	if(report)
-	{
-			output("Getting the value reference of '%s",_valuereference->_name);
-			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
-			output("'.\n");
-	}
 	// replacing:	outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
-	if(_valuereference){
+	if(_valuereference!=NULL){
+		if(report)
+		{
+				output("Getting the value reference of '%s",_valuereference->_name);
+				if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
+				output("'.\n");
+		}
 		referencedValue=_valuereference->_value; // if we do not have a name and and item id that's what we will return
 		// MDH@02NOV2019 replacing: assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
 		// MDH@14NOV2019: if no referened value is available we should use the name to obtain the value of the top level referenced value
-		if(!referencedValue){ // no actual referenced value stored (BUT that could actually be the value to return)
+		if(NULL==referencedValue){ // no actual referenced value stored (BUT that could actually be the value to return)
 			// if we do NOT have a name it's a literal
-			if(_valuereference->_name&&strlen(_valuereference->_name->chars)>0){
+			if(_valuereference->_name!=NULL&&strlen(_valuereference->_name->chars)>0){
 				// MDH@04NOV2019: now that we've added the TT_REFERENCE token, the name may start with @ to indicate a variable reference
 				if(_valuereference->_name->chars[0]==M_DEREFERENCE_CHARACTER){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
 					// I suppose we need to wrap a copy unless we make a separate reference thing where we store the name of the variable which could just be an Mstring?????
 					// MDH@11MAR2020: let's distinguish between an unnamed ref (with no variable name defined), and a named ref (where the variable SHOULD exist)
 					Mvariable* variable=getVariable(getExecutionEnvironment(),&_valuereference->_name->chars[1],false);
-					if(variable||strlen(_valuereference->_name->chars)==1){
+					if(variable!=NULL||strlen(_valuereference->_name->chars)==1){
 						referencedValue=_getValueOfReference(_getReference(variable));
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
 						//				so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
@@ -4939,22 +5150,22 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 			}
 		}
 		// only composite values can be indexed... // MDH@23NOV2020: now including VT_ARRAY things as well
-		if(referencedValue&&(referencedValue->type==VT_ARRAY||referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
+		if(referencedValue!=NULL&&(referencedValue->type==VT_ARRAY||referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
 			if(report)
 				outputValue("Top level value reference: '",referencedValue,"'.\n");
 			// MDH@14NOV2019: ANY value that evaluates to a list or map can be further indexed
 			// if we have index/attribute names we have to get the final subvalue
 			// MDH@07APR2020: TODO the following is copied over from setReferencedValue, so obviously it's possible to combine the two in a single function in the future
 			Mlist* itemidList=(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST?_valuereference->_itemid->value._list:NULL); // let's assume that it is always a list
-			if(itemidList&&!itemidList->_first)itemidList=NULL;
+			if(itemidList!=NULL&&NULL==itemidList->_first)itemidList=NULL;
 			// empty lists should also return the full element, so only something to do when we actually have list elements!!!
 			// MDH@07APR2020: should be similar to what setReferencedValue does except for the part of setting the value!!!
-			if(itemidList){
+			if(itemidList!=NULL){
 				if(report)
 					outputList("Item id list: ",itemidList,"'.\n"); // DEBUG
 				Mvalue* *valueholder=&referencedValue; // MDH@07APR2020 replacing what we used in setReferencedValue(): getValueHolder(getExecutionEnvironment(),_valuereference->_name);
 				// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
-				if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
+				if(valueholder!=NULL&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
 					// if(amVerboseDebugging())outputInfo("************ Element(s) to set.");
 					// let's get the first index/attribute name
 					Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@19JUN2020 not anymore: MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
@@ -4962,19 +5173,19 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 					//				this works for lists not for maps
 					// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
 					Mvalue*** _valueholders=MALLOC_1(sizeof(void*),-'_',owner); // set immediately so MALLOC suffices
-					if(_valueholders){
+					if(_valueholders!=NULL){
 						// output("Value holder: %p.",_valueholders); // DEBUG
 						size_t numberOfValueholders=1,numberOfNewValueholders=0; // if allocating memory for a single Mvalue** succeeds we have a go
 						bool result=true;
 						_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
 						// we need to find the last index or attribute name
 						Mvalue* indexorattributenameListelementValue=NULL;
-						if(indexorattributenameListelement){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
+						if(indexorattributenameListelement!=NULL){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
 							// NOTE the last one needs to be assigned to
-							while(indexorattributenameListelement){
+							while(indexorattributenameListelement!=NULL){
 								indexorattributenameListelementValue=indexorattributenameListelement->_value;
 								// if no value is defined, it is ignored TODO should we????
-								if(indexorattributenameListelementValue){
+								if(indexorattributenameListelementValue!=NULL){
 									if(report)
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 									// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
@@ -4996,7 +5207,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										// which we now did
 										Mvalue*** _newValueholders=_valueholders;
 										if(numberOfNewValueholders>numberOfValueholders)_newValueholders=REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_');
-										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
+										if(_newValueholders!=NULL){ // REALLOC succeeded (or a single element to assign)
 											// output("Number of new getReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -5005,7 +5216,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											// let's check if all index list elements are integer, if not, convert integers to their text equivalent
 											Mlistelement* flattenedIndexListelement=_flattenedIndexList->_first;
 											Mvalue* flattenedIndexListelementValue;
-											while(flattenedIndexListelement){
+											while(flattenedIndexListelement!=NULL){
 												flattenedIndexListelementValue=getFirstScalarValue(flattenedIndexListelement->_value);
 												if(flattenedIndexListelementValue->type!=VT_INTEGER&&flattenedIndexListelementValue->type!=VT_BIGINTEGER)break;
 												flattenedIndexListelement=flattenedIndexListelement->_next;
@@ -5033,16 +5244,16 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											}
 											// now we can create the elements
 											flattenedIndexListelement=_flattenedIndexList->_first;
-											while(flattenedIndexListelement){
+											while(flattenedIndexListelement!=NULL){
 												numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 												indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
-												if(indexorattributenameListelementValue){
+												if(indexorattributenameListelementValue!=NULL){
 													if(report)
 														outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
 													int valueholderIndex=numberOfValueholders;
 													while(--valueholderIndex>=0){
 														valueholder=_valueholders[valueholderIndex];
-														if(*valueholder){
+														if(*valueholder!=NULL){
 															// if we are accessing a map we have to ascertain that the attribute name in a string
 															if((*valueholder)->type==VT_MAP){
 																// MDH@22OCT2020: because the attributes are supposed to be text, we simply convert all indices to text using _getValueText(indexvalue,true)
@@ -5058,18 +5269,18 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																		outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
-																	if(valueIndexListelement){
+																	if(valueIndexListelement!=NULL){
 																		Mvalue** newValueholder;
-																		while(valueholderMap){
+																		while(valueholderMap!=NULL){
 																			if(report)
 																				outputMap("Value holder map: ",valueholderMap,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
-																			if(indexorattributenameListelementValue){
+																			if(indexorattributenameListelementValue!=NULL){
 																				// MDH@07NOV2022 BUG FIX: _getValueText returns a disowned text, of which I should take ownership immediately
 																				Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner);
-																				if(_attributenameText){
+																				if(_attributenameText!=NULL){
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
-																					if(!newValueholder){
+																					if(NULL==newValueholder){
 																						if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)!=1)
 																							output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
 																						else
@@ -5083,17 +5294,17 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																					newValueholder=NULL;
 																			}
 																			valueIndexListelement=valueIndexListelement->_next;
-																			if(!valueIndexListelement)break;
+																			if(NULL==valueIndexListelement)break;
 																			// we have another property 'index', so we should have a value holder map
 																			valueholderMap=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_MAP?(*newValueholder)->value._map:NULL);
 																		}
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																	}
-																	if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
+																	if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 																/*
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
-																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+																if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 															}else
 															if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
@@ -5103,20 +5314,20 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																	// outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
-																	if(valueIndexListelement){
+																	if(valueIndexListelement!=NULL){
 																		Mvalue** newValueholder;
-																		while(valueholderList||valueholderArray){
+																		while(valueholderList!=NULL||valueholderArray!=NULL){
 																			// outputList("Value holder list: ",valueholderList,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
-																			if(indexorattributenameListelementValue){
+																			if(indexorattributenameListelementValue!=NULL){
 																				long long listIndex=M_LL_INVALID;
 																				if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
 																				if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
 																				// MDH@19JUN2020: I suppose we should also allow appending to the list if listIndex equals M_LL_INVALID
-																				if(valueholderList){ // indexing a list
+																				if(valueholderList!=NULL){ // indexing a list
 																					if(listIndex!=M_LL_INVALID){
 																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
-																						if(!newValueholder){
+																						if(NULL==newValueholder){
 																							listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
 																							if(listIndex>0){
 																								newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
@@ -5130,26 +5341,26 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																				}else{ // indexing an array
 																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
 																					if(report)
-																						if(newValueholder)
+																						if(newValueholder!=NULL)
 																							output("New value holder reference value #%llu in array.\n",listIndex);
 																				}
 																			}
 																			valueIndexListelement=valueIndexListelement->_next;
-																			if(!valueIndexListelement)break;
-																			if(!newValueholder||!*newValueholder)break;
+																			if(NULL==valueIndexListelement)break;
+																			if(NULL==newValueholder||NULL==*newValueholder)break;
 																			// we have another property 'index', so we should have a value holder map
 																			valueholderList=((*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
 																			valueholderArray=((*newValueholder)->type==VT_ARRAY?(*newValueholder)->value._array:NULL);
 																		}
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																	}
-																	if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
+																	if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-															if(!_valueholders[valueholderIndex+numberOfNewValueholders])
+															if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
 																output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														}
 													}
@@ -5163,7 +5374,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										}
 										numberOfNewValueholders=0; // MDH@19OCT2020: in any case zero numberOfNewValueholders (to ascertain that FREE below will use numberOfValueholders!!!!)
 									}
-									if(_flattenedIndexList)FREE_LIST(_flattenedIndexList,owner);
+									if(_flattenedIndexList!=NULL)FREE_LIST(_flattenedIndexList,owner);
 								}
 								// if all the valueholders are NULL we break????
 								int valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
@@ -5181,8 +5392,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								int valueholderIndex=numberOfValueholders;
 								while(--valueholderIndex>=0){
 									if(report)
-										{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
-									if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){
+									{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
+									if(_resultList!=NULL&&appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){
 										FREE_LIST(_resultList,owner);
 										_resultList=NULL;
 										output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));
@@ -5195,7 +5406,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-						if(_valueholders){
+						if(_valueholders!=NULL){
 							// output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
 							FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
 							// output("Value holders getReferencedValues() freed!\n"); // DEBUG
@@ -5281,10 +5492,19 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
+/**
+ * @brief sets the referenced value object to \p _newValue
+ * 
+ * @param _valuereference 
+ * @param owner_valuereference 
+ * @param _newValue 
+ * @return true on success
+ * @return false on failure
+ */
 bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner owner_valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=false;
-	if(_valuereference&&_valuereference->_name){
+	if(_valuereference!=NULL&&_valuereference->_name!=NULL){
 		if(report)
 		{
 			output("Setting the value reference of '%s",_valuereference->_name);
@@ -5294,7 +5514,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 		// MDH@18OCT2019: without an _itemid the variable is allowed to NOT yet exist
 		Mlist* itemidList=(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST?_valuereference->_itemid->value._list:NULL); // let's assume that is it always a list
 		// MDH@19JUN2020 allowing empty index lists again: if(itemidList&&!itemidList->_first)itemidList=NULL; // MDH@31MAR2020: empty lists are ignored (although that's an error theoretically)
-		if(itemidList){ // the hard part: index/attribute name list assignment!!
+		if(itemidList!=NULL){ // the hard part: index/attribute name list assignment!!
 			// _valuereference->_value=_newValue; // MDH@07APR2020: TODO do we need this?????
 			// MDH@25MAR2020: we can cut the user some slack by allowing automatic initialization to a list or map depending on the whether a property is added or an index
 			//				so value needs to be a list or a map or NULL to be indexable unless we allow values to become maps, or making a list
@@ -5304,9 +5524,9 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 			// MDH@28MAR2020: if we allow item index elements to be lists we need an array of value holders
 			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name->chars);
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
-			if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
+			if(valueholder!=NULL&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
 				// MDH@19JUN2020: if itemidList is empty, we use the default index or attribute name
-				if(!itemidList->_first)
+				if(NULL==itemidList->_first)
 					if(appendedToList(itemidList,owner_valuereference,(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY?_getIntegerValue(M_LL_INVALID):_getTextValue("'"),M_LL_INVALID)<0)
 						return false;
 				result=true;
@@ -5318,18 +5538,18 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				//				this works for lists not for maps
 				// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
 				Mvalue*** _valueholders=MALLOC_1(sizeof(void*),-'_',owner); // set immediately so MALLOC suffices // MDH@19JUN2020: a single value holders array
-				if(_valueholders){
+				if(_valueholders!=NULL){
 					size_t numberOfValueholders=1,numberOfNewValueholders=0; // if allocating memory for a single Mvalue** succeeds we have a go
 					_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
 					// we need to find the last index or attribute name
 					Mvalue* indexorattributenameListelementValue=NULL;
-					if(indexorattributenameListelement){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
+					if(indexorattributenameListelement!=NULL){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
 						// NOTE the last one needs to be assigned to
-						while(indexorattributenameListelement){
+						while(indexorattributenameListelement!=NULL){
 							// if(_valuereference->_itemid)outputValue("Item id: '",_valuereference->_itemid,"'.\n"); // DEBUG
 							indexorattributenameListelementValue=indexorattributenameListelement->_value;
 							// if no value is defined, it is ignored TODO should we????
-							if(indexorattributenameListelementValue){
+							if(indexorattributenameListelementValue!=NULL){
 								if(report)
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 								// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
@@ -5353,7 +5573,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 									// which we now did
 									Mvalue*** _newValueholders=_valueholders;
 									if(numberOfNewValueholders>numberOfValueholders)_newValueholders=REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_');
-									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
+									if(_newValueholders!=NULL){ // REALLOC succeeded (or a single element to assign)
 										// output("Number of new setReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -5362,12 +5582,12 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 										// let's check if all index list elements are integer, if not, convert integers to their text equivalent
 										Mlistelement* flattenedIndexListelement=_flattenedIndexList->_first;
 										Mvalue* flattenedIndexListelementValue;
-										while(flattenedIndexListelement){
+										while(flattenedIndexListelement!=NULL){
 											flattenedIndexListelementValue=getFirstScalarValue(flattenedIndexListelement->_value);
 											if(flattenedIndexListelementValue->type!=VT_INTEGER&&flattenedIndexListelementValue->type!=VT_BIGINTEGER)break;
 											flattenedIndexListelement=flattenedIndexListelement->_next;
 										}
-										if(!flattenedIndexListelement)_flattenedIndexList->valuetype=VT_INTEGER; // mark the index list as integer
+										if(NULL==flattenedIndexListelement)_flattenedIndexList->valuetype=VT_INTEGER; // mark the index list as integer
 										// knowing the index list (element) type already means that we know what the indexed value should be (a list or a map)
 										// now we know whether what we are indexing should be lists or maps we can ascertain that it does
 										int valueholderIndex=numberOfValueholders;
@@ -5394,12 +5614,12 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 										if(report)
 											outputList("****** Flattened index list: '",_flattenedIndexList,"'.\n");
 										flattenedIndexListelement=_flattenedIndexList->_first;
-										while(flattenedIndexListelement){
+										while(flattenedIndexListelement!=NULL){
 											// output("%c\n",'A'); // DEBUG
 											Mlist* _assignedIndexList=owned_list(__list("assigned indices"),owner); // where we'll be collecting all indices assigned based on this flattened index list element
 											numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 											indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
-											if(indexorattributenameListelementValue){
+											if(indexorattributenameListelementValue!=NULL){
 												if(amVerboseDebugging())
 													outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
 												int valueholderIndex=numberOfValueholders;
@@ -5422,7 +5642,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 														if(isValueUndefined(*_valueholders[valueholderIndex+numberOfNewValueholders])!=M_FALSE){_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;outputError("Failed to create a list or map.");}
 													}
 													*/
-													if(*valueholder){
+													if((*valueholder)!=NULL){
 														// if we are accessing a map we have to ascertain that the attribute name in a string
 														if((*valueholder)->type==VT_MAP){
 															// MDH@23OCT2020: same here
@@ -5436,29 +5656,29 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																if(report)
 																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
 																// 'iterating' over all list elements
-																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
-																if(valueIndexListelement){
+																Mlistelement* valueIndexListelement=(_valueIndexList!=NULL?_valueIndexList->_first:NULL);
+																if(valueIndexListelement!=NULL){
 																	Mvalue** newValueholder;
-																	while(valueholderMap){
+																	while(valueholderMap!=NULL){
 																		// output("%c\n",'B'); // DEBUG
 																		// outputMap("Value holder map: ",valueholderMap,".\n"); // DEBUG
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
-																		if(indexorattributenameListelementValue){
+																		if(indexorattributenameListelementValue!=NULL){
 																			// MDH@19OCT2020: if we do not unquote the value we can safely remove the final quote????? by decrementing the length...
 																			// MDH@22OCT2020: however this will get us into trouble when dealing with values that are not text (e.g. integers), so we switch back to getting the text dequoted
 																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner); // MDH@19OCT2020 bug fix: take ownership
-																			if(_attributenameText){ // we need to free _attributenameText when we're done with it
-																				if(string_insert_char(_attributenameText,0,'\'')){ // ascertain that _attributenameText starts with a quote character, so we can use _getTextValue on it
+																			if(_attributenameText!=NULL){ // we need to free _attributenameText when we're done with it
+																				if(string_insert_char(_attributenameText,0,'\'')!=NULL){ // ascertain that _attributenameText starts with a quote character, so we can use _getTextValue on it
 																					char* _attributename=string(_attributenameText)+1; // skipping the initial quote
 																					if(amVerboseDebugging())
 																						output("Attribute name text: '%s'.\n",_attributename); // DEBUG
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);		
-																					if(!newValueholder){
+																					if(NULL==newValueholder){
 																						if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),_attributename,NULL)==M_TRUE){
 																							newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);
 																							// register in the assigned index list
 																							// MDH@19OCT2020 bug fix: _getTextValue assumes that _attributenameText starts with the text quote character!!
-																							if(_assignedIndexList&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
+																							if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
 																							{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																						}else
 																							output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,_attributename);
@@ -5472,17 +5692,17 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																				newValueholder=NULL;
 																		}
 																		valueIndexListelement=valueIndexListelement->_next;
-																		if(!valueIndexListelement)break;
+																		if(NULL==valueIndexListelement)break;
 																		// we have another property 'index', so we should have a value holder map
 																		valueholderMap=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_MAP?(*newValueholder)->value._map:NULL);
 																		// output("%c\n",'C'); // DEBUG
 																	}
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																}
-																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
+																if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 															/*}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
-															if(!_valueholders[valueholderIndex+numberOfNewValueholders])
+															if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
 																output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														}else
 														if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){ // MDH@23NOV2020: either a list or an array being indexed
@@ -5495,20 +5715,20 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
 																// 'iterating' over all index list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
-																if(valueIndexListelement){
+																if(valueIndexListelement!=NULL){
 																	Mvalue** newValueholder;
-																	while(valueholderList||valueholderArray){
+																	while(valueholderList!=NULL||valueholderArray!=NULL){
 																		// output("%c\n",'D'); // DEBUG
 																		// outputList("Value holder list: ",valueholderList,".");
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
-																		if(indexorattributenameListelementValue){
+																		if(indexorattributenameListelementValue!=NULL){
 																			long long listIndex=M_LL_INVALID;
 																			if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
 																			if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
 																			// MDH@19JUN2020 M_LL_INVALID allowed as index indicating appending: if(listIndex!=M_LL_INVALID){
-																			if(valueholderList){ // MDH@23NOV2020: a list
+																			if(valueholderList!=NULL){ // MDH@23NOV2020: a list
 																				newValueholder=(listIndex!=M_LL_INVALID?getValueHolderAtIndex(valueholderList,listIndex):NULL);
-																				if(!newValueholder){
+																				if(NULL==newValueholder){
 																					listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
 																					if(listIndex>0){
 																						if(amVerboseDebugging())
@@ -5516,7 +5736,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																						// if(amVerboseDebugging())output("List element at index #%zd retrieved.\n",listIndex);
 																						// register in the assigned index list
-																						if(_assignedIndexList&&appendedToList(_assignedIndexList,owner,_getIntegerValue(listIndex),M_LL_INVALID)<=0)
+																						if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getIntegerValue(listIndex),M_LL_INVALID)<=0)
 																						{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																					}else
 																						output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
@@ -5524,15 +5744,15 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																			}else{ // MDH@23NOV2020: an array (and we're NOT going to create an element that's not there like we do with a list!!!!)
 																				newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
 																				if(report)
-																					if(newValueholder)
+																					if(newValueholder!=NULL)
 																						output("New value holder reference value #%llu in array.\n",listIndex);
 																			}
 																			//}else	newValueholder=NULL;
 																		}
 																		valueIndexListelement=valueIndexListelement->_next;
-																		if(!valueIndexListelement)break;
+																		if(NULL==valueIndexListelement)break;
 																		// we have another property 'index', so we should have a value holder map
-																		if(!newValueholder||!*newValueholder)break;
+																		if(NULL==newValueholder||NULL==(*newValueholder))break;
 																		valueholderList=((*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
 																		valueholderArray=((*newValueholder)->type==VT_ARRAY?(*newValueholder)->value._array:NULL);
 																		// output("%c\n",'E'); // DEBUG
@@ -5540,19 +5760,19 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																	// output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																}
-																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
+																if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
 														}else
 															_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-														if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+														if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 													}
 												}
 											}
 											// if we managed to collect all assigned indices we use these to replace the current value in the flattened index list element
-											if(_assignedIndexList){
-												if(_assignedIndexList->_first){
+											if(_assignedIndexList!=NULL){
+												if(_assignedIndexList->_first!=NULL){
 													if(report)
 														outputList("Assigned index list: '",_assignedIndexList,"'.\n"); // DEBUG
 													if(_assignedIndexList->_first==_assignedIndexList->_last){
@@ -5575,13 +5795,13 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 									numberOfNewValueholders=0; // MDH@19OCT2020: in both cases (whether realloc failed or not we can zero numberOfNewValueholders)
 								}
 								// MDH@19JUN2020 TODO not too happy about using _flattenedIndexList and assignedIndexList to collect the actual ids of the properties or array elements
-								if(_flattenedIndexList){
-									if(_flattenedIndexList->_first){ // at least one element
+								if(_flattenedIndexList!=NULL){
+									if(_flattenedIndexList->_first!=NULL){ // at least one element
 										if(report)
 											outputList("Flattened index list: '",_flattenedIndexList,"'.\n");
 										if(_flattenedIndexList->_first!=_flattenedIndexList->_last){ // more than one element: replace the value by the reversed list (which is disowned to start with!!!!)
 											Mlist* _rereversedIndexList=owned_list(_getReversedList(_flattenedIndexList),owner);
-											if(_rereversedIndexList)assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));else outputBug("Failed to reverse an index list");
+											if(_rereversedIndexList!=NULL)assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));else outputBug("Failed to reverse an index list");
 										}else // replace the value by the first value in the flattened index list
 											assignValue(&indexorattributenameListelement->_value,_flattenedIndexList->_first->_value);
 									}
@@ -5589,7 +5809,9 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 								}
 							}
 							// if all the valueholders are NULL we break????
-							long long valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
+							long long valueholderIndex=numberOfValueholders;
+							while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");
+							if(valueholderIndex<0){result=false;break;}
 							// how about putting the flattenedIndexList back????
 
 							indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
@@ -5600,7 +5822,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 						long long valueholderIndex=numberOfValueholders;
 						if(report)
 						{output("Setting %llu values",valueholderIndex);outputValue(" to '",_newValue,"'.\n");}
-						while(--valueholderIndex>=0)if(_valueholders[valueholderIndex])assignValue(_valueholders[valueholderIndex],_newValue);
+						while(--valueholderIndex>=0)if(_valueholders[valueholderIndex]!=NULL)assignValue(_valueholders[valueholderIndex],_newValue);
 						// output("Values set!\n"); // DEBUG
 					}
 					/* MDH@31MAR2020 we've dealt with the last index element as well in the block above, so replacing:
@@ -5693,7 +5915,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					}
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-					if(_valueholders){
+					if(_valueholders!=NULL){
 						// if(_valuereference->_itemid)outputValue("Item id before freeing the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 						// output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
 						FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
@@ -5719,17 +5941,17 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 			char* variableName=_valuereference->_name->chars;
 			Menvironment* executionEnvironment=getExecutionEnvironment();
 			Mvariable* variable=getVariable(executionEnvironment,variableName,false); // if the variable exists, variable will be non-NULL
-			if((variable||addVariable(executionEnvironment,owner,variableName,VT_UNDEFINED,false))
+			if((variable!=NULL||addVariable(executionEnvironment,owner,variableName,VT_UNDEFINED,false))
 				&&setValue(executionEnvironment,variableName,_newValue)){
 				// NOTE even if the value itself is NULL, its address is never NULL
 				_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
 				result=true;
 				// MDH@04MAR2020: as soon as result is set, we can determine if a function without a body is assigned!!
-				if(_newValue&&_newValue->type==VT_FUNCTION){
+				if(_newValue!=NULL&&_newValue->type==VT_FUNCTION){
 					Mfunction* function=_newValue->value._function;
 					if(function->type==FT_USER){
 						Muserfunction* userfunction=function->functionunion._userfunction;
-						if(userfunction&&!userfunction->_bodyCommandList){
+						if(userfunction!=NULL&&NULL==userfunction->_bodyCommandList){
 							registerFunctionBodyRequest(_valuereference->_name->chars);
 						}
 					}
@@ -5747,6 +5969,12 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 }
 
 // MDH@24OCT2019: we need a method that can convert a big integer to an integer
+/**
+ * @brief get the long long equivalent of big integer \p biginteger
+ * 
+ * @param biginteger 
+ * @return long long the equivalent of big integer \p biginteger
+ */
 long long getBigintegerInteger(Mbiginteger* biginteger){
 	long long result=M_LL_INVALID;
 	if(biginteger){
