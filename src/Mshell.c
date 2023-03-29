@@ -5971,7 +5971,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 // MDH@24OCT2019: we need a method that can convert a big integer to an integer
 /**
  * @brief get the long long equivalent of big integer \p biginteger
- * 
+ * @details returns M_LL_INVALID on failure
  * @param biginteger 
  * @return long long the equivalent of big integer \p biginteger
  */
@@ -5980,7 +5980,8 @@ long long getBigintegerInteger(Mbiginteger* biginteger){
 	if(biginteger){
 		if(amVerboseDebugging())
 			outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
-		if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+		if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&
+				mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
 			result=mp_get_i64(MP_INT_POINTER(biginteger));
 			if(amVerboseDebugging())
 				outputInfo("Big integer converted to a small integer.");
@@ -5992,12 +5993,17 @@ long long getBigintegerInteger(Mbiginteger* biginteger){
 		output("Small integer result: %lld.\n",result);
 	return result;
 }
-
+/**
+ * @brief returns the result of applying unary operator \p operator to \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the result of applying unary operator \p operator to \p _value
+ */
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	if(amVerboseDebugging())
 	{
 		output("Applying unary operator '%c'",operator);
-		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.\n",_value->type);}else output(".\n");
+		if(_value!=NULL){outputValue(" to value '",_value,"'");output(" of type %u.\n",_value->type);}else output(".\n");
 	}
 	// delegating to the one argument functions that we have is best!!!
 	Mvalue* result=NULL;
@@ -6010,18 +6016,30 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	}
 	/////if(!result)return NULL;
 	if(amVerboseDebugging())
-	{if(result){outputValue(" Result of applying the unary operator (",result,")");output(" of type %u.\n",result->type);}else output(".\n");}
+	{if(result!=null){outputValue(" Result of applying the unary operator (",result,")");output(" of type %u.\n",result->type);}else output(".\n");}
 	return result;
 }
-
+/**
+ * @brief returns whether or not token type \p tokenType is a one character token type or not
+ * 
+ * @param tokenType 
+ * @return true when \p tokenType is a one character token type
+ * @return false when \p tokenType is not a one character token type
+ */
 bool isOneCharacterTokenType(uint8_t tokenType){
 	// TODO how about TT_EXPRESSION -> NO because a TT_EXPRESSION token is always considered ended, i.e. significantCharacterCount is not an issue in determining whether a new token starts there
 	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
 }
 
 // MDH@01MAR2021: TODO check if this one should be here or in M.c
+/**
+ * @brief outputs token \p _token returning the number of characters to output
+ * 
+ * @param _token 
+ * @return size_t the number of token characters to output
+ */
 static size_t outputToken(Mtoken const * const _token){
-	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
+	size_t numberOfCharactersToOutput=(_token!=NULL&&_token->text!=NULL?string_length(_token->text):0);
 	if(numberOfCharactersToOutput>0){
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
 		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
@@ -6037,9 +6055,16 @@ static size_t outputToken(Mtoken const * const _token){
 	return numberOfCharactersToOutput;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
-
+/**
+ * @brief the global function to output a token
+ * 
+ */
 static OutputTokenFunction* outputTokenFunction=NULL;
-
+/**
+ * @brief outputs the last character of token \p _token
+ * 
+ * @param _token 
+ */
 void outputLastTokenChar(Mtoken* _token){
 	///////outputTokenColor(_userInputCommand->_lastToken);
 	outputChar(string_last_char(_token->text));
@@ -6052,7 +6077,14 @@ void outputLastTokenChar(Mtoken* _token){
  * we need to store the value in a value reference just in case the value is the destination of an assignment, so yes, reference is an apt name
 */
 // MDH@17NOV2019: applying unary operator on an indexed value not working as it should, so has to be fixed
-
+/**
+ * @brief returns the next value reference from the current expression being evaluated
+ * 
+ * @param info 
+ * @param endTokenTypes 
+ * @param endTokenTypeCount 
+ * @return Mvaluereference* the next value reference from the current expression being evaluated
+ */
 Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){Mallocationowner owner=getOwner(__LINE__);
 
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
@@ -6064,7 +6096,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 
 	Mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
 		
-	while(expressionToken&&expressionToken->type==TT_UNARY){
+	while(expressionToken!=NULL&&expressionToken->type==TT_UNARY){
 		char unaryOperatorChar=string_char(expressionToken->text,0);
 		if(unaryOperatorChar!='+'){
 			if(!unaryOperators)unaryOperators=__string();
@@ -6076,7 +6108,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		{if(unaryOperators)output("Unary operators: '%s'.\n",string(unaryOperators));else output("No unary operators!\n");}
 	// ASSERT unary operators extracted
 
-	if(expressionToken){
+	if(expressionToken!=NULL){
 		if(amVerboseDebugging())
 			output("_getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		_valueReference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',owner);
@@ -6100,13 +6132,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			case TT_FUNCTION:
 				{
 					Mfunction* function=getFunction(getExecutionEnvironment(),_significantTokenText); // get the function associated with the name of the function
-					if(function){
+					if(function!=NULL){
 						canbeindexedtheoretically=true; // MDH@17NOV2019: stick to what the tokenizer allow TODO exclude special functions
 						// MDH@17JUL2019: we know the function and when the name is one of the special functions
 						//				like 'function' to define a function we know not to evaluate the third argument!!
 						//				it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
 						// MDH@25JUL2019: adding if, while and for functions
-						unsigned long long numberOfFunctionParameters=(function->_parameterMap?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
+						unsigned long long numberOfFunctionParameters=(function->_parameterMap!=NULL?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
 						/* MDH@28OCT2020: defining user functions no longer 'special' function (calls)
 						if(!strcmp(_significantTokenText,DEFINEANONYMOUSFUNCTION_NAME)){
 							if(amVerboseDebugging())
@@ -6154,7 +6186,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						// MDH@02NOB2019: force the arguments value list to be weak
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate,true);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
-						if(_functionArgumentsValue){
+						if(_functionArgumentsValue!=NULL){
 							if(amVerboseDebugging())
 								outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
 							if(amVerboseDebugging())
@@ -6167,7 +6199,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							){
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
-								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
+								if(functionCallArgumentList!=NULL&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
 									outputError("Failed to create the to do expression list");
 									FREE_LIST(functionCallArgumentList,owner);
 									functionCallArgumentList=NULL; // so nothing will get done!!
@@ -6199,21 +6231,21 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							// MDH@02MAR2020 BUG FIX: extract the function name BEFORE the function call is evaluated!!!!
 							char* definedFunctionName=(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)?NULL:_functionCallArgumentMap->_first->_variable->_value->value._text->_c);
 							// if(amVerbose())
-								if(definedFunctionName){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
+								if(definedFunctionName!=NULL){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
 							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
 							if(amVerboseDebugging())
 								{output("Result of calling '%s'",_significantTokenText);outputValue(": '",functionCallValue,"'.\n");}
 							// if this was a call to the 'define user function' function
-							if(definedFunctionName){ // MDH@02MAR2020: replacing: !strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
+							if(definedFunctionName!=NULL){ // MDH@02MAR2020: replacing: !strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
 								// is the result 1???
-								if(functionCallValue&&functionCallValue->type==VT_INTEGER&&functionCallValue->value._integer->ll){ // function successfully created
+								if(functionCallValue!=NULL&&functionCallValue->type==VT_INTEGER&&functionCallValue->value._integer->ll){ // function successfully created
 									// let's push the function name on the stack of functions to create
 									// we know the first argument contains the function name
 									// MDH@02MAR2020: is this a bug???? because we cannot simply assign unless we strdup() the defined function name!!
 									// MDH@02MAR2020 replacing (see above): char* definedFunctionName=_functionCallArgumentMap->_first->_variable->_value->value._text->_c;
 									Mfunction* definedFunction=getFunction(getExecutionEnvironment(),definedFunctionName);
 									// if the function now exists but does not yet have a body, queue the function name on the list of bodies to be set
-									if(definedFunction&&definedFunction->type==FT_USER&&!definedFunction->functionunion._userfunction->_bodyCommandList)
+									if(definedFunction!=NULL&&definedFunction->type==FT_USER&&NULL==definedFunction->functionunion._userfunction->_bodyCommandList)
 										registerFunctionBodyRequest(definedFunctionName);
 									else
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
@@ -6345,7 +6377,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					expressionToken=nextEnvironmentExpressionToken(); // now pointing to the real fraction part text following the given integer!!!!
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
 					Mstring* pRealText=_realText;
-					if(pRealText){
+					if(pRealText!=NULL){
 						char* _realSignificantTokenText=_getSignificantTokenCharacters(expressionToken); // free asap
 						if(amVerboseDebugging())output("Integer part of decimal text: '%s'.\n",string(pRealText));
 						pRealText=string_append(pRealText,_realSignificantTokenText);
@@ -6363,7 +6395,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(amVerboseDebugging())outputInfo("Decimal precision checked!");
 						Mdecimal* _decimal=owned_decimal(__decimal(get_default_mpd_context(),0,0),owner);
 						if(amVerboseDebugging())outputInfo("Decimal created!");
-						if(_decimal){
+						if(_decimal!=NULL){
 							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
 							if(amVerboseDebugging())outputInfo("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
@@ -6386,7 +6418,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
 					// output("Converting '%s' to a big integer.\n",_significantTokenText); // DEBUG
-					if(mp_read_radix(MP_INT_POINTER(_biginteger),_significantTokenText,10)==MP_OKAY){
+					if(_biginteger!=NULL&&mp_read_radix(MP_INT_POINTER(_biginteger),_significantTokenText,10)==MP_OKAY){
 						// outputBiginteger("Big integer: '",_biginteger,"'.\n"); // DEBUG
 						if(mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
 							// outputBiginteger("Storing the small integer of '",_biginteger,"' as referenced value.\n"); // DEBUG
@@ -6399,7 +6431,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,getValueOfBiginteger(disowned_biginteger(_biginteger,true));
 						}
 					}else{
-						FREE_BIGINTEGER(_biginteger,owner);
+						if(_biginteger!=NULL)FREE_BIGINTEGER(_biginteger,owner);
 						outputErrorAndText("Failed to create the big integer to store integer ",_significantTokenText);
 					}
 					// outputValue("Value referenced: '",_valueReference->_value,"'.\n"); // DEBUG
@@ -6447,13 +6479,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			default:
 				break;
 		}
-		if(_significantTokenText)free(_significantTokenText); // free the (duplicated significant) token text
+		if(_significantTokenText!=NULL)free(_significantTokenText); // free the (duplicated significant) token text
 		if(amVerboseDebugging()){
 			if(_valueReference){
 				outputInfo("Extracted reference:");
-				if(_valueReference->_name)output("\tName: '%s'.\n",_valueReference->_name);else outputInfo("\tNo name!");
-				if(_valueReference->_value)outputValue("\tValue: '",_valueReference->_value,"'.\n");else outputInfo("\tNo value referenced!");
-				if(_valueReference->_itemid)outputValue("\tIndex ids: ",_valueReference->_itemid,"'.\n");else outputInfo("\tNo item ids.");
+				if(_valueReference->_name!=NULL)output("\tName: '%s'.\n",_valueReference->_name);else outputInfo("\tNo name!");
+				if(_valueReference->_value!=NULL)outputValue("\tValue: '",_valueReference->_value,"'.\n");else outputInfo("\tNo value referenced!");
+				if(_valueReference->_itemid!=NULL)outputValue("\tIndex ids: ",_valueReference->_itemid,"'.\n");else outputInfo("\tNo item ids.");
 			}else
 				outputInfo("No value reference!");
 		}
@@ -6468,20 +6500,20 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			// MDH@17NOV2019: moved over from getValueOfExpression() to where it should below i.e. before unary operators are applied!!!
 			// MDH@24MAR2020: it's probably easier to create a list of item ids here to be filled with indices (some of which can be property names)
 			Mlist* itemIdsList=NULL;
-			while(expressionToken&&expressionToken->next&&(expressionToken->next->type==TT_LIST||expressionToken->next->type==TT_PROPERTY)){
-				if(!itemIdsList){
+			while(expressionToken!=NULL&&expressionToken->next!=NULL&&(expressionToken->next->type==TT_LIST||expressionToken->next->type==TT_PROPERTY)){
+				if(NULL==itemIdsList){
 					itemIdsList=owned_list(_getListOfType(VT_UNDEFINED),owner); // we know we're going to need to list
-					if(!itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",M_ERROR_PREFIX,_valueReference->_name);break;}
+					if(NULL==itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",M_ERROR_PREFIX,_valueReference->_name);break;}
 				}
 				expressionToken=nextEnvironmentExpressionToken();
 				// if(amDebugging())
 				if(amVerboseDebugging())if(*outputTokenFunction){output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 				if(expressionToken->type==TT_LIST){
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
-					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
+					if(indexListValue!=NULL&&indexListValue->type==VT_LIST&&indexListValue->value._list){
 						Mlist* newItemIdsList=indexListValue->value._list;
-						Mlistelement* newItemIdListElement=newItemIdsList->_first;
-						while(newItemIdListElement){
+						Mlistelement* newItemIdListElement=(newItemIdsList!=NULL?newItemIdsList->_first:NULL);
+						while(newItemIdListElement!=NULL){
 							if(appendedToList(itemIdsList,owner,newItemIdListElement->_value,M_LL_INVALID)<=0){
 								outputError("Failed to append augmented item id.");
 								// TODO can't break here?????
@@ -6494,19 +6526,19 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
 					// we have to wrap the property name inside a value as text
 					Mstring* _propertyName=owned_string(_getSignificantTokenText(expressionToken),owner);
-					if(_propertyName){
+					if(_propertyName!=NULL){
 						// MDH@25OCT2020: how about allowing property names to be integers as well, as a shortcut for using square bracket notation
 						long long index=_strtoll(string(_propertyName)+1,getNAI()); // NOT including the period of course!!
 						if(index!=getNAI()){
 							Mvalue* indexValue=_getIntegerValue(index);
-							if(!indexValue||appendedToList(itemIdsList,owner,indexValue,M_LL_INVALID)<=0){
+							if(NULL==indexValue||appendedToList(itemIdsList,owner,indexValue,M_LL_INVALID)<=0){
 								output("%sFailed to add index '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
 								// TODO can't break here
 							}
 						}else
 						if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 							Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
-							if(!propertyNameValue||appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)<=0){
+							if(NULL==propertyNameValue||appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)<=0){
 								output("%sFailed to add property name '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
 								// TODO can't break here
 							}
@@ -6520,7 +6552,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				if(amVerboseDebugging()){output("End of augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 			}
 			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
-			if(itemIdsList){
+			if(itemIdsList!=NULL){
 				assignValue(&_valueReference->_itemid,_getValueOfList(disowned_list(itemIdsList,owner)));
 				if(amVerboseDebugging())outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
 			}
@@ -6534,7 +6566,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		if(l>0){
 			Mvalue* referencedValue;
 			char unaryOperator;
-			while(l>0&&_valueReference){
+			while(l>0&&_valueReference!=NULL){
 				unaryOperator=string_char(unaryOperators,--l);
 				referencedValue=getReferencedValue(_valueReference);
 				if(amVerboseDebugging())
@@ -6546,14 +6578,14 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				// MDH@17NOV2019: applying a unary operator is dangerous because we may set the value BUT that's NOT enough
 				//				because if the name and/or item id remains it will be used again later on
 				///output("A\n");
-				if(_valueReference->_name){
+				if(_valueReference->_name!=NULL){
 					///output("B\n");
 					// MDH@09NOV2022: apparently the following (now commented out at the end) caused a BUG I guess because _valueReference->_name is NOT owned by the value owner
 					FREECHARS(_valueReference->_name,Msubowner(owner,1)); // replacing: FREECHARS(_valueReference->_name,Msubowner(getValueOwner(),1));
 					_valueReference->_name=NULL;
 				}
 				///output("C\n");
-				if(_valueReference->_itemid){ // this is is a value wrapping a list of indices
+				if(_valueReference->_itemid!=NULL){ // this is is a value wrapping a list of indices
 					///output("D\n");
 					// conform what would happen in free_valuereference!!! 
 					// TODO consider alternative creating a new value reference
@@ -6578,11 +6610,11 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 
 	}
 
-	if(!_valueReference){outputError("No value reference!");return NULL;} // MDH@09NOV2022: just-in-case
+	if(NULL==_valueReference){outputError("No value reference!");return NULL;} // MDH@09NOV2022: just-in-case
 
 	if(amVerboseDebugging())
 	{
-		if(_valueReference->_value){
+		if(_valueReference->_value!=NULL){
 			outputValue("Value result: '",_valueReference->_value,"'");
 			output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);
 		}else
@@ -6633,24 +6665,53 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 
 // helper functions that apply binary operators to value of which at least one is a list
 // MDH@03NOV2020: I suppose we can have a method that will provide us with the value type for applying binary operators that maintain type
+/**
+ * @brief returns \p listValuetype when \p listValuetype equals \p valueValuetype or VT_UNDEFINED otherwise
+ * 
+ * @param listValuetype 
+ * @param valueValuetype 
+ * @return Mvaluetype \p listValuetype when \p listValuetype equals \p valueValuetype or VT_UNDEFINED otherwise
+ */
 static Mvaluetype getMatchingListValuetype(Mvaluetype listValuetype,Mvaluetype valueValuetype){
 	// essentially the matching list value type is listValuetype unless valueValuetype is different
 	// TODO we might improve on this if we select the 'highest' of the two value types as the result type
 	return(listValuetype!=valueValuetype?VT_UNDEFINED:listValuetype);
 }
+// we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
+/**
+ * @brief returns \p arrayValuetype when \p arrayValuetype equals \p valueValuetype or VT_UNDEFINED otherwise
+ * 
+ * @param arrayValuetype 
+ * @param valueValuetype 
+ * @return Mvaluetype \p arrayValuetype when \p arrayValuetype equals \p valueValuetype or VT_UNDEFINED otherwise
+ */
+static Mvaluetype getMatchingArrayValuetype(Mvaluetype arrayValuetype,Mvaluetype valueValuetype){
+	// essentially the matching list value type is listValuetype unless valueValuetype is different
+	// TODO we might improve on this if we select the 'highest' of the two value types as the result type
+	return(arrayValuetype!=valueValuetype?VT_UNDEFINED:arrayValuetype);
+}
+
+/**
+ * @brief applies binary operator \p binaryoperator to the elements in \p list1 and \p list2
+ * 
+ * @param _list1 
+ * @param _list2 
+ * @param maintainsValuetype 
+ * @return Mlist* the wrapped M list of the result of applying \p binaryoperator to the elements of \p list1 and \p list2
+ */
 Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
-	if(!_list1)return _list2;if(!_list2)return _list1;
+	if(NULL==_list1)return _list2;if(NULL==_list2)return _list1;
 	// MDH@30OCT2019: ALWAYS apply the binary operator i.e. do NOT just return the value!!! (which makes perfect sense for equality / unequality)
 	//				TODO if the result equals NULL, should we then NOT add the given element?????
 	// ASSERT neither are NULL
 	// MDH@03NOV2020: the return type of the list really depends on the binary operator applied, whether or not it maintains type integrity, so it makes sense to actually pass in the list result type as a separate argument
 	Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list1->valuetype,_list2->valuetype):VT_UNDEFINED),owner); // TODO if the types are the same use that?
-	if(_result){
+	if(_result!=NULL){
 		// elements with the same index are to be added and stored under that index
 		Mlistelement* _listelement1=_list1->_first;
 		Mlistelement* _listelement2=_list2->_first;
-		while(_listelement1||_listelement2){
-			if(_listelement1&&_listelement2){
+		while(_listelement1!=NULL||_listelement2!=NULL){
+			if(_listelement1!=NULL&&_listelement2!=NULL){
 				if(_listelement1->index==_listelement2->index){
 					if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index)<=0)break;
 					_listelement1=_listelement1->_next;_listelement2=_listelement2->_next;
@@ -6663,7 +6724,7 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 					_listelement2=_listelement2->_next;
 				}
 			}else
-			if(_listelement1){
+			if(_listelement1!=NULL){
 				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index)<=0)break;
 				_listelement1=_listelement1->_next;
 			}else{
@@ -6674,15 +6735,23 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 	}
 	return disowned_list(_result,owner);
 }
+/**
+ * @brief applies binary operator \p binaryoperator to the elements of M list \p _list and M array \p _array
+ * 
+ * @param _list 
+ * @param _array 
+ * @param maintainsValuetype 
+ * @return Mlist* returns the wrapped M list containing the result of applying \p binaryoperator to M list \p _list and M array \p _array
+ */
 Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
-	if(!_array||_array->numberOfElements==0)return _list;
+	if(NULL==_array||_array->numberOfElements==0)return _list;
 	Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_array->valuetype):VT_UNDEFINED),owner); // TODO if the types are the same use that?
-	if(_result){
+	if(_result!=NULL){
 		// elements with the same index are to be added and stored under that index
 		Mlistelement* _listelement=_list->_first;
 		unsigned long long arrayindex=0;
-		while(_listelement||arrayindex<_array->numberOfElements){
-			if(_listelement&&arrayindex<_array->numberOfElements){
+		while(_listelement!=NULL||arrayindex<_array->numberOfElements){
+			if(_listelement!=NULL&&arrayindex<_array->numberOfElements){
 				if(_listelement->index==arrayindex+1){
 					if(appendedToList(_result,owner,binaryoperator(_listelement->_value,_array->values[arrayindex]),arrayindex+1)<=0)break;
 					_listelement=_listelement->_next;arrayindex++;
@@ -6695,7 +6764,7 @@ Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction bi
 					arrayindex++;
 				}
 			}else
-			if(_listelement){
+			if(_listelement!=NULL){
 				if(appendedToList(_result,owner,binaryoperator(_listelement->_value,NULL),_listelement->index)<=0)break;
 				_listelement=_listelement->_next;
 			}else{
@@ -6706,18 +6775,28 @@ Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction bi
 	}
 	return disowned_list(_result,owner);
 }
+/**
+ * @brief applies binary operator \p binaryoperator to array \p _array and M list \p _list
+ * 
+ * @param _array 
+ * @param _list 
+ * @param binaryoperator
+ * @param maintainsValuetype 
+ * @return Marray* the wrapped M array containing the result of applying \p binaryoperator to the elements of M array \p _array and M list \p _list
+ */
 Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
-	if(!_list||_list->numberOfElements==0)return _array;
+	if(NULL==_list||_list->numberOfElements==0)return _array;
 	// ASSERT the list is not empty
-	unsigned long long arraylength=(_array?_array->numberOfElements:0);
+	unsigned long long arraylength=(_array!=NULL?_array->numberOfElements:0);
 	// the number of elements in the array is the maximum of the number of elements in the array or the index of the list
 	Marray* _result=owned_array(_getArray("appliedToArrayAndList",MAX(arraylength,_list->_last->index)),owner);
-	if(_result){
+	if(_result!=NULL){
+		if(maintainsValuetype)_result->valuetype=_array->valuetype; // MDH@29MAR2023: TODO should we do this????
 		// elements with the same index are to be added and stored under that index
 		Mlistelement* _listelement=_list->_first;
 		unsigned long long arrayindex=0;
-		while(_listelement||arrayindex<arraylength){
-			if(_listelement&&arrayindex<arraylength){
+		while(_listelement!=NULL||arrayindex<arraylength){
+			if(_listelement!=NULL&&arrayindex<arraylength){
 				if(_listelement->index==arrayindex+1){
 					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_listelement->_value));
 					_listelement=_listelement->_next;arrayindex++;
@@ -6730,7 +6809,7 @@ Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction b
 					arrayindex++;
 				}
 			}else
-			if(_listelement){
+			if(_listelement!=NULL){
 				assignValue(&_result->values[_listelement->index-1],binaryoperator(NULL,_listelement->_value));
 				_listelement=_listelement->_next;
 			}else{
@@ -6743,61 +6822,92 @@ Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction b
 }
 
 // we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
+/**
+ * @brief applies the binary operator \p binaryoperator to each element in M list \p _list with \p _value
+ * 
+ * @param _list 
+ * @param _value 
+ * @param binaryoperator
+ * @param maintainsValuetype 
+ * @return Mvalue* returns the wrapped M list of applying \p binaryoperator to each element in M list \p _list and \p _value
+ */
 Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mvalue* resultValue=NULL;
-	if(_value->type!=VT_LIST&&_value->type!=VT_ARRAY){
-		// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
-		Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
-		Mlistelement* _listelement=_list->_first;
-		while(_listelement){
-			Mvalue* resultValue=binaryoperator(_listelement->_value,_value);
-			if(appendedToList(_result,owner,resultValue,_listelement->index)<=0)break;
-			// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
-			_listelement=_listelement->_next;
-		}
-		resultValue=_getValueOfList(disowned_list(_result,owner));
-	}else
-	if(_value->type==VT_LIST)
-		resultValue=_getValueOfList(_appliedToLists(_list,_value->value._list,binaryoperator,maintainsValuetype));
-	else
-		resultValue=_getValueOfList(_appliedToListAndArray(_list,_value->value._array,binaryoperator,maintainsValuetype));
+	if(_value!=NULL){
+		if(_value->type!=VT_LIST&&_value->type!=VT_ARRAY){
+			// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
+			Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
+			if(_result!=NULL){
+				Mlistelement* _listelement=_list->_first;
+				while(_listelement!=NULL){
+					Mvalue* resultValue=binaryoperator(_listelement->_value,_value);
+					if(appendedToList(_result,owner,resultValue,_listelement->index)<=0){
+						outputError("Failed to store the result of applying a binary operator");
+						break;
+					}
+					// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
+					_listelement=_listelement->_next;
+				}
+				resultValue=_getValueOfList(disowned_list(_result,owner));
+			}
+		}else
+		if(_value->type==VT_LIST)
+			resultValue=_getValueOfList(_appliedToLists(_list,_value->value._list,binaryoperator,maintainsValuetype));
+		else
+			resultValue=_getValueOfList(_appliedToListAndArray(_list,_value->value._array,binaryoperator,maintainsValuetype));
+	}
 	return resultValue;
 }
+/**
+ * @brief applies binary operator \p binaryoperator to \p _value and each element in M list \p _list
+ * 
+ * @param _value 
+ * @param _list 
+ * @param binaryoperator
+ * @param maintainsValuetype 
+ * @return Mvalue* the wrapped M list with results of applying \p binaryoperator to \p _value and elements in \p _list
+ */
 Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mvalue* resultValue=NULL;
-	if(_value->type!=VT_LIST&&_value->type!=VT_ARRAY){
-		// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
-		Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
-		Mlistelement* _listelement=_list->_first;
-		while(_listelement){
-			Mvalue* resultValue=binaryoperator(_value,_listelement->_value);
-			if(appendedToList(_result,owner,resultValue,_listelement->index)<=0)break;
-			// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
-			_listelement=_listelement->_next;
-		}
-		resultValue=_getValueOfList(_result);
-	}else
-	if(_value->type==VT_LIST)
-		resultValue=_getValueOfList(_appliedToLists(_value->value._list,_list,binaryoperator,maintainsValuetype));
-	else
-		resultValue=_getValueOfArray(_appliedToArrayAndList(_value->value._array,_list,binaryoperator,maintainsValuetype));
+	if(_value!=NULL){
+		if(_value->type!=VT_LIST&&_value->type!=VT_ARRAY){
+			// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
+			Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
+			if(_result!=NULL){
+				Mlistelement* _listelement=_list->_first;
+				while(_listelement!=NULL){
+					Mvalue* resultValue=binaryoperator(_value,_listelement->_value);
+					if(appendedToList(_result,owner,resultValue,_listelement->index)<=0)break;
+					// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
+					_listelement=_listelement->_next;
+				}
+				resultValue=_getValueOfList(_result);
+			}
+		}else
+		if(_value->type==VT_LIST)
+			resultValue=_getValueOfList(_appliedToLists(_value->value._list,_list,binaryoperator,maintainsValuetype));
+		else
+			resultValue=_getValueOfArray(_appliedToArrayAndList(_value->value._array,_list,binaryoperator,maintainsValuetype));
+	}
 	return resultValue;
 }
 
-// we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
-static Mvaluetype getMatchingArrayValuetype(Mvaluetype arrayValuetype,Mvaluetype valueValuetype){
-	// essentially the matching list value type is listValuetype unless valueValuetype is different
-	// TODO we might improve on this if we select the 'highest' of the two value types as the result type
-	return(arrayValuetype!=valueValuetype?VT_UNDEFINED:arrayValuetype);
-}
+/**
+ * @brief applies \p binaryoperator to the elements in M array \p _array1 and M array \p _array2
+ * 
+ * @param _array1 
+ * @param _array2 
+ * @param maintainsValuetype 
+ * @return Marray* returns the wrapped M array with results of applying \p binaryoperator to the associated elements in \p _array1 and \p array2
+ */
 Marray* _appliedToArrays(Marray* _array1,Marray* _array2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
-	if(!_array1)return _array2;if(!_array2)return _array1;
+	if(NULL==_array1)return _array2;if(NULL==_array2)return _array1;
 	Marray* _result=owned_array(_getArray("_appliedToArrays",MAX(_array1->numberOfElements,_array2->numberOfElements)),owner); // TODO if the types are the same use that?
-	if(_result){
+	if(_result!=NULL){
 		if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array1->valuetype,_array2->valuetype);
 		unsigned long long arrayindex=0;
 		while(arrayindex<_result->numberOfElements){
@@ -6808,50 +6918,70 @@ Marray* _appliedToArrays(Marray* _array1,Marray* _array2,TwoArgumentFunction bin
 	}
 	return disowned_array(_result,owner);
 }
+/**
+ * @brief applies \p binaryoperator to each element in M array \p _array and \p _value
+ * 
+ * @param _array 
+ * @param _value 
+ * @param binaryoperator
+ * @param maintainsValuetype 
+ * @return Mvalue* the wrapped M array of applying \p binaryoperator to each element in M array \p _array and \p _value
+ */
 Mvalue* _appliedToArray(Marray* _array,Mvalue* _value,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mvalue* resultValue=NULL;
-	if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
-		Marray* _result=NULL;
-		// should create an array of the same length
-		_result=owned_array(_getArray("_appliedToArray",_array->numberOfElements),owner);
-		if(_result){
-			if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
-			unsigned long long arrayindex=0;
-			while(arrayindex<_array->numberOfElements){
-				assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
-				arrayindex++;
+	if(_value!=NULL){
+		if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
+			// should create an array of the same length
+			Marray* _result=owned_array(_getArray("_appliedToArray",_array->numberOfElements),owner);
+			if(_result!=NULL){
+				if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
+				unsigned long long arrayindex=0;
+				while(arrayindex<_array->numberOfElements){
+					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
+					arrayindex++;
+				}
+				resultValue=_getValueOfArray(disowned_array(_result,owner));
 			}
-			resultValue=_getValueOfArray(disowned_array(_result,owner));
-		}
-	}else
-	if(_value->type==VT_ARRAY)
-		resultValue=_getValueOfArray(_appliedToArrays(_array,_value->value._array,binaryoperator,maintainsValuetype));
-	else
-		resultValue=_getValueOfArray(_appliedToArrayAndList(_array,_value->value._list,binaryoperator,maintainsValuetype));
+		}else
+		if(_value->type==VT_ARRAY)
+			resultValue=_getValueOfArray(_appliedToArrays(_array,_value->value._array,binaryoperator,maintainsValuetype));
+		else
+			resultValue=_getValueOfArray(_appliedToArrayAndList(_array,_value->value._list,binaryoperator,maintainsValuetype));
+	}
 	return resultValue;
 }
+/**
+ * @brief applies \p binaryoperator to \p _value and each element of M array \p _array
+ * 
+ * @param _value 
+ * @param _array 
+ * @param maintainsValuetype 
+ * @return Mvalue* the wrapped 
+ */
 Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mvalue* resultValue=NULL;
-	if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
-		// should create an array of the same length
-		Marray* _result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements),owner);
-		if(_result){
-			if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
-			unsigned long long arrayindex=0;
-			while(arrayindex<_array->numberOfElements){
-				assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
-				arrayindex++;
+	if(_value!=NULL){
+		if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
+			// should create an array of the same length
+			Marray* _result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements),owner);
+			if(_result!=NULL){
+				if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
+				unsigned long long arrayindex=0;
+				while(arrayindex<_array->numberOfElements){
+					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
+					arrayindex++;
+				}
 			}
-		}
-	}else
-	if(_value->type==VT_ARRAY)
-		resultValue=_getValueOfArray(_appliedToArrays(_value->value._array,_array,binaryoperator,maintainsValuetype));
-	else
-		resultValue=_getValueOfList(_appliedToListAndArray(_value->value._list,_array,binaryoperator,maintainsValuetype));
+		}else
+		if(_value->type==VT_ARRAY)
+			resultValue=_getValueOfArray(_appliedToArrays(_value->value._array,_array,binaryoperator,maintainsValuetype));
+		else
+			resultValue=_getValueOfList(_appliedToListAndArray(_value->value._list,_array,binaryoperator,maintainsValuetype));
+	}
 	return resultValue;
 }
 
@@ -6866,8 +6996,15 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 // rational number addition
 // generic addition
 ///// MDH@18NOV2019 is now defined elsewhere!!: Mdecimal* getValueDecimal(Mvalue* _value);
+/**
+ * @brief returns the sum M value of \p _value1 and \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the sum M value of \p _value1 and \p _value2
+ */
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL; // MDH@24OCT2019: propagate NULL
+	if(NULL==_value1||NULL==_value2)return NULL; // MDH@24OCT2019: propagate NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,add,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add,true);
@@ -6904,14 +7041,15 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// outputBiginteger("Adding '",_biginteger1,"' and '");outputBiginteger(NULL,_biginteger2,"'.\n"); // DEBUG
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_biginteger1&&_biginteger2){
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerboseDebugging())
 				{outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_sumBiginteger=owned_biginteger(__biginteger(),owner);
-			if(_sumBiginteger&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){
+			if(_sumBiginteger!=NULL&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){
 				FREE_BIGINTEGER(_sumBiginteger,owner);_sumBiginteger=NULL;
 				outputError("Failed to add two big integers");
-			} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			}
+			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
@@ -6922,7 +7060,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
-			if(!_sumBiginteger)return _getIntegerValue(M_LL_INVALID);
+			if(NULL==_sumBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llsum=getBigintegerInteger(_sumBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llsum!=M_LL_INVALID){
@@ -6936,7 +7074,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 	// if the first value is a text we should always do concatenation!!!!
 	if(_value1->type==VT_TEXT){ // force string concatenation using the quote character in the Mvalue in the resulting text
 		Mstring* _valueText=owned_string(__string(),owner);
-		if(!_valueText)return NULL;
+		if(NULL==_valueText)return NULL;
 		Mstring* p=_valueText;
 		p=string_append_char(p,_value1->value._text->presuffix);
 		p=string_append(p,_value1->value._text->_c);
@@ -6944,10 +7082,10 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		// MDH@28OCT2019: think twice this is only true when _value2 is also of type text
 		if(_value2->type!=VT_TEXT){
 			Mstring* _value2Text=owned_string(_getValueText(_value2,true),owner); // get the text representation of the second argument without quotes
-			if(_value2Text){p=string_append(p,string(_value2Text));FREE_STRING(_value2Text,owner);}
+			if(_value2Text!=NULL){p=string_append(p,string(_value2Text));FREE_STRING(_value2Text,owner);}
 		}else // second argument also of type text
 			p=string_append(p,_value2->value._text->_c);
-		Mvalue* _value=(p?_getTextValue(string(_valueText)):NULL);
+		Mvalue* _value=(p!=NULL?_getTextValue(string(_valueText)):NULL);
 		FREE_STRING(_valueText,owner);
 		return _value;
 	}
@@ -6962,7 +7100,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		if(amVerboseDebugging())
 			outputInfo("Rational copies released.");
 		Mvalue* _sumValue=NULL;
-		if(_sumRational){
+		if(_sumRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
 				_sumValue=_getValueOfDecimal(_getRationalDecimal(_sumRational));
 				FREE_RATIONAL(_sumRational,owner);
@@ -6977,7 +7115,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner);
 		Mdecimal* _sumDecimal=owned_decimal(_getDecimalSum(_decimal1,_decimal2),owner); // _dadd replaced by _getDecimalSum that takes the repeating decimal digits into account as well
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_sumDecimal)return NULL; // failed to create the sum for whatever reason
+		if(NULL==_sumDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getValueOfDecimal(disowned_decimal(_sumDecimal,owner));
 	}
 	// if either is a real
@@ -7008,9 +7146,15 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 	*/
 	return NULL;
 }
-
+/**
+ * @brief subtracts M value \p _value2 from M value \p _value1
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* \p _value1 minus \p _value2
+ */
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(amVerboseDebugging())
 	{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,subtract,true);
@@ -7049,11 +7193,11 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		Mbiginteger *_biginteger2=((_value2->type==VT_TIME
 									?owned_biginteger(_getBiginteger(getTimeLongLong(_value2->value._time)),owner)
 									:(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger)));
-		if(_biginteger1&&_biginteger2){
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerboseDebugging())
 			{outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_differenceBiginteger=owned_biginteger(__biginteger(),owner);
-			if(_differenceBiginteger&&mp_sub(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_differenceBiginteger))!=MP_OKAY)
+			if(_differenceBiginteger!=NULL&&mp_sub(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_differenceBiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_differenceBiginteger,owner);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 			{outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
@@ -7067,7 +7211,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
-			if(!_differenceBiginteger)return _getIntegerValue(M_LL_INVALID);
+			if(NULL==_differenceBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long lldifference=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(lldifference!=M_LL_INVALID){FREE_BIGINTEGER(_differenceBiginteger,owner);return _getIntegerValue(lldifference);}
@@ -7077,13 +7221,17 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	}
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
-		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);
+		else 
+		if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(amVerboseDebugging())
 			{outputRational("Computing the difference of rational '",_rational1,"'");outputRational(" and rational '",_rational2,"'.\n");}
 		Mrational* _differenceRational=owned_rational(_getRationalDifference(_rational1,_rational2),owner); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		else 
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		Mvalue* _differenceValue=NULL;
-		if(_differenceRational){
+		if(_differenceRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
 				_differenceValue=_getValueOfDecimal(_getRationalDecimal(_differenceRational));
 				FREE_RATIONAL(_differenceRational,owner);
@@ -7098,13 +7246,13 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		Mdecimal* _differenceDecimal=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner); // _dsub replaced by _getDecimalDifference which takes repeating decimal digits into account as well
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_differenceDecimal)return NULL; // failed to create the sum for whatever reason
+		if(NULL==_differenceDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getValueOfDecimal(disowned_decimal(_differenceDecimal,owner));
 	}
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerboseDebugging())
-			{outputValue("Subtracting integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		{outputValue("Subtracting integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
 		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2:M_LD_NAN);
 	}
@@ -7116,9 +7264,15 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	*/
 	return NULL;
 }
-
+/**
+ * @brief multiplies M value \p _value1 and \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the product of \p _value1 and \p _value2
+ */
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,multiply,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply,true);
 	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,multiply,true);
@@ -7140,14 +7294,14 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
 		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_biginteger1&&_biginteger2){
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerboseDebugging())
 				{outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_productBiginteger=owned_biginteger(__biginteger(),owner);
-			if(_productBiginteger&&mp_mul(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_productBiginteger))!=MP_OKAY)
+			if(_productBiginteger!=NULL&&mp_mul(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_productBiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_productBiginteger,owner);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
-				{outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
+			{outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
@@ -7156,7 +7310,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
-			if(!_productBiginteger)return _getIntegerValue(M_LL_INVALID);
+			if(NULL==_productBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llproduct=getBigintegerInteger(_productBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llproduct!=M_LL_INVALID){FREE_BIGINTEGER(_productBiginteger,owner);return _getIntegerValue(llproduct);}
@@ -7197,7 +7351,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		Mrational* _productRational=owned_rational(_getRationalProduct(_rational1,_rational2),owner); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
 		Mvalue* _productValue=NULL;
-		if(_productRational){
+		if(_productRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
 				_productValue=_getValueOfDecimal(_getRationalDecimal(_productRational));
 				FREE_RATIONAL(_productRational,owner);
@@ -7214,19 +7368,24 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		Mdecimal* _productDecimal=owned_decimal(_getDecimalProduct(_decimal1,_decimal2),owner); // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_productDecimal)return NULL; // failed to create the sum for whatever reason
+		if(NULL==_productDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getValueOfDecimal(disowned_decimal(_productDecimal,owner));
 	}
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerboseDebugging())
-			{outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		{outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
 		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
 	}
 	return NULL;
 }
-
+/**
+ * @brief returns the 1 value of the given \p valuetype
+ * 
+ * @param valuetype 
+ * @return Mvalue* the 1 value in the given value type \p valuetype
+ */
 Mvalue* _getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
 	switch(valuetype){
 		case VT_TIME:
@@ -7239,7 +7398,13 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner
 	}
 	return NULL;
 }
-
+/**
+ * @brief returns \p base to the power of \p _powerValue
+ * 
+ * @param base 
+ * @param _powerValue 
+ * @return long double \p base to the power of \p _powerValue
+ */
 long double getRealPowerValue(long double base,Mvalue* _powerValue){
 	// ASSERT assuming power does not equal 0
 	if(isLongDoubleUndefined(base)==M_FALSE){ // TODO might still be infinite though
