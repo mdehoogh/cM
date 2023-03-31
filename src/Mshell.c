@@ -6016,7 +6016,7 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	}
 	/////if(!result)return NULL;
 	if(amVerboseDebugging())
-	{if(result!=null){outputValue(" Result of applying the unary operator (",result,")");output(" of type %u.\n",result->type);}else output(".\n");}
+	{if(result!=NULL){outputValue(" Result of applying the unary operator (",result,")");output(" of type %u.\n",result->type);}else output(".\n");}
 	return result;
 }
 /**
@@ -6905,6 +6905,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
  * @return Marray* returns the wrapped M array with results of applying \p binaryoperator to the associated elements in \p _array1 and \p array2
  */
 Marray* _appliedToArrays(Marray* _array1,Marray* _array2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	// MDH@30MAR2023: it's debatable whether we want a elementwise binary operator application or every element with every other element
 	if(NULL==_array1)return _array2;if(NULL==_array2)return _array1;
 	Marray* _result=owned_array(_getArray("_appliedToArrays",MAX(_array1->numberOfElements,_array2->numberOfElements)),owner); // TODO if the types are the same use that?
 	if(_result!=NULL){
@@ -6997,11 +6998,11 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 // generic addition
 ///// MDH@18NOV2019 is now defined elsewhere!!: Mdecimal* getValueDecimal(Mvalue* _value);
 /**
- * @brief returns the sum M value of \p _value1 and \p _value2
+ * @brief returns the sum of \p _value1 and \p _value2
  * 
  * @param _value1 
  * @param _value2 
- * @return Mvalue* the sum M value of \p _value1 and \p _value2
+ * @return Mvalue* the sum of \p _value1 and \p _value2
  */
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL; // MDH@24OCT2019: propagate NULL
@@ -7147,7 +7148,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 	return NULL;
 }
 /**
- * @brief subtracts M value \p _value2 from M value \p _value1
+ * @brief returns the difference of \p _value2 and \p _value1
  * 
  * @param _value1 
  * @param _value2 
@@ -7265,7 +7266,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	return NULL;
 }
 /**
- * @brief multiplies M value \p _value1 and \p _value2
+ * @brief returns the product of \p _value1 and \p _value2
  * 
  * @param _value1 
  * @param _value2 
@@ -7399,16 +7400,16 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner
 	return NULL;
 }
 /**
- * @brief returns \p base to the power of \p _powerValue
+ * @brief returns the long double power of long double base \p base and wrapped exponent \p _powerValue
  * 
  * @param base 
  * @param _powerValue 
- * @return long double \p base to the power of \p _powerValue
+ * @return long double the power of long double base \p base and wrapped exponent \p _powerValue
  */
 long double getRealPowerValue(long double base,Mvalue* _powerValue){
 	// ASSERT assuming power does not equal 0
 	if(isLongDoubleUndefined(base)==M_FALSE){ // TODO might still be infinite though
-		if(_powerValue)
+		if(_powerValue!=NULL)
 		switch(_powerValue->type){
 			case VT_INTEGER:return powl(base,_powerValue->value._integer->ll); // very easy, as we can expext to be able to convert the integer to a long double
 			case VT_BIGINTEGER:return powl(base,mp_get_long_double(_powerValue->value._biginteger));
@@ -7416,7 +7417,8 @@ long double getRealPowerValue(long double base,Mvalue* _powerValue){
 			case VT_RATIONAL:
 				{
 					long double power=powl(mp_get_long_double(_powerValue->value._rational->num),power);
-					if(_powerValue->value._rational->den)power/=powl(mp_get_long_double(_powerValue->value._rational->den),power);
+					if(_powerValue->value._rational->den!=NULL)
+						power/=powl(mp_get_long_double(_powerValue->value._rational->den),power);
 					return powl(base,power);
 				}
 			case VT_FLOAT:return powl(base,_powerValue->value._float->ld);
@@ -7425,10 +7427,17 @@ long double getRealPowerValue(long double base,Mvalue* _powerValue){
 	}
 	return M_LD_NAN; // uncomputable
 }
+/**
+ * @brief returns the power of wrapped base \p _baseValue and long double exponent \p power
+ * 
+ * @param _baseValue 
+ * @param power 
+ * @return long double the power of wrapped base \p _baseValue and long double exponent \p power
+ */
 long double getFloatValuePower(Mvalue* _baseValue,long double power){
 	// ASSERT assuming power does not equal 0
 	if(isLongDoubleUndefined(power)==M_FALSE){ // TODO might still be infinite though
-		if(_baseValue)
+		if(_baseValue!=NULL)
 		switch(_baseValue->type){
 			case VT_INTEGER:return powl(_baseValue->value._integer->ll,power); // very easy, as we can expext to be able to convert the integer to a long double
 			case VT_BIGINTEGER:return powl(mp_get_long_double(_baseValue->value._biginteger),power);
@@ -7436,7 +7445,8 @@ long double getFloatValuePower(Mvalue* _baseValue,long double power){
 			case VT_RATIONAL:
 				{ // transform the base value rational to a long double
 					long double base=powl(mp_get_long_double(_baseValue->value._rational->num),power);
-					if(_baseValue->value._rational->den)base/=powl(mp_get_long_double(_baseValue->value._rational->den),power);
+					if(_baseValue->value._rational->den!=NULL)
+						base/=powl(mp_get_long_double(_baseValue->value._rational->den),power);
 					return powl(base,power);
 				}
 			case VT_FLOAT:return powl(_baseValue->value._float->ld,power);
@@ -7445,12 +7455,19 @@ long double getFloatValuePower(Mvalue* _baseValue,long double power){
 	}
 	return M_LD_NAN; // uncomputable
 }
-
+/**
+ * @brief returns the decimal power of decimal base \p base and decimal exponent \p exponent
+ * 
+ * @param base 
+ * @param exponent 
+ * @param mpd_context 
+ * @return Mdecimal* the decimal power of decimal base \p base and decimal exponent \p exponent
+ */
 Mdecimal* _getDecimalPower(mpd_t* base,mpd_t* exponent,mpd_context_t* mpd_context){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimalPower=NULL;
-	if(base&&exponent&&mpd_context){
+	if(base!=NULL&&exponent!=NULL&&mpd_context!=NULL){
 		_decimalPower=owned_decimal(__decimal(mpd_context,0,0),owner);
-		if(_decimalPower){
+		if(_decimalPower!=NULL){
 			uint32_t status=0;
 			mpd_qpow(_decimalPower->mpd,base,exponent,mpd_context,&status);
 			if((status&0xEFBF)!=0)
@@ -7463,83 +7480,132 @@ Mdecimal* _getDecimalPower(mpd_t* base,mpd_t* exponent,mpd_context_t* mpd_contex
 }
 
 // computing the integer power of some value, can be performed more exact than when the exponent is not an integer
+/**
+ * @brief returns the big integer power of big integer base \p baseBiginteger and big integer exponent \p exponentBiginteger
+ * 
+ * @param baseBiginteger 
+ * @param exponentBiginteger 
+ * @return Mbiginteger* the big integer power of big integer base \p baseBiginteger and big integer exponent \p exponentBiginteger
+ */
 Mbiginteger* _getBigintegerPowerWithPositiveBigintegerExponent(Mbiginteger* baseBiginteger,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT assuming exponentBiginteger is positive (so never zero!!!)
 	Mbiginteger* _resultBiginteger=NULL;
-	if(baseBiginteger&&exponentBiginteger){
+	if(baseBiginteger!=NULL&&exponentBiginteger!=NULL){
 		////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
 		if(isBigintegerZero(exponentBiginteger))
 			_resultBiginteger=owned_biginteger(_getBiginteger(1),owner);
 		else
-		if(!isBigintegerOne(exponentBiginteger)){
+		if(isBigintegerOne(exponentBiginteger))
+			_resultBiginteger=owned_biginteger(_getBigintegerCopy(baseBiginteger),owner);
+		else{
 			// determine half the exponent
 			Mbiginteger* _halfexponentBiginteger=owned_biginteger(__biginteger(),owner);
-			if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
-				Mbiginteger* _halfresultBiginteger=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,_halfexponentBiginteger),owner);
-				if(_halfresultBiginteger){
-					Mbiginteger* _doublehalfresultBiginteger=owned_biginteger(__biginteger(),owner);
-					if(mp_sqr(MP_INT_POINTER(_halfresultBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY){
-						if(!mp_isodd(MP_INT_POINTER(exponentBiginteger))||mp_mul(MP_INT_POINTER(_doublehalfresultBiginteger),MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY)
-							_resultBiginteger=_doublehalfresultBiginteger;
-						else
-							FREE_BIGINTEGER(_doublehalfresultBiginteger,owner);
-					}else
-						FREE_BIGINTEGER(_doublehalfresultBiginteger,owner);
-					FREE_BIGINTEGER(_halfresultBiginteger,owner);
+			if(_halfexponentBiginteger!=NULL){
+				if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
+					Mbiginteger* _halfresultBiginteger=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,_halfexponentBiginteger),owner);
+					if(_halfresultBiginteger!=NULL){
+						Mbiginteger* _doublehalfresultBiginteger=owned_biginteger(__biginteger(),owner);
+						if(_doublehalfresultBiginteger!=NULL){
+							if((mp_sqr(MP_INT_POINTER(_halfresultBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY)&&
+								 (!mp_isodd(MP_INT_POINTER(exponentBiginteger))||mp_mul(MP_INT_POINTER(_doublehalfresultBiginteger),MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY))
+								_resultBiginteger=_doublehalfresultBiginteger;
+							else
+								FREE_BIGINTEGER(_doublehalfresultBiginteger,owner);
+						}
+						FREE_BIGINTEGER(_halfresultBiginteger,owner);
+					}
 				}
+				FREE_BIGINTEGER(_halfexponentBiginteger,owner);
 			}
-			FREE_BIGINTEGER(_halfexponentBiginteger,owner);
-		}else
-			_resultBiginteger=owned_biginteger(_getBigintegerCopy(baseBiginteger),owner);
+		}
 	}
 	return disowned_biginteger(_resultBiginteger,owner);
 }
+/**
+ * @brief returns the wrapped power of big integer base \p baseBiginteger and big integer exponent \p exponentBiginteger 
+ * @details takes the sign of \p exponentBiginteger into account
+ *          the result will be a rational if \p exponentBiginteger is negative
+ * @param baseBiginteger 
+ * @param exponentBiginteger 
+ * @return Mvalue* the wrapped big integer power of big integer base \p baseBiginteger and big integer exponent \p exponentBiginteger 
+ */
 Mvalue* _getBigintegerBigintegerPowerValue(Mbiginteger* baseBiginteger,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	Mbiginteger* _bigintegerPower=NULL;
 	bool neg=false;
-	if(baseBiginteger&&exponentBiginteger){
+	if(baseBiginteger!=NULL&&exponentBiginteger!=NULL){
 		//////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
 		if(mp_iszero(MP_INT_POINTER(baseBiginteger))==MP_NO){ // non-zero base
 			neg=(mp_isneg(MP_INT_POINTER(exponentBiginteger))==MP_YES);
 			if(mp_iszero(MP_INT_POINTER(exponentBiginteger))!=MP_YES){ // not zero
-				MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS; // sneaky, sneaky!! ascertaining to use a positive exponent!
+				if(neg)MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS; // sneaky, sneaky!! ascertaining to use a positive exponent!
 				_bigintegerPower=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,exponentBiginteger),owner);
+				// MDH@30MAR2023: OOPS shouldn't we reset the sign?
+				if(neg)MP_INT_POINTER(exponentBiginteger)->sign=MP_NEG;
 			}else
 				_bigintegerPower=owned_biginteger(_getBiginteger(1),owner);
 		}else // base is zero, so power is zero as well
 			_bigintegerPower=owned_biginteger(_getBiginteger(0),owner);
 	}
-	return(_bigintegerPower?(neg?_getValueOfRational(_getRational(NULL,_bigintegerPower,0,false)):_getValueOfBiginteger(disowned_biginteger(_bigintegerPower,owner))):NULL);
+	return(_bigintegerPower!=NULL?(neg?_getValueOfRational(_getRational(NULL,_bigintegerPower,0,false)):_getValueOfBiginteger(disowned_biginteger(_bigintegerPower,owner))):NULL);
 }
+/**
+ * @brief returns the rational power of rational base \p baseRational and big integer exponent \p exponentBiginteger
+ * 
+ * @param baseRational 
+ * @param exponentBiginteger 
+ * @return Mrational* the rational power of rational base \p baseRational and big integer exponent \p exponentBiginteger
+ */
 Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	// the result is the rational of the power of the numerator and the power of the denominator
 	// if the exponent is negative we simply exchange the numerator and the denominator!!	
 	Mrational* _rationalPower=NULL;
-	if(baseRational&&exponentBiginteger){
-		bool neg=(mp_isneg(MP_INT_POINTER(exponentBiginteger))==MP_YES);
-		MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS;
-		Mbiginteger *baseNumerator=(neg?baseRational->den:baseRational->num),*baseDenominator=(neg?baseRational->num:baseRational->den);
-		Mbiginteger *_numerator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger),owner);
-		Mbiginteger *_denominator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger),owner);
-		_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner);
-		if(!_rationalPower||!_rationalPower->num)FREE_BIGINTEGER(_numerator,owner);
-		if(!_rationalPower||!_rationalPower->den)FREE_BIGINTEGER(_denominator,owner);
+	if(baseRational!=NULL&&exponentBiginteger!=NULL){
+		if(!isBigintegerZero(exponentBiginteger)){
+			bool neg=false;
+			if(mp_isneg(MP_INT_POINTER(exponentBiginteger))==MP_YES){
+				MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS;
+				neg=true;
+			}
+			Mbiginteger *baseNumerator=(neg?baseRational->den:baseRational->num),*baseDenominator=(neg?baseRational->num:baseRational->den);
+			Mbiginteger *_numerator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger),owner);
+			Mbiginteger *_denominator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger),owner);
+			if(neg)MP_INT_POINTER(exponentBiginteger)->sign=MP_NEG;
+			_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner);
+			if(NULL==_rationalPower||NULL==_rationalPower->num)FREE_BIGINTEGER(_numerator,owner);
+			if(NULL==_rationalPower||NULL==_rationalPower->den)FREE_BIGINTEGER(_denominator,owner);
+		}else // the exponent equals zero, so return rational 1
+			_rationalPower=owned_rational(__rational(),owner);
 	}
 	return disowned_rational(_rationalPower,owner);
 }
+/**
+ * @brief returns the maximum of the decimal context of \p d1 and \p d2
+ * 
+ * @param d1 
+ * @param d2 
+ * @return mpd_context_t* the maximum of the decimal context of \p d1 and \p d2
+ */
 mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){// TODO check ownership 
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
 	return(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 }
+/**
+ * @brief returns the wrapped power of base \p baseValue and exponent \p exponentBiginteger
+ * 
+ * @param baseValue 
+ * @param exponentBiginteger 
+ * @return Mvalue* the wrapped power of base \p baseValue and exponent \p exponentBiginteger
+ */
 Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	// the general idea is to recursively half the exponent until we end up with having to compute the square which is easy to do
 	// but perhaps we should delegate further to functions that deal with specific base value types
+	if(baseValue!=NULL)
 	switch(baseValue->type){
 		case VT_INTEGER:
 			{
 				Mvalue* _resultValue=NULL;
 				Mbiginteger* _baseBiginteger=owned_biginteger(_getBiginteger(baseValue->value._integer->ll),owner);
-				if(_baseBiginteger){
+				if(_baseBiginteger!=NULL){
 					_resultValue=_getBigintegerBigintegerPowerValue(_baseBiginteger,exponentBiginteger);
 					FREE_BIGINTEGER(_baseBiginteger,owner);
 				}
@@ -7552,7 +7618,7 @@ Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteg
 		case VT_DECIMAL:
 			if(baseValue->value._decimal->repeating>0){
 				Mrational* _decimalRational=owned_rational(_getDecimalRational(baseValue->value._decimal),owner);
-				if(_decimalRational){
+				if(_decimalRational!=NULL){
 					Mrational* _decimalRationalPower=owned_rational(_getRationalBigintegerPower(_decimalRational,exponentBiginteger),owner);
 					FREE_RATIONAL(_decimalRational,owner);
 					return _getValueOfRational(disowned_rational(_decimalRationalPower,owner));
@@ -7571,10 +7637,17 @@ Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteg
 
 // for finding the decimal root with an integer root degree we need to be able to compute any power of a decimal
 // TODO more convenient to work with raw mpd_t instances directly
+/**
+ * @brief returns the decimal power of base decimal \p baseDecimal and big integer exponent \p exponentBiginteger
+ * 
+ * @param baseDecimal 
+ * @param exponentBiginteger 
+ * @return Mdecimal* the decimal power of base decimal \p baseDecimal and big integer exponent \p exponentBiginteger
+ */
 Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT assuming exponentBiginteger is positive (so never zero!!!)
 	Mdecimal* _resultDecimal=NULL;
-	if(baseDecimal&&exponentBiginteger){
+	if(baseDecimal!=NULL&&exponentBiginteger!=NULL){
 		////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
 		if(isBigintegerZero(exponentBiginteger))
 			_resultDecimal=owned_decimal(__decimal(NULL,1,0),owner);
@@ -7582,34 +7655,36 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 		if(!isBigintegerOne(exponentBiginteger)){
 			// get a decimal context
 			Mdecimalcontext* decimalcontext=getDecimalcontext(baseDecimal->prec);
-			mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+			mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:get_default_mpd_context());
 			// determine half the exponent
 			Mbiginteger* _halfexponentBiginteger=owned_biginteger(__biginteger(),owner);
-			if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
-				Mdecimal* _halfresultDecimal=owned_decimal(_getDecimalPowerWithPositiveBigintegerExponent(baseDecimal,_halfexponentBiginteger),owner);
-				if(_halfresultDecimal){
-					Mdecimal* _doublehalfresultDecimal=owned_decimal(__decimal(NULL,1,0),owner);
-					if(_doublehalfresultDecimal){
-						uint32_t status=0;
-						mpd_qmul(_doublehalfresultDecimal->mpd,_halfresultDecimal->mpd,_halfresultDecimal->mpd,mpd_context,&status);
-						if((status&0xEFBF)==0){
-							if(mp_isodd(MP_INT_POINTER(exponentBiginteger))){
-								_resultDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
-								if(_resultDecimal){
-									mpd_qmul(_resultDecimal->mpd,_doublehalfresultDecimal->mpd,baseDecimal->mpd,mpd_context,&status);
-									if((status&0xEFBF)!=0){FREE_DECIMAL(_resultDecimal,owner);_resultDecimal=NULL;}
+			if(_halfexponentBiginteger!=NULL){
+				if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
+					Mdecimal* _halfresultDecimal=owned_decimal(_getDecimalPowerWithPositiveBigintegerExponent(baseDecimal,_halfexponentBiginteger),owner);
+					if(_halfresultDecimal){
+						Mdecimal* _doublehalfresultDecimal=owned_decimal(__decimal(NULL,1,0),owner);
+						if(_doublehalfresultDecimal!=NULL){
+							uint32_t status=0;
+							mpd_qmul(_doublehalfresultDecimal->mpd,_halfresultDecimal->mpd,_halfresultDecimal->mpd,mpd_context,&status);
+							if((status&0xEFBF)==0){
+								if(mp_isodd(MP_INT_POINTER(exponentBiginteger))){
+									_resultDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
+									if(_resultDecimal!=NULL){
+										mpd_qmul(_resultDecimal->mpd,_doublehalfresultDecimal->mpd,baseDecimal->mpd,mpd_context,&status);
+										if((status&0xEFBF)!=0){FREE_DECIMAL(_resultDecimal,owner);_resultDecimal=NULL;}
+									}else
+										outputError("Failed to create a decimal in computing the integer power of a decimal");
 								}else
-									outputError("Failed to create a decimal in computing the integer power of a decimal");
+									_resultDecimal=owned_decimal(_getDecimalCopy(_doublehalfresultDecimal),owner);
 							}else
-								_resultDecimal=owned_decimal(_getDecimalCopy(_doublehalfresultDecimal),owner);
-						}else
-							outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
-						FREE_DECIMAL(_doublehalfresultDecimal,owner);
+								outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
+							FREE_DECIMAL(_doublehalfresultDecimal,owner);
+						}
+						FREE_DECIMAL(_halfresultDecimal,owner);
 					}
-					FREE_DECIMAL(_halfresultDecimal,owner);
 				}
+				FREE_BIGINTEGER(_halfexponentBiginteger,owner);
 			}
-			FREE_BIGINTEGER(_halfexponentBiginteger,owner);
 		}else
 			_resultDecimal=owned_decimal(_getDecimalCopy(baseDecimal),owner);
 	}
@@ -7617,14 +7692,25 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 }
 
 // MDH@11OCT2019: until we know a better way I stick to using squared exponentation
+/**
+ * @brief returns the power in \p powerBiginteger of base big integer \p baseBiginteger and exponent big integer \p exponentBiginteger
+ * 
+ * @param baseBiginteger 
+ * @param exponentBiginteger 
+ * @param powerBiginteger the power of base big integer \p baseBiginteger and exponent big integer \p exponentBiginteger
+ * @return mp_err the result error code
+ */
 mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteger const * const exponentBiginteger,Mbiginteger * const powerBiginteger){Mallocationowner owner=getOwner(__LINE__);
-	mp_err result=(baseBiginteger&&exponentBiginteger&&powerBiginteger?MP_OKAY:MP_ERR);
+	mp_err result=(baseBiginteger!=NULL&&exponentBiginteger!=NULL&&powerBiginteger!=NULL?MP_OKAY:MP_ERR);
 	if(result==MP_OKAY){
 		if(!isBigintegerOne(baseBiginteger)&&!isBigintegerZero(exponentBiginteger)){
-			Mbiginteger *_multiplierBiginteger=owned_biginteger(_getBigintegerCopy(baseBiginteger),owner)
-					   ,*_exponentBiginteger=owned_biginteger(_getBigintegerCopy(exponentBiginteger),owner);
-			if(_multiplierBiginteger&&_exponentBiginteger){
-				if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))!=MP_YES)mp_set_i32(MP_INT_POINTER(powerBiginteger),1);else result=mp_copy(MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(powerBiginteger)); // initialize powerBiginteger to 1
+			Mbiginteger *_multiplierBiginteger=owned_biginteger(_getBigintegerCopy(baseBiginteger),owner),
+					   			*_exponentBiginteger=owned_biginteger(_getBigintegerCopy(exponentBiginteger),owner);
+			if(_multiplierBiginteger!=NULL&&_exponentBiginteger!=NULL){
+				if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))!=MP_YES)
+					mp_set_i32(MP_INT_POINTER(powerBiginteger),1);
+				else 
+					result=mp_copy(MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(powerBiginteger)); // initialize powerBiginteger to 1
 				// can we do this iteratively???
 				while(result==MP_OKAY){
 					if(mp_iszero(MP_INT_POINTER(_exponentBiginteger))==MP_YES)break;
@@ -7632,7 +7718,8 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 					if((result=mp_div_2(MP_INT_POINTER(_exponentBiginteger),MP_INT_POINTER(_exponentBiginteger)))!=MP_OKAY)break;
 					// square the multiplier
 					if((result=mp_sqr(MP_INT_POINTER(_multiplierBiginteger),MP_INT_POINTER(_multiplierBiginteger)))!=MP_OKAY)break;
-					if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))==MP_YES)if((result=mp_mul(MP_INT_POINTER(powerBiginteger),MP_INT_POINTER(_multiplierBiginteger),MP_INT_POINTER(powerBiginteger)))!=MP_OKAY)break;
+					if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))==MP_YES)
+					if((result=mp_mul(MP_INT_POINTER(powerBiginteger),MP_INT_POINTER(_multiplierBiginteger),MP_INT_POINTER(powerBiginteger)))!=MP_OKAY)break;
 				}
 			}
 			FREE_BIGINTEGER(_multiplierBiginteger,owner);FREE_BIGINTEGER(_exponentBiginteger,owner);
@@ -7644,10 +7731,17 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 
 // MDH@10OCT2019: if both the argument and the degree is rational we can use rational approximations of the (Newtonian) (decimal) algorithm used in _getBigintegerRootValue()
 // MDH@15OCT2019: how about checking whether the root approximation is near the actual root????
+/**
+ * @brief returns the \p rootDegreeBiginteger root of rational \p rootArgumentRational
+ * 
+ * @param rootArgumentRational 
+ * @param rootDegreeBiginteger 
+ * @return Mrational* the \p rootDegreeBiginteger root of rational \p rootArgumentRational
+ */
 Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mbiginteger* rootDegreeBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT root degree big integer must NOT be negative, and use a single mp_digit (otherwise computing the function value computation is too hard)
 	Mrational* _rationalBigintegerRootRational=NULL;
-	if(rootArgumentRational&&rootDegreeBiginteger){
+	if(rootArgumentRational!=NULL&&rootDegreeBiginteger!=NULL){
 		// if the degree is zero, return 1
 		if(!isBigintegerZero(rootDegreeBiginteger)){
 			// if either rational is one, return a copy of the root argument rational
@@ -7655,9 +7749,10 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 				if(MP_INT_POINTER(rootDegreeBiginteger)->used==1){ // should ALWAYS be the case!!!!
 					outputBiginteger("Computing the rational approximation to the ",rootDegreeBiginteger,"th root");
 					outputRational(" of ",rootArgumentRational,".\n");
-					Mbiginteger *p_a=rootArgumentRational->num,*q_a=(rootArgumentRational->den?rootArgumentRational->den:owned_biginteger(_getBiginteger(1),owner)); // helpers that will contain the numerator and denominator of A (the root argument)
+					Mbiginteger *p_a=rootArgumentRational->num,
+											*q_a=(rootArgumentRational->den!=NULL?rootArgumentRational->den:owned_biginteger(_getBiginteger(1),owner)); // helpers that will contain the numerator and denominator of A (the root argument)
 					Mbiginteger *_pk=owned_biginteger(__biginteger(),owner),*_qk=owned_biginteger(_getBiginteger(1),owner); // initialize the solution to the root argument allowing that q_k equals NULL to indicate it is equal to 1
-					if(_pk&&_qk){
+					if(_pk!=NULL&&_qk!=NULL){
 						// TODO how to check whether rootDegreeBiginteger is nottoo large????
 						mp_err result=MP_OKAY;
 						// MDH@13OCT2019: TODO if there's exactly one mp_digit being used in the root degree we can improve on the initial approximation
@@ -7665,7 +7760,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						int64_t rootDegreeDigit=mp_get_i64(MP_INT_POINTER(rootDegreeBiginteger));
 						// let's change the initial approximation of the root using the n root method on the big integer numerator and denominator
 						if((result=mp_n_root(MP_INT_POINTER(p_a),(mp_digit)rootDegreeDigit,MP_INT_POINTER(_pk)))==MP_OKAY&&
-							(!q_a||(result=mp_n_root(MP_INT_POINTER(q_a),(mp_digit)rootDegreeDigit,MP_INT_POINTER(_qk)))==MP_OKAY)){
+							(NULL==q_a||(result=mp_n_root(MP_INT_POINTER(q_a),(mp_digit)rootDegreeDigit,MP_INT_POINTER(_qk)))==MP_OKAY)){
 							// TODO we could have a match already (currently discovered in the first step of the iterations below)
 							// _pk now not above n root of p_a
 							// _qk now not above n root of q_a
@@ -7678,10 +7773,10 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						if(result==MP_OKAY){
 							// try to initialize root degree times the denominator of the root argument (which could be NULL when it equals 1)
 							Mbiginteger* _np_a=owned_biginteger(_getBigintegerCopy(rootDegreeBiginteger),owner);
-							if(_np_a&&q_a&&mp_mul(MP_INT_POINTER(_np_a),MP_INT_POINTER(q_a),MP_INT_POINTER(_np_a))!=MP_OKAY){
+							if(_np_a!=NULL&&q_a!=NULL&&mp_mul(MP_INT_POINTER(_np_a),MP_INT_POINTER(q_a),MP_INT_POINTER(_np_a))!=MP_OKAY){
 								FREE_BIGINTEGER(_np_a,owner);_np_a=NULL;
 							}
-							if(_np_a){
+							if(_np_a!=NULL){
 								// MDH@30MAY2020: TOTO own all the bigintegers
 								// we need some additional helper big integers
 								Mbiginteger *_pktothepowern=owned_biginteger(__biginteger(),owner)
@@ -7708,7 +7803,11 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										   ,*_pkhalfway=owned_biginteger(__biginteger(),owner)
 										   ,*_distancehalfway=owned_biginteger(__biginteger(),owner)
 										   ,*_one=owned_biginteger(_getBiginteger(1),owner); // what we'll use for determining a value below the root
-								if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_distancenumerator&&_pktothepowernminus1&&_divremainder&&_gcd&&_nextpk&&_nextqk&&_num1&&_num&&_den&&_distancedenominator&&_pkctothepowern&&_pkonthisside&&_pkontheotherside&&_deltapk&&_distanceonthisside&&_distanceontheotherside&&_pkdifference&&_pkhalfway&&_distancehalfway&&_one){
+								if (_pktothepowern!=NULL&&_qktothepowern!=NULL&&_delta1!=NULL&&_delta2!=NULL&&_distancenumerator!=NULL&&
+										_pktothepowernminus1!=NULL&&_divremainder!=NULL&&_gcd!=NULL&&_nextpk!=NULL&&_nextqk!=NULL&&
+										_num1!=NULL&&_num!=NULL&&_den!=NULL&&_distancedenominator!=NULL&&_pkctothepowern!=NULL&&
+										_pkonthisside!=NULL&&_pkontheotherside!=NULL&&_deltapk!=NULL&&_distanceonthisside!=NULL&&
+										_distanceontheotherside!=NULL&&_pkdifference!=NULL&&_pkhalfway!=NULL&&_distancehalfway!=NULL&&_one!=NULL){
 									char c;
 									unsigned long long iter=0;
 									Mrational* _rational;
@@ -7717,9 +7816,9 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										output("\nRational root approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");
 										// let's show the decimal representation of this value
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_pk),/*_getBigintegerCopy*/(_qk),M_LD_NAN,false),owner);
-										if(_rational){
+										if(_rational!=NULL){
 											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
-											if(_decimal){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
+											if(_decimal!=NULL){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
 										}
 										output(".\n");
 										// update the delta
@@ -7736,35 +7835,45 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
 										*/
-										if(!q_a||!_delta1||mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(NULL==q_a||NULL==_delta1||mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY)
+										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 1: ",_delta1,".\n");
-										if(!p_a||!_delta2||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(NULL==p_a||NULL==_delta2||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY)
+										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 2: ",_delta2,".\n");
-										if(!_delta2||!_delta1||!_distancenumerator||mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+										if(NULL==_delta2||NULL==_delta1||NULL==_distancenumerator||mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY)
+										{outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
 										// we can compute the denominator of the distance as well which is q_a times _qktothepowern
-										if(!_qktothepowern||!q_a||!_distancedenominator||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
+										if(NULL==_qktothepowern||NULL==q_a||NULL==_distancedenominator||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY)
+										{outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
 
 										outputBiginteger("\tDistance from (",_pk,"/");outputBiginteger(NULL,_qk,")");outputBiginteger("**",rootDegreeBiginteger," to ");
 										outputBiginteger("root argument (",p_a,"/");outputBiginteger(NULL,q_a,"): ");
 										outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,")");
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_distancenumerator),/*_getBigintegerCopy*/(_distancedenominator),M_LD_NAN,false),owner);
-										if(_rational){
+										if(_rational!=NULL){
 											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
-											if(_decimal){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
+											if(_decimal!=NULL){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
 										}
 										outputChar('\n');
 
 										if(mp_iszero(MP_INT_POINTER(_distancenumerator)))break; // if delta is zero, exact hit (which I think can only happen when)
 										
-										if(mp_div(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_pk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_divremainder))!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
+										if(mp_div(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_pk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_divremainder))!=MP_OKAY)
+										{outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
 										// update _pk (next) and _qk (next)
-										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextpk))!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-										if(mp_add(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_nextpk))!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_nextqk))!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextqk))!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextpk))!=MP_OKAY)
+										{outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										if(mp_add(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_nextpk))!=MP_OKAY)
+										{outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_nextqk))!=MP_OKAY)
+										{outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextqk))!=MP_OKAY)
+										{outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 										// that's neat isn't it?
 										// how about normalizing _pk and _qk here, which might help
-										if(mp_gcd(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd))!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
+										if(mp_gcd(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd))!=MP_OKAY)
+										{outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
 										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_divremainder))!=MP_OKAY
 																	||mp_div(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_divremainder))!=MP_OKAY))
 										{outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
@@ -7773,14 +7882,22 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										// ASSERT we have to ascertain that the denominator remains the same!!!!!
 										// the sign of distance numerator tells us on which side of the root we are
 										// how about using two big integers???? starting out with 
-										if(computeBigintegerPower(_nextpk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance numerator for bracketing.");break;}
-										if(computeBigintegerPower(_nextqk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance denominator for bracketing.");break;}
-										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
-										if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
+										if(computeBigintegerPower(_nextpk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY)
+										{outputError("Failed to initialize the distance numerator for bracketing.");break;}
+										if(computeBigintegerPower(_nextqk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY)
+										{outputError("Failed to initialize the distance denominator for bracketing.");break;}
+										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY)
+										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY)
+										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY)
+										{outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY)
+										{outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
 										outputBiginteger("\n\tDistance of the next Newtonian approximation (",_nextpk,"/");
-										outputBiginteger(NULL,_nextqk,"):");outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,").\n");
+										outputBiginteger(NULL,_nextqk,"):");
+										outputBiginteger("(",_distancenumerator,"/");
+										outputBiginteger(NULL,_distancedenominator,").\n");
 
 										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pkonthisside))==MP_OKAY
 													&&mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pkontheotherside))==MP_OKAY
@@ -7834,20 +7951,25 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											output("\t%sFailed to perform rational root bracketing.\n",M_ERROR_PREFIX);
 
 										// what's the change in approximation?
-										if(mp_mul(MP_INT_POINTER(_pk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_num))!=MP_OKAY){outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
-										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_num1))!=MP_OKAY){outputError("Failed to initialize the change to the rational root approximation");break;}
-										if(mp_sub(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
-										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk),MP_INT_POINTER(_den))!=MP_OKAY){outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
-										if(mp_gcd(MP_INT_POINTER(_num),MP_INT_POINTER(_den),MP_INT_POINTER(_gcd))!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_pk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_num))!=MP_OKAY)
+										{outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
+										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_num1))!=MP_OKAY)
+										{outputError("Failed to initialize the change to the rational root approximation");break;}
+										if(mp_sub(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY)
+										{outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
+										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk),MP_INT_POINTER(_den))!=MP_OKAY)
+										{outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
+										if(mp_gcd(MP_INT_POINTER(_num),MP_INT_POINTER(_den),MP_INT_POINTER(_gcd))!=MP_OKAY)
+										{outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
 										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_num),MP_INT_POINTER(_gcd),MP_INT_POINTER(_num),MP_INT_POINTER(_divremainder))!=MP_OKAY
 											||mp_div(MP_INT_POINTER(_den),MP_INT_POINTER(_gcd),MP_INT_POINTER(_den),MP_INT_POINTER(_divremainder))!=MP_OKAY))
 										{outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
 										output("\tChange in rational approximation: ",iter);outputBiginteger("(",_num,NULL);outputBiginteger("/",_den,")");
 										bool decimalprecisionreached=false;
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_num),/*_getBigintegerCopy*/(_den),M_LD_NAN,false),owner);
-										if(_rational){
+										if(_rational!=NULL){
 											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
-											if(_decimal){
+											if(_decimal!=NULL){
 												if(mpd_iszero(_decimal->mpd)==MP_YES)decimalprecisionreached=true;
 												outputDecimal("=",_decimal,NULL);
 												FREE_DECIMAL(_decimal,owner);
@@ -7855,12 +7977,14 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										}
 										output(".\n");
 										if(decimalprecisionreached)break; // decimal precision reached
-										if(inputCharReadFunction){
+										if(inputCharReadFunction!=NULL){
 											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");(*inputCharReadFunction)(&c);outputChar('\n'); // wait for any key
 											if(c==3)break;
 										}
-										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pk))!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
-										if(mp_copy(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk))!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
+										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pk))!=MP_OKAY)
+										{outputError("Failed to update the numerator of the rational root approximation");break;}
+										if(mp_copy(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk))!=MP_OKAY)
+										{outputError("Failed to update the denominator of the rational root approximation");break;}
 
 									}
 									FREE_BIGINTEGER(_pktothepowern,owner);
@@ -7894,9 +8018,9 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 							outputError("Failed to initialize the rational root approximation");
 					}else
 						outputError("Failed to initialize the rational rational root approximation");
-					if(!rootArgumentRational->den)FREE_BIGINTEGER(q_a,owner); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
+					if(NULL==rootArgumentRational->den)FREE_BIGINTEGER(q_a,owner); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
 					// take care of freeing the result numerator and denominator when we do not have a rational root rational
-					if(!_rationalBigintegerRootRational){FREE_BIGINTEGER(_pk,owner);FREE_BIGINTEGER(_qk,owner);}
+					if(NULL==_rationalBigintegerRootRational){FREE_BIGINTEGER(_pk,owner);FREE_BIGINTEGER(_qk,owner);}
 				}else
 					outputError("The root degree is too large (which should never happen though, as it should have been prevented)");
 			}else
@@ -7908,9 +8032,16 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 }
 // MDH@10OCT2019: better to return a decimal instead of already wrapping the result in a value (so we can do postprocessing!!!!)
 //				wait we're wrapping it because the result could be different from a decimal!!!!
+/**
+ * @brief returns the \p rootDegreeBiginteger root of \p rootArgumentValue
+ * 
+ * @param rootArgumentValue 
+ * @param rootDegreeBiginteger 
+ * @return Mvalue* the \p rootDegreeBiginteger root of \p rootArgumentValue
+ */
 Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegreeBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _bigintegerRootValue=NULL;
-	if(rootArgumentValue&&rootDegreeBiginteger){
+	if(rootArgumentValue!=NULL&&rootDegreeBiginteger!=NULL){
 		if(amVerbose())
 		{outputValue("Determining the root of ",rootArgumentValue,NULL);outputBiginteger(" with degree ",rootDegreeBiginteger,".\n");}
 		// TODO check for special values like 0 or 1 or negatives...
@@ -7918,16 +8049,16 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 		// a rational with a delta should be purified
 		// we can do the decimal approximation first
 		Mdecimal* _rootArgumentDecimal=owned_decimal(_getValueDecimal(rootArgumentValue),owner);
-		if(_rootArgumentDecimal){
+		if(_rootArgumentDecimal!=NULL){
 			uint32_t status=0;
 			if(amVerbose())
 				outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
 			// we need an mpd_context for use in the decimal computations!!
 			Mdecimalcontext* _decimalcontext=getDecimalcontext(_rootArgumentDecimal->prec);
-			mpd_context_t* mpd_context=(_decimalcontext?_decimalcontext->mpd_context:get_default_mpd_context());
-			if(mpd_context){
+			mpd_context_t* mpd_context=(_decimalcontext!=NULL?_decimalcontext->mpd_context:get_default_mpd_context());
+			if(mpd_context!=NULL){
 				Mdecimal* _rootDegreeDecimal=owned_decimal(_getBigintegerDecimal(rootDegreeBiginteger),owner);
-				if(_rootDegreeDecimal){
+				if(_rootDegreeDecimal!=NULL){
 					if(amVerbose())
 						outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
 					// MDH@10OCT2019: to anticipate on root arguments smaller than 1 of which the root will be larger instead of smaller we use the square root as first approximation
@@ -7935,7 +8066,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 					//				this means not using the distance anymore because e.g. 2**(7/9) with decimal precision 20 failed to converge (resulted in toggling between two decimals that different by the final digit)
 					Mdecimal *_bigintegerRootDecimal=owned_decimal(__decimal(mpd_context,1,0),owner)
 							,*_nextBigintegerRootDecimal=owned_decimal(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
-					if(_bigintegerRootDecimal&&_nextBigintegerRootDecimal){
+					if(_bigintegerRootDecimal!=NULL&&_nextBigintegerRootDecimal!=NULL){
 						if(amVerbose())
 						outputInfo("Root computation result decimals created...");
 						uint32_t status=0;
@@ -7950,7 +8081,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 							// TODO only when the root degree is larger than 2 do we do the iterative process
 							// 0. preparations: we need (root degree - 1 ) regularly
 							Mdecimal* _rootDegreeMinus1Decimal=owned_decimal(__decimal(mpd_context,0,0),owner); /////_getDecimalCopy(_rootDegreeDecimal);
-							if(_rootDegreeMinus1Decimal){
+							if(_rootDegreeMinus1Decimal!=NULL){
 								if(amVerbose())
 								outputInfo("Root computation helper decimal created...");
 								// can't I use getDecimalOne() here?????? apparently not!!
@@ -7962,7 +8093,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 									outputInfo("Root computation helper decimal initialized...");
 									// we need the root degree minus 1 as big integer as well
 									Mbiginteger* _rootDegreeMinus1Biginteger=owned_biginteger(_getBigintegerCopy(rootDegreeBiginteger),owner);
-									if(_rootDegreeMinus1Biginteger){
+									if(_rootDegreeMinus1Biginteger!=NULL){
 										if(amVerbose())
 										outputInfo("Root computation helper big integer created...");
 										if(mp_decr(MP_INT_POINTER(_rootDegreeMinus1Biginteger))==MP_OKAY){
@@ -7977,7 +8108,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													,*_productplusquotient=owned_decimal(__decimal(mpd_context,0,0),owner)
 													,*_power=owned_decimal(__decimal(mpd_context,0,0),owner);
 											// initial value of the quotient denominator that we need for checking whether we're done and in the computation
-											if(/*_distance&&_prevdistance&&*/_product&&_quotient&&_productplusquotient&&_power){
+											if(/*_distance&&_prevdistance&&*/_product!=NULL&&_quotient!=NULL&&_productplusquotient!=NULL&&_power!=NULL){
 												if(amVerbose())
 												outputInfo("Root computation helper decimals created...");
 												// ready to rock 'n' roll, eh iterate
@@ -7989,7 +8120,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													// 'update' the quotient denominator, so we can use it in checking whether we are already there yet, and if not in the computation
 													// TODO might it be a good idea to compute the quotient and compare the quotient with the current solution??????
 													_quotientdenominator=owned_decimal(_getDecimalPowerWithPositiveBigintegerExponent(_bigintegerRootDecimal,_rootDegreeMinus1Biginteger),owner);
-													if(!_quotientdenominator){status=0xFFFFFFFF;break;}
+													if(NULL==_quotientdenominator){status=0xFFFFFFFF;break;}
 													/* MDH@10OCT2019: not using the distance anymore!!!
 													// are we there yet?????
 													// compute the current power value
@@ -8012,7 +8143,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 														output("Root approximation at iteration #%" PRIu32 ":",iter);
 														outputDecimal(" ",_bigintegerRootDecimal,".");
 														////////outputDecimal(" Distance: ",_distance,".");
-														if(inputCharReadFunction){
+														if(inputCharReadFunction!=NULL){
 															output(" %s...","Press any key to continue");
 															(*inputCharReadFunction)(&c);
 														}
@@ -8083,8 +8214,15 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 	}
 	return _bigintegerRootValue;
 }
+/**
+ * @brief returns the power of base \p _value1 and exponent \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the power of base \p _value1 and exponent \p _value2
+ */
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,power,true);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,power,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power,false); // MDH@02NOV2020 TODO: the input type is not always maintained for certain type combinations but sometimes it is
@@ -8111,7 +8249,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
 		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_biginteger1&&_biginteger2){
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerbose())
 				{outputBiginteger("Exponentiating big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
 			_powerBiginteger=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(_biginteger1,_biginteger2),owner);
@@ -8145,7 +8283,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 		// given that the way to compute the power might be different depending on the type of the exponent if differentiate between that
 		Mvalue* _returnValue=NULL;
 		// 1. when the exponent is integer
-		if(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||(_value2->type==VT_RATIONAL&&(!_value2->value._rational->den||isBigintegerOne(_value2->value._rational->den)))){
+		if(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||(_value2->type==VT_RATIONAL&&(NULL==_value2->value._rational->den||isBigintegerOne(_value2->value._rational->den)))){
 			Mbiginteger* _exponentBiginteger=owned_biginteger(_getValueBiginteger(_value2),owner);
 			_returnValue=_getBigintegerPowerValue(_value1,_exponentBiginteger);
 			if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_exponentBiginteger,owner);
@@ -8158,16 +8296,16 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 			if(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0)
 				_exponentRational=owned_rational(_getDecimalRational(_value2->value._decimal),owner);
 			// MDH@14OCT2019: let's only do a rational approximation if the exponent is rational but the denominator is not too large i.e. using at most a single mp_digit (which might be large enough as it is though)
-			if(_exponentRational&&(!_exponentRational->den||MP_INT_POINTER(_exponentRational->den)->used==1)){ // the exponent is rational and the exponent denominator (which results in root finding is not too large)
+			if(_exponentRational!=NULL&&(NULL==_exponentRational->den||MP_INT_POINTER(_exponentRational->den)->used==1)){ // the exponent is rational and the exponent denominator (which results in root finding is not too large)
 				Mvalue* _rootValue=NULL; // the result of the computation of taking the power of a decimal to a rational exponent
 				//if(amVerbose())
 				outputRational("Computing a power with rational exponent ",_exponentRational,".\n");
 				bool neg=(MP_INT_POINTER(_exponentRational->num)->sign==MP_NEG);
 				Mbiginteger* _positiveExponentNumerator=(neg?owned_biginteger(_getBigintegerNeg(_exponentRational->num),owner):_exponentRational->num);
 				Mbiginteger* exponentDenominator=_exponentRational->den;
-				if(_positiveExponentNumerator){ // we 
+				if(_positiveExponentNumerator!=NULL){ // we 
 					// TODO now we are testing whether the denominator does not equal one, but in the future all rationals with denominator 1 should have a NULL denominator!!!
-					if(exponentDenominator&&!isBigintegerOne(exponentDenominator)){ // a 'real' rational (i.e. not simply pretending to be one)
+					if(exponentDenominator!=NULL&&!isBigintegerOne(exponentDenominator)){ // a 'real' rational (i.e. not simply pretending to be one)
 						// MDH@10OCT2019: we can improve on the computation of the power by computing the integer quotient of the rational and the remainder
 						// MDH@10OCT2019: we can even improve even more by choosing the smallest of the numerator and denominator to be used in the power computation
 						//				NO we can't because 2**(x/y) is NOT equal to 1/2**(y/x) as I conjectured, so we have to stick to the original approximation for now
@@ -8175,11 +8313,11 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						
 						mp_ord numdencomp=mp_cmp(MP_INT_POINTER(_positiveExponentNumerator),MP_INT_POINTER(exponentDenominator));
 						if(numdencomp!=MP_EQ){ // numerator and denominator are not equal
-							Mbiginteger *_integerdividend=owned_biginteger(__biginteger(),owner)
-									   ,*_remainder=owned_biginteger(__biginteger(),owner); // the defaults when the denominator equals NULL
+							Mbiginteger *_integerdividend=owned_biginteger(__biginteger(),owner),
+													*_remainder=owned_biginteger(__biginteger(),owner); // the defaults when the denominator equals NULL
 							// we divide the maximum of the numerator and the denominator by the minimum of the numerator and the denominator (which typically means that _integerdividend will always be nonzero essentially)
-							if(_integerdividend
-									&&_remainder
+							if(_integerdividend!=NULL
+									&&_remainder!=NULL
 									&&mp_div(MP_INT_POINTER(_positiveExponentNumerator),MP_INT_POINTER(exponentDenominator),MP_INT_POINTER(_integerdividend),MP_INT_POINTER(_remainder))==MP_OKAY)
 							{
 								// if _integerdividend is not zero we may compute the multiplier
@@ -8207,7 +8345,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 									_rootValue=_getBigintegerRootValue(rootArgumentValue,exponentDenominator);
 								// now apply the multiplier if need be
 								//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
-								if(_multiplierValue){ // have to multiply
+								if(_multiplierValue!=NULL){ // have to multiply
 									_rootValue=multiply(_multiplierValue,_rootValue);
 									outputValue("Rational exponent root equals the product of multiplier ",_multiplierValue," and ");
 									outputBiginteger("the ",exponentDenominator,"th ");
@@ -8242,7 +8380,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						_returnValue=_rootValue;
 					if(neg){
 						FREE_BIGINTEGER(_positiveExponentNumerator,owner);
-						if(_returnValue)_returnValue=Mreciprocal(_returnValue);
+						if(_returnValue!=NULL)_returnValue=Mreciprocal(_returnValue);
 					}
 				}else
 					outputError("Failed to reverse the sign of the rational exponent");
@@ -8253,10 +8391,10 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 				Mdecimal *_baseDecimal=getValueDecimal(_value1),*_exponentDecimal=getValueDecimal(_value2);
 				if(_value1->type!=VT_DECIMAL)owned_decimal(_baseDecimal,owner);
 				if(_value2->type!=VT_DECIMAL)owned_decimal(_exponentDecimal,owner);
-				if(_baseDecimal&&_exponentDecimal){
+				if(_baseDecimal!=NULL&&_exponentDecimal!=NULL){
 					Mdecimal* _powerDecimal=NULL;
 					mpd_context_t* mpd_context=getContextOfDecimals(_baseDecimal,_exponentDecimal);
-					if(!mpd_context)outputError("No decimal context for use in the power function");
+					if(NULL==mpd_context)outputError("No decimal context for use in the power function");
 					// the decimal library has a function to compute the power of two decimals and we can use that for most of the value pairs
 					// if either has a repeating part we have a problem
 					if(_baseDecimal->repeating>0){
@@ -8269,15 +8407,17 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						Mdecimal* _denPowerDecimal=owned_decimal(_getDecimalPower(_baseDenDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
 						_powerDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 						// the quotient of the numerator and denominator power is the end result
-						if(_powerDecimal){
+						if(_powerDecimal!=NULL){
 							uint32_t status=0;
 							mpd_qdiv(_powerDecimal->mpd,_numPowerDecimal->mpd,_denPowerDecimal->mpd,mpd_context,&status);
 							if((status&0xEFBF)!=0)
 							{outputError("Failed to divide the numerator and denominator powers");FREE_DECIMAL(_powerDecimal,owner);_powerDecimal=NULL;}
 						}else
 							outputError("Failed to create the decimal result of applying the power function to a rational");
-						FREE_DECIMAL(_baseNumDecimal,owner);FREE_DECIMAL(_baseDenDecimal,owner);
-						FREE_DECIMAL(_numPowerDecimal,owner);FREE_DECIMAL(_denPowerDecimal,owner);
+						FREE_DECIMAL(_baseNumDecimal,owner);
+						FREE_DECIMAL(_baseDenDecimal,owner);
+						FREE_DECIMAL(_numPowerDecimal,owner);
+						FREE_DECIMAL(_denPowerDecimal,owner);
 						if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_baseRational,owner);
 					}else{ // base and exponent decimals is true
 						_powerDecimal=owned_decimal(_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
@@ -8297,6 +8437,13 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 }
 
 // MDH@15AUG2019: given that epower means base times 10 to the power of exponent, it makes sense to actually compute epower as mul(base,power(10,exponent)) where for 10 we use a single integer
+/**
+ * @brief returns \p _value times 10 to the power of \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* \p _value times 10 to the power of \p _value2
+ */
 Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	// we can still use the shortcuts
 	if(!_value1||!_value2)return NULL;
@@ -8353,8 +8500,15 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 }
 
 // MDH@07JUN2019: when two integers are presented to divide instead of actually computing the division we can store the division as a rational (so we kind of have a slow evaluation of the division, and we maintain accuracy as long as possible)
+/**
+ * @brief returns the quotient of \p value1 and \p value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the quotient of \p value1 and \p value2
+ */
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,divide,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divide,false);
@@ -8377,12 +8531,15 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	}
 	// if one of them is a rational do a rational division
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
-		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner);	
+		Mrational *_rational1=getValueRational(_value1),
+							*_rational2=getValueRational(_value2);
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else 
+		if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner);	
 		Mrational* _quotientRational=owned_rational(_getRationalQuotient(_rational1,_rational2),owner); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else 
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
 		Mvalue* _quotientValue=NULL;
-		if(_quotientRational){
+		if(_quotientRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
 				_quotientValue=_getValueOfDecimal(_getRationalDecimal(_quotientRational));
 				FREE_RATIONAL(_quotientRational,owner);
@@ -8394,10 +8551,12 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	// if either is a decimal, compute the quotient decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); 
+		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else 
+		if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); 
 		// after adding the two rationals we do not need the newly created rationals anymore		
 		Mdecimal* _divideDecimal=owned_decimal(_getDecimalQuotient(_decimal1,_decimal2),owner); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else 
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getValueOfDecimal(disowned_decimal(_divideDecimal,owner));
 	}
 	// if either is a real
@@ -8416,8 +8575,15 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	*/
 	return NULL;
 }
+/**
+ * @brief returns the integer quotient of \p _value1 and \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the integer quotient of \p _value1 and \p _value2
+ */
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,integerdivide,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,integerdivide,false);
@@ -8439,10 +8605,10 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
 		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_biginteger1&&_biginteger2){
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_integerquotientBiginteger=__biginteger();
-			if(_integerquotientBiginteger&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_integerquotientBiginteger),NULL)!=MP_OKAY)
+			if(_integerquotientBiginteger!=NULL&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_integerquotientBiginteger),NULL)!=MP_OKAY)
 			{FREE_BIGINTEGER(_integerquotientBiginteger,owner);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
 		}else
@@ -8453,7 +8619,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
-			if(!_integerquotientBiginteger)return _getIntegerValue(M_LL_INVALID);
+			if(NULL==_integerquotientBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llintegerquotient=getBigintegerInteger(_integerquotientBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llintegerquotient!=M_LL_INVALID){
@@ -8496,24 +8662,29 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 	// MDH@28OCT2019: copied over from divide() and adjusted to return an integer
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		if(_value1->type!=VT_RATIONAL)OWNED(_rational1,owner);else if(_value2->type!=VT_RATIONAL)OWNED(_rational2,owner);
-		if(amVerbose()){outputRational("Determining the integer part of dividing rational '",_rational1,"'");outputRational(" by '",_rational2,"'.\n");}
+		if(_value1->type!=VT_RATIONAL)OWNED(_rational1,owner);else 
+		if(_value2->type!=VT_RATIONAL)OWNED(_rational2,owner);
+		if(amVerbose())
+		{outputRational("Determining the integer part of dividing rational '",_rational1,"'");outputRational(" by '",_rational2,"'.\n");}
 		Mrational* _quotientRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
 		if(amVerbose())outputRational("Quotient: '",_quotientRational,"'.\n");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else 
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
 		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
 		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
-		if(!_quotientRational)return NULL;
+		if(NULL==_quotientRational)return NULL;
 		Mbiginteger* _rationalInteger=owned_biginteger(_getRationalInteger(_quotientRational,true,true),owner);
 		FREE_RATIONAL(_quotientRational,owner); // only used for temporary storage of the division rational
 		return _getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner));
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
+		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else 
+		if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
 		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_divideDecimal)return NULL;
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else 
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(NULL==_divideDecimal)return NULL;
 		Mdecimal* _decimalInteger=owned_decimal(_getDecimalInteger(_divideDecimal,true,true),owner);
 		FREE_DECIMAL(_divideDecimal,owner); // only used for temporary storage of the division result
 		return _getValueOfDecimal(disowned_decimal(_decimalInteger,owner));
@@ -8536,8 +8707,15 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 	*/
 	return NULL;
 }
+/**
+ * @brief returns \p _value1 modulo \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* \p _value1 modulo \p _value2
+ */
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,divideremainder,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divideremainder,false);
@@ -8559,11 +8737,11 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
 		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_biginteger1&&_biginteger2){
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerbose())
 				{outputBiginteger("Moduloing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_moduloBiginteger=owned_biginteger(__biginteger(),owner);
-			if(_moduloBiginteger&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),NULL,MP_INT_POINTER(_moduloBiginteger))!=MP_OKAY)
+			if(_moduloBiginteger!=NULL&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),NULL,MP_INT_POINTER(_moduloBiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_moduloBiginteger,owner);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer division remainder: '",_moduloBiginteger,"'.\n");}
 		}else
@@ -8574,7 +8752,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
-			if(!_moduloBiginteger)return _getIntegerValue(M_LL_INVALID);
+			if(NULL==_moduloBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llmodulo=getBigintegerInteger(_moduloBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llmodulo!=M_LL_INVALID){FREE_BIGINTEGER(_moduloBiginteger,owner);return _getIntegerValue(llmodulo);}
@@ -8611,34 +8789,39 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 	// MDH@28OCT2019: copied over from integerdivide() and adjusted to return the remainder
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else 
+		if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner);
 		if(amVerbose()){outputRational("Determining the remainder of dividing rational '",_rational1,"'");outputRational(" by '",_rational2,"'.\n");}
 		Mrational* _quotientRational=owned_rational(_getRationalQuotient(_rational1,_rational2),owner); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
 		if(amVerbose())outputRational("Quotient: '",_quotientRational,"'.\n");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else 
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		// after dividing the two rationals we do not need the newly created rationals anymore
 		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
 		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
-		if(!_quotientRational)return NULL;
+		if(NULL==_quotientRational)return NULL;
 		Mbiginteger* _rationalInteger=owned_biginteger(_getRationalInteger(_quotientRational,true,true),owner);
 		FREE_RATIONAL(_quotientRational,owner); // only used for temporary storage of the division rational
-		if(!_rationalInteger)return NULL;
+		if(NULL==_rationalInteger)return NULL;
 		return subtract(_value1,multiply(_value2,_getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner)))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
+		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else 
+		if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
 		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_divideDecimal)return NULL;
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else 
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(NULL==_divideDecimal)return NULL;
 		Mdecimal* _decimalInteger=owned_decimal(_getDecimalInteger(_divideDecimal,true,true),owner);
 		FREE_DECIMAL(_divideDecimal,owner); // only used for temporary storage of the division result
-		if(!_decimalInteger)return NULL;
+		if(NULL==_decimalInteger)return NULL;
 		return subtract(_value1,multiply(_value2,_getValueOfDecimal(disowned_decimal(_decimalInteger,owner))));
 	}
 	// MDH@28OCT2019: if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
-		if(amVerbose()){outputValue("Determining what's left after dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		if(amVerbose())
+		{outputValue("Determining what's left after dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
 		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2*truncl(ld1/ld2):M_LD_NAN);
 	}
@@ -8655,10 +8838,23 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 
 // integer arithmetic 
 // TODO yet to complete for big integers, rationals, decimals etc.
+/**
+ * @brief returns the not of long long \p boolean
+ * 
+ * @param boolean 
+ * @return long long \p _value1 modulo \p _value2
+ */
 static long long not(long long boolean){return(boolean==M_LL_INVALID?M_LL_INVALID:(boolean==M_TRUE?M_FALSE:M_TRUE));} // if invalid, stays invalid, otherwise return M_FALSE when M_TRUE and vice versa
 // bitwise operators (and, or, xor)
+/**
+ * @brief returns the bitwise xor of \p _value1 and \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the bitwise xor of \p _value1 and \p _value2
+ */
 Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwisexor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwisexor,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwisexor,false);
@@ -8667,11 +8863,11 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _xorbiginteger=owned_biginteger(__biginteger(),owner);
-		if(_xorbiginteger){
+		if(_xorbiginteger!=NULL){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 			Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-			if(_biginteger1&&_biginteger2&&mp_xor(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_xorbiginteger))!=MP_OKAY)
+			if(_biginteger1!=NULL&&_biginteger2!=NULL&&mp_xor(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_xorbiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_xorbiginteger,owner);_xorbiginteger=NULL;}
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_xorbiginteger,owner));
@@ -8684,8 +8880,15 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	}
 	return NULL;
 }
+/**
+ * @brief returns the bitwise and of \p _value1 or \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the bitwise and of \p _value1 or \p _value2
+ */
 Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwiseand,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseand,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseand,false);
@@ -8693,11 +8896,11 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _bitwiseandbiginteger=owned_biginteger(__biginteger(),owner);
-		if(_bitwiseandbiginteger){
+		if(_bitwiseandbiginteger!=NULL){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 			Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-			if(_biginteger1&&_biginteger2&&mp_and(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseandbiginteger))!=MP_OKAY)
+			if(_biginteger1!=NULL&&_biginteger2!=NULL&&mp_and(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseandbiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_bitwiseandbiginteger,owner);_bitwiseandbiginteger=NULL;}
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_bitwiseandbiginteger,owner));
@@ -8710,8 +8913,15 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	}
 	return NULL;
 }
+/**
+ * @brief returns the bitwise or of \p _value1 and \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the bitwise or of \p _value1 and \p _value2
+ */
 Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,bitwiseor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseor,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,bitwiseor,false);
@@ -8720,11 +8930,11 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _bitwiseorbiginteger=owned_biginteger(__biginteger(),owner);
-		if(_bitwiseorbiginteger){
+		if(_bitwiseorbiginteger!=NULL){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 			Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-			if(_biginteger1&&_biginteger2&&mp_or(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseorbiginteger))!=MP_OKAY)
+			if(_biginteger1!=NULL&&_biginteger2!=NULL&&mp_or(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseorbiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_bitwiseorbiginteger,owner);_bitwiseorbiginteger=NULL;}
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_bitwiseorbiginteger,owner));
@@ -8739,8 +8949,15 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 }
 
 // logical binary operators
+/**
+ * @brief returns the logical or of \p _value1 and \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the logical or of \p _value1 and \p _value2
+ */
 Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,logicaland,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicaland,false);
@@ -8752,7 +8969,7 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		if(_biginteger1&&_biginteger2)_logicalandbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_YES||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_YES?0:1); // if either is zero, the result is zero otherwise 1
+		if(_biginteger1!=NULL&&_biginteger2!=NULL)_logicalandbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_YES||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_YES?0:1); // if either is zero, the result is zero otherwise 1
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getValueOfBiginteger(disowned_biginteger(_logicalandbiginteger,owner));
 	}	
@@ -8763,7 +8980,7 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	return NULL;
 }
 Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,logicalor,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicalor,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,logicalor,false);
@@ -8775,7 +8992,7 @@ Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		if(_biginteger1&&_biginteger2)_logicalorbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_NO||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		if(_biginteger1!=NULL&&_biginteger2!=NULL)_logicalorbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_NO||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getValueOfBiginteger(disowned_biginteger(_logicalorbiginteger,owner));
 	}
@@ -8788,13 +9005,27 @@ Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 
 // binary shift operators
 // helper function taking care of shifting integers, taking the invalid integer values (for integer and shift) into account
+/** TODO shifting might return a big integer
+ * @brief returns \p integer shifted by \p shift positions
+ * 
+ * @param integer 
+ * @param shift 
+ * @return long long \p integer shifted by \p shift positions
+ */
 long long integerShift(long long integer,long long shift){
 	long long result=(shift==M_LL_INVALID?M_LL_INVALID:integer);
 	if(shift!=0&&result!=M_LL_INVALID){if(shift>0)result<<=shift;else result>>=(-shift);} // always shift left or right by a positive value!!
 	return result;
 }
+/**
+ * @brief returns \p _value1 shifted left by \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* p _value1 shifted left by \p _value2
+ */
 Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftleft,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftleft,false);
@@ -8803,14 +9034,15 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	// ASSERT neither value zero
 	// TODO deal with integers separately
 	// do NOT allow shifting by anything that cannot be converted to an integer
-	long long shiftleftinteger=getValueInteger(_value2);if(shiftleftinteger==M_LL_INVALID)return NULL;
+	long long shiftleftinteger=getValueInteger(_value2);
+	if(shiftleftinteger==M_LL_INVALID)return NULL;
 	///////////if(shiftleftinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,shiftleftinteger));
 	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,shiftleftinteger));
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftleftBiginteger=owned_biginteger(_getBigintegerCopy(_value1->value._biginteger),owner); // make a copy of the big integer to shift left
-		if(_shiftleftBiginteger){
+		if(_shiftleftBiginteger!=NULL){
 			if((shiftleftinteger<0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger)))!=MP_OKAY){
 				FREE_BIGINTEGER(_shiftleftBiginteger,owner);_shiftleftBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
@@ -8823,29 +9055,29 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
 		Mrational* _shiftleftRational=NULL;
 		Mrational* _rational1=owned_rational(_getValueRational(_value1),owner);
-		if(_rational1){
+		if(_rational1!=NULL){
 			// shifting to the right means dividing the rational by 2 the given number of times but this means doubling the denominator
 			// i.e. we should never divide because we could end up with zero (and loose the precision of exact computations)
 			_shiftleftRational=owned_rational(_getRationalCopy(_rational1),owner);
-			if(_shiftleftRational){
+			if(_shiftleftRational!=NULL){
 				///if(amVerbose())
 				outputRational("Rational shift left copy: '",_shiftleftRational,"'.\n");
 				if(shiftleftinteger<0){ // naughty boy (or girl for that matter)... // actually a shift right
 					// multiply the denominator by 2 shiftleftinteger times
-					if(!_shiftleftRational->den)_shiftleftRational->den=_getBiginteger(1); // force having a non NULL denominator before trying to shift it
+					if(NULL==_shiftleftRational->den)_shiftleftRational->den=_getBiginteger(1); // force having a non NULL denominator before trying to shift it
 					if(_shiftleftRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftleftRational->den),-shiftleftinteger,MP_INT_POINTER(_shiftleftRational->den))!=MP_OKAY){
 						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
 						outputError("Failed to half a rational");
 					}
 					// force normalization
-					if(_shiftleftRational){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational,owner);}
+					if(_shiftleftRational!=NULL){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational,owner);}
 				}else{ 
 					if(mp_mul_2d(MP_INT_POINTER(_shiftleftRational->num),shiftleftinteger,MP_INT_POINTER(_shiftleftRational->num))!=MP_OKAY){
 						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
 						outputError("Failed to double a rational");
 					}
 				}
-				if(_shiftleftRational){
+				if(_shiftleftRational!=NULL){
 					_shiftleftRational->normalized=false;
 					if(!normalizeRational(_shiftleftRational,owner))
 					{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize shift left rational ",_shiftleftRational,".\n");}
@@ -8860,7 +9092,7 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
 		// similar approach as with a rational, except decimals have a shiftl and shiftr method
 		Mdecimal* _shiftleftDecimal=owned_decimal(_getDecimalCopy(_value1->value._decimal),owner);
-		if(_shiftleftDecimal){
+		if(_shiftleftDecimal!=NULL){
 			uint32_t status=0;
 			if(_shiftleftDecimal>0)mpd_qshiftr(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,shiftleftinteger,&status);else mpd_qshiftl(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,-shiftleftinteger,&status);
 			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftleftDecimal,owner);_shiftleftDecimal=NULL;outputError("Failed to shift a decimal to the left");}
@@ -8870,8 +9102,15 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	}
 	return NULL;
 }
+/**
+ * @brief returns \p _value1 shifted right \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* \p _value1 shifted right \p _value2
+ */
 Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftright,false);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright,false);
 	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftright,false);
@@ -8886,7 +9125,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,-shiftrightinteger));
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftrightBiginteger=owned_biginteger(_getBigintegerCopy(_value1->value._biginteger),owner); // make a copy of the big integer to shift right
-		if(_shiftrightBiginteger){
+		if(_shiftrightBiginteger!=NULL){
 			if((shiftrightinteger>0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger)))!=MP_OKAY){
 				FREE_BIGINTEGER(_shiftrightBiginteger,owner);_shiftrightBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
@@ -8915,29 +9154,29 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
 		Mrational* _shiftrightRational=NULL;
 		Mrational* _rational1=owned_rational(_getValueRational(_value1),owner);
-		if(_rational1){
+		if(_rational1!=NULL){
 			// shifting to the right means dividing the rational by 2 the given number of times but this means doubling the denominator
 			// i.e. we should never divide because we could end up with zero (and loose the precision of exact computations)
 			_shiftrightRational=owned_rational(_getRationalCopy(_rational1),owner);
-			if(_shiftrightRational){
+			if(_shiftrightRational!=NULL){
 				///if(amVerbose())
 				outputRational("Rational shift right copy: '",_shiftrightRational,"'.\n");
 				if(shiftrightinteger>0){
 					// multiply the denominator by 2 shiftrightinteger times
-					if(!_shiftrightRational->den)_shiftrightRational->den=OWNED(_getBiginteger(1),owner); // force having a non NULL denominator before trying to shift it
+					if(NULL==_shiftrightRational->den)_shiftrightRational->den=OWNED(_getBiginteger(1),owner); // force having a non NULL denominator before trying to shift it
 					if(_shiftrightRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftrightRational->den),shiftrightinteger,MP_INT_POINTER(_shiftrightRational->den))!=MP_OKAY){
 						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
 						outputError("Failed to half a rational");
 					}
 					// force normalization
-					if(_shiftrightRational){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational,owner);}
+					if(_shiftrightRational!=NULL){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational,owner);}
 				}else{ // naughty boy (or girl for that matter)...
 					if(mp_mul_2d(MP_INT_POINTER(_shiftrightRational->num),-shiftrightinteger,MP_INT_POINTER(_shiftrightRational->num))!=MP_OKAY){
 						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
 						outputError("Failed to double a rational");
 					}
 				}
-				if(_shiftrightRational){
+				if(_shiftrightRational!=NULL){
 					_shiftrightRational->normalized=false;
 					if(!normalizeRational(_shiftrightRational,owner))
 					{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize shift right rational ",_shiftrightRational,".\n");}
@@ -8952,10 +9191,12 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
 		// similar approach as with a rational, except decimals have a shiftl and shiftr method
 		Mdecimal* _shiftrightDecimal=owned_decimal(_getDecimalCopy(_value1->value._decimal),owner);
-		if(_shiftrightDecimal){
+		if(_shiftrightDecimal!=NULL){
 			uint32_t status=0;
-			if(_shiftrightDecimal>0)mpd_qshiftr(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,shiftrightinteger,&status);else mpd_qshiftl(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,-shiftrightinteger,&status);
-			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;outputError("Failed to shift a decimal to the right");}
+			if(_shiftrightDecimal>0)mpd_qshiftr(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,shiftrightinteger,&status);
+			else mpd_qshiftl(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,-shiftrightinteger,&status);
+			if((status&0xEFBF)!=0)
+			{FREE_DECIMAL(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;outputError("Failed to shift a decimal to the right");}
 		}else 
 			outputError("Failed to copy a decimal");
 		return _getValueOfDecimal(disowned_decimal(_shiftrightDecimal,owner));
@@ -8968,14 +9209,21 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 // let's start with the one used by Msort and Msorted
 
 // TODO these should return either TRUE, FALSE or UNDEFINED independent of the input type
+/**
+ * @brief returns M_TRUE if \p _value1 is smaller than \p _value2, M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long 
+ */
 static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT do not call when either is a list
-	if(!_value1&&!_value2)return M_FALSE; // both NULL, so equal, and therefore not smaller than
-	if(!_value1||!_value2)return(_value1?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
+	if(NULL==_value1&&NULL==_value2)return M_FALSE; // both NULL, so equal, and therefore not smaller than
+	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
 		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result<0?M_TRUE:M_FALSE); 
 	}
@@ -8992,11 +9240,11 @@ static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference){
+			if(_rationalDifference!=NULL){
 				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
 				result=isRationalNegative(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
@@ -9004,17 +9252,18 @@ static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+		Mdecimal 	*_decimal1=owned_decimal(_getValueDecimal(_value1),owner),
+							*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference){
+			if(_decimalDifference!=NULL){
 				if(amVerbose())
 					outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
 				result=isDecimalNegative(_decimalDifference);
@@ -9029,21 +9278,34 @@ static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 	}
 	return M_LL_INVALID;
 }
+/**
+ * @brief returns M_TRUE if \p _value1 is smaller than \p _value2 , M_FALSE otherwise
+ * @details deals with array and list arguments as well
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* M_TRUE if \p _value1 is smaller than \p _value2 , M_FALSE otherwise
+ */
 Mvalue* Msmallerthan(Mvalue* _value1,Mvalue* _value2){
-	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msmallerthan,false);
-	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthan,false);
-	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Msmallerthan,false);
-	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthan,false);
+	if(_value1!=NULL&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msmallerthan,false);
+	if(_value1!=NULL&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthan,false);
+	if(_value2!=NULL&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Msmallerthan,false);
+	if(_value2!=NULL&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthan,false);
 	return _getIntegerValue(smallerthan(_value1,_value2));
 }
-
+/** TODO could also return M_LL_INVALID if the values are not comparable!!
+ * @brief returns M_TRUE if \p _value1 is larger than \p _value2 , M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long M_TRUE if \p _value1 is larger than \p _value2 , M_FALSE otherwise
+ */
 static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1&&!_value2)return M_FALSE; // both NULL, so not larger than
-	if(!_value1||!_value2)return(_value1?M_TRUE:M_FALSE); // if at least one of them is NULL the result is M_TRUE if _value1 is __not__ NULL (and _value2 is NULL therefore), otherwise both are NULL and they are equal
+	if(NULL==_value1&&NULL==_value2)return M_FALSE; // both NULL, so not larger than
+	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if at least one of them is NULL the result is M_TRUE if _value1 is __not__ NULL (and _value2 is NULL therefore), otherwise both are NULL and they are equal
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
 		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result>0?M_TRUE:M_FALSE);
 	}
@@ -9053,18 +9315,18 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		long long lllargerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long lllargerthan=(_biginteger1!=NULL&&_biginteger2!=NULL?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return(lllargerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference){
+			if(_rationalDifference!=NULL){
 				if(amVerbose())outputRational("Difference in determining whether a rational is larger than another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalNegative(_rationalDifference));
 				FREE_RATIONAL(_rationalDifference,owner);
@@ -9072,17 +9334,18 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference){
+			if(_decimalDifference!=NULL){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is larger than another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalNegative(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
@@ -9090,26 +9353,41 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				outputError("Failed to compute the difference of two decimals");
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return result;
 	}
 	return M_LL_INVALID;
 }
+/**
+ * @brief returns M_TRUE if \p _value1 is larger than \p _value2 , M_FALSE otherwise
+ * @details takes list and array arguments into account
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* M_TRUE if \p _value1 is larger than \p _value2 , M_FALSE otherwise
+ */
 Mvalue* Mlargerthan(Mvalue* _value1,Mvalue* _value2){
-	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mlargerthan,false);
-	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthan,false);
-	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mlargerthan,false);
-	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthan,false);
+	if(_value1!=NULL&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mlargerthan,false);
+	if(_value1!=NULL&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthan,false);
+	if(_value2!=NULL&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mlargerthan,false);
+	if(_value2!=NULL&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthan,false);
 	return _getIntegerValue(largerthan(_value1,_value2));
 }
 
+/** TODO should return M_LL_INVALID if the arguments are not comparable
+ * @brief returns M_TRUE if \p _value1 is larger than or equal to \p _value2 , M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long M_TRUE if \p _value1 is larger than or equal to \p _value2 , M_FALSE otherwise
+ */
 long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1&&!_value2)return M_TRUE; // both NULL
-	if(!_value1||!_value2)return(_value1?M_FALSE:M_TRUE); // if _value1 is NULL, it is smaller, so false, otherwise _value2 is NULL and yes _value1 is larger
+	if(NULL==_value1&&NULL==_value2)return M_TRUE; // both NULL
+	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_FALSE:M_TRUE); // if _value1 is NULL, it is smaller, so false, otherwise _value2 is NULL and yes _value1 is larger
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
 		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result>=0?M_TRUE:M_FALSE);
 	}
@@ -9119,18 +9397,18 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		long long lllargerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long lllargerthanorequalto=(_biginteger1!=NULL&&_biginteger2!=NULL?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return lllargerthanorequalto;
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference){
+			if(_rationalDifference!=NULL){
 				if(amVerbose())outputRational("Difference in determining whether a rational is larger than or equal to another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalNegative(_rationalDifference));
 				FREE_RATIONAL(_rationalDifference,owner);
@@ -9146,10 +9424,10 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference){
+			if(_decimalDifference!=NULL){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is larger than or equal to another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalNegative(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
@@ -9163,21 +9441,36 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 	}
 	return M_LL_INVALID;
 }
+/**
+ * @brief returns M_TRUEs when \p _value1 is larger than or equal to \p _value2 , M_FALSEs otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* M_TRUEs when \p _value1 is larger than or equal to \p _value2 , M_FALSEs otherwise
+ */
 Mvalue* Mlargerthanorequalto(Mvalue* _value1,Mvalue* _value2){
-	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mlargerthanorequalto,false);
-	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthanorequalto,false);
-	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mlargerthanorequalto,false);
-	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthanorequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mlargerthanorequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthanorequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mlargerthanorequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthanorequalto,false);
 	return _getIntegerValue(largerthanorequalto(_value1,_value2));
 }
-
+/**
+ * @brief return M_TRUE if \p _value1 is not equal to \p _value2 , M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long M_TRUE if \p _value1 is not equal to \p _value2 , M_FALSE otherwise
+ */
 static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1&&!_value2)return M_FALSE; // both NULL, so not unequal
-	if(!_value1||!_value2)return M_TRUE; // not both NULL, so unequal
+	if(NULL==_value1&&NULL==_value2)return M_FALSE; // both NULL, so not unequal
+	if(NULL==_value1||NULL==_value2)return M_TRUE; // not both NULL, so unequal
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
 		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		int result=(_value1text!=NULL&&_value2text!=NULL
+								?strcmp(string(_value1text),string(_value2text))
+								:(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result!=0?M_TRUE:M_FALSE);
 	}
@@ -9187,18 +9480,20 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		long long llunequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llunequalto=(_biginteger1!=NULL&&_biginteger2!=NULL
+													?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_FALSE:M_TRUE)
+													:M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return llunequalto;
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference){
+			if(_rationalDifference!=NULL){
 				if(amVerbose())outputRational("Difference in determining whether a rational is not equal to another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalZero(_rationalDifference)); 
 				FREE_RATIONAL(_rationalDifference,owner);
@@ -9214,10 +9509,10 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference){
+			if(_decimalDifference!=NULL){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is not equal to another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalZero(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
@@ -9231,21 +9526,36 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 	}
 	return M_LL_INVALID;
 }
+/**
+ * @brief returns M_TRUEs if \p _value1 is not equal to \p _value2 , M_FALSEs otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* M_TRUEs if \p _value1 is not equal to \p _value2 , M_FALSEs otherwise
+ */
 Mvalue* Munequalto(Mvalue* _value1,Mvalue* _value2){
-	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Munequalto,false);
-	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Munequalto,false);
-	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Munequalto,false);
-	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Munequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Munequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Munequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Munequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Munequalto,false);
 	return _getIntegerValue(unequalto(_value1,_value2));
 }
-
+/**
+ * @brief returns M_TRUE if \p _value1 is equal to \p _value2 , M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long M_TRUE if \p _value1 is equal to \p _value2 , M_FALSE otherwise
+ */
 static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1&&!_value2)return M_TRUE; // both NULL, so equal
-	if(!_value1||!_value2)return M_FALSE; // either NULL but not both, definitely not equal
+	if(NULL==_value1&&NULL==_value2)return M_TRUE; // both NULL, so equal
+	if(NULL==_value1||NULL==_value2)return M_FALSE; // either NULL but not both, definitely not equal
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
 		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		int result=(_value1text!=NULL&&_value2text!=NULL
+								?strcmp(string(_value1text),string(_value2text))
+								:(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result==0?M_TRUE:M_FALSE);
 	}
@@ -9255,17 +9565,19 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		long long llequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llequalto=(_biginteger1!=NULL&&_biginteger2!=NULL
+												?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_TRUE:M_FALSE)
+												:M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return llequalto;
 	}
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference){
+			if(_rationalDifference!=NULL){
 				if(amVerbose())outputRational("Difference in determining whether a rational is equal to another rational: '",_rationalDifference,"'.\n");
 				result=isRationalZero(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
@@ -9281,10 +9593,10 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference){
+			if(_decimalDifference!=NULL){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is equal to another decimal: '",_decimalDifference,"'.\n");
 				result=isDecimalZero(_decimalDifference);
 				FREE_DECIMAL(_decimalDifference,owner);
@@ -9308,21 +9620,39 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 	*/
 	return M_LL_INVALID;
 }
+/**
+ * @brief returns M_TRUEs if \p _value1 is equal to \p _value2 , M_FALSEs otherwise
+ * @details takes care of array and list arguments
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* M_TRUEs if \p _value1 is equal to \p _value2 , M_FALSEs otherwise
+ */
 Mvalue* Mequalto(Mvalue* _value1,Mvalue* _value2){
-	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mequalto,false);
-	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mequalto,false);
-	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mequalto,false);
-	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mequalto,false);
 	return _getIntegerValue(equalto(_value1,_value2));
 }
 
 // MDH@21OCT2019: first comparison method dealing with decimals and rationals from which the rest was produced
+/**
+ * @brief returns M_TRUE if \p _value1 is smaller than or equal to \p _value2 , M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long M_TRUE if \p _value1 is smaller than or equal to \p _value2 , M_FALSE otherwise
+ */
 static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return(_value1?M_FALSE:M_TRUE); // if at least one of them is NULL, if _value1 is, the result should be false, true otherwise
+	if(NULL==_value1&&NULL==_value2)return M_FALSE; // MDH@30MAR2023: OOPS forgotten earlier
+	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_FALSE:M_TRUE); // if at least one of them is NULL, if _value1 is, the result should be false, true otherwise
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),
+						*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text!=NULL&&_value2text!=NULL
+								?strcmp(string(_value1text),string(_value2text)):
+								(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result<=0?M_TRUE:M_FALSE);
 	}
@@ -9332,18 +9662,20 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llsmallerthanorequalto=(_biginteger1!=NULL&&_biginteger2!=NULL
+																		?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_FALSE:M_TRUE)
+																		:M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return llsmallerthanorequalto;
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
-				 ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference){
+			if(_rationalDifference!=NULL){
 				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than or equal to another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalPositive(_rationalDifference)); // i.e. if difference is NOT positive, we should return M_TRUE
 				FREE_RATIONAL(_rationalDifference,owner);
@@ -9359,10 +9691,10 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-				,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference){
+			if(_decimalDifference!=NULL){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is smaller than or equal to another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalPositive(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
@@ -9376,42 +9708,57 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 	}
 	return M_LL_INVALID;
 }
+/**
+ * @brief returns M_TRUEs when \p _value1 is smaller than or equal to \p _value2 , M_FALSEs otherwise
+ * @details takes care of list and array arguments
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* M_TRUEs when \p _value1 is smaller than or equal to \p _value2 , M_FALSEs otherwise
+ */
 Mvalue* Msmallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(_value1&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msmallerthanorequalto,false);
-	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthanorequalto,false);
-	if(_value2&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Msmallerthanorequalto,false);
-	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthanorequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msmallerthanorequalto,false);
+	if(_value1!=NULL&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthanorequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Msmallerthanorequalto,false);
+	if(_value2!=NULL&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthanorequalto,false);
 	return _getIntegerValue(smallerthanorequalto(_value1,_value2));
 }
 // end comparison operator implementation
 
 // MDH@01APR2020: we can make a list with intermediate values for multi-dimensional ranging by passing in the start list, the delta list and the end list each of which should have equal length
 //				I guess we can pass in a count that tells us how many multidimensional points to return instead of the end 
+/**
+ * @brief returns the range of integer values starting with \p firstRangeValue and ending with \p lastRangeValue
+ * 
+ * @param firstRangeValue 
+ * @param lastRangeValue 
+ * @param up the direction set to true when \p firstRangeValue <= \p lastRangeValue , false otherwise
+ * @return Mlist* he range of values starting with \p firstRangeValue and ending with \p lastRangeValue
+ */
 static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
-	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?owned_list(_getListOfType(VT_INTEGER),owner):NULL);
-	if(_scalarRangeList){
+	Mlist* _scalarRangeList=(firstRangeValue!=NULL&&lastRangeValue!=NULL?owned_list(_getListOfType(VT_INTEGER),owner):NULL);
+	if(_scalarRangeList!=NULL){
 		long long direction=smallerthanorequalto(firstRangeValue,lastRangeValue);
 		if(direction!=M_LL_INVALID){
 			*up=(direction==M_TRUE);
 			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
 			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
 			Mvalue* firstIntegerRangeValue=(*up?Mceil(firstRangeValue):Mfloor(firstRangeValue)); // OOPS *up NOT up
-			if(firstIntegerRangeValue){
+			if(firstIntegerRangeValue!=NULL){
 				long long rangeInteger=getValueInteger(firstIntegerRangeValue);
 				if(rangeInteger!=M_LL_INVALID){
 					Mvalue* integerrangeValue=_getIntegerValue(rangeInteger);
-					if(integerrangeValue){
+					if(integerrangeValue!=NULL){
 						if(amVerbose()){
 							Mvalue* lastIntegerRangeValue=(*up?Mfloor(lastRangeValue):Mceil(lastRangeValue));
 							if(amDebugging()){
 								outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerRangeValue,"].\n");
-								if(inputCharReadFunction){
+								if(inputCharReadFunction!=NULL){
 									char c;output("%s...","Press Ctrl-C to stop or any other key to continue");(*inputCharReadFunction)(&c);if(c==3)return NULL;
 								}
 							}
 						}
 						Mvalue* inrangeValue;
-						while(integerrangeValue){
+						while(integerrangeValue!=NULL){
 							// determine whether this value does not exceed the last value
 							long long inrange=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
 							if(inrange==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
@@ -9435,10 +9782,18 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 	return disowned_list(_scalarRangeList,owner);
 }
 // MDH@25NOV2020: preferable to store the range elements in an array
+/**
+ * @brief returns a M array containing the range of integer values starting at \p firstRangeValue and ending with \p lastRangeValue
+ * 
+ * @param firstRangeValue 
+ * @param lastRangeValue 
+ * @param up the returned direction, true when \p firstRangeValue <= \p lastRangeValue , false otherwise
+ * @return Marray* the range of integer values starting at \p firstRangeValue and ending with \p lastRangeValue
+ */
 static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Marray* _scalarRangeArray=NULL; // can't create the array until we know how many values will be in it
-	if(firstRangeValue&&lastRangeValue){
+	if(firstRangeValue!=NULL&&lastRangeValue!=NULL){
 		long long direction=smallerthanorequalto(firstRangeValue,lastRangeValue);
 		if(direction!=M_LL_INVALID){
 			*up=(direction==M_TRUE);
@@ -9447,11 +9802,11 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
 			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
 			Mvalue* firstIntegerRangeValue=(*up?Mceil(firstRangeValue):Mfloor(firstRangeValue));
-			if(firstIntegerRangeValue){
+			if(firstIntegerRangeValue!=NULL){
 				long long rangeInteger=getValueInteger(firstIntegerRangeValue);
 				if(rangeInteger!=M_LL_INVALID){
 					Mvalue* integerrangeValue=_getIntegerValue(rangeInteger);
-					if(integerrangeValue){
+					if(integerrangeValue!=NULL){
 						Mvalue* lastIntegerRangeValue=(*up?Mfloor(lastRangeValue):Mceil(lastRangeValue));
 						if(report){
 							outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerRangeValue,"].\n");
@@ -9467,7 +9822,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 							?(lastRangeInteger>=rangeInteger?1+(lastRangeInteger-rangeInteger):0)
 							:(rangeInteger>=lastRangeInteger?1+(rangeInteger-lastRangeInteger):0));
 						_scalarRangeArray=owned_array(_getArray("_getScalarRangeArray",arraylength),owner);
-						if(_scalarRangeArray){
+						if(_scalarRangeArray!=NULL){
 							if(arraylength>0){
 								Mvalue** valueholder=_scalarRangeArray->values;
 								while(integerrangeValue){
@@ -9495,8 +9850,15 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 }
 
 // MDH@18OCT2019: we can get the range of integers between two values
+/**
+ * @brief returns the range of integer values from \p _value1 to \p _value2
+ * @details both arguments must be not NULL
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the range of integer values from \p _value1 to \p _value2
+ */
 Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_MAP||_value2->type==VT_MAP)return NULL; // neither operand can be a map for sure
 	if(_value1->type==VT_REFERENCE||_value2->type==VT_REFERENCE)return NULL; // neither operand can be a reference for sure
 	if(_value1->type==VT_FUNCTION||_value2->type==VT_FUNCTION)return NULL; // neither operand can be a function for sure
@@ -9506,50 +9868,52 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	//				I suppose we can stick to the original approach if there are less than 2 elements in the list
 	bool up;
 	if(_value1->type==VT_LIST){
-		if(!_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange,false);
+		if(NULL==_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange,false);
 
 		// with at least two elements in the list we could use the second argument as the count if it is not a list, this would give us additional functionality
 		// because normally we would expect value2 to be an end point somehow and therefore a list
 		Mlistelement* endIntegerRangeListelement=(_value2->type==VT_LIST?_value2->value._list->_first:NULL);
 		Mvalue* endIntegerRangeValue=(_value2->type==VT_LIST?(endIntegerRangeListelement?endIntegerRangeListelement->_value:NULL):_value2);
-		if(!endIntegerRangeValue)return NULL; // we need a end value (whether from a scalar or from a list)
+		if(NULL==endIntegerRangeValue)return NULL; // we need a end value (whether from a scalar or from a list)
 		
 		Mlistelement* startIntegerRangeListelement=_value1->value._list->_first;
 		Mvalue* startIntegerRangeValue=startIntegerRangeListelement->_value;
-		if(!startIntegerRangeValue)return NULL;
+		if(NULL==startIntegerRangeValue)return NULL;
 
 		Mlist* _integerRangeList=owned_list(_getScalarRangeList(startIntegerRangeValue,endIntegerRangeValue,&up),owner);
-		if(!_integerRangeList||!_integerRangeList->_first)return NULL; // if undefined or empty apparently no integers between the start and end of the first dimensions
+		if(NULL==_integerRangeList||NULL==_integerRangeList->_first)return NULL; // if undefined or empty apparently no integers between the start and end of the first dimensions
 
 		if(amVerboseDebugging())
 			outputList("First scalar range: ",_integerRangeList,".\n");
 
 		Mvalue* rangeValue=subtract(endIntegerRangeValue,startIntegerRangeValue); // the total range in the first dimension
 		// the first integer range list tells us how many elements we need to create for successive elements
-		Mvalue *firstIntegerRangeValue=_integerRangeList->_first->_value,*lastIntegerRangeValue=_integerRangeList->_last->_value;
-		Mvalue *startDeltaValue=subtract(firstIntegerRangeValue,startIntegerRangeValue),*endDeltaValue=subtract(endIntegerRangeValue,lastIntegerRangeValue);
+		Mvalue *firstIntegerRangeValue=_integerRangeList->_first->_value
+					,*lastIntegerRangeValue=_integerRangeList->_last->_value;
+		Mvalue *startDeltaValue=subtract(firstIntegerRangeValue,startIntegerRangeValue)
+					,*endDeltaValue=subtract(endIntegerRangeValue,lastIntegerRangeValue);
 
 		// so we either have rangeValue=startDeltaValue+1+...+1+endDelta when up is true or rangeValue=endDelta+-1+...+-1+startDelta when up is false
 
 		// the multiplication factor (deltato use in each successive dimension equals the difference between end and start value divided by rangeValue
 
 		Mlist* _multFactorList=owned_list(_getListOfType(VT_UNDEFINED),owner);		
-		if(!_multFactorList){FREE_LIST(_integerRangeList,owner);return NULL;} // MDH@17JUN2020: free the integer range list please...
+		if(NULL==_multFactorList){FREE_LIST(_integerRangeList,owner);return NULL;} // MDH@17JUN2020: free the integer range list please...
 
 		// iterate over all successive elements in the _value1 list
 		while(1){
 			startIntegerRangeListelement=startIntegerRangeListelement->_next;
-			if(!startIntegerRangeListelement)break;
+			if(NULL==startIntegerRangeListelement)break;
 			Mvalue* startIntegerRangeValue=startIntegerRangeListelement->_value;
-			if(!startIntegerRangeValue)continue; // skip whatever is not present
+			if(NULL==startIntegerRangeValue)continue; // skip whatever is not present
 			// in the _value2 'list' (if any) get the next end value
-			if(endIntegerRangeListelement){
+			if(endIntegerRangeListelement!=NULL){
 				endIntegerRangeListelement=endIntegerRangeListelement->_next;
-				if(endIntegerRangeListelement)endIntegerRangeValue=endIntegerRangeListelement->_value;
+				if(endIntegerRangeListelement!=NULL)endIntegerRangeValue=endIntegerRangeListelement->_value;
 			}
 			// we need to compute the delta (step) 
 			Mvalue* deltaRangeValue=divide(subtract(endIntegerRangeValue,startIntegerRangeValue),rangeValue);
-			if(!deltaRangeValue)continue;
+			if(NULL==deltaRangeValue)continue;
 			if(appendedToList(_multFactorList,owner,deltaRangeValue,M_LL_INVALID)<=0){
 				FREE_LIST(_multFactorList,owner);
 				_multFactorList=NULL;
@@ -9561,19 +9925,19 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 			outputList("Multiplicators: ",_multFactorList,".\n");
 
 		Mlist* _resultList=NULL;
-		if(_multFactorList){
+		if(_multFactorList!=NULL){
 			// now we have multiplication factors we can determine the values in the subsequent dimensions
 			if(_multFactorList->numberOfElements>0){
 				// initialize the start integer range start and end list element
 				// endIntegerRangeListelement=(_value2->type==VT_LIST?_value2->value._list->_first:NULL);
 				_resultList=owned_list(_getListOfType(VT_UNDEFINED),owner);
-				if(_resultList){
+				if(_resultList!=NULL){
 					// iterating over all elements in _integerRangeList
 					Mvalue *firstRangeValue=startDeltaValue,*incrementValue=_getIntegerValue(1); // MDH@03MAR2020: no need to use assign here because firstRangeValue is temporary
 					Mlistelement* _integerRangeListelement=_integerRangeList->_first;
-					while(_integerRangeListelement){
+					while(_integerRangeListelement!=NULL){
 						Mlist* _pointList=owned_list(_getListOfType(VT_UNDEFINED),owner);
-						if(!_pointList){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
+						if(NULL==_pointList){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						if(appendedToList(_pointList,owner,_integerRangeListelement->_value,M_LL_INVALID)<=0)
 						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						// now to compute the points in all other dimensions which means we have to increment startIntegerRangeListelement and endIntegerRangeListelement
@@ -9581,7 +9945,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 						Mvalue* rangeValue;
 						// outputValue("Increment: ",incrementValue,".\n");
 						startIntegerRangeListelement=_value1->value._list->_first;
-						while(startIntegerRangeListelement->_next){
+						while(startIntegerRangeListelement->_next!=NULL){
 							startIntegerRangeListelement=startIntegerRangeListelement->_next;
 							startIntegerRangeValue=startIntegerRangeListelement->_value; // should always be there
 							/* no need to know the end of the range because we know the multiplication factor (i.e. slope)
@@ -9596,7 +9960,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 							{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 							multFactorListelement=multFactorListelement->_next;
 						}
-						if(!_resultList)break;
+						if(NULL==_resultList)break;
 						// append _pointList to the result list
 						if(appendedToList(_resultList,owner,_getValueOfList(disowned_list(_pointList,owner)),M_LL_INVALID)<=0)
 						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
@@ -9618,10 +9982,16 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	// replacing: return _getValueOfList(_getScalarRangeList(_value1,_value2,&up));
 	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
 }
-
+/**
+ * @brief returns the result of applying binary operator \p operator to \p _value1 and \p _value2
+ * @param operator
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the result of applying binary operator \p operator to \p _value1 and \p _value2
+ */
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	Mvalue* result=NULL;
-	if(_value1&&_value2){
+	if(_value1!=NULL&&_value2!=NULL){
 		if(amVerbose()&&amDebugging())
 		{outputValue("Computing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.\n");}
 		switch(operator[0]){
@@ -9651,6 +10021,12 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	return result;
 }
 // MDH@14OCT2019: using (almost the) same precedence as used in C (except I have power operators as well ** and e)
+/**
+ * @brief returns the precedence value of operator \p operator
+ * 
+ * @param operator 
+ * @return char the precedence value of operator \p operator
+ */
 char getOperatorPrecedence(Mstring* operator){
 	if(operator){
 		char c;
@@ -9677,13 +10053,22 @@ char getOperatorPrecedence(Mstring* operator){
 	}
 	return 0;
 }
-
+/**
+ * @brief for storing formula elements
+ * 
+ */
 typedef struct Mformulaelement{
 	Mvaluereference* _operand; // an operand to apply the binary operator to
 	Mstring* _operator; // a (shortcut) binary operator 
 	struct Mformulaelement* _next;
 	struct Mformulaelement* _prev; // MDH@21MAY2019: unfortunately needed for moving back!!
 }Mformulaelement;
+/**
+ * @brief returns a new formula element
+ * 
+ * @param source 
+ * @return Mformulaelement* a new formula element
+ */
 Mformulaelement* __formulaelement(char* source){Mallocationowner owner=getOwner(__LINE__);
 	// output("BEFORE FORMULA ELEMENT ALLOCATION MARKS:\n");outputAllocationTypeMarks();
 	Mformulaelement* _formulaelement=CALLOC_1(sizeof(Mformulaelement),'4',owner);
@@ -9695,13 +10080,20 @@ Mformulaelement* __formulaelement(char* source){Mallocationowner owner=getOwner(
 	*/
 	return DISOWNED(_formulaelement,owner);
 }
+/**
+ * @brief frees formula element \p _formulaelement
+ * 
+ * @param _formulaelement 
+ * @param owner_formulaelement 
+ * @return size_t the number of formula elements freed
+ */
 size_t free_formulaelement(Mformulaelement* _formulaelement,Mallocationowner owner_formulaelement){
 	// return the total number of formula elements freed
 	size_t result=0;
-	if(_formulaelement){
-		if(_formulaelement->_next)result+=free_formulaelement(_formulaelement->_next,owner_formulaelement);
-		if(_formulaelement->_operator)FREE_STRING(_formulaelement->_operator,owner_formulaelement);
-		if(_formulaelement->_operand)FREE_VALUEREFERENCE(_formulaelement->_operand,owner_formulaelement);
+	if(_formulaelement!=NULL){
+		if(_formulaelement->_next!=NULL)result+=free_formulaelement(_formulaelement->_next,owner_formulaelement);
+		if(_formulaelement->_operator!=NULL)FREE_STRING(_formulaelement->_operator,owner_formulaelement);
+		if(_formulaelement->_operand!=NULL)FREE_VALUEREFERENCE(_formulaelement->_operand,owner_formulaelement);
 		FREE_DISOWNED_1(_formulaelement,'4',owner_formulaelement);
 		result+=1; // another one
 		// output("FORMULA ELEMENT FREED: %zd:%zd.\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
@@ -9747,6 +10139,15 @@ char* getSignificantTokenText(Mtoken* token){
  * typically this assignee can be composite referencing indices or attributes in maps, obviously we can put this variable in some sort of structure
  * it composes a list of value references to which operators are to be applied
  */
+/**
+ * @brief returns the result of the evaluation of the expression being evaluated
+ * 
+ * @param info 
+ * @param resulttype 
+ * @param endTokenTypes 
+ * @param endTokenTypeCount 
+ * @return Mvalue* the result of the evaluation of the expression being evaluated
+ */
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount){Mallocationowner owner=getOwner(__LINE__);
 
 	Mvalue* _expressionValue=NULL;
@@ -9756,7 +10157,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 	// e.g. ( ends with , or )	[ ends with ]	 { ends with }	etc.   
 	/////////_expressionvalue->_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference)); // create a value reference that is to hold a single value reference as result
 	
-	if(expressionToken){
+	if(expressionToken!=NULL){
 		if(amVerboseDebugging()){
 			output("getValueOfExpression() interpreting %s expression starting with token '%s' of type '%s'",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			if(endTokenTypeCount){
@@ -9776,7 +10177,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 
-		while(expressionToken){
+		while(expressionToken!=NULL){
 			
 			if(amVerboseDebugging())
 				output("getValueOfExpression() processing %s expression token '%s' of type %s.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
@@ -9790,7 +10191,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				break;
 			}
 			
-			if(_formulaelement){
+			if(_formulaelement!=NULL){
 				// MDH@09NOV2022 NOTE: this is actually the only place where _getValueReference is getting called and may be confused with _getValuereference TODO
 				_formulaelement->_operand=owned_valuereference(_getValueReference("operand",endTokenTypes,endTokenTypeCount),Msubowner(owner,1)); // MDH@08JUN2020: whatever we bind in the formula element needs to be subowned by it
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
@@ -9804,7 +10205,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			//				this can be done any number of times
 
 			// NOTE some binary operators are stored in a couple of tokens!!!
-			if(expressionToken){
+			if(expressionToken!=NULL){
 				if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)
 					expressionToken=nextEnvironmentExpressionToken();
 				// MDH@14NOV2019: this is the first possible place where we should be aware of further indexing
@@ -9845,7 +10246,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// MDH@16MAY2019: can't end an expression with an operator BRO'
-			if(expressionToken){
+			if(expressionToken!=NULL){
 				if(amVerboseDebugging())
 					output("Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				endTokenTypeIndex=endTokenTypeCount;
@@ -9862,14 +10263,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
 				_formulaelement->_operator=owned_string(_getSignificantTokenText(expressionToken),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
-				if(!_formulaelement->_operator){output("%sFailed to copy operator '%s'.\n",M_ERROR_PREFIX,string(expressionToken->text));break;}
+				if(NULL==_formulaelement->_operator){output("%sFailed to copy operator '%s'.\n",M_ERROR_PREFIX,string(expressionToken->text));break;}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
-				while(expressionToken->next&&expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
+				while(expressionToken->next!=NULL&&expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
 					expressionToken=nextEnvironmentExpressionToken();
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
-				if(expressionToken->next&&expressionToken->next->type==TT_ASSIGNMENT){
+				if(expressionToken->next!=NULL&&expressionToken->next->type==TT_ASSIGNMENT){
 					expressionToken=nextEnvironmentExpressionToken();
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
@@ -9877,7 +10278,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
 				_formulaelement->_next=OWNED(__formulaelement("successor"),owner); // MDH@08JUN2020: similar to all other formula elements this one needs to be owned by me as well otherwise I won't be able to free it myself
 				_formulaelement=_formulaelement->_next;
-				if(!_formulaelement){
+				if(NULL==_formulaelement){
 					outputError("Failed to create a new formula element.");
 					break;
 				}
@@ -9889,7 +10290,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		}
 
 		// evaluate the formula
-		if(formula){
+		if(formula!=NULL){
 
 			if(amVerboseDebugging()){
 				outputValue("First formula value: '",formula->_operand->_value,"'.\n");
@@ -9902,7 +10303,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			uint16_t numberOfAssignments=0;
 			Mformulaelement* _lastAssignmentFormulaelement=NULL;
 			_formulaelement=formula;
-			while(_formulaelement){
+			while(_formulaelement!=NULL){
 				if(string_last_char(_formulaelement->_operator)!='=')break; // not ending with assignment operator character to start with
 				if(string_char(_formulaelement->_operator,0)=='<'||string_char(_formulaelement->_operator,0)=='>'||string_char(_formulaelement->_operator,0)=='!')break; // break on <=, >= and !=
 				if(string_length(_formulaelement->_operator)>1&&string_char(_formulaelement->_operator,0)=='=')break; // break on ==
@@ -9932,10 +10333,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			//				which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
 			//				we always need to compare two successive operators if the precedence of the first is not below the precedence of the second you may apply the first operator, otherwise you skip applying the operator
 			//				perhaps it's best to immediately consume formula elements we no longer need!!!!!
-			Mvalue* _result=(_formulaelement->_next?NULL:getReferencedValue(_formulaelement->_operand)); // bit of a nuisance though!!!
+			Mvalue* _result=(_formulaelement->_next!=NULL?NULL:getReferencedValue(_formulaelement->_operand)); // bit of a nuisance though!!!
 			Mformulaelement* nextformulaelement;
 			char operatorprecedence,nextoperatorprecedence;
-			while(_formulaelement->_next){
+			while(_formulaelement->_next!=NULL){
 				operatorprecedence=getOperatorPrecedence(_formulaelement->_operator);
 				nextoperatorprecedence=getOperatorPrecedence(_formulaelement->_next->_operator);
 				if(operatorprecedence>=nextoperatorprecedence){ // current operator has higher or the same precedence which means we can apply it
@@ -9944,7 +10345,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					_formulaelement->_operand->_value=_result;
 					// MDH@02NOV2019 replacing: assignValue(&(_formulaelement->_operand->_value),_result);
 					// but because _result could be NULL we have to force _name to be NULL just in case 
-					if(_formulaelement->_operand->_name){FREECHARS(_formulaelement->_operand->_name,owner);_formulaelement->_operand->_name=NULL;}
+					if(_formulaelement->_operand->_name)
+					{FREECHARS(_formulaelement->_operand->_name,owner);_formulaelement->_operand->_name=NULL;}
 					// we need to point the formula operand to the next of the consumed formula element, so the consumed formula element won't be used again in computations
 					nextformulaelement=_formulaelement->_next;
 					// point the formula element now storing the result to the next of the consumed formula element
@@ -9967,7 +10369,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						outputInfo("No formula element to free!");
 					*/
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
-					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
+					if(_formulaelement->_prev!=NULL)_formulaelement=_formulaelement->_prev;
 					// is there a formula element in front of it that has not yet been applied?????
 					if(amVerboseDebugging())
 						outputValue("Result: '",_result,"'.\n");
@@ -9992,7 +10394,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			if(amVerboseDebugging())
 				{
 					outputValue("Result: '",_result,"'.\n");
-					allocated=getAllocationTypeOccupied('4',0);freed=getAllocationTypeFreed('4',0);
+					allocated=getAllocationTypeOccupied('4',0);
+					freed=getAllocationTypeFreed('4',0);
 					output("Type '4' AFTER: allocated: %zd - freed: %zd - left to free: %zd\n",allocated,freed,formulaElementCount);
 				}
 
@@ -10001,11 +10404,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(amVerboseDebugging())
 					output("Performing %u assignments.\n",numberOfAssignments);
 				_formulaelement=_lastAssignmentFormulaelement;
-				while(_formulaelement){
+				while(_formulaelement!=NULL){
 					_valuereference=_formulaelement->_operand;
 					if(amVerboseDebugging()){
 						Mstring* _indexidText=owned_string(_getValueText(_valuereference->_itemid,false),owner);
-						if(_indexidText){
+						if(_indexidText!=NULL){
 							output("Assignment to %s%s using operator %s!\n",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
 							FREE_STRING(_indexidText,owner);
 						}
@@ -10092,37 +10495,43 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 // MDH@22DEC2020: I can simplify the for loop by wrapping it inside an environment by being able to create one
 //				on the fly with a local variable map similar to what the anonymous function does
 //				thus effectively separating commands inside the block from the declaration of local variables
+/**
+ * @brief creates and returns a new (wrapped) environment initialized with variables defined in \p _localMapValue
+ * 
+ * @param _localMapValue 
+ * @return Mvalue* a new (wrapped) environment initialized with variables defined in \p _localMapValue
+ */
 Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
 	long long result=M_LL_INVALID;
-	if(!_localMapValue||_localMapValue->type==VT_MAP){
+	if(NULL==_localMapValue||_localMapValue->type==VT_MAP){
 		result=M_FALSE;
-		Mmap* localMap=(_localMapValue?_localMapValue->value._map:NULL);
-		if(!localMap)
+		Mmap* localMap=(_localMapValue!=NULL?_localMapValue->value._map:NULL);
+		if(NULL==localMap)
 			outputWarning("No with (local) variables defined!");
 		else
 		if(localMap->numberOfElements==0)
 			outputWarning("With map empty!");
 		Menvironment* _withEnvironment=owned_environment(__environment(),owner);
-		if(_withEnvironment){
+		if(_withEnvironment!=NULL){
 			if(report)
 				output("With environment created.\n");
 			Mmapelement* withNameMapelement=(localMap?getMapelement(localMap,"."):NULL);
-			Mvariable* withNameVariable=(withNameMapelement?withNameMapelement->_variable:NULL);
-			Mstring* _withNameText=(withNameVariable?owned_string(_getValueText(withNameVariable->_value,true),owner):NULL);
+			Mvariable* withNameVariable=(withNameMapelement!=NULL?withNameMapelement->_variable:NULL);
+			Mstring* _withNameText=(withNameVariable!=NULL?owned_string(_getValueText(withNameVariable->_value,true),owner):NULL);
 			// if a property "." is defined, it's text value will be the name of the with environment
 			_withEnvironment->_name=owned_chars(_getChars((_withNameText?string(_withNameText):"")),Msubowner(owner,1));
 			// copy local map
-			if(localMap)_withEnvironment->_variableMap=owned_map(_getMapCopy(localMap),Msubowner(owner,1));
-			if(!localMap||_withEnvironment->_variableMap){
+			if(localMap!=NULL)_withEnvironment->_variableMap=owned_map(_getMapCopy(localMap),Msubowner(owner,1));
+			if(NULL==localMap||_withEnvironment->_variableMap){
 				if(report)
 					output("Local variables map registered.\n");
-				if(!withNameMapelement||removedFromMap(_withEnvironment->_variableMap,owner,".")==M_TRUE){
+				if(NULL==withNameMapelement||removedFromMap(_withEnvironment->_variableMap,owner,".")==M_TRUE){
 					// almost there
 					if(!pushExecutionEnvironment(disowned_environment(_withEnvironment,owner))){ // _withEnvironment not bound!!!
 						free_environment(_withEnvironment);_withEnvironment=NULL;
 						output("%sFailed to register %senvironment",M_ERROR_PREFIX,(_withNameText?"":"the with "));
-						if(_withNameText)output(" '%s'",string(_withNameText));
+						if(_withNameText!=NULL)output(" '%s'",string(_withNameText));
 						output(".\n");
 					}else{
 						result=M_TRUE;
@@ -10130,7 +10539,7 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 							output("With environment activated.\n");
 					}
 				}else
-				if(withNameMapelement)
+				if(withNameMapelement!=NULL)
 					outputError("Failed to remove the with environment name from the local variables map");	
 			}
 			if(result==M_FALSE&&_withEnvironment!=NULL){
@@ -10157,7 +10566,7 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 				output(".\n");
 			}
 			*/
-			if(_withNameText)FREE_STRING(_withNameText,owner);
+			if(_withNameText!=NULL)FREE_STRING(_withNameText,owner);
 		}
 	}else
 		outputError("With argument not a (local variable) map!");
@@ -10165,21 +10574,27 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 }
 // MDH@23DEC2020: you can decide now to return whatever you want (from the current environment)
 //				but if the value is NULL the default i.e. the entire variable map is returned
+/**
+ * @brief ends a with environment returning either \p _returnValue or, by default, the with environment variable map
+ * @details returns \p _returnValue when \p _returnValue is not NULL
+ * @param _returnValue the value to return instead of the with environment variable map
+ * @return Mvalue* the return value
+ */
 Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__);
 	// let's make endwith return a copy of the variable map of the environment we're going to pop!!!
 	// TODO we should check whether there's a with environment active!!!!!!!!
-	if(!getEnvironmentParent(getExecutionEnvironment())){
+	if(NULL==getEnvironmentParent(getExecutionEnvironment())){
 		outputError("No (with) environment to end.");
 		return NULL;
 	}
 	Mmap* _resultMap=NULL;
 	if(_returnValue==NULL){ // no return value specified
 		_resultMap=owned_map(_getMapCopy(getExecutionEnvironment()->_variableMap),owner);
-		if(!_resultMap)
+		if(NULL==_resultMap)
 			outputError("Failed to return the with environment variable map");
 	}
 	popExecutionEnvironment();
-	return(_resultMap?_getValueOfMap(disowned_map(_resultMap,owner)):_returnValue);
+	return(_resultMap!=NULL?_getValueOfMap(disowned_map(_resultMap,owner)):_returnValue);
 }
 // the functions to create functions are moved here from Menvironment.h/c because they require parsing the command texts
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
@@ -10193,6 +10608,14 @@ Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__)
 //				ok it might also know which external variables it uses and the body won't parse if trying to access an external variable that does not exist
 //				I'm wondering if the local map value should define initial values at all????
 //				what if a person forget the local map value???? I guess we will just assume no local variables
+/**
+ * @brief returns a wrapped anonymous function with parameter map \p _parameterMapValue , local variables \p _localMapValue and body \p _bodyValue
+ * 
+ * @param _parameterMapValue 
+ * @param _localMapValue 
+ * @param _bodyValue 
+ * @return Mvalue* the new anonymous function wrapper
+ */
 Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mvalue* _bodyValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging();
 	Mvalue* _functionValue=NULL;
@@ -10202,21 +10625,21 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 	//				OK, we need two maps and one list
 	Mmap *parameterMap=NULL,*localMap=NULL;
 	Mlist* bodyCommandList=NULL;
-	if(_parameterMapValue&&_parameterMapValue->type==VT_LIST){
+	if(_parameterMapValue!=NULL&&_parameterMapValue->type==VT_LIST){
 		bodyCommandList=_parameterMapValue->value._list;
 	}else{ // first argument not a list, so should be a map (if defined)
-		if(_parameterMapValue){
+		if(_parameterMapValue!=NULL){
 			if(_parameterMapValue->type!=VT_MAP){outputError("Parameters of function not defined in a map");return NULL;}
 			parameterMap=_parameterMapValue->value._map;
 		}
-		if(_localMapValue&&_localMapValue->type==VT_LIST){
+		if(_localMapValue!=NULL&&_localMapValue->type==VT_LIST){
 			bodyCommandList=_bodyValue->value._list;		
 		}else{ // second argument not a list, so should be a map
-			if(_localMapValue){
+			if(_localMapValue!=NULL){
 				if(_localMapValue->type!=VT_MAP){outputError("Local variables of function not defined in a map");return NULL;}
 				localMap=_localMapValue->value._map;
 			}
-			if(_bodyValue){
+			if(_bodyValue!=NULL){
 				if(_bodyValue->type!=VT_LIST){outputError("Body of function not defined in a list");return NULL;}
 				bodyCommandList=_bodyValue->value._list;
 			}
@@ -10225,22 +10648,22 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 	// ASSERT at this point all arguments are processed and accepted
 	// if(amVerbose())outputValue("Anonymous function parameter map: ",_parameterMapValue,".\n");
 	Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'U',Msubowner(owner,1)); // TODO check why I need to use U here
-	if(_userfunction){
+	if(_userfunction!=NULL){
 		if(report)
 		{outputMap("Processing the declaration of a function with parameters ",parameterMap," and ");outputMap("local variables ",localMap,".\n");}
 		Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'F',owner); // TODO check why I need to use F here
-		if(_function){
+		if(_function!=NULL){
 			if(report)outputInfo("Function created.");
 
 			// MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
 			//				so we have to make a copy of the parameter map
-			if(parameterMap)
+			if(parameterMap!=NULL)
 				_function->_parameterMap=owned_map(_getMapCopy(parameterMap),Msubowner(owner,1)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
 			else
 			if(report)outputInfo("No parameters registered.");
 
 			// MDH@29OCT2020: the local map is stored with the user function (and not the function because system functions do not need explicitly defined local variables)
-			if(localMap)
+			if(localMap!=NULL)
 				_userfunction->_localMap=owned_map(_getMapCopy(localMap),Msubowner(owner,2)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
 			else
 			if(report)outputInfo("No local variables registered.");
@@ -10248,30 +10671,30 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 			_function->functionunion._userfunction=_userfunction; // NOTE already owned at the right level
 
 			// user function expects a list of commands, so we have to wrap the single token (if any)
-			if(bodyCommandList){
+			if(bodyCommandList!=NULL){
 				if(report)output("Will process the body commands.\n");
 				Mlistelement* bodyCommandListelement=(bodyCommandList?bodyCommandList->_first:NULL);
-				if(bodyCommandListelement){
+				if(bodyCommandListelement!=NULL){
 					_userfunction->_bodyCommandList=owned_list(_getListOfType(VT_TOKEN),Msubowner(owner,2));
-					if(_userfunction->_bodyCommandList){
+					if(_userfunction->_bodyCommandList!=NULL){
 						Mcommand* _command=NULL; // we'll be using _command to determine afterwards whether or not we succeeded in parsing the body commands
 						// the only way to successively parse the body commands is by creating a temporary environment that will expose the parameters as existing variables
 						// so the code here was taken from getValueOfFunctionCall() but because this is an anonymous function we do not have a name yet
 						// which obviously prevents recursive calls by name (we should find a way to make recursive calls in anonymous functions though)
 						Mmap* _argumentMap=_getFunctionArgumentMap(_function,NULL,owner); // to obtain the defaults (although we don't need them) we simply pass NULL as argument list
-						if(_argumentMap){
+						if(_argumentMap!=NULL){
 							Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(_function,"",_argumentMap),owner);
-							if(_functionExecutionEnvironment){
+							if(_functionExecutionEnvironment!=NULL){
 								if(pushExecutionEnvironment(disowned_environment(_functionExecutionEnvironment,owner))){
 									if(report)output("Ready to parse %zd body command lines.\n",bodyCommandList->numberOfElements);
 									// which is similar to what _getValueOfFunctionCall does
 									bool commandContinued;
 									char inputChar,inputCharType;
-									while(bodyCommandListelement){
+									while(bodyCommandListelement!=NULL){
 										// convert the body command to a text (to be tokenized)
 										Mstring* _bodyCommandText=owned_string(_getValueText(bodyCommandListelement->_value,true),owner);
 										// TODO should we simply skip the command?????
-										if(_bodyCommandText){
+										if(_bodyCommandText!=NULL){
 											char *bodyCommandCharacter=string(_bodyCommandText);
 											// immediately determine whether this command is continued on the next command text
 											// if it does cut off the continuation character as we do not consider it to be part of the actual command text
@@ -10281,9 +10704,9 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 											if(commandContinued)string_setlength(_bodyCommandText,string_length(_bodyCommandText)-1);
 											if(report)output("Characters of command text%s '%s' parsed: '",(_command?" continuation":""),string(_bodyCommandText));
 											// ascertain to have a command (we will have one if this command text is considered a continuation of the command so far)
-											if(!_command)_command=owned_command(_getNewCommand(true),owner);
+											if(NULL==_command)_command=owned_command(_getNewCommand(true),owner);
 											// can't break here if the command is NULL because we haven't freed _bodyCommandText yet
-											if(_command){ // a command to parse into in which inputChar will always be set
+											if(_command!=NULL){ // a command to parse into in which inputChar will always be set
 												// ignore whitespace at the beginning of the command
 												// MDH@28OCT2020 NOTE: following the same approach as used in Mevalfunction()
 												Mtoken* lastCommandToken=_command->_firstToken;
@@ -10294,7 +10717,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 													whitespace&=(inputCharType=='W'||inputChar<=32);
 													if(!whitespace){
 														lastCommandToken=commandCharacterAppended(_command,inputChar,&inputCharType,false);
-														if(!lastCommandToken)break; // some error
+														if(NULL==lastCommandToken)break; // some error
 														if(lastCommandToken!=_command->_lastToken){
 															_command->_lastToken=lastCommandToken;
 															if(report)outputChar('|');
@@ -10306,7 +10729,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 											}
 											FREE_STRING(_bodyCommandText,owner);
 											// if we either do not have a command, or inputChar is still nonzero
-											if(!_command){outputError("Failed to create a body command");break;}
+											if(NULL==_command){outputError("Failed to create a body command");break;}
 											if(inputChar){outputError("Failed to parse a body command");break;}
 											if(!commandContinued){ // command not continued on the next line, therefore we should register the command
 												// if the command is somehow invalid we should abort, and discard the result, this is done by ascertaining tokenValue to be NULL
@@ -10315,10 +10738,10 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 												if(aValidCommandIndicator!=0){
 													Mvalue* tokenValue=(aValidCommandIndicator>0?_getValueOfToken(_command->_firstToken):NULL);
 													// if the command is bound i.e. tokenValue is not NULL ascertain that the tokens will not be freed when freeing the command (below)
-													if(tokenValue)_command->_firstToken=NULL;
-													if(tokenValue&&appendedToList(_userfunction->_bodyCommandList,owner,tokenValue,M_LL_INVALID)<=0)tokenValue=NULL; // by doing this, after freeing the command below, we'll break and _command will be NULL and recognized as error below
+													if(tokenValue!=NULL)_command->_firstToken=NULL;
+													if(tokenValue!=NULL&&appendedToList(_userfunction->_bodyCommandList,owner,tokenValue,M_LL_INVALID)<=0)tokenValue=NULL; // by doing this, after freeing the command below, we'll break and _command will be NULL and recognized as error below
 													// we need to free the command anyway, to ascertain that the next command text will start with a new command altogether
-													if(!tokenValue){outputError("Failed to store the body command!");break;} // storing the command somehow failed, therefore _command will not be NULL and therefore indicate erroneous body command parsing
+													if(NULL==tokenValue){outputError("Failed to store the body command!");break;} // storing the command somehow failed, therefore _command will not be NULL and therefore indicate erroneous body command parsing
 												}
 												// prepare for parsing the next command text
 												FREE_COMMAND(_command,owner);_command=NULL;
@@ -10333,11 +10756,11 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 								}
 							}
 							// free the execution environment, if either failing to push or pop the execution environment
-							if(_functionExecutionEnvironment)FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
-							if(_argumentMap)FREE_MAP(_argumentMap,owner);
+							if(_functionExecutionEnvironment!=NULL)FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
+							if(_argumentMap!=NULL)FREE_MAP(_argumentMap,owner);
 							// if _command is not currently defined parsing and storing the body commands failed somehow!!
 							// OOPS that's not true because after registration of a command, the command is NULLed, so I guess that if there's a pending command something went wrong
-							if(_command){
+							if(_command!=NULL){
 								FREE_COMMAND(_command,owner);
 								FREE_LIST(_userfunction->_bodyCommandList,owner);
 								_userfunction->_bodyCommandList=NULL;
@@ -10362,27 +10785,35 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 	}else
 		outputError("Failed to create the anonymous user function");
 
-	if(!_functionValue)
+	if(NULL==_functionValue)
 		outputError("Failed to create an anonymous function");
 	else
 	if(report)outputInfo("Anonymous function created!");
 	return _functionValue;
 }
 // might make the following obsolete (defun)
+/**
+ * @brief returns a new function with name \p _nameValue , parameter map \p _parameterMapValue and body \p _bodyTokenValue
+ * 
+ * @param _nameValue 
+ * @param _parameterMapValue 
+ * @param _bodyTokenValue 
+ * @return Mvalue* a new function with name \p _nameValue , parameter map \p _parameterMapValue and body \p _bodyTokenValue
+ */
 Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	// the user specifies the body as a text (to prevent evaluation during defining the function)
 	// but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
 	// of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
-	if(_nameValue&&_parameterMapValue){
+	if(_nameValue!=NULL&&_parameterMapValue!=NULL){
 		if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
 			Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
-			if(_userfunction){
+			if(_userfunction!=NULL){
 				if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
 				Mtext* functionName=_nameValue->value._text;
 				// user function expects a list of commands, so we have to wrap the single token (if any)
-				if(_bodyTokenValue){
+				if(_bodyTokenValue!=NULL){
 					_userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
-					if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
+					if(NULL==_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
 						output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
 					// replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
 				}
@@ -10391,7 +10822,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 					// MDH@17JUL2019: the map needs to be stored with the Mfunction
 				Mallocationowner owner_environment=getOwnerExecutionEnvironment();
 				Mfunction* _function=owned_function(_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c),owner);
-				if(_function){
+				if(_function!=NULL){
 					// MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
 					//				so we have to make a copy of the parameter map
 					_function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,4)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
@@ -10407,8 +10838,8 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 		}else
 			outputError("Invalid user function name, parameter map or body");
 	}else{
-		if(!_nameValue)outputError("No name defined of function");
-		if(!_parameterMapValue)outputError("No (formal) parameter map defined for function");
+		if(NULL==_nameValue)outputError("No name defined of function");
+		if(NULL==_parameterMapValue)outputError("No (formal) parameter map defined for function");
 		////////if(!_bodyTokenValue)outputError("No body (expression) defined of function");
 	}
 	return _getIntegerValue(0); // indicating failure...
@@ -10417,9 +10848,15 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 // MDH@04DEC2020: computing sample statistics on any sequence inserted here as it uses Misnumeric (see Mfunctions.c/h), multiply and add M functions
 // MDH@04DEC2020: generic sample statistics map producer, which only processes the numeric values
 //				as it uses M functions it has to be here and not in Mlist.c/h
+/**
+ * @brief returns the sample statistics map using values provided by M iterator \p iterator
+ * 
+ * @param iterator 
+ * @return Mmap* the sample statistics map using values provided by M iterator \p iterator
+ */
 static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
-	Mmap* _statisticsMap=(iterator?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
-	if(_statisticsMap){
+	Mmap* _statisticsMap=(iterator!=NULL?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
+	if(_statisticsMap!=NULL){
 		if(amVerbose())output("Computing float sample statistics.\n");
 		long long missings=0,errors=0,count=0,minimumindex=0,maximumindex=0;
 		// initialize sum, sumofsquares, minimum and maximum to NULL
@@ -10429,7 +10866,7 @@ static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 			// output("Index: %llu",index); // DEBUG
 			value=iter_next(iterator);
 			// output(" - value='",value,"'\n"); // DEBUG
-			if(value){
+			if(value!=NULL){
 				if(getValueInteger(Misnumeric(value))==M_TRUE){
 					squarevalue=multiply(value,value);
 					if(count>0){
@@ -10461,12 +10898,19 @@ static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 		appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
 		return disowned_map(_statisticsMap,owner);
 	}
-	if(iterator)outputMemoryError("Failed to create a map to store statistics in.");
+	if(iterator!=NULL)outputMemoryError("Failed to create a map to store statistics in.");
 	return NULL;
 }
+/**
+ * @brief returns the correleation of sequences \p _sequence1Value and \p _sequence2Value
+ * 
+ * @param _sequence1Value 
+ * @param _sequence2Value 
+ * @return Mvalue* he correleation of sequences \p _sequence1Value and \p _sequence2Value
+ */
 Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL));
-	if(_sequence1Value&&_sequence2Value){
+	if(_sequence1Value!=NULL&&_sequence2Value!=NULL){
 		// the sequences need to have the same number of elements
 		if((_sequence1Value->type==VT_LIST||_sequence1Value->type==VT_ARRAY)
 			&&(_sequence2Value->type==VT_LIST||_sequence2Value->type==VT_ARRAY)){
@@ -10509,7 +10953,7 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 				}
 				if(count){
 					Mvalue* countValue=_getIntegerValue(count);
-					if(countValue){
+					if(countValue!=NULL){
 						// if(report)
 						{
 							output("Correlation constituent parts:");
@@ -10535,9 +10979,15 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 }
 // MDH@04JAN2021: if the first element of the iterator is a list itself, we should be returning an array of sample statistics for each list element
 //				and a correlation matrix for the combined samples but only for pairs with the same number of elements
+/**
+ * @brief returns the statistics map using the sample values from \p iterator
+ * 
+ * @param iterator 
+ * @return Mmap* the statistics map using the sample values from \p iterator
+ */
 static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _statsMap=NULL;
-	if(iterator){
+	if(iterator!=NULL){
 		// MDH@04JAN2021: the valuetype of the iterator is the valuetype of the array or the list
 		//				I suppose that we should now accomodate MAP and LIST value iterators as well
 		//				if the value type of the array is not set i.e. it can store values of any type, we use the type of the first element
@@ -10545,24 +10995,24 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 		Mvaluetype valuetype=iterator->valuetype;
 		if(valuetype==VT_UNDEFINED){
 			// assume valueholder is a pointer to the first element of 
-			firstvalue=(iterator->valueholder?*(iterator->valueholder):NULL);
-			if(firstvalue)valuetype=firstvalue->type; // if firstvalue is NULL (i.e. on an empty list), valuetype will remain VT_UNDEFINED
+			firstvalue=(iterator->valueholder!=NULL?*(iterator->valueholder):NULL);
+			if(firstvalue!=NULL)valuetype=firstvalue->type; // if firstvalue is NULL (i.e. on an empty list), valuetype will remain VT_UNDEFINED
 		}
 		if(valuetype==VT_LIST||valuetype==VT_ARRAY){ // both support iterators
 			// does it really matter whether we return a list or array???????? I guess we can return a list because a lot of elements could be NULL in the array as well
 			_statsMap=owned_map(__map("_getStatsMap"),owner);
-			if(_statsMap){
+			if(_statsMap!=NULL){
 				// should we be storing the correlations in a list or in an array????
 				// we might get a lot of NULL values in an array if the input is a sparse list
-				Mlist *_statsList=owned_list(__list("_getStatsMap"),owner)
-						,*_corrsList=owned_list(__list("_getStatsMap"),owner);
-				if(_statsList&&_corrsList){
+				Mlist *_statsList=owned_list(__list("_getStatsMap"),owner),
+							*_corrsList=owned_list(__list("_getStatsMap"),owner);
+				if(_statsList!=NULL&&_corrsList!=NULL){
 					// wrap the lists and append them to the map
 					// NOTE by disowning the lists they will be freed if failing to wrap them
 					//	  which means we do not need to free them anymore
 					Mvalue *statsListValue=_getValueOfList(disowned_list(_statsList,owner))
-							,*corrsListValue=_getValueOfList(disowned_list(_corrsList,owner));
-					if(statsListValue&&corrsListValue){
+								,*corrsListValue=_getValueOfList(disowned_list(_corrsList,owner));
+					if(statsListValue!=NULL&&corrsListValue!=NULL){
 						// with the lists bound to the values, they will be freed if the values are gc'ed
 						if(appendedToMap(_statsMap,owner,"statistics",statsListValue)==M_TRUE
 							&&appendedToMap(_statsMap,owner,"correlations",corrsListValue)==M_TRUE){
@@ -10572,21 +11022,21 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 							while((index=iter_nextindex(iterator))){
 								// output("Index: %llu",index); // DEBUG
 								value=iter_next(iterator);
-								if(value){
+								if(value!=NULL){
 									if(value->type==VT_LIST||value->type==VT_ARRAY){
 										// as we'll be storing all correlations with successive lists
 										// we need to ascertain to have such a list
 										if(index!=iterator->lastindex){ // assumedly not the last list/array
 											Mlist* _nextcorrsList=owned_list(__list("_getStatsMap"),owner);
-											if(_nextcorrsList){
+											if(_nextcorrsList!=NULL){
 												if(appendedToList(_corrsList,owner,_getValueOfList(_nextcorrsList),index)>0){
 													nextiterator=*iterator; // get a copy
 													while((nextindex=iter_nextindex(&nextiterator))){
 														nextvalue=iter_next(&nextiterator);
-														if(!nextvalue)continue;
+														if(NULL==nextvalue)continue;
 														if(nextvalue->type==VT_LIST||nextvalue->type==VT_ARRAY){
 															Mvalue* corr=Mcorr(value,nextvalue);
-															if(corr){
+															if(corr!=NULL){
 																if(appendedToList(_nextcorrsList,owner,corr,nextindex)<=0){
 																	output("%sFailed to store correlation coefficient ",M_ERROR_PREFIX);
 																	outputValue("'",corr,"'.\n");
@@ -10604,7 +11054,7 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 										}
 										// most convenient to use Mstats 
 										Mvalue* valuestatsMapValue=Mstats(value);
-										if(valuestatsMapValue){
+										if(valuestatsMapValue!=NULL){
 											if(appendedToList(_statsList,owner,valuestatsMapValue,index)<=0){
 												valuestatsMapValue=NULL;
 												output("%s",M_ERROR_PREFIX);
@@ -10645,13 +11095,19 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 	}
 	return disowned_map(_statsMap,owner);
 }
+/**
+ * @brief returns the wrapped statistics map of the sample values in sequence \p sequenceValue
+ * 
+ * @param sequenceValue 
+ * @return Mvalue* the wrapped statistics map of the sample values in sequence \p sequenceValue
+ */
 Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _statsMap=NULL;
-	if(sequenceValue){
+	if(sequenceValue!=NULL){
 		Miterator iterator={};
 		if(sequenceValue->type==VT_LIST){
 			Mlist* list=sequenceValue->value._list;
-			if(list){
+			if(list!=NULL){
 				iterator=getListiterator(list);
 				/*
 				if(list->valuetype!=VT_MAP&&list->valuetype!=VT_REFERENCE&&list->valuetype!=VT_LIST&&list->valuetype!=VT_UNDEFINED){
@@ -10669,12 +11125,12 @@ Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
 		}else
 		if(sequenceValue->type==VT_ARRAY){
 			Marray* array=sequenceValue->value._array;
-			if(array)
+			if(array!=NULL)
 				iterator=getArrayiterator(array);
 			else
 				outputBug("Missing value array!");
 		}
-		if(iterator.next)
+		if(iterator.next!=NULL)
 			_statsMap=owned_map(_getStatsMap(&iterator),owner);
 	}else
 		outputError("No sample list to compute statistics of");
@@ -10682,19 +11138,27 @@ Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // MDH@29OCT2020: the famous array functions of JS: foreach, map, reduce, filter
+/**
+ * @brief reduces the wrapped M list \p _listValue using the wrapped M function \p _functionValue
+ * 
+ * @param _listValue 
+ * @param _functionValue 
+ * @param _initialAccumulatedValue 
+ * @return Mvalue* the result of reducing M list \p _listValue
+ */
 Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccumulatedValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _accumulatedValue=_initialAccumulatedValue;
 	// it's up to the user to supply an initial accumulated value like a default
-	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-	if(list){
-		Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-		if(function){
+	Mlist* list=(_listValue!=NULL&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list!=NULL){
+		Mfunction* function=(_functionValue!=NULL&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+		if(function!=NULL){
 			Mlist* _reduceFunctionArgumentList=owned_list(__list("reduce"),owner);
-			if(_reduceFunctionArgumentList){
+			if(_reduceFunctionArgumentList!=NULL){
 				// we are to append a total of 
 				Mlistelement* listelement=list->_first;
-				if(listelement){
+				if(listelement!=NULL){
 					long long listelementIndex=0;
 					long long accumulatedValueIndex=appendedToList(_reduceFunctionArgumentList,owner,_accumulatedValue,M_LL_INVALID);
 					long long valueIndex=appendedToList(_reduceFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
@@ -10725,22 +11189,28 @@ Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccum
 		outputError("No list to reduce specified.");
 	return _accumulatedValue;
 }
-
+/**
+ * @brief returns the wrapped list with mapped elements of \p _listValue applying \p _functionValue to each element
+ * 
+ * @param _listValue 
+ * @param _functionValue 
+ * @return Mvalue* the wrapped list with mapped elements of \p _listValue applying \p _functionValue to each element
+ */
 Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _mapValue=NULL;
 	// it's up to the user to supply an initial accumulated value like a default
-	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-	if(list){
-		Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-		if(function){
+	Mlist* list=(_listValue!=NULL&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list!=NULL){
+		Mfunction* function=(_functionValue!=NULL&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+		if(function!=NULL){
 			Mlist* _mapFunctionArgumentList=owned_list(__list("lmap"),owner);
-			if(_mapFunctionArgumentList){
+			if(_mapFunctionArgumentList!=NULL){
 				Mlist* _mapList=owned_list(__list("lmap"),owner);
-				if(_mapList){
+				if(_mapList!=NULL){
 					// we are to append a total of 
 					Mlistelement* listelement=list->_first;
-					if(listelement){
+					if(listelement!=NULL){
 						long long listelementIndex=listelement->index;
 						long long valueIndex=appendedToList(_mapFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
 						long long indexIndex=appendedToList(_mapFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID);
@@ -10755,7 +11225,7 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
 								// if we fail to add the result of applying the map function, we report that but we do not break, the length of the result list should be the same as that of the input list
 								if(appendedToList(_mapList,owner,_mapFunctionValue,listelementIndex)<=0)outputError("Failed to add the result of applying the map function");
 								listelement=listelement->_next;
-								if(!listelement)break;
+								if(NULL==listelement)break;
 								if(appendedToList(_mapFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
 								listelementIndex=listelement->index;
 								if(appendedToList(_mapFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
@@ -10763,7 +11233,7 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
 						}
 					}
 					_mapValue=_getValueOfList(disowned_list(_mapList,owner));
-					if(!_mapValue)free_list(_mapList); // if not bound (but already disowned) free the list myself
+					if(NULL==_mapValue)free_list(_mapList); // if not bound (but already disowned) free the list myself
 				}else
 					outputError("Failed to create the map result list");
 				FREE_LIST(_mapFunctionArgumentList,owner);
@@ -10775,20 +11245,27 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
 		outputError("No list to map specified.");
 	return _mapValue;
 }
+/**
+ * @brief returns a wrapped list of filtered elements of \p _listValue using boolean function wrapped in \p _functionValue
+ * 
+ * @param _listValue 
+ * @param _functionValue 
+ * @return Mvalue* a wrapped list of filtered elements of \p _listValue using boolean function wrapped in \p _functionValue
+ */
 Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* _filterValue=NULL;
 	// it's up to the user to supply an initial accumulated value like a default
-	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-	if(list){
+	Mlist* list=(_listValue!=NULL&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list!=NULL){
 		Mlist* _filterList=owned_list(__list("lfilter"),owner);
-		if(_filterList){
+		if(_filterList!=NULL){
 			Mlistelement* listelement=list->_first;
-			if(listelement){
-				Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-				if(function){
+			if(listelement!=NULL){
+				Mfunction* function=(_functionValue!=NULL&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+				if(function!=NULL){
 					Mlist* _filterFunctionArgumentList=owned_list(__list("lfilter"),owner);
-					if(_filterFunctionArgumentList){
+					if(_filterFunctionArgumentList!=NULL){
 						// we are to append a total of 
 						long long listelementIndex=listelement->index;
 						long long valueIndex=appendedToList(_filterFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
@@ -10809,7 +11286,7 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 									break;
 								}
 								listelement=listelement->_next;
-								if(!listelement)break;
+								if(NULL==listelement)break;
 								if(appendedToList(_filterFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
 								listelementIndex=listelement->index;
 								if(appendedToList(_filterFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
@@ -10827,7 +11304,7 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 				}
 			}
 			_filterValue=_getValueOfList(disowned_list(_filterList,owner));
-			if(!_filterValue)free_list(_filterList); // if not bound (but already disowned) free the list myself
+			if(NULL==_filterValue)free_list(_filterList); // if not bound (but already disowned) free the list myself
 		}else
 			outputError("Failed to create the filter result list");
 	}else
@@ -10835,21 +11312,28 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 	return _filterValue;
 }
 // NOTE how does foreach compare to map???? as it seems that foreach does not return a value as opposed to map
+/**
+ * @brief returns the wrapped M list applying \p _functionValue to each element of the list wrapped in \p _listValue
+ * 
+ * @param _listValue 
+ * @param _functionValue 
+ * @return Mvalue* the wrapped M list applying \p _functionValue to each element of the list wrapped in \p _listValue
+ */
 Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long foreachCount=M_LL_INVALID; // counting the number of times the function was applied
 	// similar to map but returning the number of elements the function was applied to
 	// it's up to the user to supply an initial accumulated value like a default
-	Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-	if(list){ // there is a list to iterate
+	Mlist* list=(_listValue!=NULL&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(list!=NULL){ // there is a list to iterate
 		Mlistelement* listelement=list->_first;
 		// let's allow the function to be NULL
-		Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-		if(function){
+		Mfunction* function=(_functionValue!=NULL&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+		if(function!=NULL){
 			Mlist* _foreachFunctionArgumentList=owned_list(__list("lforeach"),owner);
-			if(_foreachFunctionArgumentList){
+			if(_foreachFunctionArgumentList!=NULL){
 				// we are to append a total of 
-				if(listelement){
+				if(listelement!=NULL){
 					long long listelementIndex=listelement->index;
 					// passing the list as first argument, and the index into the list as second argument on every call to the given function
 					long long listIndex=appendedToList(_foreachFunctionArgumentList,owner,_listValue,M_LL_INVALID);
@@ -10864,10 +11348,10 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 							foreachCount++; // successfully applied the function to this element
 							if(report){outputMap("Result of applying the foreach function to '",_foreachFunctionArgumentMap,"'");outputValue(": '",_foreachFunctionValue,"'.\n");}
 							listelement=listelement->_next;
-							if(!listelement)break;
+							if(NULL==listelement)break;
 							if(appendedToList(_foreachFunctionArgumentList,owner,_getIntegerValue(listelement->index),indexIndex)<=0)break;
 						}while(listelement);
-						if(listelement)foreachCount=-foreachCount;
+						if(listelement!=NULL)foreachCount=-foreachCount;
 					}
 				}
 				FREE_LIST(_foreachFunctionArgumentList,owner);
@@ -10883,6 +11367,10 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 }
 
 // SORTING STUFF
+/**
+ * @brief sort statistics
+ * 
+ */
 struct Msortstatistics{
 	unsigned long long memoryallocation;
 	unsigned long long comparisons;
@@ -10893,7 +11381,15 @@ struct Msortstatistics{
 	unsigned long long pointertests;
 	unsigned long long fieldtests;
 };
+/**
+ * @brief the single sortstatistics instance
+ * 
+ */
 static struct Msortstatistics sortstatistics;
+/**
+ * @brief outputs the current sort statistics
+ * 
+ */
 static void outputSortStatistics(){
 	output("Sort statistics: value comparisons=%llu | memory allocation=%llu | pointer: assignments=%llu - references=%llu - tests=%llu | field: assignments=%llu - references=%llu - tests=%llu.\n"
 			,sortstatistics.comparisons,sortstatistics.memoryallocation
@@ -10906,7 +11402,24 @@ static int alargerthan(const void* aValue,const void* bValue){
 	long long result=largerthan(*((Mvalue**)aValue),*((Mvalue**)bValue));
 	return(result<=0?-1:1);
 }
-static long long acsort(Marray* _array){if(!_array)return M_LL_INVALID;qsort(_array->values,_array->numberOfElements,sizeof(Mvalue*),alargerthan);return M_TRUE;}
+/**
+ * @brief returns M_TRUE when \p _array was quick sorted successfully, M_FALSE otherwise
+ * @details will return M_LL_INVALID if \p _array is NULL
+ * @param _array 
+ * @return long long M_TRUE on success, M_FALSE or M_LL_INVALID on failure
+ */
+static long long acsort(Marray* _array){
+	if(NULL==_array)return M_LL_INVALID;
+	qsort(_array->values,_array->numberOfElements,sizeof(Mvalue*),alargerthan);
+	return M_TRUE;
+}
+/**
+ * @brief exchanges elements at index \p index1 and \p index2 of the elements in \p values
+ * 
+ * @param values 
+ * @param index1 
+ * @param index2 
+ */
 static void aswap(Mvalue** const values,long long index1,long long index2){
 	// normally we would not be allowed to do it this way, but the reference count
 	// of both values remains the same when we exchange their position in the list
@@ -10917,6 +11430,14 @@ static void aswap(Mvalue** const values,long long index1,long long index2){
 	sortstatistics.pointerassignments++;sortstatistics.fieldreferences+=4;
 	sortstatistics.pointerreferences+=2;sortstatistics.fieldassignments+=2;
 }
+/**
+ * @brief partitions \p values from elements at index \p l through \p h
+ * 
+ * @param values 
+ * @param l 
+ * @param h 
+ * @return unsigned long long 
+ */
 static unsigned long long apartition(Mvalue** const values,unsigned long long l,unsigned long long h){
 	// output("Partitioning elements #%llu through #%llu.\n",l->index,h->index);
 	sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.pointerassignments++;
@@ -10942,11 +11463,17 @@ static unsigned long long apartition(Mvalue** const values,unsigned long long l,
 	return i; //* i+1 but actually we are returning i itself because that's the first value used
 }
 // MDH@25NOV2020: because we want to work with unsigned long long values, adapting apartition accordingly
+/**
+ * @brief quick sorts \p _array, returning M_TRUE on success, or M_FALSE or M_LL_INVALID on failure
+ * 
+ * @param _array 
+ * @return long long returning M_TRUE on success, or M_FALSE or M_LL_INVALID on failure
+ */
 static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
-	if(_array){
+	if(_array!=NULL){
 		result=M_TRUE;
 		clock_t sortstart=clock();
 		sortstatistics.fieldreferences++;
@@ -10956,7 +11483,7 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 				output("Sorting an array of %zd elements with quicksort.\n",arraylength);
 				unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(arraylength)));
 				long long* stack=MALLOC(sizeof(long long),maxtop=initialmaxtop,-'u',owner);
-				if(stack){
+				if(stack!=NULL){
 					sortstatistics.memoryallocation+=(sizeof(long long)*maxtop);
 					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
@@ -10981,7 +11508,7 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 								if(report)
 									output("Expanding the stack.\n");
 								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
-								if(!stack){
+								if(NULL==stack){
 									result=M_FALSE;
 									output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
 									break;
@@ -11001,7 +11528,7 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 								if(report)
 									output("Expanding the stack.\n");
 								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
-								if(!stack){
+								if(NULL==stack){
 									result=M_FALSE;
 									output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);
 									break;
@@ -11034,6 +11561,12 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 }
 
 // MDH@02NOV2020: we can speed up sorting if we can somehow reverse parts of a list
+/**
+ * @brief swaps the value wrapped in \p listelement1 and \p listelement2
+ * 
+ * @param listelement1 
+ * @param listelement2 
+ */
 static void lswap(Mlistelement* const listelement1,Mlistelement* const listelement2){
 	// normally we would not be allowed to do it this way, but the reference count
 	// of both values remains the same when we exchange their position in the list
@@ -11044,8 +11577,16 @@ static void lswap(Mlistelement* const listelement1,Mlistelement* const listeleme
 	sortstatistics.pointerassignments++;sortstatistics.fieldreferences+=2;sortstatistics.pointerreferences++;sortstatistics.fieldassignments+=2;
 }
 // it's best to pass l-1 instead of l, then we will always be able to compute l
+/**
+ * @brief helper function to partition a list
+ * 
+ * @param list 
+ * @param lmin1 
+ * @param h 
+ * @return Mlistelement* the pointer to the first element of the partitioned list
+ */
 static Mlistelement* lpartition(Mlist* const list,Mlistelement* const lmin1,Mlistelement* const h){
-	Mlistelement* l=(lmin1?lmin1->_next:list->_first);
+	Mlistelement* l=(lmin1!=NULL?lmin1->_next:list->_first);
 	// output("Partitioning elements #%llu through #%llu.\n",l->index,h->index);
 	Mvalue* x=h->_value; //* x=list[h] // x is set once, as the value at index h
 	Mlistelement* i=lmin1; //* i=l-1
@@ -11065,7 +11606,7 @@ static Mlistelement* lpartition(Mlist* const list,Mlistelement* const lmin1,Mlis
 				sortstatistics.comparisons++;
 			}
 			if(notlarger==M_TRUE){
-				i=(i?i->_next:list->_first); //* i++; // make i start at index l otherwise increment
+				i=(i!=NULL?i->_next:list->_first); //* i++; // make i start at index l otherwise increment
 				sortstatistics.pointerassignments++;sortstatistics.pointertests++;sortstatistics.fieldreferences++;
 				lswap(i,j);
 			}
@@ -11088,7 +11629,7 @@ static Mlistelement* lpartition(Mlist* const list,Mlistelement* const lmin1,Mlis
 		}
 		*/
 	}
-	Mlistelement* iplus1=(i?i->_next:list->_first);
+	Mlistelement* iplus1=(i!=NULL?i->_next:list->_first);
 	sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
 	lswap(iplus1,h); //* swap(list[i+1],list[h])
 	return i; //* i+1 but actually we are returning i itself because that's the first value used
@@ -11096,15 +11637,21 @@ static Mlistelement* lpartition(Mlist* const list,Mlistelement* const lmin1,Mlis
 // Mlsort performs an inline sort i.e. the input list is rearranged
 // helper function to sort a list
 // MDH@02NOV2020: how about returning the number of stack values we actually needed to give some additional information
+/**
+ * @brief quick sorts \p _list in place
+ * 
+ * @param _list 
+ * @return long long M_TRUE on success, M_FALSE or M_LL_INVALID on failure
+ */
 static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
-	if(_list){
+	if(_list!=NULL){
 		Mlistelement* listelement=_list->_first;
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 		sortstatistics.pointertests++;
-		if(listelement){
+		if(listelement!=NULL){
 			sortstatistics.pointertests++;sortstatistics.fieldtests++;
 			if(listelement!=_list->_last){ // at least two items
 				// we need a stack of integers with the same size as the list length
@@ -11115,7 +11662,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 				//				how about re-allocating in
 				unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(_list->numberOfElements)));
 				Mlistelement** stack=MALLOC(sizeof(Mlistelement*),maxtop=initialmaxtop,-'l',owner);
-				if(stack){
+				if(stack!=NULL){
 					sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*maxtop);
 					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
@@ -11135,15 +11682,15 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 						sortstatistics.pointerassignments+=3;sortstatistics.fieldreferences+=2;
 						//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
 						sortstatistics.pointertests++;
-						l=(lmin1?lmin1->_next:_list->_first);
+						l=(lmin1!=NULL?lmin1->_next:_list->_first);
 						sortstatistics.fieldreferences++;sortstatistics.pointerassignments++;
-						if(pmin1){
+						if(pmin1!=NULL){
 							sortstatistics.fieldtests+=2;
 							if(pmin1->index>l->index){
 								if(top>=maxtop){
 									if(report)output("Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
-									if(!stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
+									if(NULL==stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
 									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);
 									maxtop+=initialmaxtop;
 									if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
@@ -11155,16 +11702,16 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 							}
 						}
 						// move p two elements up
-						p=(pmin1?pmin1->_next:_list->_first);
-						pplus1=(p?p->_next:_list->_first);
+						p=(pmin1!=NULL?pmin1->_next:_list->_first);
+						pplus1=(p!=NULL?p->_next:_list->_first);
 						sortstatistics.fieldreferences+=2;sortstatistics.pointerassignments+=2;sortstatistics.pointertests+=3; // including the one below (of pplus1)
-						if(pplus1){
+						if(pplus1!=NULL){
 							sortstatistics.fieldtests+=2;
 							if(pplus1->index<h->index){
 								if(top>=maxtop){
 									if(report)output("Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
-									if(!stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
+									if(NULL==stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
 									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);									
 									maxtop+=initialmaxtop;
 									if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
@@ -11210,12 +11757,14 @@ typedef struct Mindexrange{
 	struct Mindexrange* _next;
 }Mindexrange;
 // helper functions
+/*
 // abinarymerge is called from aharmonicabinarysort trying to speed up merging by using binary search to find the insert position
 static bool abinarymerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
 	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=false;
 	return result;
 }
+*/
 // NOTE in amerge() l, m and r are zero-based
 // NOTE amerge is used both in atimsort as in aharmonicasort
 static void outputValues(char const * const prefix,char const * const info,Mvalue const * const * const values,unsigned long long length,unsigned long long bugindex){
@@ -11230,6 +11779,17 @@ static void outputValues(char const * const prefix,char const * const info,Mvalu
 	output(".\n");
 }
 // the default amerge copies the presumable original values, then uses the copy to overwrite the original with the new values
+/**
+ * @brief merges elements l through m in \p values with elements m+1 through r in \p values
+ * 
+ * @param values 
+ * @param l 
+ * @param m 
+ * @param r 
+ * @param report 
+ * @return true on success
+ * @return false on failure
+ */
 static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
 	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	if(report)
@@ -11241,8 +11801,9 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 	// TODO can we do this without actually having to do this??????
 	sortstatistics.pointerassignments+=2;
 	Mvalue **left=MALLOC(sizeof(Mvalue*),len1,-'v',owner),**right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
-	if(left)sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len1);if(right)sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len2);
-	if(left&&right){
+	if(left!=NULL)sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len1);
+	if(right!=NULL)sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len2);
+	if(left!=NULL&&right!=NULL){
 		// ASSERT both left and right (if needed) defined
 		result=true;
 		// copy the pointers over
@@ -11262,7 +11823,10 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 		if(report)
 			outputValues("","Checking second sequence: ",right,len2,len2);
 		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
-		if(!result)outputBug("Sequences are not ordered!");else if(report)output("Sequences are in correct ascending order!\n");
+		if(result){
+			if(report)output("Sequences are in correct ascending order!\n");
+		}else 
+			outputBug("Sequences are not ordered!");
 		
 		i=j=0;
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
@@ -11274,15 +11838,17 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 				if(report)
 					outputValue("->",*valueholder," ");
 				// check
-				if(previousvalueholder&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
-				{result=false;output("%sMerged value #%llu",M_BUG_PREFIX,i);outputValue("'",*valueholder,"' from the first sequence is smaller than");outputValue(" the previously added value '",*previousvalueholder,"'.\n");break;}
+				if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
+				{result=false;
+				output("%sMerged value #%llu",M_BUG_PREFIX,i);outputValue("'",*valueholder,"' from the first sequence is smaller than");outputValue(" the previously added value '",*previousvalueholder,"'.\n");break;}
 			}else{
 				*valueholder=right[j++];
 				if(report)
 					outputValue("<-",*valueholder," ");
 				// check
-				if(previousvalueholder&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
-				{result=false;output("%sMerged value #%llu",M_BUG_PREFIX,j);outputValue("'",*valueholder,"' from the second sequence is smaller than");outputValue(" the previously added value '",*previousvalueholder,"'.\n");break;}
+				if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
+				{result=false;
+				output("%sMerged value #%llu",M_BUG_PREFIX,j);outputValue("'",*valueholder,"' from the second sequence is smaller than");outputValue(" the previously added value '",*previousvalueholder,"'.\n");break;}
 			}
 			sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 			previousvalueholder=valueholder++;
@@ -11293,7 +11859,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 			if(report)
 				outputValue("->",*valueholder," ");
 			// check
-			if(previousvalueholder&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
+			if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
 			{result=false;output("%sAppended value #%llu",M_BUG_PREFIX,i);outputValue("'",*valueholder,"' from the first sequence is smaller than");outputValue(" the previously added value '",*previousvalueholder,"'.\n");break;}
 			previousvalueholder=valueholder++;
 		}
@@ -11303,7 +11869,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 			if(report)
 				outputValue("->",*valueholder," ");
 			// check
-			if(previousvalueholder&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
+			if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE)
 			{result=false;output("%sAppended value #%llu",M_BUG_PREFIX,j);outputValue("'",*valueholder,"' from the second sequence is smaller than");outputValue(" the previously added value '",*previousvalueholder,"'.\n");break;}
 			previousvalueholder=valueholder++;
 		}
@@ -11316,6 +11882,17 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 }
 // an possible improvement on amerge() is to only create a copy of the second sequence, so that these positions become available in the merging process
 // by go backwards through the second sequence elements we can accomplish to move every value in the first sequence at most once (as intended)
+/**
+ * @brief alternative to amerge
+ * 
+ * @param values 
+ * @param l 
+ * @param m 
+ * @param r 
+ * @param report 
+ * @return true on success
+ * @return false on failure
+ */
 static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
 	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	if(report)
@@ -11327,7 +11904,7 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 	// TODO can we do this without actually having to do this??????
 	sortstatistics.pointerassignments++;
 	Mvalue **right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
-	if(right){
+	if(right!=NULL){
 		sortstatistics.memoryallocation+=sizeof(Mvalue*)*len2;
 		result=true;
 		// copy the pointers over
@@ -11347,8 +11924,11 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 		if(report)
 			outputValues("","Checking second sequence: ",right,len2,len2);
 		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
-		if(!result)outputBug("Sequences are not ordered!");else if(report)output("Sequences are in correct ascending order!\n");
-		
+		if(result){
+			if(report)output("Sequences are in correct ascending order!\n");
+		}else
+			outputBug("Sequences are not ordered!");
+
 		// NOTE programmatically a much more elegant merge than amerge()
 		long long smaller; // the last position (index) where the previous element was inserted
 		unsigned long long tomergeinto=len1,toinsert=len2; // keep track of amount to insert
@@ -11400,6 +11980,17 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 	return result;
 }
 // MDH@02DEC2020: we may further limit the number of comparisons by using a binary search when looking for the first smaller value
+/**
+ * @brief alternative to amerge and ainsertmerge
+ * 
+ * @param values 
+ * @param l 
+ * @param m 
+ * @param r 
+ * @param report 
+ * @return true on success
+ * @return false on failure
+ */
 static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report){Mallocationowner owner=getOwner(__LINE__);
 	// bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	// report=true;
@@ -11412,7 +12003,7 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 	// TODO can we do this without actually having to do this??????
 	sortstatistics.pointerassignments++;
 	Mvalue **right=MALLOC(sizeof(Mvalue*),len2,-'v',owner);
-	if(right){
+	if(right!=NULL){
 		sortstatistics.memoryallocation+=(sizeof(Mvalue*)*len2);
 		result=true;
 		// copy the pointers over
@@ -11432,7 +12023,10 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 		if(report)
 			outputValues("","Checking second sequence: ",right,len2,len2);
 		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
-		if(!result)outputBug("Sequences are not ordered!");else if(report)output("Sequences are in correct ascending order!\n");
+		if(result){
+			if(report)output("Sequences are in correct ascending order!\n");
+		}else
+			outputBug("Sequences are not ordered!");
 		
 		// NOTE programmatically a much more elegant merge than amerge()
 		long long smaller; // the last position (index) where the previous element was inserted
@@ -11506,6 +12100,15 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 //				it's easier to simply merge in all second sequence values into the first sequence values
 // MDH@05NOV2020: lmerge does not need to keep the index values ascending so it can safely
 //				exchange the position of list elements in the list
+/**
+ * @brief merges \p _list elements 1 + \p beforefirstone through \p lastone with elements 1 + \p lastone through \p lastanother
+ * 
+ * @param _list 
+ * @param beforefirstone 
+ * @param lastone 
+ * @param lastanother 
+ * @return Mlistelement* the pointer to the first merged element
+ */
 static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirstone,Mlistelement * const lastone,Mlistelement * const lastanother){
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 
@@ -11532,7 +12135,7 @@ static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirst
 	sortstatistics.fieldreferences+=5;
 	sortstatistics.pointertests++;
 
-	while(one&&another){
+	while(one!=NULL&&another!=NULL){
 		sortstatistics.pointertests+=2; // one&&another
 		sortstatistics.comparisons++; // next
 		// determine the first one that is larger than another
@@ -11562,16 +12165,16 @@ static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirst
 		sortstatistics.pointertests+=3;
 	}
 	// consume the rest of the ones or anothers (either one is left), which is easy because all the ones are already linked correctly
-	if(one){ // rest of the ones to consume
-		if(mergedlistelement)mergedlistelement->_next=one;else _list->_first=one;
+	if(one!=NULL){ // rest of the ones to consume
+		if(mergedlistelement!=NULL)mergedlistelement->_next=one;else _list->_first=one;
 		mergedlistelement=lastone;
 	}else{ // rest of the anothers to consume
-		if(mergedlistelement)mergedlistelement->_next=another;else _list->_first=another;
+		if(mergedlistelement!=NULL)mergedlistelement->_next=another;else _list->_first=another;
 		mergedlistelement=lastanother;
 	}
 	// link the head of the merged list elements to the successor of the original last another
 	mergedlistelement->_next=nextlastanother;
-	if(!nextlastanother){_list->_last=mergedlistelement;sortstatistics.fieldassignments++;sortstatistics.pointerreferences++;}
+	if(NULL==nextlastanother){_list->_last=mergedlistelement;sortstatistics.fieldassignments++;sortstatistics.pointerreferences++;}
 	sortstatistics.pointerassignments++;
 	sortstatistics.pointerreferences+=3;
 	sortstatistics.fieldassignments+=2;
@@ -11629,6 +12232,14 @@ static Mlistelement* lmerge(Mlist * const _list,Mlistelement * const beforefirst
 }
 */
 // harmonica sort helper function
+/**
+ * @brief reverses elements \p firstindex through \p lastindex in \p values
+ * 
+ * @param values 
+ * @param firstindex 
+ * @param lastindex 
+ * @param report 
+ */
 static void areverse(Mvalue** values,unsigned long long firstindex,unsigned long long lastindex,bool report){
 	if(report)
 	{outputValue("Reversing: '",*(values+firstindex),"'");outputValue(" through '",*(values+lastindex),"'.\n");}
@@ -11644,12 +12255,20 @@ static void areverse(Mvalue** values,unsigned long long firstindex,unsigned long
 // reversing the order of list elements is expected to be much faster than having to insert into a large list, where merging would be possible!!!
 // CHANGING first -> ... -> last -> afterlast TO last -> ... -> first -> afterlast
 //		  essentially all the successors change but beforefirst should now point to last I suppose
+/**
+ * @brief reverses elements 1 + \p beforefirst through \p last in \p _list
+ * 
+ * @param _list 
+ * @param beforefirst 
+ * @param last 
+ * @param report 
+ */
 static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement * const last,bool report){
 	// ASSERT beforelist can be NULL, but last should NOT
-	Mlistelement* first=(beforefirst?beforefirst->_next:_list->_first);
+	Mlistelement* first=(beforefirst!=NULL?beforefirst->_next:_list->_first);
 	if(report)
 	{outputValue("Reversing: '",first->_value,"'");outputValue(" through '",last->_value,"'.\n");}
-	if(beforefirst){ // not at the start of the list
+	if(beforefirst!=NULL){ // not at the start of the list
 		beforefirst->_next=last;
 		if(report)
 		{outputValue("Successor of '",beforefirst->_value,"'");outputValue(" set to '",beforefirst->_next->_value,"'.\n");}
@@ -11659,7 +12278,7 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 			outputValue("First list element changed to '",_list->_first->_value,"'.\n");
 	}
 	Mlistelement* afterlast=last->_next; // salvage the current successor of last
-	if(!afterlast){
+	if(NULL==afterlast){
 		_list->_last=first; // if last is the last element in the list, first will be the new last element of the list
 		sortstatistics.pointerreferences++;sortstatistics.fieldassignments++;
 		if(report)
@@ -11671,7 +12290,7 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 	sortstatistics.pointerassignments+=6;sortstatistics.pointerreferences+=2;
 	sortstatistics.fieldassignments++;sortstatistics.fieldreferences+=3;
 	sortstatistics.pointertests+=3;
-	while(listelement){
+	while(listelement!=NULL){
 		sortstatistics.pointertests++;
 		if(report)
 		{outputValue("Next list element '",nextlistelement->_value,"'");outputValue(" to point to '",listelement->_value,"'.\n");}
@@ -11699,13 +12318,24 @@ static void lreverse(Mlist* _list,Mlistelement * const beforefirst,Mlistelement 
 	}
 }
 // we'd like to pass the merge function to use depending
+/**
+ * @brief array merge function definition
+ * 
+ */
 typedef bool (*ArrayMergeFunction)(Mvalue** const values,unsigned long long l,unsigned long long m,unsigned long long r,bool report);
 
 // lharmonicasort is the original harmonicasort which is quite slow
+/**
+ * @brief harmonica sorts \p _array using \p arrayMergeFunction as array merge function
+ * 
+ * @param _array 
+ * @param arrayMergeFunction 
+ * @return long long 
+ */
 static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunction){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=M_LL_INVALID;
-	if(_array){
+	if(_array!=NULL){
 		result=M_TRUE;
 		clock_t sortstart=clock();
 		unsigned long long arraylength=_array->numberOfElements;
@@ -11840,29 +12470,35 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 	}
 	return result;
 }
+/**
+ * @brief lharmonica sorts \p _list 
+ * @details returns M_LL_INVALID when _list is NULL
+ * @param _list 
+ * @return long long returns M_TRUE on success, or M_FALSE or M_LL_INVALID on failure
+ */
 static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
-	long long result=(_list?M_TRUE:M_LL_INVALID);
+	long long result=(_list!=NULL?M_TRUE:M_LL_INVALID);
 	if(result==M_TRUE){
 		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-		if(previous){ // at least two elements in the list
+		if(previous!=NULL){ // at least two elements in the list
 			Mlistelement* current=previous->_next; // the first element to compare
 			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-			if(current){
+			if(current!=NULL){
 				while(1){
 					sortstatistics.comparisons++;
 					if(!equalto(previous->_value,current->_value))break;
 					previous=current;
 					current=current->_next;
 					sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-					if(!current)break;
+					if(NULL==current)break;
 				}
 			}
 			// skip all equal values so we can set the rundirection to either -1 or 1
 			// obviously all elements could be equal
 			sortstatistics.pointertests++; // the test below
-			if(current){ // at least 2 unequal elements in the list
+			if(current!=NULL){ // at least 2 unequal elements in the list
 				// we're either going up or down
 				sortstatistics.comparisons++; // the comparison below
 				int rundirection=(largerthan(current->_value,previous->_value)==M_TRUE?1:-1);
@@ -11877,11 +12513,11 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 					Mlistelement* listelement=_list->_first;
 					while(1){
 						listelement=listelement->_next;
-						if(!listelement)break;
+						if(NULL==listelement)break;
 						if(listelement->index!=nextindexrange->last+1){ // there's a gap
 							nextindexrange->_next=CALLOC_1(sizeof(Mindexrange),'~',owner);
 							nextindexrange=nextindexrange->_next;
-							if(!nextindexrange)break; // TODO serious problem
+							if(NULL==nextindexrange)break; // TODO serious problem
 							nextindexrange->first=listelement->index;
 						}
 						// update last
@@ -11899,7 +12535,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				bool emptyrun;
 				while(1){
 					sortstatistics.pointertests++;
-					if(!current)break;
+					if(NULL==current)break;
 					currentValue=current->_value; // the value to compare
 					sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 					if(report){outputValue("Comparing '",currentValue,"'");outputValue(" with '",previousValue,"'.\n");}
@@ -11911,7 +12547,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 							runlargest=previous;
 							if(report)outputValue("Up run maximum: '",previousValue,"'.\n");
 							sortstatistics.pointertests++;
-							if(smallest){
+							if(smallest!=NULL){
 								emptyrun=(smallest->_next==previous);
 								sortstatistics.fieldtests++;sortstatistics.pointertests++;
 							}else
@@ -11923,7 +12559,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 								//				apparently NOT as it loops indefinitely somewhere
 								// MDH@09NOV2020: OOPS we're supposed to pass in the beforefirst NOT the first, so how do we find the predecessor of runsmallest?????
 								sortstatistics.pointertests++;
-								if(largest)lmerge(_list,NULL/*runsmallest*/,largest,previous);
+								if(largest!=NULL)lmerge(_list,NULL/*runsmallest*/,largest,previous);
 								smallest=_list->_first;
 								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;sortstatistics.pointertests++;
 								if(previous->_next==current){largest=previous;sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;}
@@ -11940,7 +12576,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 							if(report)outputValue("Down run minimum: '",previousValue,"'.\n");
 							// if there's nothing in between the down run is empty
 							sortstatistics.pointertests++;
-							if(largest){
+							if(largest!=NULL){
 								emptyrun=(largest->_next==previous);
 								sortstatistics.fieldtests++;sortstatistics.pointertests++;
 							}else
@@ -11949,7 +12585,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 								// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
 								// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
 								sortstatistics.pointertests++;
-								if(largest){
+								if(largest!=NULL){
 									previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
 									lreverse(_list,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
@@ -11985,7 +12621,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				sortstatistics.pointertests++; // test on largest below
 				if(rundirection>0){ // end of an up run
 					// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
-					if(largest){
+					if(largest!=NULL){
 						if(report)output("Processing the final up run!\n");
 						lmerge(_list,NULL,largest,previous);
 					}else
@@ -11996,7 +12632,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 					if(report)output("Processing the final down run!\n");
 					runsmallest=previous;
 					sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
-					if(largest){ // something in front that we need to merge the down run into
+					if(largest!=NULL){ // something in front that we need to merge the down run into
 						// nothing to reverse if there's only a single element in the down run
 						sortstatistics.fieldtests++;sortstatistics.pointertests++;
 						if(largest->_next!=previous){
@@ -12026,7 +12662,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				while(1){
 					listelement->index=index;
 					listelement=listelement->_next;
-					if(!listelement)break;
+					if(NULL==listelement)break;
 					// update the index to assign
 					if(index==nextindexrange->last){
 						nextindexrange=nextindexrange->_next;
@@ -12036,7 +12672,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				}
 				// free all dynamically allocated index ranges
 				Mindexrange* indexrangetofree=indexrange._next;
-				while(indexrangetofree){
+				while(indexrangetofree!=NULL){
 					nextindexrange=indexrangetofree->_next;
 					FREE_DISOWNED_1(indexrangetofree,'~',owner);
 					indexrangetofree=nextindexrange;
@@ -12050,6 +12686,12 @@ const unsigned long long M_RUN_LENGTH=32;
 // calling the improved version harmonica binary sort which keeps waypoints on the part already sorted, to speed up merging
 // the general idea is to keep every M_RUN_LENGTH list element of the already sorted list, so we can use binary sort to find the lower boundary of what we're inserting
 // if we run out of memory we simply double the space between the remembered list elements
+/**
+ * @brief returns the integer square root of \p n
+ * 
+ * @param n 
+ * @return unsigned long long the integer square root of \p n
+ */
 static unsigned long long llsqrt(unsigned long long n){
 	unsigned long long q=1;
 	while(q<=n)q<<=2;
@@ -12064,11 +12706,19 @@ static unsigned long long llsqrt(unsigned long long n){
 	}
 	return r;
 }
+/**
+ * @brief returns the list element with value smaller than or equal to \p value
+ * @details \p numberoflistelements list elements starting with \p listelements are to be searched
+ * @param listelements 
+ * @param numberoflistelements 
+ * @param value 
+ * @return Mlistelement* the list element with value smaller than or equal to \p value
+ */
 static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long numberoflistelements,Mvalue* value){
-	if(smallerthan(value,(*listelements)->_value)==M_TRUE)return NULL;
+	if(NULL==listelements||numberoflistelements==0||smallerthan(value,(*listelements)->_value)==M_TRUE)return NULL;
 	unsigned long long lastindex=--numberoflistelements;
 	Mlistelement* last=listelements[lastindex];
-	if(smallerthan(last->_value,value)==M_TRUE)return last;
+	if(NULL==last||smallerthan(last->_value,value)==M_TRUE)return last;
 	unsigned long long middleindex,firstindex=0;
 	while(lastindex>firstindex+1){
 		middleindex=(firstindex+lastindex)>>1;
@@ -12080,15 +12730,22 @@ static Mlistelement* binarysearch(Mlistelement** listelements,unsigned long long
 	return listelements[firstindex];
 }
 // MDH@11NOV2020: the stack multiplier tells us how many times the stack size is to be multiplied with
+/**
+ * @brief lharmonica binary sorts \p _list
+ * @details returns M_LL_INVALID only when \p _list is NULL
+ * @param _list 
+ * @param stackmultiplier 
+ * @return long long M_TRUE on success, or M_FALSE or M_LL_INVALID on failure
+ */
 static long long lharmonicabinarysort(Mlist* const _list,long long stackmultiplier){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
-	long long result=(_list?M_TRUE:M_LL_INVALID);
+	long long result=(_list!=NULL?M_TRUE:M_LL_INVALID);
 	if(result==M_TRUE){
 		Mlistelement* previous=_list->_first; // where we'll be keeping the first element in the list
 		if(report)
 			outputValue("First value: '",previous->_value,"'.\n");
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-		if(previous){ // at least two elements in the list
+		if(previous!=NULL){ // at least two elements in the list
 			Mlistelement* current=previous->_next; // the first element to compare
 			if(report)
 				outputValue("Second value: '",current->_value,"'.\n");
@@ -12097,7 +12754,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 			// skip all equal values so we can set the rundirection to either -1 or 1
 			// obviously all elements could be equal
 			sortstatistics.pointertests++; // the test below
-			if(current){ // at least 2 unequal elements in the list
+			if(current!=NULL){ // at least 2 unequal elements in the list
 
 				// advance current (NOTE if the list has only two elements, current would then be NULL)
 				/* NO
@@ -12123,7 +12780,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 					output("Stack size: %llu.\n",stacksize);
 				if(stacksize>=3){
 					stack=CALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
-					if(stack){
+					if(stack!=NULL){
 						if(report)
 							output("Stack address: '%p'.\n",stack);
 						if(stackmultiplier<0){ // the stack is to be filled gradually
@@ -12147,7 +12804,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 				if(/*stack||*/_list->_last->index>_list->numberOfElements){ // possibly multiple range
 					Mlistelement *prevlistelement=_list->_first;
 					Mlistelement *listelement=prevlistelement->_next; // initialized to the second element
-					while(listelement){
+					while(listelement!=NULL){
 						/* fill the sublist with the value associated with listelement 
 						if(stack){
 							leftbeforestack--;
@@ -12201,7 +12858,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 					previous=current;
 					current=current->_next;
 					sortstatistics.pointerassignments+=2;sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
-				}while(current);
+				}while(current!=NULL);
 				if(report)
 				{
 					outputValue("After skipping equal values: first: '",previous->_value,"' - ");
@@ -12209,7 +12866,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 				}
 
 				// when all values are the same rundirection current will be NULL and rundirection will end up zero!!! 
-				int rundirection=(current?(largerthan(current->_value,previous->_value)==M_TRUE?1:-1):0);
+				int rundirection=(current!=NULL?(largerthan(current->_value,previous->_value)==M_TRUE?1:-1):0);
 
 				if(rundirection!=0){
 
@@ -12225,7 +12882,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 					bool emptyrun;
 					while(1){
 						sortstatistics.pointertests++;
-						if(!current)break;
+						if(NULL==current)break;
 						processedsofar++;
 						currentValue=current->_value; // the value to compare
 						sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
@@ -12240,7 +12897,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 								if(report)
 									outputValue("Up run maximum: '",previousValue,"'.\n");
 								sortstatistics.pointertests++;
-								if(smallest){
+								if(smallest!=NULL){
 									emptyrun=(smallest->_next==previous);
 									sortstatistics.fieldtests++;sortstatistics.pointertests++;
 								}else
@@ -12252,14 +12909,14 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 									//				apparently NOT as it loops indefinitely somewhere
 									// MDH@09NOV2020: OOPS we're supposed to pass in the beforefirst NOT the first, so how do we find the predecessor of runsmallest?????
 									sortstatistics.pointertests++;
-									if(largest){
+									if(largest!=NULL){
 										runsmallest=largest->_next; // the successor of the largest is essentially the first list element to merge from `another`
 										smaller=NULL; // this is going to be the 'offset' to the main list that we're going to speed determine
 										sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests++;
 										if(runsmallest){ // TODO should always be there I suppose!!!
 											runsmallestValue=runsmallest->_value;
 											sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests+=2; // test below
-											if(stack&&*stack){ // if the first element in the stack is set
+											if(stack!=NULL&&(*stack)!=NULL){ // if the first element in the stack is set
 												sortstatistics.comparisons++;
 												if(smallerthan(runsmallestValue,stack[stackminimumindex]->_value)!=M_TRUE){
 													upperstackindex=stackmaximumindex; // replacing: stacksize-1
@@ -12308,7 +12965,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 														if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
 													}
 													sortstatistics.pointertests++;
-													if(!beforefirstone)break;
+													if(NULL==beforefirstone)break;
 													sortstatistics.comparisons++;
 													if(largerthan(firstone->_value,runsmallestValue))break; // found one that is larger, which means we're done
 													// ASSERT firstone is smaller than or equal to runsmallest
@@ -12320,13 +12977,13 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 										if(report)
 										{
 											if(smaller)outputValue("'",smaller->_value,"' is smaller");else output("Nothing is smaller");
-											if(runsmallest)outputValue(" then '",runsmallestValue,"'");output(".\n");
+											if(runsmallest!=NULL)outputValue(" then '",runsmallestValue,"'");output(".\n");
 										}
 										largest=lmerge(_list,smaller,largest,previous);
 										largest->index=0; // mark the largest with index 0 (so we can see where it currently is)
 										if(report)
 											outputList("List after merging up run: ",_list,"'.\n");
-										if(stack&&!*stack){
+										if(stack!=NULL&&(*stack)==NULL){ // TODO should this be *stack!=NULL???????
 											if(betweenstackelements>0){
 												if(processedsofar>=stacksize){
 													stackminimumindex=0;stackmaximumindex=stacksize-1;
@@ -12367,7 +13024,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 									outputValue("Down run minimum: '",previousValue,"'.\n");
 								// if there's nothing in between the down run is empty
 								sortstatistics.pointertests++;
-								if(largest){
+								if(largest!=NULL){
 									emptyrun=(largest->_next==previous);
 									sortstatistics.fieldtests++;sortstatistics.pointertests++;
 								}else
@@ -12376,7 +13033,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 									// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
 									// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
 									sortstatistics.pointertests++;
-									if(largest){
+									if(largest!=NULL){
 										previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
 										sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.fieldtests++;
 										lreverse(_list,largest,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
@@ -12390,7 +13047,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 										sortstatistics.pointerassignments++;
 										// MDH@10NOV2020: how about speeding up by doing an initial search of the list so far???
 										runsmallestValue=runsmallest->_value;
-										if(stack&&*stack){
+										if(stack!=NULL&&(*stack)!=NULL){
 											// when merging a down run we can have a new minimum
 											sortstatistics.comparisons++;
 											if(smallerthan(runsmallestValue,stack[stackminimumindex]->_value)!=M_TRUE){
@@ -12447,7 +13104,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 													if(firstone==largest){beforefirstone=NULL;sortstatistics.pointerassignments++;break;}
 												}
 												sortstatistics.pointertests++;
-												if(!beforefirstone)break;
+												if(NULL==beforefirstone)break;
 												sortstatistics.pointerreferences++;sortstatistics.fieldreferences++;sortstatistics.comparisons++; // the test below
 												if(largerthan(firstone->_value,runsmallestValue))break; // found one that is larger, which means we're done
 												// ASSERT firstone is smaller than or equal to runsmallest
@@ -12464,7 +13121,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 										largest->index=0;
 										if(report)
 											outputList("List after merging down run: ",_list,"'.\n");
-										if(stack&&!*stack){
+										if(stack!=NULL&&NULL==(*stack)){
 											if(betweenstackelements>0){
 												// filling the stack once if we have enough elements to fill it in one go
 												if(processedsofar>=stacksize){
@@ -12515,7 +13172,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 					sortstatistics.pointertests++; // test on largest below
 					if(rundirection>0){ // end of an up run
 						// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
-						if(largest){
+						if(largest!=NULL){
 							if(report)
 								output("Processing the final up run!\n");
 							lmerge(_list,NULL,largest,previous);
@@ -12527,7 +13184,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 						if(report)output("Processing the final down run!\n");
 						runsmallest=previous;
 						sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
-						if(largest){ // something in front that we need to merge the down run into
+						if(largest!=NULL){ // something in front that we need to merge the down run into
 							// nothing to reverse if there's only a single element in the down run
 							sortstatistics.fieldtests++;sortstatistics.pointertests++;
 							if(largest->_next!=previous){
@@ -12553,7 +13210,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 					while(1){
 						listelement->index=index;
 						listelement=listelement->_next;
-						if(!listelement)break;
+						if(NULL==listelement)break;
 						// update the index to assign
 						if(index==nextindexrange->last){
 							nextindexrange=nextindexrange->_next;
@@ -12564,7 +13221,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 					unsigned long long indexrangesfreed=0;
 					// free all dynamically allocated index ranges
 					Mindexrange* indexrangetofree=indexrange._next;
-					while(indexrangetofree){
+					while(indexrangetofree!=NULL){
 						indexrangesfreed++;
 						nextindexrange=indexrangetofree->_next;
 						FREE_DISOWNED_1(indexrangetofree,'~',owner);
@@ -12574,8 +13231,8 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 						output("%lld captured index ranges freed!\n",indexrangesfreed);
 				} // rundirection!=0
 
-				if(stack){
-					if(!*stack)output("%sNo stack elements used (processed: %lld)!",M_WARNING_PREFIX,processedsofar);
+				if(stack!=NULL){
+					if(NULL==(*stack))output("%sNo stack elements used (processed: %lld)!",M_WARNING_PREFIX,processedsofar);
 					if(report)
 						output("Freeing %llu elements of stack '%p'.\n",stacksize,stack);
 					FREE_DISOWNED(stack,stacksize,-'l',owner); // replacing debug version: _FREE_DISOWNED(stack,stacksize,-'l',owner);
@@ -12731,6 +13388,14 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 	return mergedlistelement; // returning the last merged element (therefore the maximum)
 }
 */
+
+/**
+ * @brief insertion sorts \p values from element index \p first through \p last
+ * 
+ * @param values 
+ * @param first 
+ * @param last 
+ */
 static void ainsertionsort(Mvalue** const values,unsigned long long first,unsigned long long last){
 	// ASSERT first and last are assumed to be array positions (one-based) not zero-based
 	//		which means that we need to insert [first,last-1] instead of (originally)
@@ -12778,11 +13443,18 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 		}
 	}
 }
+/**
+ * @brief atime sorts \p _array using array merge function \p arrayMergeFunction 
+ * @details M_LL_INVALID is returned when \p _array is NULL
+ * @param _array 
+ * @param arrayMergeFunction 
+ * @return long long M_TRUE on success, or M_FALSE or M_LL_INVALID on failure
+ */
 static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunction){
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=M_LL_INVALID;
 	sortstatistics.pointertests++;
-	if(_array){
+	if(_array!=NULL){
 		result=M_TRUE;
 		clock_t sortstart=clock(); // force to double
 		sortstatistics.fieldreferences++;
@@ -12809,10 +13481,18 @@ static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunc
 }
 // linsertinginsertionSort works the same way linsertionSort does, except that it rearranges the list elements instead of moving the values
 // and it returns the new last (if any)
+/**
+ * @brief insertion sorts \p _list from the element following \p beforefirst through \p last
+ * @details rearranges the list elements not the values they contain as linsertionsort does
+ * @param _list 
+ * @param beforefirst 
+ * @param last 
+ * @return Mlistelement* the pointer to the smallest list element
+ */
 static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * const beforefirst,Mlistelement * const last){
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	// ASSERT last should NOT be NULL
-	Mlistelement* smallest=(beforefirst?beforefirst->_next:_list->_first); // called first in linsertionSort
+	Mlistelement* smallest=(beforefirst!=NULL?beforefirst->_next:_list->_first); // called first in linsertionSort
 	if(report){outputValue("Insertion sorting '",smallest->_value,"'");outputValue(" through '",last->_value,"'.\n");}
 
 	Mlistelement *afterlast=last->_next; // remember the successor of the last element
@@ -12827,7 +13507,7 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 	sortstatistics.pointerassignments+=8;sortstatistics.pointerreferences++;sortstatistics.fieldreferences+=3;sortstatistics.pointertests++;
 	while(1){ // safety check
 		sortstatistics.pointertests++;
-		if(!toinsert)break;
+		if(NULL==toinsert)break;
 		nexttoinsert=toinsert->_next; // remember the next to insert
 		toinsertValue=toinsert->_value; // the value to insert into what's in front of it
 		// MDH@04NOV2020: we can speed things up a little bit by comparing with the largest value so far
@@ -12855,10 +13535,10 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 			toinsert->_next=larger;
 			sortstatistics.fieldassignments++;sortstatistics.pointerreferences++;sortstatistics.pointertests++;
 			// toinsert has to become the successor of notlarger
-			if(!notlarger){ // we have a new minimum
+			if(NULL==notlarger){ // we have a new minimum
 				smallest=toinsert; // update what we consider to contain the smallest value
 				if(report)outputValue("New smallest value: '",smallest->_value,"'.\n");
-				if(beforefirst)beforefirst->_next=smallest;else _list->_first=smallest; // we have to ascertain that beforefirst points to this new smallest value
+				if(beforefirst!=NULL)beforefirst->_next=smallest;else _list->_first=smallest; // we have to ascertain that beforefirst points to this new smallest value
 				sortstatistics.fieldassignments++;sortstatistics.pointerreferences+=2;sortstatistics.pointerassignments++;
 			}else{
 				notlarger->_next=toinsert;
@@ -12877,7 +13557,7 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 	}
 	largest->_next=afterlast; // ascertain that the successor of largest is the successor of the original last
 	sortstatistics.fieldassignments++;sortstatistics.pointerreferences++;sortstatistics.pointertests++;
-	if(!afterlast){
+	if(NULL==afterlast){
 		_list->_last=largest; // if there is no afterlast we should update the last element of the list
 		sortstatistics.fieldassignments++;sortstatistics.pointerreferences++;
 	}
@@ -12928,11 +13608,18 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 }
 */
 // MDH@05NOV2020: changing timsort by registering the index ranges first, and writing the indices at the end
+/**
+ * @brief ltime sorts \p _list
+ * @details returns M_LL_INVALID iff \p _list is NULL
+ * @param _list 
+ * @return long long M_TRUE on success, M_FALSE or M_LL_INVALID on failure
+ */
 static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
-	if(_list){
+	if(_list!=NULL){
+		result=M_FALSE; // MDH@31MAR2023: as promised
 		sortstatistics.fieldtests+=2;
 		if(_list->_first!=_list->_last){ // a list with at least two elements
 			// determine the index ranges
@@ -12942,11 +13629,11 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 				Mlistelement* listelement=_list->_first;
 				while(1){
 					listelement=listelement->_next;
-					if(!listelement)break;
+					if(NULL==listelement)break;
 					if(listelement->index!=nextindexrange->last+1){ // there's a gap
 						nextindexrange->_next=CALLOC_1(sizeof(Mindexrange),'~',owner);
 						nextindexrange=nextindexrange->_next;
-						if(!nextindexrange)break; // TODO serious problem
+						if(NULL==nextindexrange)break; // TODO serious problem
 						nextindexrange->first=listelement->index;
 					}
 					// update last
@@ -12960,12 +13647,12 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 			sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
 			while(1){
 				sortstatistics.pointertests++;
-				if(!runlast)break;
+				if(NULL==runlast)break;
 				runsize=0;
 				// ascertain that runlast is never NULL (as required by linsertionSort)
 				while(++runsize<M_RUN_LENGTH){
 					sortstatistics.fieldtests++;
-					if(!runlast->_next)break;
+					if(NULL==runlast->_next)break;
 					runlast=runlast->_next;
 					sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 				}
@@ -13011,14 +13698,14 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 					sortstatistics.pointerassignments+=4;sortstatistics.pointerreferences+=2;sortstatistics.fieldreferences++;sortstatistics.pointertests++;
 					while(--left>0){
 						sortstatistics.fieldtests++;
-						if(!lastanother->_next)break;
+						if(NULL==lastanother->_next)break;
 						if(left*2==size){lastone=lastanother;sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;}
 						lastanother=lastanother->_next;
 						sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 					}
 					// only sort if there are two sequences
 					sortstatistics.pointertests++;
-					if(lastone){
+					if(lastone!=NULL){
 						sortstatistics.pointertests+=2;
 						if(lastone!=lastanother){
 							sortstatistics.pointerassignments++;
@@ -13053,7 +13740,7 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 			while(1){
 				listelement->index=index;
 				listelement=listelement->_next;
-				if(!listelement)break;
+				if(NULL==listelement)break;
 				// update the index to assign
 				if(index==nextindexrange->last){
 					nextindexrange=nextindexrange->_next;
@@ -13063,7 +13750,7 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 			}
 			// free all dynamically allocated index ranges
 			Mindexrange* indexrangetofree=indexrange._next;
-			while(indexrangetofree){
+			while(indexrangetofree!=NULL){
 				nextindexrange=indexrangetofree->_next;
 				FREE_DISOWNED_1(indexrangetofree,'~',owner);
 				indexrangetofree=nextindexrange;
@@ -13075,21 +13762,28 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 	return result;
 }
 // Msort is the generic entry point for sorting lists
+/**
+ * @brief sorts \p _tosortValue using sort method indicator \p _sortMethodValue
+ * 
+ * @param _tosortValue 
+ * @param _sortMethodValue 
+ * @return Mvalue* the wrapped boolean M_TRUE on success, M_FALSE or M_LL_INVALID on failure
+ */
 Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	// we've got merge, tim and quick sort, below you can see what the default is
 	char sortMethodVariant='\0',sortMethod='\0';
-	if(_sortMethodValue&&_sortMethodValue->type==VT_TEXT){sortMethod=_sortMethodValue->value._text->_c[0];if(sortMethod)sortMethodVariant=_sortMethodValue->value._text->_c[1];}
+	if(_sortMethodValue!=NULL&&_sortMethodValue->type==VT_TEXT){sortMethod=_sortMethodValue->value._text->_c[0];if(sortMethod)sortMethodVariant=_sortMethodValue->value._text->_c[1];}
 	// can either sort a list or the list elements in a map
-	if(_tosortValue){
+	if(_tosortValue!=NULL){
 		if(_tosortValue->type==VT_MAP){
 			// will return the number of successfully sorted elements
 			result=0;
-			Mmapelement* mapelement=(_tosortValue->value._map?_tosortValue->value._map->_first:NULL);
-			while(mapelement){
-				Mvalue* mapelementValue=(mapelement->_variable?mapelement->_variable->_value:NULL);
-				if(mapelementValue){
+			Mmapelement* mapelement=(_tosortValue->value._map!=NULL?_tosortValue->value._map->_first:NULL);
+			while(mapelement!=NULL){
+				Mvalue* mapelementValue=(mapelement->_variable!=NULL?mapelement->_variable->_value:NULL);
+				if(mapelementValue!=NULL){
 					Mvalue* mapelementValueSortResult=Msort(mapelementValue,_sortMethodValue);
 					long long mapelementSortResult=(mapelementValueSortResult?mapelementValueSortResult->value._integer->ll:M_LL_INVALID);
 					if(mapelementSortResult>0)result+=mapelementValueSortResult->value._integer->ll;
@@ -13129,36 +13823,46 @@ Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
 }
 // similar to Msort but does not change the input in any way, returns NULL on failure
 // MDH@24DEC2020 TODO it's advisable when sorting a list to create an array instead of a list to sort, and creating a list from the sorted array result
+/**
+ * @brief returns \p _tosortValue sorted using sort method \p _sortMethodValue
+ * @details returns NULL on failure
+ * @param _tosortValue 
+ * @param _sortMethodValue 
+ * @return Mvalue* \p _tosortValue sorted using sort method \p _sortMethodValue
+ */
 Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	Mvalue* sortedValue=NULL;
-	if(_tosortValue){
+	if(_tosortValue!=NULL){
 		if(_tosortValue->type==VT_MAP){
 			// make a copy of the map, which means that we can sort the map elements in place
 			Mmap* _tosortMap=owned_map(_getMapCopy(_tosortValue->value._map),owner);
 			long long result=0;
 			// will return the number of successfully sorted elements
-			Mmapelement* mapelement=(_tosortMap?_tosortMap->_first:NULL);
-			while(mapelement){
-				Mvalue* mapelementValue=(mapelement->_variable?mapelement->_variable->_value:NULL);
-				if(mapelementValue){
+			Mmapelement* mapelement=(_tosortMap!=NULL?_tosortMap->_first:NULL);
+			while(mapelement!=NULL){
+				Mvalue* mapelementValue=(mapelement->_variable!=NULL?mapelement->_variable->_value:NULL);
+				if(mapelementValue!=NULL){
 					Mvalue* mapelementValueSortResult=Msort(mapelementValue,_sortMethodValue);
-					long long mapelementSortResult=(mapelementValueSortResult?mapelementValueSortResult->value._integer->ll:M_LL_INVALID);
+					long long mapelementSortResult=(mapelementValueSortResult!=NULL?mapelementValueSortResult->value._integer->ll:M_LL_INVALID);
 					if(mapelementSortResult<=0)break; // if failing to sort this map element value
 				}
 				mapelement=mapelement->_next;
 			}
-			if(mapelement){ // something left unsorted
+			if(mapelement!=NULL){ // something left unsorted
 				FREE_MAP(_tosortMap,owner);
 				outputError("");outputValue("Failed to sort '",mapelement->_variable->_value,"'.\n");
 			}else
 				sortedValue=_getValueOfMap(disowned_map(_tosortMap,owner));
 		}else{
 			char sortMethodVariant='\0',sortMethod='\0';
-			if(_sortMethodValue&&_sortMethodValue->type==VT_TEXT){sortMethod=_sortMethodValue->value._text->_c[0];if(sortMethod)sortMethodVariant=_sortMethodValue->value._text->_c[1];}
+			if(_sortMethodValue!=NULL&&_sortMethodValue->type==VT_TEXT){
+				sortMethod=_sortMethodValue->value._text->_c[0];
+				if(sortMethod)sortMethodVariant=_sortMethodValue->value._text->_c[1];
+			}
 			if(_tosortValue->type==VT_LIST){
 				Mlist* _tosortList=owned_list(_getListCopy(_tosortValue->value._list),owner);
-				if(_tosortList){
+				if(_tosortList!=NULL){
 					sortstatistics=(struct Msortstatistics){};
 					long long sortResult=M_LL_INVALID;
 					switch(sortMethod){
@@ -13179,7 +13883,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 			}else
 			if(_tosortValue->type==VT_ARRAY){
 				Marray* _tosortArray=owned_array(_getArrayCopy(_tosortValue->value._array),owner);
-				if(_tosortArray){
+				if(_tosortArray!=NULL){
 					sortstatistics=(struct Msortstatistics){};
 					long long sortResult=M_LL_INVALID;
 					switch(sortMethod){
@@ -13206,27 +13910,34 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 }
 
 // MDH@01NOV2020: grouping can make seperate sublists from a list either into a list or a map
+/**
+ * @brief groups elements of \p _listValue based on the group indicator returned by function \p functionValue
+ * 
+ * @param _listValue 
+ * @param _functionValue 
+ * @return Mvalue* the (wrapped) grouped list elements
+ */
 Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
-	if((!_listValue||_listValue->type==VT_LIST)&&(!_functionValue||_functionValue->type==VT_FUNCTION)){
-		Mlist* list=(_listValue?_listValue->value._list:NULL);
-		if(list){
+	if((NULL==_listValue||_listValue->type==VT_LIST)&&(NULL==_functionValue||_functionValue->type==VT_FUNCTION)){
+		Mlist* list=(_listValue!=NULL?_listValue->value._list:NULL);
+		if(list!=NULL){
 			// if no function is specified Mlgroup essentially uses the value type to construct the groups
 			Mmap* _groupMap=owned_map(__map("Mlgroup"),owner);
-			if(_groupMap){
-				Mfunction* function=(_functionValue?_functionValue->value._function:NULL);
+			if(_groupMap!=NULL){
+				Mfunction* function=(_functionValue!=NULL?_functionValue->value._function:NULL);
 				long long functionArgumentIndex=0;
-				Mlist* _functionArgumentList=(function?owned_list(__list("Mlgroup"),owner):NULL);
-				if(_functionArgumentList)functionArgumentIndex=appendedToList(_functionArgumentList,owner,NULL,M_LL_INVALID);
-				if(!function||functionArgumentIndex>0){
+				Mlist* _functionArgumentList=(function!=NULL?owned_list(__list("Mlgroup"),owner):NULL);
+				if(_functionArgumentList!=NULL)functionArgumentIndex=appendedToList(_functionArgumentList,owner,NULL,M_LL_INVALID);
+				if(NULL==function||functionArgumentIndex>0){
 					Mvalue* listelementValue;
 					Mlistelement* listelement=list->_first;
-					while(listelement){
+					while(listelement!=NULL){
 						// does it make sense to group NULL values?????
 						listelementValue=listelement->_value;
 						char* group=NULL;
-						if(listelementValue){
-							if(function){
+						if(listelementValue!=NULL){
+							if(function!=NULL){
 								if(appendedToList(_functionArgumentList,owner,listelementValue,functionArgumentIndex)>0){
 									Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentList,owner);
 									Mvalue* groupValue=getValueOfFunctionCall(function,"",_functionArgumentMap);
@@ -13240,14 +13951,14 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 						}else
 							group="";
 						// I suppose that when the function returns NULL, we can't group
-						if(group){
+						if(group!=NULL){
 							if(report){outputValue("Group of '",listelementValue,"'");output(": '%s'.\n",group);}
 							Mmapelement* groupMapelement=getMapelement(_groupMap,group);
-							if(!groupMapelement){ // the given group is not yet present
+							if(NULL==groupMapelement){ // the given group is not yet present
 								Mlist* groupList=owned_list(__list("Mlgroup"),owner);
-								if(groupList){
+								if(groupList!=NULL){
 									Mvalue* groupListValue=_getValueOfList(disowned_list(groupList,owner));
-									if(groupListValue){
+									if(groupListValue!=NULL){
 										// NOTE unfortunately appendedToMap() will copy the list in groupListValue
 										//	  TODO I have to think about whether this is correct or not
 										//	  DONE it seems correct in that assignValue() will create a new
@@ -13267,7 +13978,7 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 									// NOTE the following is a bit elaborate because we know that
 									//	  groupListValue will NOT be referenced (count==0) when it exists
 									//	  so in any normal situation, we either get the warning or the list is freed
-									if(groupListValue){
+									if(groupListValue!=NULL){
 										// can't free groupList anyway because it is now owned
 										if(groupListValue->count==0){
 											if(Misdisowned(groupList)){
@@ -13285,10 +13996,9 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 							} 
 							// we may safely assume that the group list is in the value of the group map element
 							Mlist* groupList=(groupMapelement?groupMapelement->_variable->_value->value._list:NULL);
-							if(groupList){
+							if(groupList!=NULL){
 								if(report)output("Number of elements in group list: %zd.\n",groupList->numberOfElements);
-								long long groupListelementIndex=
-											appendedToList(groupList,owner,listelementValue,M_LL_INVALID);
+								long long groupListelementIndex=appendedToList(groupList,owner,listelementValue,M_LL_INVALID);
 								if(groupListelementIndex<=0){
 									output(M_ERROR_PREFIX);outputValue("Failed to register '",listelementValue,"'");
 									output(" in group '%s'.\n",group);	
@@ -13303,7 +14013,7 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 					}
 					return _getValueOfMap(disowned_map(_groupMap,owner));
 				}else{ // we have a function, but not a valid function argument list
-					if(_functionArgumentList)FREE_LIST(_functionArgumentList,owner);
+					if(_functionArgumentList!=NULL)FREE_LIST(_functionArgumentList,owner);
 					outputError("Failed to prepare for calling the group function");
 				}
 
@@ -13311,29 +14021,34 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 				outputError("Failed to create the group map");
 		}
 	}else{
-		if(_listValue)outputError("First argument to the group function not a list");
-		if(_functionValue)outputError("Second argument to the group function not a function");
+		if(_listValue!=NULL)outputError("First argument to the group function not a list");
+		if(_functionValue!=NULL)outputError("Second argument to the group function not a function");
 	}
-
 	return NULL;
 }
 // MDH@03NOV2020: runs tells you how many runs there are in a given list and what length they are
 //				it's more convenient to return the points where the direction changes
+/**
+ * @brief returns the list of run points in \p _listValue
+ * 
+ * @param _listValue 
+ * @return Mvalue* the list of run points in \p _listValue
+ */
 Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__);
-	if(_listValue){
+	if(_listValue!=NULL){
 		if(_listValue->type==VT_LIST){
 			Mlist* list=_listValue->value._list;
-			Mlistelement* listelement=(list?list->_first:NULL);
-			if(listelement){ // at least one element in the list
+			Mlistelement* listelement=(list!=NULL?list->_first:NULL);
+			if(listelement!=NULL){ // at least one element in the list
 				Mlist* _runsList=owned_list(__list("Mrunpoints"),owner);
-				if(_runsList){
+				if(_runsList!=NULL){
 					// the first and last list element will always be in the list
 					if(appendedToList(_runsList,owner,listelement->_value,listelement->index)>0){
 						// if all elements are equal direction will remain 0, in which case the returned list will remain empty
 						int direction,rundirection=0;
 						unsigned long long valueindex;
 						Mvalue *value,*nextvalue=listelement->_value;
-						while(listelement->_next){
+						while(listelement->_next!=NULL){
 							value=nextvalue;
 							valueindex=listelement->index;
 							// update direction to indicate whether the next element is down or up or equal
@@ -13369,7 +14084,7 @@ Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__)
 			unsigned long long arraylength=array->numberOfElements;
 			if(arraylength>0){
 				Mlist* _runsList=owned_list(__list("Mrunpoints"),owner);
-				if(_runsList){
+				if(_runsList!=NULL){
 					Mvalue** valueholder=array->values; // the pointer to the first Mvalue*
 					Mvalue* value=*valueholder; // the first value pointed to
 					// the first and last list element will always be in the list
@@ -13447,6 +14162,13 @@ Mexpressionvalue* getFunctionValue(Mtoken* _offsetToken,char* functionName){
 */
 
 // and finally
+/**
+ * @brief applies setting character \p settingCharacter
+ * 
+ * @param settingCharacter 
+ * @return true on success
+ * @return false on failure
+ */
 bool settingApplied(char settingCharacter){
 	if(settingCharacter=='v'||settingCharacter=='V'){setVerbose(settingCharacter=='V');return true;}
 	if(settingCharacter=='d'||settingCharacter=='D'){setDebugging(settingCharacter=='D');return true;}
@@ -13457,14 +14179,30 @@ bool settingApplied(char settingCharacter){
 
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
 // MDH@07DEC2020: added argument locale for setting the locale
+/**
+ * @brief initializes the shell
+ * 
+ * @param settingCharacters 
+ * @param locale 
+ * @param moduleDebugging 
+ * @param _inputCharReadFunction 
+ * @param _inputInfoFunction 
+ * @param _inputErrorFunction 
+ * @param _outputTokenFunction 
+ * @param _reoutputTokenFunction 
+ * @param _updateLastTokenAutocompletionTextFunction 
+ * @param _outputCommandInfoFunction 
+ * @return true on success
+ * @return false on failure
+ */
 bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
 
 	M_MODULE_DEBUGGING=moduleDebugging; // MDH@05DEC2020
 
 	// MDH@07DEC2020: if locale is not NULL try to set the current (overall) locale to it
-	if(locale){
+	if(locale!=NULL){
 		char* newlocale=setlocale(LC_ALL,locale);
-		if(!newlocale)
+		if(NULL==newlocale)
 			output("%sFailed to use proposed locale '%s'!",M_ERROR_PREFIX,locale);
 		else
 		if(strcmp(locale,newlocale)==0)
@@ -13504,7 +14242,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 	// MDH@06NOV2019: NULL_value remains NULL for ever...
 	UNDEFINED_value=__value("undefined");
-	if(!UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
+	if(NULL==UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
 
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
 	//				therefore it shouldn't be a token value 
@@ -13528,7 +14266,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	//if(amVerboseDebugging())
 		output("Creating the root M environment.\n"); // DEBUG
 	Menvironment* _Menvironment=owned_environment(_getNewEnvironment(),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
-	if(_Menvironment){
+	if(_Menvironment!=NULL){
 		//if(amVerbose())
 			output("M environment created.\n");
 		_Menvironment->_name=owned_chars(_getChars("M"),Msubowner(owner,1)); // TODO why make a dynamic copy???
@@ -13536,7 +14274,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			output("M environment named.\n");
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC_1(sizeof(Mfunctionmap),'W',Msubowner(owner,1));
-		if(environmentFunctionMap){
+		if(environmentFunctionMap!=NULL){
 
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
 			// MDH@29MAY2019: we've got (symbol) NULL
@@ -13548,11 +14286,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!addVariable(_Menvironment,owner,M_UNDEFINED_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_UNDEFINED_VARIABLE_NAME,UNDEFINED_value)){
 				outputWarning("Failed to create, add or initialize constant UNDEFINED.");
 			}
-			if(!NAF_value||!addVariable(_Menvironment,owner,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
+			if(NULL==NAF_value||!addVariable(_Menvironment,owner,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
 				outputWarning("Failed to create, add or initialize Not-a-float constant NAF.");
 				////////return false;
 			}
-			if(!NAI_value||!addVariable(_Menvironment,owner,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
+			if(NULL==NAI_value||!addVariable(_Menvironment,owner,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
 				outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
@@ -13563,7 +14301,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}*/
 			// create and add PI and E constants!!!
 			Mvalue* PI_value=_getFloatValue(M_LD_PI);
-			if(!PI_value){
+			if(NULL==PI_value){
 				outputError("Failed to create PI");
 				return NULL;
 			}
@@ -13579,7 +14317,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 
 			Mvalue* E_value=_getFloatValue(M_LD_E);
-			if(!E_value){
+			if(NULL==E_value){
 				///////free_value(E_value);
 				outputError("Failed to create E");
 				return NULL;
@@ -13597,7 +14335,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@05DEC2020: obtain the current LC_ALL locale, and save it to the LOCALE variable
 			// MDH@07DEC2020: we're going to use a map to store both the current locale setting (in property '') as well as all the fields
 			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
-			if(!localesettingsValue)outputWarning("Failed to obtain the current locale settings value");
+			if(NULL==localesettingsValue)outputWarning("Failed to obtain the current locale settings value");
 			// the locale settings variable will be created as immutable, so once set it cannot be changed itself (although the map can be!!!)
 			if(!addVariable(_Menvironment,owner,M_LOCALE_SETTINGS_VARIABLE_NAME,VT_MAP,true)){
 				output("%sFailed to register '%s'.\n",M_ERROR_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
