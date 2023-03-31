@@ -149,11 +149,21 @@ char const * const M_BUILD="10";char const * const M_DATE="20 October 2021"; // 
 //char const * const M_BUILD="17";char const * const M_DATE="14 November 2019, 21:00"; // adding the M variable and M() and variables() function 
 //char const * const M_BUILD="18";char const * const M_DATE="15 November 2019, 14:00"; // keeping track of the amount of memory used by the 'managed' (M) types
 
+/**
+ * @brief the text to use for inserting the previous command result
+ * 
+ */
 static char const * const GET_CALL_CHARACTERS="get()";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
 // the list of token type ids in the corresponding order!!!
+/**
+ * @brief returns the foreground color string of token type \p tokenType
+ * 
+ * @param tokenType 
+ * @return const char* the foreground color string of token type \p tokenType
+ */
 static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
 	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
 	////////output("(%d)",tokentype_id);
@@ -170,10 +180,20 @@ static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
 	}
 	return "";
 }
+/**
+ * @brief outputs the background and foreground color associated with token type \p tokenTye
+ * 
+ * @param tokenType 
+ */
 static void outputTokenTypeColor(TokenType tokenType){
 	setBackColor(getBackgroundColor());
 	setColor(getTokenColor(tokenType));
 }
+/**
+ * @brief outputs the background and foreground colors of token \p _token
+ * 
+ * @param _token 
+ */
 static void outputTokenColor(Mtoken* _token){
 	if(_token)outputTokenTypeColor(_token->type);
 	///////printf("[%d]",_userInputCommand->_lastToken->type);
@@ -217,10 +237,13 @@ static void outputCommandInfo(Mcommand* command){
 	}
 }
 */
-
+/**
+ * @brief writes the current time stamp to file \p _file
+ * @param _file
+ */
 void writeTimestamp(FILE* _file){if(!_file)return;Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _timestamp=owned_string(_getTimestamp(NULL),owner);
-	if(!_timestamp)return;
+	if(NULL==_timestamp)return;
 	fprintf(_file,"%s\t",string(_timestamp));
 	FREE_STRING(_timestamp,owner);
 	/* replacing:
@@ -232,17 +255,27 @@ void writeTimestamp(FILE* _file){if(!_file)return;Mallocationowner owner=getOwne
 	*/
 }
 
+/**
+ * @brief the file to contain debuf information
+ * 
+ */
 FILE* debugfile=NULL;
 #include <stdarg.h>
 #ifdef __GNUC__
 	__attribute__((format(printf, 1, 2)))
 #endif
+/**
+ * @brief outputs all arguments using format string \p fmt to the debug file
+ * 
+ * @param fmt 
+ * @param ... 
+ */
 void debugWrite(const char* fmt,...){
-	if(!debugfile){
+	if(NULL==debugfile){
 		debugfile=fopen("./Mdebug.txt","a+t"); // append (or create) in text mode
 		fputc('\n',debugfile); // start with a single empty line (separating the sessions)
 	}
-	if(debugfile){
+	if(debugfile!=NULL){
 		va_list args;
 		va_start(args,fmt);
 		writeTimestamp(debugfile);		
@@ -266,7 +299,10 @@ bool initVariable(Menvironment* _Menvironment,char* name,double d){
 }
 */
 // there will be a root (M) environment
-
+/**
+ * @brief the (root) M environment (as returned by the call to shellInitialized)
+ * 
+ */
 Menvironment* _Menvironment=NULL; // this is the root (M) environment that we will be executing in
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
@@ -300,34 +336,41 @@ char* _getFormattedText(uint8_t maxlength,char* fmt,...){
 #endif
 */
 
+/**
+ * @brief returns a new M string containing the text representaion of M function map \p _functionMap
+ * 
+ * @param _functionmap 
+ * @return Mstring* a new M string containing the text representaion of M function map \p _functionMap
+ */
 Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _s=owned_string(__string(),owner);
-	if(_s){
+	if(_s!=NULL){
 		Mstring* p=string_append_char(_s,'[');
-		if(_functionmap){
+		if(_functionmap!=NULL){
 			///printf("\n%s(%d)",string(p),_functionmap->numberOfFunctions);
 			Mfunctionmapelement* _functionmapelement=_functionmap->_first;
-			while(_functionmapelement){
+			while(_functionmapelement!=NULL){
 				///printf("\n%s","start");
 				Mfunction* _function=_functionmapelement->_function;
-				if(!_function)continue;
-				///printf("\n%s","func");
-				p=string_append(p,string(_functionmapelement->_name)); // _name moved from _function to _functionmapelement
-				if(!p)break;
-				///printf("\n%s","name");
-				// I guess we might show the parameter map (if any)
-				string_append_char(p,'(');
-				if(_function->_parameterMap){
-					Mstring* parameterMapText=owned_string(_getMapText(_function->_parameterMap,false,false,false),owner); // do NOT show curly braces, quotes or missing defaults
-					if(parameterMapText){
-						string_append(p,string(parameterMapText));
-						FREE_STRING(parameterMapText,owner);
+				if(_function!=NULL){
+					///printf("\n%s","func");
+					p=string_append(p,string(_functionmapelement->_name)); // _name moved from _function to _functionmapelement
+					if(NULL==p)break;
+					///printf("\n%s","name");
+					// I guess we might show the parameter map (if any)
+					string_append_char(p,'(');
+					if(_function->_parameterMap!=NULL){
+						Mstring* parameterMapText=owned_string(_getMapText(_function->_parameterMap,false,false,false),owner); // do NOT show curly braces, quotes or missing defaults
+						if(parameterMapText!=NULL){
+							string_append(p,string(parameterMapText));
+							FREE_STRING(parameterMapText,owner);
+						}
 					}
+					///printf("\n%s","params");
+					string_append_char(p,')');
 				}
-				///printf("\n%s","params");
-				string_append_char(p,')');
 				_functionmapelement=_functionmapelement->_next;
-				if(_functionmapelement)p=string_append(p,", "); // only when there's a next map element to process
+				if(_functionmapelement!=NULL)p=string_append(p,", "); // only when there's a next map element to process
 				///printf("\n%s","next");
 			}
 		}
@@ -335,16 +378,24 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){Mallocationowner owner=
 		p=string_append_char(p,']');
 		///printf("\n%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){FREE_STRING(_s,owner);_s=NULL;}
+		if(NULL==p){FREE_STRING(_s,owner);return NULL;}
 	}
 	return disowned_string(_s,owner);
 }
+/**
+ * @brief outputs the function map of the current execution M environment
+ * 
+ */
 void outputFunctions(){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _functionsText=owned_string(_getFunctionMapText(getExecutionEnvironment()->_functionMap),owner);
 	if(!_functionsText){outputError("Failed to create the output. Possible cause: out of memory.");return;}
 	output("\nFunctions: %s.\n",string(_functionsText));
 	FREE_STRING(_functionsText,owner);
 }/* VALIDATED */
+/**
+ * @brief outputs the variables of the current execution M environment
+ * 
+ */
 void outputVariables(){Mallocationowner owner=getOwner(__LINE__);
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
 	// MDH@24OCT2019: now using _getVariableMapText() instead of _getMapText() because the former is environment aware and can show the symbols with the same value (if any)
@@ -353,11 +404,20 @@ void outputVariables(){Mallocationowner owner=getOwner(__LINE__);
 	output("\nVariables: %s.\n",string(_variablesText));
 	FREE_STRING(_variablesText,owner);
 }/* VALIDATED */
-
+/**
+ * @brief the enum of possible input modes: command, control or shell
+ * 
+ */
 enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input modes: command, control, and shell
-
+/**
+ * @brief the actual (current) input mode
+ * 
+ */
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
-
+/**
+ * @brief the prompt info for each possible input mode
+ * 
+ */
 char* promptinfo[]={"Command mode: clear the command with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Use history command|Verbose|Wrap - Options: Beep|Reset|eXit|Functions|History|Shell.","Shell mode: enter a system command to execute."};
 /**
 call prompt() when ready to receive a new command
@@ -372,21 +432,41 @@ void storeCursor(){printf("\0337");}
 void restoreCursor(){printf("\0338");}
 */
 
+/**
+ * @brief outputs the display (settings) flags
+ * 
+ */
 void displayFlags(){
 	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amVerboseDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
 }
+/**
+ * @brief outputs all setting flag characters
+ * 
+ */
 void outputFlags(){
 	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amVerboseDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
 }
 
 // the user input (either the shell command or the M user input command)
+/**
+ * @brief the current shell command (in command mode)
+ * 
+ */
 Mstring* _shellCommand=NULL;Mallocationowner owner_shellCommand=(Mallocationowner){MI_MAIN,__LINE__,1};
-
+/**
+ * @brief the current user input command (in command mode)
+ * 
+ */
 Mcommand* _userInputCommand=NULL;Mallocationowner owner_userInputCommand=(Mallocationowner){MI_MAIN,__LINE__,1}; // the current input command
 
 // keeping track of both the cursor position and the total command length
+/**
+ * @brief returns the length of the current (shell or user input) command
+ * @details enters 0 when in control mode or when in command mode there is no user input command or token
+ * @return size_t the length of the current (shell or user input) command
+ */
 size_t getUserInputLength(){
-	if(inputMode==IM_COMMAND)return(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0);
+	if(inputMode==IM_COMMAND)return(_userInputCommand!=NULL&&_userInputCommand->_lastToken!=NULL?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0);
 	if(inputMode==IM_SHELL)return string_length(_shellCommand);
 	return 0;
 }
@@ -395,28 +475,53 @@ size_t getUserInputLength(){
 // MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
 // MDH@30OCT2019: if we let toInfoInputLine() return the number of lines it moved back we can pass that into toUserInputCursorPosition() to go down that number of lines
 // MDH@30OCT2019: for each user input line, keep track of the total number of characters written by the user
+/**
+ * @brief the record with information on a single user inout line (in command mode)
+ * 
+ */
 typedef struct Muserinputline{
 	size_t offset,index; // the number of characters on previous lines and the line index
 	struct Muserinputline *_prev; // for accessing previous lines
 }Muserinputline;
+/**
+ * @brief the current user input line pointer
+ * 
+ */
 static Muserinputline* _userinputline=NULL;static Mallocationowner owner_userinputline=(Mallocationowner){MI_MAIN,__LINE__,1};
-static size_t getNumberOfCommandLines(){return(_userinputline?_userinputline->index:0)+1;}
+/**
+ * @brief returns the number of lines showing the user input command
+ * 
+ * @return size_t the number of lines showing the user input command
+ */
+static size_t getNumberOfCommandLines(){return(_userinputline!=NULL?_userinputline->index:0)+1;}
 // MDH@24SEP2020: unless we're at the end of a command getUserInputLength() would be the current offset BUT if a command is being output completely that would be an invalid assumption therefore we now pass in the offset to use
+/**
+ * @brief returns a new user input line starting at offset \p offset in the current user input command
+ * 
+ * @param offset 
+ * @return Muserinputline* a new user input line starting at offset \p offset in the current user input command
+ */
 static Muserinputline* __userinputline(size_t offset){Mallocationowner owner=getOwner(__LINE__);
 	Muserinputline* _newUserinputline=CALLOC_1(sizeof(Muserinputline),'6',owner);
-	if(_newUserinputline){
+	if(_newUserinputline!=NULL){
 		_newUserinputline->_prev=_userinputline;
 		_newUserinputline->offset=offset; // this should be the total number of characters in the command on previous input lines
 		_newUserinputline->index=getNumberOfCommandLines(); // count the lines
 		_userinputline=OWNED(DISOWNED(_newUserinputline,owner),owner_userinputline); // MDH@30JUN2020: pass ownership when assigning to the global _userinputline because then it it bound!!!!
 	}
+	// TODO what if this fails????
 	return _newUserinputline;
 }
 // call free_userinputline() when starting a new user input command
+/**
+ * @brief frees the current (last) user input line
+ * 
+ * @return size_t the number of user input lines
+ */
 static size_t free_userinputline(){
 	size_t numberOfUserInputLines=0;
 	Muserinputline* prevUserinputline;
-	while(_userinputline){
+	while(_userinputline!=NULL){
 		numberOfUserInputLines++;
 		prevUserinputline=_userinputline->_prev;
 		FREE_DISOWNED_1(_userinputline,'6',owner_userinputline);
@@ -425,26 +530,53 @@ static size_t free_userinputline(){
 	return numberOfUserInputLines;
 }
 // MDH@24SEP2020: if a user input line is removed, we return the difference between the removed line offset and the new line offset, which essentially is the number of command characters on the new command line
+/**
+ * @brief removes the current user input line
+ * 
+ * @return size_t the length of the current user input line
+ */
 static size_t removeUserinputline(){
-	if(!_userinputline)return 0;
+	if(NULL==_userinputline)return 0;
 	size_t offset=_userinputline->offset;
 	Muserinputline* prevUserinputline=_userinputline->_prev;
 	FREE_DISOWNED_1(_userinputline,'6',owner_userinputline);
 	_userinputline=prevUserinputline;
-	return offset-(_userinputline?_userinputline->offset:0);
+	return offset-(_userinputline!=NULL?_userinputline->offset:0);
 }
 // MDH@30OCT2019 END
+/**
+ * @brief moves the user input cursor to the info input line (the line in front of the command prompt)
+ * 
+ * @return size_t the number of lines moved up
+ */
 size_t toInfoInputLine(){
 	size_t linesUp=0,lines=getNumberOfCommandLines(); // ASSERT lines should be at least 1
 	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();// (M_MODULE_DEBUGGING&MM_MAIN): output("[%zd]",lines);
 	return linesUp;
 } // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
 // output functions that require access to the current token
+/**
+ * @brief outputs the user input last command token colors
+ * 
+ */
 void outputUserInputCommandTokenColor(){
-	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
+	if(_userInputCommand!=NULL&&_userInputCommand->_lastToken!=NULL)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
 }
+/**
+ * @brief the prompt length
+ * 
+ */
 uint8_t promptLength=0;
+/**
+ * @brief the number of characters on the current user input command line
+ * 
+ */
 size_t numberOfLineCommandCharacters=0; // the number of command characters on the current command line
+/**
+ * @brief returns the cursor to the current user command line input position
+ * 
+ * @return size_t the number of user input command line characters
+ */
 size_t returnToUserInputCommandCursorPosition(){
 	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
 	toStartOfLine();
@@ -456,25 +588,43 @@ size_t returnToUserInputCommandCursorPosition(){
 	return numberOfInputCommandLineCharacters;
 }
 // MDH@15OCT2020: changed to also be able to move up (which we need after showing the suggested text)
+/**
+ * @brief returns the cursor to the position of user input after moving to the user input info line moving up \p lines
+ * 
+ * @param lines the number of lines to move down again
+ * @return size_t the number of user input command line characters
+ */
 size_t toUserInputCursorPosition(long lines){
 	while(lines!=0){if(lines>0){oneLineDown();lines--;}else{oneLineUp();lines++;}} // replacing: while(linesDown>0){oneLineDown();linesDown--;}
 	return returnToUserInputCommandCursorPosition();
 }
 // MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
+/**
+ * @brief writes \p ... using format \p fmt in the default input color on the user input info line
+ * 
+ * @param fmt 
+ * @param ... the arguments to write
+ */
 static void inputInfo(const char* const fmt,...){
 	// STUPID ME!!!!! return;
-	if(fmt&&strlen(fmt)){ // we have a format
+	if(fmt!=NULL&&strlen(fmt)>0){ // we have a format
 		// outputChar('X');
 		size_t linesMovedUp=toInfoInputLine();
 		resetOutputColor(); // get the default output color!!
 		// NOTE we have to call vprintf here NOT printf!!!
 		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toUserInputCursorPosition(linesMovedUp);
+		toUserInputCursorPosition(linesMovedUp); // back to where we came from
 	}
 }
+/**
+ * @brief writes \p ... using format \p fmt in the error color on the user input info line
+ * 
+ * @param fmt 
+ * @param ... 
+ */
 static void inputError(const char* const fmt,...){
-	if(fmt&&strlen(fmt)){ // we have a format
+	if(fmt!=NULL&&strlen(fmt)>0){ // we have a format
 		size_t linesMovedUp=toInfoInputLine();
 		setColor(getErrorColor());setBackColor(getBackgroundColor());
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
@@ -486,33 +636,63 @@ static void inputError(const char* const fmt,...){
 // manual feed forward characters stuff
 // what the user consumed manually, and is supposed to remain continguous i.e. uninterrupted by other feed forward texts
 // it's possible that manual feed forward text is empty so it will block the identifier continuation text when that is the case!!
+/**
+ * @brief the global manual feed forward M string
+ * 
+ */
 Mstring* _manualFeedforwardText=NULL;Mallocationowner owner_manualFeedforwardText=(Mallocationowner){MI_MAIN,__LINE__,1};
+/**
+ * @brief deletes the manual feed forward text
+ * 
+ */
 void deleteManualFeedforwardText(){
 	// ASSERT _manualFeedforwardText not NULL
 	FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
 }
+/**
+ * @brief the number of identifier continuation feed forward characters
+ * 
+ */
 size_t numberOfIdentifierContinuationManualFeedforwardCharacters=0; // MDH@06OCT2019: determine the number of manual feed forward characterr matching the identifier continuation
 // the following two functions are called only once!!!
+/**
+ * @brief prepends character \p c to the manual feedforward text
+ * 
+ * @param c 
+ * @return true on success
+ * @return false on failure
+ */
 bool manualFeedforwardCharacterPrepended(char c){
 	if(!c)return false;
-	if(!_manualFeedforwardText){_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);if(!_manualFeedforwardText)return false;}
+	if(NULL==_manualFeedforwardText){_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);
+	if(NULL==_manualFeedforwardText)return false;}
 	return(string_insert_char(_manualFeedforwardText,0,c)!=NULL);
 }
+/**
+ * @brief prepends C string \p characters to the manual feed forward text
+ * 
+ * @param characters 
+ * @return true on success
+ * @return false on failure
+ */
 bool prependedToManualFeedforwardText(char const * const characters){
-	if(!characters)return false;
-	if(!_manualFeedforwardText){_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);if(!_manualFeedforwardText)return false;}
+	if(NULL==characters)return false;
+	if(NULL==_manualFeedforwardText){_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);
+	if(NULL==_manualFeedforwardText)return false;}
 	return(string_prepend(_manualFeedforwardText,characters)!=NULL); // MDH@05DEC2022 preferably compare to NULL
 }
+/**
+ * @brief removes and returns the first manual feed forward text character
+ * 
+ * @return char the first manual feed forward text character
+ */
 char getFirstManualFeedforwardCharacterRemoved(){
 	// ASSERT _manualFeedforwardText should not be NULL
 	//if(_manualFeedforwardText){
-		char c=string_removed_char(_manualFeedforwardText,0);
-		if(c){
-			if(string_length(_manualFeedforwardText)==0)deleteManualFeedforwardText();
-			return c;
-		}
+	char c=string_removed_char(_manualFeedforwardText,0);
+	if(c&&string_length(_manualFeedforwardText)==0)deleteManualFeedforwardText();
 	//}
-	return 0;
+	return c;
 	/* replacing: return(_manualFeedforwardText?string_removed_char(_manualFeedforwardText,0):'\0'); */
 }
 
@@ -522,25 +702,51 @@ char getFirstManualFeedforwardCharacterRemoved(){
 // MDH@28OCT2019: not needed here anymore... Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the sequence of tokens starting with _userInputCommand->_firstToken
 // MDH@02OCT2019: might need this in multiple places!!
 // MDH@04NOV2019: added TT_REFERENCE tokens as well
+/**
+ * @brief returns true if \p lastCommandToken is an identier token, false otherwise
+ * 
+ * @param lastCommandToken 
+ * @return true if \p lastCommandToken is an identifier token
+ * @return false if \p lastCommandToken is not an identifier token
+ */
 bool inIdentifierToken(Mtoken* lastCommandToken){
-	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE||lastCommandToken->type==TT_REFERENCE:false);
+	return(lastCommandToken!=NULL?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE||lastCommandToken->type==TT_REFERENCE:false);
 }
 
 /* MDH@28OCT2019 replacing: 
 Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the command input by the user
 */
+
+/**
+ * @brief whether or not the identifier has changed
+ * 
+ */
 bool userInputCommandIdentifierContinuationNeedsUpdating=false; // whether or not the identifier has changed
+/**
+ * @brief the identifier continuation C string characters
+ * 
+ */
 char* _identifierContinuationCharacters=NULL; // the single text that we can continue the current identifier token with
+/**
+ * @brief returns the first identifier continuation character
+ * 
+ * @return char 
+ */
 char getFirstIdentifierContinuationCharacter(){
 	inputInfo("%s","Determining the first identifier continuation character!");
-	return(_identifierContinuationCharacters?_identifierContinuationCharacters[0]:'\0');
+	return(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters[0]:'\0');
 }
+/**
+ * @brief removes the first identifier continuation character
+ * 
+ * @return char 
+ */
 char firstIdentifierContinuationCharacterRemoved(){
-	char identifierContinuationCharacterToRemove=(_identifierContinuationCharacters?_identifierContinuationCharacters[0]:'\0');
-	if(identifierContinuationCharacterToRemove!='\0'){ // something to remove i.e. the length is at least 1
+	char identifierContinuationCharacterToRemove=(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters[0]:'\0');
+	if(identifierContinuationCharacterToRemove){ // something to remove i.e. the length is at least 1
 		if(strlen(_identifierContinuationCharacters)>1){ // something left over
 			char* newIdentifierContinuationText=strdup(_identifierContinuationCharacters+1); // get dynamic copy of remainder, ignore if we fail!!!
-			if(newIdentifierContinuationText){ // the part to replace created!!
+			if(newIdentifierContinuationText!=NULL){ // the part to replace created!!
 				free(_identifierContinuationCharacters);
 				_identifierContinuationCharacters=newIdentifierContinuationText;
 			}else // failure
@@ -560,17 +766,30 @@ bool deleteFirstIdentifierContinuationCharacter(){
 	return true;
 }
 */
+
+/**
+ * @brief the set of characters expected next in continuing the current identifier token
+ * 
+ */
 char* _identifierContinuationOptionalCharacters=NULL; // the set of characters expected next of existing identifiers
 // MDH@26SEP2019: we create a separate method that will determine the last token identifier continuation text and continuation characters
+/**
+ * @brief deletes the identifier continuation C string
+ * 
+ */
 void deleteIdentifierContinuation(){
-	if(_identifierContinuationOptionalCharacters){free(_identifierContinuationOptionalCharacters);_identifierContinuationOptionalCharacters=NULL;}
-	if(_identifierContinuationCharacters){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
+	if(_identifierContinuationOptionalCharacters!=NULL){free(_identifierContinuationOptionalCharacters);_identifierContinuationOptionalCharacters=NULL;}
+	if(_identifierContinuationCharacters!=NULL){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
 }
 // user input command specific
 
 // MDH@20SEP2019: we used to keep track of the behind cursor text, in a single Mstring instance, but because we also want to be able to add variable completion we keep a sequence of char* 
 //				each feed forward char* is associated with a single token, and if that token is removed so should the associated feed forward
 // call deleteTokenautocompletiontexts whenever the behind cursor text changes
+/**
+ * @brief storing the auto completion text associated with a given token
+ * 
+ */
 typedef struct Mtokenautocompletiontext{
 	Mtoken* token;
 	Mchars* _text; // MDH@23APR2020: replacing char*
@@ -580,17 +799,27 @@ typedef struct Mtokenautocompletiontext{
 // MDH@30SEP2019: all token feed forward texts accepted (i.e. consumed) are pointed to by _lastConsumedAutoCompletiontext
 //				consumption of feed forward texts is done by right arrow (one character at a time) or tab (all feed forward characters)
 //				right arrow reads the first feed forward character, gets it accepted and then moves the feed forward character to the consumed feed forward texts
+/**
+ * @brief the pointers to the first and last consumed token auto completion text
+ * 
+ */
 Mtokenautocompletiontext *_firstTokenautocompletiontext=NULL,*_lastConsumedAutoCompletiontext=NULL;Mallocationowner tokenautocompletiontextowner=(Mallocationowner){MI_MAIN,__LINE__,1};
 // MDH@26SEP2019: it's prudent to store the identifier continuation text separated from the rest of the (autogenerated) feed forward text
+/**
+ * @brief returns the auto completion M string text separating the successive token auto completion C strings with character \p sep
+ * 
+ * @param sep 
+ * @return Mstring* the auto completion M string text separating the successive token auto completion C strings with character \p sep
+ */
 Mstring* _getAutoCompletionText(char sep){Mallocationowner owner=getOwner(__LINE__);
 	// constructs the total feed forward text
 	Mstring* _autoCompletionText=owned_string(__string(),owner);
-	if(_autoCompletionText){
+	if(_autoCompletionText!=NULL){
 		Mtokenautocompletiontext* tokenautocompletiontext=_firstTokenautocompletiontext;
-		while(tokenautocompletiontext){
+		while(tokenautocompletiontext!=NULL){
 			if(tokenautocompletiontext->_text&&!string_append(_autoCompletionText,tokenautocompletiontext->_text->chars))break;
 			///////if(autocompletiontext->token)if(!string_append_char(_suggestedText,'#'))break;
-			if(sep&&!string_append_char(_autoCompletionText,sep))break;
+			if(sep)if(NULL==string_append_char(_autoCompletionText,sep))break;
 			tokenautocompletiontext=tokenautocompletiontext->_next;
 		}
 		/* MDH@04OCT2019: moved over to updateAutoCompletionText()
@@ -617,14 +846,25 @@ Mstring* _getAutoCompletionText(char sep){Mallocationowner owner=getOwner(__LINE
 	}
 	return disowned_string(_autoCompletionText,owner);
 }
-
+/**
+ * @brief the number of characters written behind the prompt
+ * 
+ */
 size_t numberOfBehindPromptCharactersWritten=0; // MDH@25SEP2019: the total number of text characters written behind the prompt
 
 // the globally constructed behind cursor text (without separator!!!)
+/**
+ * @brief the M string holding the auto completion text
+ * 
+ */
 Mstring* _autoCompletionText=NULL; // MDH@27FEB2019: we keep track of the auto completion text
 Mallocationowner owner_autoCompletionText=(Mallocationowner){MI_MAIN,__LINE__,1};
+/**
+ * @brief invalidates the auto completion text
+ * 
+ */
 void invalidateAutoCompletionText(){
-	if(_autoCompletionText){
+	if(_autoCompletionText!=NULL){
 		if(amVerboseDebugging())
 			inputInfo("Deleting autocompletion text.");
 		FREE_STRING(_autoCompletionText,owner_autoCompletionText); // MDH@19MAY2020: TODO should we disown ->chars before calling free_string????
@@ -633,12 +873,16 @@ void invalidateAutoCompletionText(){
 	if(amVerboseDebugging())
 		inputInfo("No auto completion text to delete.");
 }
+/**
+ * @brief updates the auto completion text from its constituent feed forward parts
+ * 
+ */
 void updateAutoCompletionText(){
 	invalidateAutoCompletionText();
 	_autoCompletionText=owned_string(_getAutoCompletionText('\0'),owner_autoCompletionText); // get the new characters
 	// merge with identifier continuation text
-	if(_autoCompletionText){
-		if(_identifierContinuationCharacters){
+	if(_autoCompletionText!=NULL){
+		if(_identifierContinuationCharacters!=NULL){
 			size_t numberOfIdentifierContinuationCharacters=strlen(_identifierContinuationCharacters);
 			if(numberOfIdentifierContinuationCharacters>0){
 				size_t numberOfFeedforwardCharacters=string_length(_autoCompletionText);
@@ -678,6 +922,11 @@ char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 // MDH@24SEP2019: we do not always want to set the identifier continuation characters
 // MDH@03OCT2019: now excluding the last token immediate feed forward text because that is being taken care of whenever the last token (type) change
 //				because of this only the matching parentheses feed forward characters remain so TODO simplify this
+/**
+ * @brief returns the C string with the auto completion text associated with the last user input command token
+ * 
+ * @return char* the C string with the auto completion text associated with the last user input command token
+ */
 char* _getLastTokenAutoCompletionText(){// Mallocationowner owner=getOwner(__LINE__);
 	// MDH@20DEC2022: changed from "" to " ", as this is a bit dangerous since this way we get a 1-character string
 	char* tokenAutoCompletionText=" "; // on the stack (zero-terminated string)
@@ -724,15 +973,27 @@ Mtokenautocompletiontext* disowned_tokenautocompletiontext(Mtokenautocompletiont
 }
 */
 Mallocationowner owner_tokenAutoCompletionTexts=(Mallocationowner){MI_MAIN,__LINE__,1};
+/**
+ * @brief frees auto completion text \p _autocompletiontext and all its successors
+ * @param _autocompletiontext the auto completion text to free
+ */
 void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext/*,Mallocationowner owner_autocompletiontext*/){
-	if(!_autocompletiontext)return;
-	if(_autocompletiontext->_next)free_tokenautocompletiontext(_autocompletiontext->_next/*,owner_autocompletiontext*/);
-	if(_autocompletiontext->_text)FREECHARS(_autocompletiontext->_text,owner_tokenAutoCompletionTexts); // MDH@02MAY2020: switching to freeChars() given that _getChars() was used to create it
+	if(NULL==_autocompletiontext)return;
+	if(_autocompletiontext->_next!=NULL)free_tokenautocompletiontext(_autocompletiontext->_next/*,owner_autocompletiontext*/);
+	if(_autocompletiontext->_text!=NULL)FREECHARS(_autocompletiontext->_text,owner_tokenAutoCompletionTexts); // MDH@02MAY2020: switching to freeChars() given that _getChars() was used to create it
 	FREE_DISOWNED_1(_autocompletiontext,'7',owner_tokenAutoCompletionTexts); // MDH@07APR2020: _autocompletiontext is an Mstring* so release as 'S'
 }
 
 // MDH@04OCT2019: if we remember the immediate feed forward token we can determine whether or not we need to remove the associated feed forward text
+/**
+ * @brief the immediate feed forward token
+ * 
+ */
 Mtoken* immediateFeedforwardToken=NULL;
+/**
+ * @brief deletes the token auto completion texts
+ * 
+ */
 void deleteTokenautocompletiontexts(){
 	invalidateAutoCompletionText();
 	////////if(amVerboseDebugging())inputInfo("AutoCompletion text deleted.");
@@ -748,9 +1009,15 @@ void deleteTokenautocompletionCharacters(size_t numberOfTokenAutoCompletionChara
 }
 */
 // every time feed forward text is to be added, it is prepended to the list of feed forward texts setting the token pointer to _userInputCommand->_lastToken
+/**
+ * @brief returns the auto completion text associated with token \p token (if any)
+ * @param token 
+ * @return Mtokenautocompletiontext* the auto completion text associated with token \p token
+ */
 Mtokenautocompletiontext* getTokenAutoCompletionText(Mtoken* token){
 	Mtokenautocompletiontext* tokenautocompletiontext=_firstTokenautocompletiontext;
-	while(tokenautocompletiontext&&tokenautocompletiontext->token!=token)tokenautocompletiontext=tokenautocompletiontext->_next;
+	while(tokenautocompletiontext!=NULL&&tokenautocompletiontext->token!=token)
+		tokenautocompletiontext=tokenautocompletiontext->_next;
 	return tokenautocompletiontext;
 }
 // _text is dynamically allocated and should be freed if not bound to some!!
@@ -759,16 +1026,22 @@ Mtokenautocompletiontext* getTokenAutoCompletionText(Mtoken* token){
 //				so that when the feed forward text for a given token is set
 //				the removed token characters and the actual feed forward characters of the token can be combined
 // MDH@25MAY2020: _text changed to _chars (assumed to be a const character array owned somewhere else that we completely leave alone, that's what we can do with completely constant pointers)
+/**
+ * @brief set the current user input command last token auto completion text to C string \p _chars
+ * 
+ * @param _chars 
+ * @return char* \p _chars
+ */
 char* setLastTokenAutoCompletionText(char const * const _chars){Mallocationowner owner=getOwner(__LINE__);
 	// do not prepend empty feed forward texts!!!
-	if(_chars){
+	if(_chars!=NULL){
 		// MDH@01OCT2019: BUG FIX it would be wrong to NOT update the last token feed forward text when no text is specified as we were doing
 		// MDH@02OCT2019: BUG FIX if _text is empty and there is no token yet do NOT add the token
 		/////////// removing: if(strlen(_text)>0){ // there's text to store
 		// if we already have an autogenerated feed forward text associated with the last command token
 		Mtokenautocompletiontext* lastTokenAutoCompletionText=getTokenAutoCompletionText(_userInputCommand->_lastToken);
-		if(lastTokenAutoCompletionText){ // yes, so replace the text contents
-			if(lastTokenAutoCompletionText->_text)FREECHARS(lastTokenAutoCompletionText->_text,owner_tokenAutoCompletionTexts);
+		if(lastTokenAutoCompletionText!=NULL){ // yes, so replace the text contents
+			if(lastTokenAutoCompletionText->_text!=NULL)FREECHARS(lastTokenAutoCompletionText->_text,owner_tokenAutoCompletionTexts);
 			invalidateAutoCompletionText();
 			lastTokenAutoCompletionText->_text=owned_chars(_getChars(_chars),Msubowner(owner_tokenAutoCompletionTexts,1)); // replacing: _getChars(_text,foid); // _text now bound!! // MDH@23APR2020 NO not bound, as _text replaced by _getChars(_text)
 		}else{ // not present yet, so add (i.e. prepend!!)
@@ -776,17 +1049,17 @@ char* setLastTokenAutoCompletionText(char const * const _chars){Mallocationowner
 				if(amVerboseDebugging())
 					inputInfo("Prepending auto completion text '%s' of token '%s' with offset %zu.",_chars,string(_userInputCommand->_lastToken->text),_userInputCommand->_lastToken->offset);
 				Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC_1(sizeof(Mtokenautocompletiontext),'7',owner_tokenAutoCompletionTexts);
-				if(_tokenautocompletiontext){
+				if(_tokenautocompletiontext!=NULL){
 					invalidateAutoCompletionText(); // I guess this is a bit confusing
 					_tokenautocompletiontext->_text=owned_chars(_getChars(_chars),Msubowner(owner_tokenAutoCompletionTexts,1)); // MDH@23APR2020: not bound because _getChars() copies the text as well
 					_tokenautocompletiontext->token=_userInputCommand->_lastToken;
 					// how about skipping all anonymous feed forward texts????
 					// if the first one is anonymous mark that one as last anonymous feed forward text
-					Mtokenautocompletiontext *lastAnonymousTokenautocompletiontext=(_firstTokenautocompletiontext&&!_firstTokenautocompletiontext->token?_firstTokenautocompletiontext:NULL);
+					Mtokenautocompletiontext *lastAnonymousTokenautocompletiontext=(_firstTokenautocompletiontext!=NULL&&NULL==_firstTokenautocompletiontext->token?_firstTokenautocompletiontext:NULL);
 					// if the successor is also anonymous increment
-					while(lastAnonymousTokenautocompletiontext&&lastAnonymousTokenautocompletiontext->_next&&!lastAnonymousTokenautocompletiontext->_next->token)
+					while(lastAnonymousTokenautocompletiontext!=NULL&&lastAnonymousTokenautocompletiontext->_next!=NULL&&NULL==lastAnonymousTokenautocompletiontext->_next->token)
 						lastAnonymousTokenautocompletiontext=lastAnonymousTokenautocompletiontext->_next;
-					if(lastAnonymousTokenautocompletiontext){
+					if(lastAnonymousTokenautocompletiontext!=NULL){
 						_tokenautocompletiontext->_next=lastAnonymousTokenautocompletiontext->_next;
 						lastAnonymousTokenautocompletiontext->_next=_tokenautocompletiontext;
 					}else{
@@ -806,14 +1079,28 @@ char* setLastTokenAutoCompletionText(char const * const _chars){Mallocationowner
 
 // MDH@01OCT2019: in general when a token is removed its associated (autogenerated) suggested (identifier continuation and feed forward text) should be removed as well
 //				NOTE invalidateAutoCompletionTextOfToken delegates to invalidateAutoCompletionTextOfToken
+/**
+ * @brief deletes the auto completion text associated with token \p token
+ * 
+ * @param token 
+ * @return true on success
+ * @return false on failure
+ */
 bool deleteTokenAutoCompletionText(Mtoken* token){
 	// locate the (autogenerated) feed forward text associated with this token (most likely the first one)
 	Mtokenautocompletiontext *prevtokenautocompletiontext=NULL,*tokenautocompletiontext=_firstTokenautocompletiontext;
-	while(tokenautocompletiontext&&tokenautocompletiontext->token!=token){prevtokenautocompletiontext=tokenautocompletiontext;tokenautocompletiontext=prevtokenautocompletiontext->_next;}
-	if(tokenautocompletiontext){
-		if(prevtokenautocompletiontext)prevtokenautocompletiontext->_next=tokenautocompletiontext->_next;else _firstTokenautocompletiontext=tokenautocompletiontext->_next;
+	while(tokenautocompletiontext!=NULL&&tokenautocompletiontext->token!=token){
+		prevtokenautocompletiontext=tokenautocompletiontext;
+		tokenautocompletiontext=prevtokenautocompletiontext->_next;
+	}
+	if(tokenautocompletiontext!=NULL){ // found
+		if(prevtokenautocompletiontext!=NULL)
+			prevtokenautocompletiontext->_next=tokenautocompletiontext->_next;
+		else 
+			_firstTokenautocompletiontext=tokenautocompletiontext->_next;
 		invalidateAutoCompletionText(); // the feed forward text changed so needs to be reconstructed whenever it is to be shown
-		tokenautocompletiontext->_next=NULL;free_tokenautocompletiontext(tokenautocompletiontext); // only free the token feed forward text we are to remove!!
+		tokenautocompletiontext->_next=NULL;
+		free_tokenautocompletiontext(tokenautocompletiontext); // only free the token feed forward text we are to remove!!
 	} // MDH@04OCT2019: it's NOT there, so we may consider it deleted
 	// relink the rest of the feed forward text chain to skip this feed forward text
 	// if we have a previous feed forward text make if point to the successor of the feed forward text we are now removing, otherwise we get a new first feed forward text
@@ -908,16 +1195,21 @@ bool deleteFirstAutoCompletionCharacter(char firstAutoCompletionCharacter,bool c
 */
 // MDH@30SEP2019: TODO still using the following for true feed forward deletes but should in due course be replaced by using the above two methods
 // MDH@02NOV2021: apparently NOT replacing firstAutoCompletionCharacterRemoved()!!!!
+/**
+ * @brief returns the first auto completion character removed
+ * 
+ * @return char the auto completion text associated with token \p token
+ */
 char firstAutoCompletionCharacterRemoved(){
 	if(amVerboseDebugging())inputInfo("Determining the first auto completion character!");
 	char autocompletionCharacterRemoved='\0';
 	// find first feed forward text with text (so skipping all without text)
 	Mtokenautocompletiontext *prevtokenautocompletiontext=NULL,*tokenautocompletiontext=_firstTokenautocompletiontext;
-	while(tokenautocompletiontext&&(!tokenautocompletiontext->_text||tokenautocompletiontext->_text->chars[0]=='\0'))
+	while(tokenautocompletiontext!=NULL&&(NULL==tokenautocompletiontext->_text||tokenautocompletiontext->_text->chars[0]=='\0'))
 	{prevtokenautocompletiontext=tokenautocompletiontext;tokenautocompletiontext=prevtokenautocompletiontext->_next;}
-	if(tokenautocompletiontext){
+	if(tokenautocompletiontext!=NULL){
 		Mchars* p=tokenautocompletiontext->_text;
-		if(p){
+		if(p!=NULL){
 			size_t l=strlen(p->chars); // the number of autocompletion characters
 			if(l>0){ // there is a first autocompletion character
 				autocompletionCharacterRemoved=p->chars[0];
@@ -926,12 +1218,15 @@ char firstAutoCompletionCharacterRemoved(){
 				// replace the current text by what's behind the first character (if any)
 				tokenautocompletiontext->_text=(l>1?owned_chars(_getChars(p->chars+1),Msubowner(owner_tokenAutoCompletionTexts,1)):NULL);
 				FREECHARS(p,owner_tokenAutoCompletionTexts); // free the currently used dynamic memory still pointed to by p // MDH@11JUN2020: i.e. freeChars called on the disowned Mchars*
-				if(!tokenautocompletiontext->_text){ // nothing left (or failing to copy the remainder over)
+				if(NULL==tokenautocompletiontext->_text){ // nothing left (or failing to copy the remainder over)
 					Mtokenautocompletiontext* nexttokenautocompletiontext=tokenautocompletiontext->_next; // remember where to link the previous to
 					tokenautocompletiontext->_next=NULL;
 					free_tokenautocompletiontext(tokenautocompletiontext); // get rid of the feed forward text
 					// link the predecessor to the successor
-					if(prevtokenautocompletiontext)prevtokenautocompletiontext->_next=nexttokenautocompletiontext;else _firstTokenautocompletiontext=nexttokenautocompletiontext;
+					if(prevtokenautocompletiontext!=NULL)
+						prevtokenautocompletiontext->_next=nexttokenautocompletiontext;
+					else 
+						_firstTokenautocompletiontext=nexttokenautocompletiontext;
 				}
 			}else
 				inputError("No auto completion characters!");
@@ -995,16 +1290,32 @@ Mtokenautocompletiontext*  getAutoCompletionTextOfCharacterPrepended(char c,bool
 //				deleteLastTokenImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken stops being the current token or when the type of the current token changes
 //				updateUserInputCommandImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
 // MDH@04OCT2019: deciding to keep the immediate feed forward text separate from the other feed forward texts, that way it is easier to merge the identifier continuation and feed forward texts
+/**
+ * @brief the M string containing the immediate feed forward text
+ * 
+ */
 Mstring* _immediateFeedforwardText=NULL;Mallocationowner owner_immediateFeedforwardText=(Mallocationowner){MI_MAIN,__LINE__,1};
-void deleteImmediateFeedforwardText(){FREE_STRING(_immediateFeedforwardText,owner_immediateFeedforwardText);_immediateFeedforwardText=NULL;}
+/**
+ * @brief deletes the immediate feed forward text M string
+ * 
+ */
+void deleteImmediateFeedforwardText(){
+	FREE_STRING(_immediateFeedforwardText,owner_immediateFeedforwardText);
+	_immediateFeedforwardText=NULL;
+}
 // MDH@05DEC2022 TODO not used anymore?: bool immediateFeedforwardToBeUpdated=false;
 // MDH@05DEC2022 NOTE: called once when updating the immediate feed forward text
 // MDH@20DEC2022 NOTE: currently determines the single character that is most expected to end the current token, although the assignment operator (=) actually is a feed forward character on a new variable which does
 //					 not need to be new at all and could confuse the user
+/**
+ * @brief returns the user input command immediate feed forward character
+ * 
+ * @return char the user input command immediate feed forward character
+ */
 char getUserInputCommandImmediateFeedforwardCharacter(){
 	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
-	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
-	if(token&&string_length(token->text)>0)
+	Mtoken* token=(_userInputCommand!=NULL?_userInputCommand->_lastToken:NULL);
+	if(token!=NULL&&string_length(token->text)>0)
 	switch(token->type){
 		case TT_NEW_VARIABLE:case TT_BINARY_aErU:return '='; // start an assignment
 		case TT_DQSTRING:return '"'; // end a double quoted string literal
@@ -1026,10 +1337,17 @@ char getUserInputCommandImmediateFeedforwardCharacter(){
 // this does NOT take care of the closing ) of a function call, although perhaps it should, we can definitely say that we're missing the , and ) that ends the current argument in a function call
 // so what we could do is use this type of feedforward text to take care of doing that, and remove it from the auto completion feedforward that inserts the closing parenthesis of a function call
 // the point being that if the argument is now valid we can always start the next argument
+/**
+ * @brief updates the user input command immediate feed forward text
+ * 
+ * @return true 
+ * @return false 
+ */
 bool updateUserInputCommandImmediateFeedforwardText(){
-	if(!_immediateFeedforwardText)return false; // should have one
+	if(NULL==_immediateFeedforwardText)return false; // should have one
 	char lastTokenImmediateFeedforwardCharacter=getUserInputCommandImmediateFeedforwardCharacter();
-	return(!lastTokenImmediateFeedforwardCharacter||!string_append_char(_immediateFeedforwardText,lastTokenImmediateFeedforwardCharacter));
+	return(lastTokenImmediateFeedforwardCharacter=='\0'||
+					string_append_char(_immediateFeedforwardText,lastTokenImmediateFeedforwardCharacter)!=NULL);
 }
 /* replacing:
 // \brief prepends the immediate feed forward character of the current token (if any), returns true on success, false otherwise
@@ -1076,25 +1394,53 @@ void invalidateAutoCompletionTextOfToken(Mtoken* token,bool deleteIdentifierCont
 	invalidateAutoCompletionTextOfToken(token);
 }
 */
+/**
+ * @brief the suggested text (consisting of all feed forward texts)
+ * 
+ */
 Mstring* _suggestedText=NULL;Mallocationowner owner_suggestedText=(Mallocationowner){MI_MAIN,__LINE__,1}; // MDH@04SEP2019: where we'll be storing the entire feed forward text (i.e. identifier continuation, immediate feed forward and auto completion text)
 
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
+/** 
+ * @brief all commands entered so far
+*/
 long long commandCount=0; // the total number of command input
+/**
+ * @brief the current user input command index
+ * 
+ */
 long long commandIndex=0; // the index of the current command from the end of the command list (stored in commands)
 
 /// MDH@28OCT2019: replaced by _userInputCommand: Mtoken* _userInputCommand->_firstToken=NULL;
 
-size_t getNumberOfSuggestedCharacters(){return(_suggestedText?string_length(_suggestedText):0);}
+/**
+ * @brief returns the number of suggested text characters
+ * 
+ * @return * size_t 
+ */
+size_t getNumberOfSuggestedCharacters(){return(_suggestedText!=NULL?string_length(_suggestedText):0);}
+/**
+ * @brief returns the number of characters in the current user input command and the number of suggested characters
+ * 
+ * @return size_t the number of characters in the current user input command and the suggested text
+ */
 size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
 // request body of function moved over to Mshell.h/c
+/**
+ * @brief outputs the current timestamp
+ * 
+ */
 void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _promptTimestamp=owned_string(_getTimestamp(NULL),owner); // should return a disowned timestamp, so we do not need to obtain ownership that we need to detach on calling free_string
-	if(!_promptTimestamp)return;
+	if(NULL==_promptTimestamp)return;
 	//outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
 	FREE_STRING(_promptTimestamp,owner);
 }
-
+/**
+ * @brief shows the prompt and sets the global prompt length \p promptLength accordingly
+ * 
+ */
 void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
@@ -1108,7 +1454,7 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				outputTimestamp();
 				echoToOutputFile();
 				Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner); // free asap
-				if(_environmentName){
+				if(_environmentName!=NULL){
 					output(string(_environmentName));
 					promptLength=string_length(_environmentName);
 					FREE_STRING(_environmentName,owner);
@@ -1118,7 +1464,7 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				promptLength=1;
 				*/
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
-				if(getCurrentFunctionBodyInput())
+				if(getCurrentFunctionBodyInput()!=NULL)
 					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getExecutionEnvironment()->_name->chars));	// replacing: printf("%lu",(commandCount+1));
 				else
 					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
@@ -1147,13 +1493,20 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 // MDH@21SEP2020: added the newline flag to indicate that a new line character is to be written
 // MDH@23SEP2020: now returning the number of prompt characters output
 // MDH@24SEP2020: bool notsuggested replaced by offset which is either the number of characters in the command so far (and therefore positive), or indicates that we're not currently writing active command text (e.g. suggested text)
+/**
+ * @brief shows the prompt continuation
+ * 
+ * @param offset the number of user input command characters on previous input lines
+ * @param newline whether or not this is a new user input line
+ * @return unsigned long long the number of prompt continuation characters written
+ */
 unsigned long long showContinuedPrompt(int64_t offset,bool newline){
 	unsigned long long promptCharactersWritten=0;
 	if(inputMode==IM_COMMAND){
 		// ASSERT only to be called in command mode with _userInputCommand not NULL
 		// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
 		if(offset>=0){
-			if(!__userinputline(offset))return 0; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
+			if(NULL==__userinputline(offset))return 0; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
 			numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
 		}
 		if(newline){
@@ -1175,10 +1528,18 @@ unsigned long long showContinuedPrompt(int64_t offset,bool newline){
 // MDH@24JUN2020: if we know how many characters that can fit on a single user input line we will be able to 
 //				determine exactly where the soft-breaks will be
 // MDH@26JUN2020: this is a bit hazardous when getCurrentNumberOfWindowTextColumns() returns a value that is below promptLength which is not to be allowed!!!
+/**
+ * @brief the number of characters available on each input line
+ * 
+ */
 int numberOfLineCharacters=0;
 // call initializeNumberOfLineCharacters every time the prompt is shown
+/**
+ * @brief initializes the total number of line characters
+ * 
+ */
 void initializeNumberOfLineCharacters(){
-	int minimumNumberOfLineCharacters=MIN(20,promptLength+10);
+	int minimumNumberOfLineCharacters=MIN(20,promptLength+10); // what we need at least
 	int newNumberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
 	if(newNumberOfLineCharacters>0){
 		numberOfLineCharacters=newNumberOfLineCharacters;
@@ -1214,6 +1575,10 @@ void initializeNumberOfLineCharacters(){
 }
 
 // MDH@06MAY2020
+/**
+ * @brief outputs the total memory usage
+ * 
+ */
 void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
 	resetOutputColor(); // MDH@30JUN2020: apparently sometimes required
 	if(!amVerbose()){
@@ -1235,13 +1600,20 @@ void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
 }/* VALIDATED */
 // MDH@11MAY2020: if we want to know what changed since the previous mark as for the incremental memory usage
 //				it's easiest to ask for all and only show the changes
+/**
+ * @brief outputs the incremental memory usage
+ * 
+ * @param incrementalNumberOfAllocationMarks 
+ * @return long long the number of allocation marks
+ */
 long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMarks){Mallocationowner owner=getOwner(__LINE__);
 	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
 	long long numberOfAllocationMarks=incrementalNumberOfAllocationMarks+1; // request at least one more allocation mark than increments we need 
 	// MDH@22MAY2020 TODO unfortunately _getAllationTypeSizes is NOT under allocation managed control
 	long long * _allocationTypeSizes=_getAllocationTypeSizes("",&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
-	if(amVerboseDebugging())output("Number of allocation type sizes received: %lld. Number of allocation marks received: %lld.\n",numberOfAllocationTypeSizes,numberOfAllocationMarks);
-	if(_allocationTypeSizes){
+	if(amVerboseDebugging())
+		output("Number of allocation type sizes received: %lld. Number of allocation marks received: %lld.\n",numberOfAllocationTypeSizes,numberOfAllocationMarks);
+	if(_allocationTypeSizes!=NULL){
 		// I suppose we need at least two allocation marks returned so we can determine at least one increment
 		if(numberOfAllocationMarks>1){
 			// for(unsigned long long allocationTypeSizeIndex=0;allocationTypeSizeIndex<numberOfAllocationTypeSizes;allocationTypeSizeIndex++){
@@ -1303,8 +1675,13 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 }/* VALIDATED */
 
 // MDH@30OCT2019 END
+/**
+ * @brief prompts for user input on the start of a new command
+ * 
+ */
 void promptForUserInput(){
-	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
+	free_userinputline();
+	if(_userinputline!=NULL)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode(0);
 	resetOutputColor();
 	newline();
@@ -1329,9 +1706,19 @@ void promptForUserInput(){
  *   ESC [nm enables rendition n (0=normal, 4=bold, 5=blinking, 7=reverse)
  *   ESC M scrolls the screen backwards if the cursor is on the top line
  */
+/**
+ * @brief outputs \p text using format \p fmt in the default output color
+ * 
+ * @param fmt 
+ * @param text 
+ */
 void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 
 // MDH@23SEP2020: if characters are output from a certain start position we can return an Mcursormovement indicating the final position and the number of characters written
+/**
+ * @brief for storing information on a cursor movement
+ * 
+ */
 typedef struct{
 	uint16_t position;
 	size_t written,lines;
@@ -1346,9 +1733,17 @@ typedef struct{
 // MDH@24SEP2020: bool notsuggested replaced by int64_t offset (pass -1 for offset if not in the command)
 //				but be careful here because 
 // MDH@13OCT2020: I thought I already handled the explicit newline characters but don't see that here
+/**
+ * @brief outputs the command line text \p text in foreground color \p textcolor
+ * @details wraps the text so it will be completely visible
+ * @param text the command line text to output
+ * @param _cursormovement is updated with the movement done by the cursor as a result of writing \p text
+ * @param textcolor 
+ * @param commandCharactersWrittenSoFar the number of command characters written so far
+ */
 static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,char* textcolor,int64_t commandCharactersWrittenSoFar){
-	if(!_cursormovement)return;
-	size_t numberOfCharactersToOutput=(text?strlen(text):0);
+	if(NULL==_cursormovement)return;
+	size_t numberOfCharactersToOutput=(text!=NULL?strlen(text):0);
 	if(numberOfCharactersToOutput>0){
 		char *textCharacter=text;
 		setColor(textcolor);
@@ -1403,14 +1798,20 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 // MDH@24SEP2020: every function that outputs text on the command line should receive a Mcursormovement reference to be passed along to outputCommandLineText...
 //				NOTE let's allow passing in NULL for _cursormovement which is valid when the result of outputToken is not used (as is often the case)
 // MDH@15OCT2020: because output
+/**
+ * @brief outputs token \p _token returning the resulting cursor movement in \p _cursormovement
+ * 
+ * @param _token 
+ * @param _cursormovement the resulting cursor movement
+ */
 static void outputToken(Mtoken const * const _token,Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
-	if(!_token)return;
+	if(NULL==_token)return;
 	// MDH@24SEP2020: the following ASSERT still holds except that _cursormovement->position should actually hold the same value
 	// ASSERT assuming _token->position actually contains the number of command characters on the current command line in front of this token
 	// MDH@24SEP2020 with _cursormovement being the added parameter we do not need this anymore: size_t position=0;
 	size_t tokenCharacterCount=string_length(_token->text);
 	if(tokenCharacterCount>0){
-		Mcursormovement cursormovement={_token->position};if(!_cursormovement)_cursormovement=&cursormovement; // if no cursor movement instance was provided, we create one from the token's position, of course no result will be available to the outside
+		Mcursormovement cursormovement={_token->position};if(NULL==_cursormovement)_cursormovement=&cursormovement; // if no cursor movement instance was provided, we create one from the token's position, of course no result will be available to the outside
 		// MDH@24SEP2020 not being used in this function apparently: uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
 		// MDH@26JUN2020: we can speed things up a bit by immediately using string()
 		char* tokenText=string(_token->text);
@@ -1508,6 +1909,11 @@ static void outputToken(Mtoken const * const _token,Mcursormovement* _cursormove
 }
 // MDH@30APR2019: when a function returns to a variable and the other way round
 // MDH@26JUN2020: TODO has to be reviewed!!!
+/**
+ * @brief reoutputs token \p _token
+ * 
+ * @param _token 
+ */
 static void reoutputToken(Mtoken const * const _token){
 	// DEBUG outputChar('X');
 	size_t tokenCharacterCount=(_token&&_token->text?string_length(_token->text):0);
@@ -1525,18 +1931,30 @@ static void reoutputToken(Mtoken const * const _token){
 	outputToken(_token,NULL); // back where we started (hopefully) // MDH@24SEP2020: not passing an Mcursormovement in, as the result of outputToken is not used!!!
 	if(tokenOnPreviousInputLine){oneLineDown();toStartOfLine();moveCursorRight(promptLength+getUserInputLength()-_userinputline->offset);}
 }
-
+/**
+ * @brief clears the user input info line
+ * 
+ */
 void clearInfo(){
 	toUserInputCursorPosition(toInfoInputLine());
 } // MDH@30OCT2019: toInfoInputLine() automatically clears the info input line!!!
-
+/**
+ * @brief outputs command \p command on the user input info line
+ * 
+ * @param command 
+ */
 void inputInfoCommand(Mcommand* command){
 	size_t linesMovedUp=toInfoInputLine();
 	resetOutputColor();
-	if(command){Mtoken* token=command->_firstToken;while(token){output("%s|",string(token->text));token=token->next;}}
+	if(command!=NULL){Mtoken* token=command->_firstToken;while(token!=NULL){output("%s|",string(token->text));token=token->next;}}
 	toUserInputCursorPosition(linesMovedUp);
 }
-
+/**
+ * @brief outputs the status on the input character entered \p inputChar of type \p inputCharType
+ * 
+ * @param inputChar 
+ * @param inputCharType 
+ */
 void outputStatus(char inputChar,char inputCharType){Mallocationowner owner=getOwner(__LINE__);
 	////////printf("[%u,%u]",getUserInputLength(),getCommandLength());
 	Mstring* _separatedBehindCursorText=owned_string(_getAutoCompletionText('|'),owner);if(!_separatedBehindCursorText)return;
@@ -1545,11 +1963,22 @@ void outputStatus(char inputChar,char inputCharType){Mallocationowner owner=getO
 	FREE_STRING(_separatedBehindCursorText,owner);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
+/**
+ * @brief outputs debug info on the current user input command and feed forward text
+ * 
+ */
 void outputDebugInfo(){Mallocationowner owner=getOwner(__LINE__);
 	////////printf("[%u,%u]",getUserInputLength(),getCommandLength());
-	Mstring* _separatedBehindCursorText=owned_string(_getAutoCompletionText('|'),owner);if(!_separatedBehindCursorText)return;
+	Mstring* _separatedBehindCursorText=owned_string(_getAutoCompletionText('|'),owner);
+	if(NULL==_separatedBehindCursorText)return;
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
-	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'.",getUserInputLength(),getCommandLength(),(_userInputCommand&&_userInputCommand->_lastToken?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
+	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'."
+						,getUserInputLength()
+						,getCommandLength()
+						,(_userInputCommand!=NULL&&_userInputCommand->_lastToken!=NULL?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:"")
+						,(_manualFeedforwardText!=NULL?string(_manualFeedforwardText):"")
+						,(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters:"")
+						,string(_separatedBehindCursorText));
 	FREE_STRING(_separatedBehindCursorText,owner);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
@@ -1573,19 +2002,39 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MI_MAIN,__LINE__,1};
 
 // keep track of all commands so far
+/**
+ * @brief the number of commands in one command block
+ * 
+ */
 #define COMMAND_BLOCKSIZE 8
  // array for storing the pointers to the first token of all commands entered
 // MDH@18JUN2020: a registered command might be a command that is a duplicate of a previous command
+/**
+ * @brief a record to store a registered command
+ * 
+ */
 typedef struct{
 	Mcommand* _command;
 	unsigned long long previousCommandIndex;
 }Mregisteredcommand;
+/**
+ * @brief stores the registered commands
+ * 
+ */
 Mregisteredcommand* _registeredcommands=NULL;Mallocationowner owner_registeredcommands=(Mallocationowner){MI_MAIN,__LINE__,1};
 size_t commandBlocks=0;
 // MDH@24MAY2020 NOTE: registerCommand is ONLY called once with _userInputCommand as argument but 
 // MDH@12JUN2020 TODO TODO TODO how to deal with the command being registered and whether or not the tokens are to be disowned when put in the value 
+/**
+ * @brief registers command \p command with owner \p owner_command
+ * 
+ * @param command 
+ * @param owner_command 
+ * @return true on success
+ * @return false on failure
+ */
 bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!command)return false;Mallocationowner owner=getOwner(__LINE__);
-	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
+	if(NULL==getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			Mregisteredcommand* newRegisteredCommands=
@@ -1616,7 +2065,7 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!comma
 	Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(disowned_token(command->_firstToken,owner_command)); // MDH@12JUN2020: TODO as we do NOT want to loose _firstToken we do NOT disown it before asking for the value of the token
 	if(_commandToEvaluateTokenValue){ // the first command token is now bound (or otherwise released)
 		// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
-		if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
+		if(NULL==getCurrentFunctionBodyInput()->_function->_bodyCommandList)
 			getCurrentFunctionBodyInput()->_function->_bodyCommandList=
 				owned_list(__list("body command list"),Msubowner(owner_currentFunctionBodyInput,2));
 		// MDH@08JUN2020: if we succeed in adding the command value to the function body we still return false as result which will result in command to be freed
@@ -1750,14 +2199,27 @@ bool continuesOperator(Mtoken* _userInputCommand->_lastToken,char inputChar){
 	}
 }
 */
+/**
+ * @brief returns whether or not token type \p tokenType is a binary operator token type
+ * 
+ * @param tokenType 
+ * @return true
+ * @return false 
+ */
 bool isBinaryOperatorTokenType(uint8_t tokenType){
 	return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;
 }
 
 // removeLastToken() removes the last user input command token, delegating the actual removal to removeLastCommandToken now defined in Mshell.h/c
+/**
+ * @brief removes the last user input command token
+ * 
+ * @return true on success
+ * @return false on failure
+ */
 bool removeLastUserInputCommandToken(){
-	Mtoken* tokenToRemove=(_userInputCommand?_userInputCommand->_lastToken:NULL);
-	if(!tokenToRemove)return false; // there's no last token to remove
+	Mtoken* tokenToRemove=(_userInputCommand!=NULL?_userInputCommand->_lastToken:NULL);
+	if(NULL==tokenToRemove)return false; // there's no last token to remove
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
 	deleteTokenAutoCompletionText(tokenToRemove);
 	// MDH@20DEC2022: if removing the comma in a function call arguments list, we need to increment the number of expected arguments again
@@ -1770,29 +2232,39 @@ bool removeLastUserInputCommandToken(){
 }
 
 // MDH@04NOV2019: moved from line 1800 or so over here as it calls removeLastUserInputCommandToken() and we do not like to have to use prototypes TODO remove all prototype() definitions
+/**
+ * @brief updates the user input command identifier continuation
+ * 
+ */
 void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@30OCT2019: simplified updating the identifier continuation a bit so wee do not need to be afraid that it won't work AND we no longer need the userInputCommandIdentifierContinuationNeedsUpdating flag!!!!
 	//				BUT right after a delete we should be allowed to set the flag so the continuation will be deleted and nothing more
 	//				OK, to make delete work, I have to check the NeedsUpdating flag which should be set to true when the token is set
 	deleteIdentifierContinuation();
 	// if currently in an identifier, we technically need updating the identifier continuation unless the NeedsUpdating flag has been turned off
-	bool canHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
+	bool canHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand!=NULL?_userInputCommand->_lastToken:NULL);
 	if(canHaveAnIdentifierContinuation){ // theoretically we could have identifier continuation
 		if(userInputCommandIdentifierContinuationNeedsUpdating){ // not blocked
 			// MDH@04NOV2019: if inside a reference, skip the reference 'operator' at the start of the reference when requesting completion text
 			Mstring* _completionText=owned_string(_userInputCommand->_lastToken->type!=TT_REFERENCE?_getCompletion(string(_userInputCommand->_lastToken->text),true):_getCompletion(string_remainder(_userInputCommand->_lastToken->text,1),false),owner);
 			// need at least two characters (the type and something text behind it)
 			// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
-			if(_completionText){
+			if(_completionText!=NULL){
 				if(string_length(_completionText)>1){
 					switch(string_char(_completionText,0)){
 						case 1:
 							_identifierContinuationCharacters=strdup(string(_completionText)+1);
-							if(!_identifierContinuationCharacters)inputError("Failed to create the identifier continuation");else if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
+							if(!_identifierContinuationCharacters!=NULL)
+								inputError("Failed to create the identifier continuation");
+							else 
+								if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
 							break;
 						case 2:
 							_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
-							if(_identifierContinuationOptionalCharacters)inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("No identifier continuation characters!");
+							if(_identifierContinuationOptionalCharacters!=NULL)
+								inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);
+							else 
+								inputError("No identifier continuation characters!");
 							break;
 					}
 				}else{
@@ -1812,10 +2284,10 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 									// replacing the last character with a blank is another option????
 									if(string_setlength(lastTokenText,lastTokenLength-1/*,owner_lastTokenText*/)){ // managed to 'cut off' c (although it's still there, because when you set the length only ->length is adjusted nothing yet to the text itself)
 										Mtoken* _errorToken=_getNewCommandToken(_userInputCommand->_lastToken,TT_ERROR); // by passing in NULL all the complicated stuff is not happening!!!
-										if(_errorToken){
+										if(_errorToken!=NULL){
 											// MDH@23OCT2020 OOPS take over ownership!!!
 											_userInputCommand->_lastToken=owned_token(_errorToken,Msubowner(owner_userInputCommand,1)); // update the last token assuming we will succeed in doing what needs doing
-											if(!string_append_char(_errorToken->text,c)){
+											if(NULL==string_append_char(_errorToken->text,c)){
 												if(removeLastUserInputCommandToken())
 													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
 												else
@@ -1828,7 +2300,7 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 											inputError("The supposed reference can never become an existing variable reference.");
 										// if we failed to create the error token, we have to append the removed character again (should be no problem because Mstring does not reduce the memory when deleting characters from the end)
 										if(_errorToken!=_userInputCommand->_lastToken){
-											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength/*,owner_lastTokenText*/))
+											if(NULL==string_setlength(_userInputCommand->_lastToken->text,lastTokenLength/*,owner_lastTokenText*/))
 											{inputError("%sCouldn't undo the adjustments made to an erroneous reference.",M_BUG_PREFIX);}
 										}
 									}else
@@ -1849,6 +2321,10 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 		}
 	}
 	// by forcing the flag to be true AFTER each update, we ascertain that you can only block it once, AND there's no need actually to set it on every new token!!!!
+	/**
+	 * @brief a flag that keeps track of whether or not we are in an identifier token
+	 * 
+	 */
 	userInputCommandIdentifierContinuationNeedsUpdating=true; // as long as we're in an identifier token, keep the 'dirty' flag true
 	/* replacing:
 	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
@@ -1882,12 +2358,17 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 	*/
 	if(amVerboseDebugging())inputInfo("User input command identifier continuation updated.");
 }/* VALIDATED */
-
+/**
+ * @brief returns the text represention of the current user input command
+ * 
+ * @param color whether or not to show the command in color
+ * @return Mstring* a new M string holding the current user input command text
+ */
 Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _commandText=owned_string(__string(),owner);
-	if(_commandText){
+	if(_commandText!=NULL){
 		Mtoken* commandToken=_userInputCommand->_firstToken; // TODO can we get rid of using commandcount-1 here????
-		while(commandToken){
+		while(commandToken!=NULL){
 			// if we bump into a comment we're done!!!
 			if(commandToken->type==TT_COMMENT)break;
 			// TODO there must be a better way to do the coloring!!!
@@ -1906,9 +2387,9 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 					string_append(_commandText,ES"38;5;");/////output("Command text: '%s'.\n",string(_commandText));
 					string_append(_commandText,getInfoColor());/////output("Command text: '%s'.\n",string(_commandText));
 					string_append_char(_commandText,'m');/////output("Command text: '%s'.\n",string(_commandText));
-					}
+				}
 				string_append_char(_commandText,'(');
-				if(commandToken->expr)string_append_char(_commandText,'*');/////output("Command text: '%s'.\n",string(_commandText));}
+				if(commandToken->expr!=NULL)string_append_char(_commandText,'*');/////output("Command text: '%s'.\n",string(_commandText));}
 				string_append(_commandText,TOKENTYPE_STRING[commandToken->type]);/////output("Command text: '%s'.\n",string(_commandText));
 				string_append(_commandText,") ");/////output("Command text: '%s'.\n",string(_commandText));
 			}
@@ -1918,7 +2399,10 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 	}
 	return disowned_string(_commandText,owner);
 }
-
+/**
+ * @brief clear the current user input command
+ * 
+ */
 void clearCommand(){
 	FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL; // MDH@28OCT2019: using the command now...
 	// numberOfLineCommandCharacters=0; // MDH@16OCT2020 not essential because a better place is when a (continued) prompt is displayed
@@ -1933,12 +2417,19 @@ void clearCommand(){
 // MDH@13MAR2020: result type changed to size_t because now returning the number of characters written
 // MDH@07DEC2020: all numbers are displayed taking the current locale into account (what _getValueText() itself never does!!!)
 extern char** Mtimezonenames;
+/**
+ * @brief outputs \p _value color coded
+ * 
+ * @param _value the value to output
+ * @return size_t the number of characters written
+ */
 size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	size_t written=0;
-	if(_value){
+	if(_value!=NULL){
 		switch(_value->type){
 			case VT_UNDEFINED:
-				outputTokenTypeColor(TT_DQSTRING);written=output("%s",M_UNDEFINED_VALUE_TEXT);
+				outputTokenTypeColor(TT_DQSTRING);
+				written=output("%s",M_UNDEFINED_VALUE_TEXT);
 				break; // let's use the same color as for double quotes string (for now)
 			case VT_TOKEN:
 				outputTokenTypeColor(_value->value._token->type);
@@ -1962,26 +2453,27 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				break; // MDH@08DEC2020: simple, NO?
 			case VT_BIGINTEGER:
 				outputTokenTypeColor(TT_INTEGER);
-				written=outputBigintegerLocale(_value->value._biginteger);
+				written+=outputBigintegerLocale(_value->value._biginteger);
 				break;
 			case VT_DECIMAL:
 				outputTokenTypeColor(TT_REAL);
 				written+=outputDecimalLocale(_value->value._decimal,false);
 				break;
 			case VT_RATIONAL:
-				if(_value->value._rational){
+				if(_value->value._rational!=NULL){
 					written+=outputChar('(');
-					outputTokenTypeColor(TT_INTEGER);written+=outputBigintegerLocale(_value->value._rational->num);resetOutputColor();
+					outputTokenTypeColor(TT_INTEGER);
+					written+=outputBigintegerLocale(_value->value._rational->num);resetOutputColor();
 					written+=outputChar('/');
 					// written+=outputChar('/'); // MDH@28OCT2020: inserting
 					outputTokenTypeColor(TT_INTEGER);
-					if(_value->value._rational->den){
+					if(_value->value._rational->den!=NULL){
 						written+=outputBigintegerLocale(_value->value._rational->den);
 					}
 					else written+=outputChar('1'); // a missing denominator means it's equal to 1
 					resetOutputColor();
 					written+=outputChar(')');
-					if(_value->value._rational->delta){
+					if(_value->value._rational->delta!=NULL){
 						outputTokenTypeColor(TT_REAL);
 						if(_value->value._rational->delta->ld>=0)written+=outputChar('+');
 						written+=outputFloatLocale(_value->value._rational->delta);
@@ -2010,7 +2502,7 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				{
 					written+=outputChar('(');
 					Marray* _array=_value->value._array;
-					if(_array){
+					if(_array!=NULL){
 						unsigned long long arraylength=_array->numberOfElements;
 						if(arraylength>0){
 							Mvalue** values=_array->values;
@@ -2061,24 +2553,24 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 					//				let's decide to only write the set elements, and if the index difference is not 1 with the previous element write the index in front of the value
 					written+=outputChar('[');
 					Mlist* _list=_value->value._list;
-					if(_list&&_list->numberOfElements){
+					if(_list!=NULL&&_list->numberOfElements){
 						long long numberOfElementsNotWritten=_list->numberOfElements;
 						numberOfElementsNotWritten-=(M_LIST_ELEMENTS_AT_START+M_LIST_ELEMENTS_AT_END);
 						Mlistelement* _listelement=_list->_first;
 						unsigned long long listitemindex=1; // the expected list item index
 						if(numberOfElementsNotWritten<=0){ // all elements will be written
-							while(_listelement){
+							while(_listelement!=NULL){
 								if(listitemindex!=_listelement->index)written+=output("%llu:",_listelement->index);
 								// replacing: if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
 								written+=outputValueColored(_listelement->_value);
 								listitemindex=_listelement->index+1; // the index of the excepted next element
 								_listelement=_listelement->_next;
-								if(_listelement)written+=outputChar(','); // something will follow
-							}						
+								if(_listelement!=NULL)written+=outputChar(','); // something will follow
+							}
 						}else{
 							// show the first 50 elements
 							long long leftToWrite=M_LIST_ELEMENTS_AT_START;
-							while(_listelement&&--leftToWrite>=0){
+							while(_listelement!=NULL&&--leftToWrite>=0){
 								// let's write the index on the first element, the last element
 								if(_listelement==_list->_first
 									||leftToWrite==0
@@ -2097,14 +2589,14 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 							listitemindex=_listelement->index;
 							written+=output("%llu:",_listelement->index); // write the index on the first element
 							// show all further elements
-							while(_listelement){
+							while(_listelement!=NULL){
 								if(_listelement==_list->_last||listitemindex!=_listelement->index)
 									written+=output("%llu:",_listelement->index);								
 								// replacing: if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
 								written+=outputValueColored(_listelement->_value);
 								listitemindex=_listelement->index+1;
 								_listelement=_listelement->_next;
-								if(_listelement)written+=outputChar(','); // something will follow
+								if(_listelement!=NULL)written+=outputChar(','); // something will follow
 							}
 						}
 					}
@@ -2115,16 +2607,16 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				{
 					written+=outputChar('{');
 					Mmap* _map=_value->value._map;
-					if(_map&&_map->numberOfElements){
+					if(_map!=NULL&&_map->numberOfElements){
 						Mvariable* _mapelementvariable;
 						Mmapelement* _mapelement=_map->_first;
-						while(_mapelement){
+						while(_mapelement!=NULL){
 							_mapelementvariable=_mapelement->_variable;
 							// TODO are we coloring the name?????
 							// quoting the name to indicate it is alphanumeric!!
 							written+=output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
 							written+=outputValueColored(_mapelementvariable->_value);
-							if(!_mapelement->_next)break;
+							if(NULL==_mapelement->_next)break;
 							written+=outputChar(',');
 							_mapelement=_mapelement->_next;
 						}
@@ -2145,7 +2637,8 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 			default: // for VT_REFERENCE, VT_FUNCTION, VT_ENVIRONMENT and the like
 				{
 					Mstring* _valueText=owned_string(_getValueText(_value,false),owner);
-					if(_valueText){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);}
+					if(_valueText!=NULL)
+					{written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);}
 				}
 				break;
 		}
@@ -2156,7 +2649,11 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 	resetOutputColor();
 	return written;
 }
-
+/**
+ * @brief unfinishes command token \p commandToken
+ * 
+ * @param commandToken 
+ */
 void unfinishCommandToken(Mtoken* commandToken){
 	// MDH@03SEP2019: adjusted so that not only the unary operators are left finished but all one character token types (which are the only tokens that are immediately finished once a single character is entered!!)
 	//				NOTE unfinishing of the current token is done so that the token can be continued, so technically we should unfinish all tokens that can be continued after a character is removed from them
@@ -2166,7 +2663,7 @@ void unfinishCommandToken(Mtoken* commandToken){
 	//	  NOTE I think it is because if that is the case there is no whitespace at the end of the token and we
 	//		   should unfinish the token so we can append to it again
 	//		   also 'one character' token types are always finished immediately, so we should not unfinish those!!!
-	if(commandToken)
+	if(commandToken!=NULL)
 		if(!isOneCharacterTokenType(commandToken->type)) // not a unary operator (of length 1) we ended up in
 			if(string_length(commandToken->text)==getTokenSignificantCharacterCount(commandToken)) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
 				unfinishToken(commandToken);
@@ -2198,20 +2695,32 @@ void prepareForEvaluatingCommand(){
 
 }
 */
+
+/**
+ * @brief the number of allocation marks addrd
+ * 
+ */
 long long allocationMarksAdded=0;
 
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //				instead of returning a bool we could return the command text (or NULL if failing to do so????)
+/**
+ * @brief evaluates the current user input command
+ * 
+ * @param resultValue stores the result value
+ * @return true on success
+ * @return false on failure
+ */
 bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LINE__);
 	
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,owner_userInputCommand,true);
 	if(aValidCommandIndicator<=0){
 		// MDH@20FEB2020: this is what we did in isAValidCommand() before, but removed from it: if the command ends with an error, we remove the error token, unfinish the (new) last token, so we can re-use it
-		if(_userInputCommand&&_userInputCommand->_lastToken&&_userInputCommand->_lastToken->type==TT_ERROR){
+		if(_userInputCommand!=NULL&&_userInputCommand->_lastToken!=NULL&&_userInputCommand->_lastToken->type==TT_ERROR){
 			removeLastUserInputCommandToken();
-			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishCommandToken(_userInputCommand->_lastToken);
+			if(NULL==_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishCommandToken(_userInputCommand->_lastToken);
 		}
 		//output("%sInvalid command indicator: %d.\n",M_ERROR_PREFIX,aValidCommandIndicator);
 		return false;
@@ -2219,7 +2728,10 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 
 	allocationMarksAdded=0;
 	if(amVerbose()){
-		if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
+		if(allocationMarkAdded())
+			allocationMarksAdded++;
+		else
+			outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
 	}
 
 	if(amVerboseDebugging())
@@ -2241,7 +2753,8 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	long long elapsed_evaluating=(clock()-before_evaluating)/M_CLOCKS_PER_MS;
 
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
-	if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show
+	if(elapsed_evaluating>0)
+		output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show
 	/*
 	Mstring* _showResultTimestamp=owned_string(_getTimestamp(NULL),owner);
 	if(_showResultTimestamp){
@@ -2253,11 +2766,17 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	*/
 
 	// output the commandText
-	if(_commandText){output("%s",string(_commandText));FREE_STRING(_commandText,owner);}else output("%sFailed to obtain the command result text",M_ERROR_PREFIX);
+	if(_commandText!=NULL){
+		output("%s",string(_commandText));
+		FREE_STRING(_commandText,owner);}
+	else 
+		output("%sFailed to obtain the command result text",M_ERROR_PREFIX);
 	output(" = ");
 
 	// if the result is a null value, show the NULL_value
-	clock_t before_writing=clock();size_t written=outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);long long elapsed_writing=(clock()-before_writing)/M_CLOCKS_PER_MS;
+	clock_t before_writing=clock();
+	size_t written=outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);
+	long long elapsed_writing=(clock()-before_writing)/M_CLOCKS_PER_MS;
 	
 	newline(); // outputValueColored() doesn't do that!!
 	/*
@@ -2269,10 +2788,12 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		outputError("Failed to obtain a timestamp");
 	dontEchoToOutputFile();
 	*/
-	if(elapsed_writing>0)output("The writing took %lld ms.\n",elapsed_writing);
+	if(elapsed_writing>0)
+		output("The writing took %lld ms.\n",elapsed_writing);
 
 	///// outputValueColored() does do this (and should): resetOutputColor();
-	if(written>1000)if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating);/////////else output("less than 1 ms.");
+	if(written>1000)
+		if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating);/////////else output("less than 1 ms.");
 
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputInfo("Result released!"); // TODO do we need to do this?????
 
@@ -2289,10 +2810,16 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 // MDH@24APR2019: outputCommand() writes the command to evaluate, and sets _userInputCommand->_lastToken in the process
 // MDH@31OCT2019: there's a complication when the last character in the token is the newline character
 // MDH@24SEP2020: now returning the position on the last command line 
+/**
+ * @brief outputs command \p command
+ * 
+ * @param command 
+ * @return size_t the position of the cursor movement (on the current line)
+ */
 size_t outputCommand(Mcommand * const command){
-	Mtoken* token=(command?command->_firstToken:NULL);
+	Mtoken* token=(command!=NULL?command->_firstToken:NULL);
 	Mcursormovement cursormovement={}; // MDH@24SEP2020: outputToken will update cursormovement accordingly so that cursormovement.position will always be the position on the command line to store in the position field of the next token
-	while(token){
+	while(token!=NULL){
 		// MDH@16OCT2020: doing the following is debatable as we could argue that the command itself hasn't changed since it was entered but consider the fact that the number of available line characters could have changed!!!!!
 		if(token->position!=cursormovement.position){
 			// output("[%zd!=%zd]",token->position,cursormovement.position); // MDH@16OCT2020 (M_MODULE_DEBUGGING&MM_MAIN)
@@ -2319,10 +2846,26 @@ size_t outputCommand(Mcommand * const command){
 }
 
 // MDH@24SEP2020: not expecting the shell to output a token on a session command line, so outputTokenText replaces outputToken (which is now declared differently)
-size_t outputTokenText(Mtoken const * const _token){if(_token){outputTokenColor(_token);return output("%s",string(_token->text));}return 0;}
-
+size_t outputTokenText(Mtoken const * const _token){
+	if(NULL==_token)return 0;
+	outputTokenColor(_token);
+	return output("%s",string(_token->text));
+}
+/**
+ * @brief the command page to show
+ * 
+ */
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
+/**
+ * @brief the total number of command pages
+ * 
+ */
 uint32_t commandPages=0; // the total number of command pages
+/**
+ * @brief sets the current command page to \p createUserInputCommandPage and shows the commands on that page
+ * 
+ * @param createUserInputCommandPage 
+ */
 void setCommandPage(uint32_t createUserInputCommandPage){
 	commandPage=createUserInputCommandPage;
 	int32_t commandToShowIndex=10,lastCommandToShowIndex=commandCount-(commandPage*10);
@@ -2331,7 +2874,7 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
 		Mtoken* token=_registeredcommands[lastCommandToShowIndex+commandToShowIndex]._command->_firstToken;
 		// MDH@24SEP2020: this is definitely an issue because outputToken() assumes the token is written on the command line which in this case is not the case, so we shouldn't use outputToken()
-		while(token){
+		while(token!=NULL){
 			outputTokenText(token); // write the token text in the color of it's type
 			// replacing: outputToken(token);
 			token=token->next;
@@ -2387,12 +2930,20 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 	// going up and down is an issue
 	*/
 }
+/**
+ * @brief shows the next command page
+ * 
+ */
 void showNextCommandPage(){
 	if(commandPage<commandPages)
 		setCommandPage(commandPage+1);
 	else
 		output("%s","No further commands to show.");
 }
+/**
+ * @brief shows the previous command page
+ * 
+ */
 void showPreviousCommandPage(){
 	if(commandPage>1)
 		setCommandPage(commandPage-1);
@@ -2401,9 +2952,13 @@ void showPreviousCommandPage(){
 }
 // MDH@25NOV2019: it's more convenient to output the values in control mode than asking for it in command mode
 //				as values() command would affect what is returned (given that it's a command)
+/**
+ * @brief outputs the current values in a table
+ * 
+ */
 void outputValues(){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _valuesTable=owned_list(_getValuesTable(NULL),owner);
-	if(_valuesTable){
+	if(_valuesTable!=NULL){
 		outputTable(_valuesTable);
 		FREE_LIST(_valuesTable,owner);
 	}else
@@ -2446,12 +3001,21 @@ void writeRestOfCommand(){ // writes rest of command assuming _userInputCommand-
 	}
 }
 */
+/**
+ * @brief sets the input mode to \p newInputMode
+*/
 void setInputMode(enum INPUTMODE_ENUM newInputMode){
 	inputMode=newInputMode;
 	deleteTokenautocompletiontexts();
 	// in command mode the behind cursor text is determined JIT, whereas it is actively used in the other modes!!!
-	if(_suggestedText)string_setlength(_suggestedText,0/*,owner_suggestedText*/);
+	if(_suggestedText!=NULL)string_setlength(_suggestedText,0/*,owner_suggestedText*/);
 }
+/**
+ * @brief switches to control mode showing \p message
+ * 
+ * @param message 
+ * @return char the character that makes the user input loop end
+ */
 char switchToControlMode(char* message){
 	if(inputMode!=IM_CONTROL){
 		if(inputMode==IM_COMMAND)clearCommand();
@@ -2465,8 +3029,17 @@ char switchToControlMode(char* message){
 	return 'o'; // to make the loop know to quit
 	//output("%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History Shell");
 }
-
+/**
+ * @brief returns the number of characters in the auto completion text M string
+ * 
+ * @return size_t the number of characters in the auto completion text M string
+ */
 size_t getNumberOfAutoCompletionCharacters(){return string_length(_autoCompletionText);} // TODO assuming _autoCompletionText has actually been constructed!!!!
+/**
+ * @brief returns the number of token auto completion texts
+ * 
+ * @return size_t the number of token auto completion texts
+ */
 size_t getNumberOfTokenAutoCompletionTexts(){
 	size_t numberOfTokenAutoCompletionTexts=0;
 	Mtokenautocompletiontext* tokenautocompletiontext=_firstTokenautocompletiontext;
@@ -2475,8 +3048,13 @@ size_t getNumberOfTokenAutoCompletionTexts(){
 }
 
 // MDH@23SEP2020: perhaps more convenient to keep track of any cursor displacement
+/**
+ * @brief outputs the manual feed forward characters
+ * 
+ * @param _cursormovement the updated cursor movement
+ */
 void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
-	if(!_cursormovement)return;
+	if(NULL==_cursormovement)return;
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
 	// MDH@04OCT2019: append it to the suggested text
 	if(string_length(_manualFeedforwardText)>0){
@@ -2491,11 +3069,16 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 		outputCommandLineText(string(_manualFeedforwardText)+_cursormovement->written,_cursormovement,getManualFeedforwardTextColor(),-1); // MDH@23SEP2020 NOTE: remember numberOfManualFeedforwardCharactersWritten is a (position/characters written) ULL
 		// replacing:setColor(getManualFeedforwardTextColor());numberOfManualFeedforwardCharactersWritten+=output("%s",string(_manualFeedforwardText)+manualFeedforwardCharactersWrittenSoFar);
 		string_setlength(_manualFeedforwardText,_cursormovement->written); // in case not all characters were actually written
-		if(!string_append(_suggestedText,string(_manualFeedforwardText)))
+		if(NULL==string_append(_suggestedText,string(_manualFeedforwardText)))
 			_cursormovement->written=0;
 		//else string_append_char(_suggestedText,'#');
 	}
 }
+/**
+ * @brief outputs the identifier continuation text characters
+ * 
+ * @param _cursormovement the updated cursor movement
+ */
 void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement){
 	if(_cursormovement&&_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)&&string_append(_suggestedText,_identifierContinuationCharacters))
 		outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
@@ -2516,8 +3099,15 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
 		// replacing: {size_t numberOfIdentifierContinuationCharactersToWrite=numberOfIdentifierContinuationCharactersWritten;while(numberOfIdentifierContinuationCharactersToWrite){outputChar(' ');numberOfIdentifierContinuationCharactersToWrite--;}
 	// return numberOfIdentifierContinuationCharactersWritten; // one less character written than the computed length!!!
 }
+/**
+ * @brief outputs the immediate feed forward characters
+ * 
+ * @param _cursormovement the updated cursor movement
+ */
 void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
-	if(_cursormovement/*&&_immediateFeedforwardText*/&&string_length(_immediateFeedforwardText)&&string_append(_suggestedText,string(_immediateFeedforwardText)))
+	if(_cursormovement!=NULL&&
+			string_length(_immediateFeedforwardText)&&
+			string_append(_suggestedText,string(_immediateFeedforwardText)))
 		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
 	/* replacing:
 	if(!_cursormovement)return;
@@ -2531,9 +3121,14 @@ void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
 	*/
 }
+/**
+ * @brief outputs the auto completion characters
+ * 
+ * @param _cursormovement the updated cursor movement
+ */
 void outputAutoCompletionCharacters(Mcursormovement* _cursormovement){
 	// MDH@05DEC2022: implemented a little bit better
-	if(_cursormovement&&string_length(_autoCompletionText)&&string_append(_suggestedText,string(_autoCompletionText)))
+	if(_cursormovement!=NULL&&string_length(_autoCompletionText)&&string_append(_suggestedText,string(_autoCompletionText)))
 		outputCommandLineText(string(_autoCompletionText),_cursormovement,getAutoCompletionTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
 	/* replacing:
 	if(!_cursormovement)return;
