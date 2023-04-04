@@ -258,83 +258,6 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
 // MDH@04NOV2020: coming soon in this theater
 #ifndef __PRODUCTION__
 /**
- * @brief returns \p _array owned by \p owner_array
- * 
- * @param _array 
- * @param owner_array 
- * @return Marray* \p _array owned by \p owner_array
- */
-Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
-	if(NULL==_array)return NULL;
-	if(_array->values!=NULL)OWNED(_array->values,Msubowner(owner_array,1));
-	return OWNED(_array,owner_array);
-}
-/**
- * @brief returns \p _array disowned by \p owner_array
- * 
- * @param _array 
- * @param owner_array 
- * @return Marray* \p _array disowned by \p owner_array
- */
-Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
-	if(NULL==_array)return NULL;
-	if(_array->values!=NULL)DISOWNED(_array->values,owner_array);
-	return DISOWNED(_array,owner_array);
-}
-#endif
-/**
- * @brief returns a new M array
- * 
- * @param source the id of the requestee
- * @return Marray* a new M array
- */
-Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
-	Marray* _array=CALLOC_1(sizeof(Marray),'A',owner);
-	if(NULL==_array)return NULL;
-	return DISOWNED_ARRAY(_array,owner);
-}
-/**
- * @brief returns a new array containing \p numberOfValues M value slots
- * 
- * @param source 
- * @param numberOfValues the number of M value slots to create in the M array
- * @return Marray* a new array containing \p numberOfValues M value slots
- */
-Marray* _getArray(char* source,unsigned long long numberOfValues){Mallocationowner owner=getOwner(__LINE__);
-	Marray* _array=owned_array(__array(source),owner);
-	if(NULL==_array)return NULL;
-	if(numberOfValues>0){ // _array->values should be initialized to accomodate the given number of values
-		_array->values=CALLOC(sizeof(Mvalue*),numberOfValues,-'a',Msubowner(owner,1));
-		if(NULL==_array->values){FREE_DISOWNED_1(_array,'A',owner);return NULL;}
-		_array->numberOfElements=numberOfValues; // OOPS almost forgot this!!!!
-	}
-	return DISOWNED_ARRAY(_array,owner);
-}
-/**
- * @brief frees the first \p numberOfValues elements from \p values
- * @details freeing an M value pointer means assigning NULL to it, effectively decrementing the M value reference count
- * @param values 
- * @param numberOfValues 
- */
-void free_values(Mvalue** values,unsigned long long numberOfValues){
-	if(NULL==values)return;
-	// disconnect every stored value
-	unsigned long long l=0;while(l<numberOfValues)assignValue(&values[l++],NULL);
-	FREE(values,numberOfValues,-'a');
-}
-/**
- * @brief frees M array \p _array
- * @param _array
- */
-void free_array(Marray* _array/*,Mallocationowner owner*/){
-	if(NULL==_array)return;
-	// if we have values, we should disconnect them from their values (see free_values)
-	if(_array->values!=NULL)free_values(_array->values,_array->numberOfElements);
-	FREE_1(_array,'A');
-}
-
-#ifndef __PRODUCTION__
-/**
  * @brief returns \p _mapelement owned by \p owner_mapelement
  * 
  * @param _mapelement 
@@ -594,6 +517,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
 			case VT_TEXT:if(_value->value._text){FREE_TEXT(_value->value._text,owner_value_data);_value->value._text=NULL;}break;
 			case VT_ARRAY:if(_value->value._array){FREE_ARRAY(_value->value._array,owner_value_data);_value->value._array=NULL;}break;
 			case VT_LIST:if(_value->value._list){FREE_LIST(_value->value._list,owner_value_data);_value->value._list=NULL;}break;
+			case VT_MATRIX:if(_value->value._matrix){FREE_MATRIX(_value->value._matrix,owner_value_data);_value->value._matrix=NULL;}break;
 			case VT_MAP:if(_value->value._map){FREE_MAP(_value->value._map,owner_value_data);_value->value._map=NULL;}break;
 			case VT_REFERENCE:if(_value->value._reference){FREE_REFERENCE(_value->value._reference,owner_value_data);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
 			case VT_FUNCTION:if(_value->value._function){FREE_FUNCTION(_value->value._function,owner_value_data);_value->value._function=NULL;}break;
@@ -1048,6 +972,45 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
 	}
 	return disowned_list(_list,owner);
 }
+
+Mmatrix* disowned_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix){
+	if(NULL==_matrix)return NULL;
+	if(_matrix->_array!=NULL)disowned_array(_matrix->_array,owner_matrix);
+	return DISOWNED(_matrix,owner_matrix);
+}
+Mmatrix* owned_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix){
+	if(NULL==_matrix)return NULL;
+	if(_matrix->_array!=NULL)owned_array(_matrix->_array,Msubowner(owner_matrix,1));
+	return OWNED(_matrix,owner_matrix);
+}
+
+Mmatrix* __matrix(long long numberOfRows,long long numberOfColumns){Mallocationowner owner=getOwner(__LINE__);
+	if(numberOfRows<=0||numberOfColumns<=0)return NULL;
+	Mmatrix* _matrix=(Mmatrix*)CALLOC_1(sizeof(Mmatrix),'M',owner);
+	if(NULL==_matrix)return NULL;
+	Marray* _array=_getArray("matrix",numberOfRows*numberOfColumns);
+	if(NULL==_array){free_matrix(_matrix,owner);return NULL;}
+	_matrix->_array=owned_array(_array,Msubowner(owner,1));
+	_matrix->numberOfRows=numberOfRows;
+	_matrix->numberOfRows=numberOfColumns;
+	return disowned_matrix(_matrix,owner);
+}
+Mmatrix* _getMatrix(long long numberOfRows,long long numberOfColumns,Mvalue* defaultElementValue){Mallocationowner owner=getOwner(__LINE__);
+	Mmatrix* _matrix=owned_matrix(__matrix(numberOfRows,numberOfColumns),owner);
+	if(NULL==_matrix)return NULL;
+	size_t left=_matrix->numberOfRows*_matrix->numberOfColumns;
+	while(left-->0)
+		assignValue(&_matrix->_array->values[left],defaultElementValue);
+	return disowned_matrix(_matrix,owner);
+}
+
+void free_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix){
+	if(_matrix!=NULL){
+		if(_matrix->_array!=NULL)FREE_ARRAY(_matrix->_array,Msubowner(owner_matrix,1));
+		FREE_1(_matrix,'M');
+	}
+}
+
 /**
  * @brief return the first scalar in M value \p value
  * 
@@ -1375,27 +1338,6 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
 			return disowned_list(_list,owner);
 		}else
 			outputError("Failed to create a list");
-	}
-	return NULL;
-}
-/**
- * @brief returns a new M array copy from M array \p array
- * 
- * @param array 
- * @return Marray* a new M array copy from M array \p array
- */
-Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
-	if(array!=NULL){
-		register unsigned long long arrayindex=array->numberOfElements; // MDH@24NOV2020: HOORAY my first time use of 'register'
-		Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex),owner);
-		if(_array!=NULL){
-			if(arrayindex>0){
-				Mvalue **newvalueholder=_array->values+arrayindex,**valueholder=array->values+arrayindex;
-				do assignValue(--newvalueholder,*(--valueholder));while(--arrayindex>0);
-			}
-			return disowned_array(_array,owner);
-		}else
-			outputError("Failed to create an array");
 	}
 	return NULL;
 }
@@ -1841,6 +1783,83 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
 // end helper functions 
 
 // ARRAY STUFF
+#ifndef __PRODUCTION__
+/**
+ * @brief returns \p _array owned by \p owner_array
+ * 
+ * @param _array 
+ * @param owner_array 
+ * @return Marray* \p _array owned by \p owner_array
+ */
+Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
+	if(NULL==_array)return NULL;
+	if(_array->values!=NULL)OWNED(_array->values,Msubowner(owner_array,1));
+	return OWNED(_array,owner_array);
+}
+/**
+ * @brief returns \p _array disowned by \p owner_array
+ * 
+ * @param _array 
+ * @param owner_array 
+ * @return Marray* \p _array disowned by \p owner_array
+ */
+Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
+	if(NULL==_array)return NULL;
+	if(_array->values!=NULL)DISOWNED(_array->values,owner_array);
+	return DISOWNED(_array,owner_array);
+}
+#endif
+/**
+ * @brief returns a new M array
+ * 
+ * @param source the id of the requestee
+ * @return Marray* a new M array
+ */
+Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
+	Marray* _array=CALLOC_1(sizeof(Marray),'A',owner);
+	if(NULL==_array)return NULL;
+	return DISOWNED_ARRAY(_array,owner);
+}
+/**
+ * @brief returns a new array containing \p numberOfValues M value slots
+ * 
+ * @param source 
+ * @param numberOfValues the number of M value slots to create in the M array
+ * @return Marray* a new array containing \p numberOfValues M value slots
+ */
+Marray* _getArray(char* source,unsigned long long numberOfValues){Mallocationowner owner=getOwner(__LINE__);
+	Marray* _array=owned_array(__array(source),owner);
+	if(NULL==_array)return NULL;
+	if(numberOfValues>0){ // _array->values should be initialized to accomodate the given number of values
+		_array->values=CALLOC(sizeof(Mvalue*),numberOfValues,-'a',Msubowner(owner,1));
+		if(NULL==_array->values){FREE_DISOWNED_1(_array,'A',owner);return NULL;}
+		_array->numberOfElements=numberOfValues; // OOPS almost forgot this!!!!
+	}
+	return DISOWNED_ARRAY(_array,owner);
+}
+/**
+ * @brief frees the first \p numberOfValues elements from \p values
+ * @details freeing an M value pointer means assigning NULL to it, effectively decrementing the M value reference count
+ * @param values 
+ * @param numberOfValues 
+ */
+void free_values(Mvalue** values,unsigned long long numberOfValues){
+	if(NULL==values)return;
+	// disconnect every stored value
+	unsigned long long l=0;while(l<numberOfValues)assignValue(&values[l++],NULL);
+	FREE(values,numberOfValues,-'a');
+}
+/**
+ * @brief frees M array \p _array
+ * @param _array
+ */
+void free_array(Marray* _array/*,Mallocationowner owner*/){
+	if(NULL==_array)return;
+	// if we have values, we should disconnect them from their values (see free_values)
+	if(_array->values!=NULL)free_values(_array->values,_array->numberOfElements);
+	FREE_1(_array,'A');
+}
+
 /**
  * @brief returns a new M value wrapping M array \p _array
  * @details if \p _array is disowned and wrapping fails, \p _array is freed
@@ -1864,6 +1883,91 @@ Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallo
 		output("%s array wrapped.\n",(disowned_array?"disowned":"owned"));
 	return _value;
 }/* TODO VALIDATED */
+
+/**
+ * @brief returns a new M array copy from M array \p array
+ * 
+ * @param array 
+ * @return Marray* a new M array copy from M array \p array
+ */
+Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
+	if(array!=NULL){
+		register unsigned long long arrayindex=array->numberOfElements; // MDH@24NOV2020: HOORAY my first time use of 'register'
+		Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex),owner);
+		if(_array!=NULL){
+			if(arrayindex>0){
+				Mvalue **newvalueholder=_array->values+arrayindex,**valueholder=array->values+arrayindex;
+				do assignValue(--newvalueholder,*(--valueholder));while(--arrayindex>0);
+			}
+			return disowned_array(_array,owner);
+		}else
+			outputError("Failed to create an array");
+	}
+	return NULL;
+}
+/**
+ * @brief returns the new M string containing the text representation of (some) elements of M array \p _array
+ * @param _array 
+ * @param showAtStart the maximum number of initial elements to show
+ * @param showAtEnd the maximum number of final elements to show
+ * @return Mstring* the new M string containing the text representation of M array \p _array
+ */
+Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
+	// as this is more like a tuple than a list (Python equivalent data structures)
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
+	Mstring* result=owned_string(__string(),owner);
+	if(result!=NULL){
+		Mstring* p=result;
+		unsigned long long l=(_array?_array->numberOfElements:0);
+		if(report){
+			p=string_append_char(p,'a');
+			p=string_append_char(p,'(');
+			p=appendll(p,l);
+			p=string_append_char(p,')');
+		}
+		p=string_append_char(p,'('); // switch to using p in appends
+		if(l>0){
+			long long firstAtEnd=l+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
+			long long elementsNotIncluded=firstAtEnd-showAtStart-1;
+			// output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
+			unsigned long long arrayelementindex=0,lastarrayelementindex=(--l);
+			do{
+				if(elementsNotIncluded>0&&arrayelementindex>=firstAtEnd){ // the first to show at the end coming up next
+					p=string_append(p,"(");
+					p=appendll(p,elementsNotIncluded);
+					p=string_append(p," element");
+					if(elementsNotIncluded>1)p=string_append_char(p,'s');
+					p=string_append(p," not displayed),");
+					elementsNotIncluded=0; // for safety
+				}
+				///////outputChar('$');
+				// increment listindex until it is equal to _listelement->index
+				// MDH@11NOV2020 we use index 0 in sorting: if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
+				if(arrayelementindex<=showAtStart||arrayelementindex>=firstAtEnd){ // a displayable value
+					if(arrayelementindex==showAtStart||arrayelementindex==firstAtEnd){
+						p=appendll(p,arrayelementindex);
+						p=string_append_char(p,':');
+					}
+					// replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
+					Mstring* _arrayelementValueText=owned_string(_getValueText(_array->values[arrayelementindex],false),owner); // to be freed asap
+					if(_arrayelementValueText!=NULL){
+						p=string_append(p,string(_arrayelementValueText));
+						FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
+					}
+					// if there's more coming write a comma
+					if(arrayelementindex!=lastarrayelementindex)p=string_append_char(p,',');
+				}
+				// output("(%llu)",listindex); // DEBUG
+			}while(p!=NULL&&(++arrayelementindex)<=lastarrayelementindex);
+		}
+		p=string_append_char(p,')');
+		/////output("List=%s",string(p));
+		// if appending failed somewhere free s
+		if(NULL==p){FREE_STRING(result,owner);result=NULL;}
+	}
+	return disowned_string(result,owner);	
+}
+// end ARRAY STUFF
 
 // LIST STUFF
 /**
@@ -2387,68 +2491,6 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
 	return _rationalValue;
 }/* VALIDATED */
 
-/**
- * @brief returns the new M string containing the text representation of (some) elements of M array \p _array
- * @param _array 
- * @param showAtStart the maximum number of initial elements to show
- * @param showAtEnd the maximum number of final elements to show
- * @return Mstring* the new M string containing the text representation of M array \p _array
- */
-Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
-	// as this is more like a tuple than a list (Python equivalent data structures)
-	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
-	Mstring* result=owned_string(__string(),owner);
-	if(result!=NULL){
-		Mstring* p=result;
-		unsigned long long l=(_array?_array->numberOfElements:0);
-		if(report){
-			p=string_append_char(p,'a');
-			p=string_append_char(p,'(');
-			p=appendll(p,l);
-			p=string_append_char(p,')');
-		}
-		p=string_append_char(p,'('); // switch to using p in appends
-		if(l>0){
-			long long firstAtEnd=l+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
-			long long elementsNotIncluded=firstAtEnd-showAtStart-1;
-			// output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
-			unsigned long long arrayelementindex=0,lastarrayelementindex=(--l);
-			do{
-				if(elementsNotIncluded>0&&arrayelementindex>=firstAtEnd){ // the first to show at the end coming up next
-					p=string_append(p,"(");
-					p=appendll(p,elementsNotIncluded);
-					p=string_append(p," element");
-					if(elementsNotIncluded>1)p=string_append_char(p,'s');
-					p=string_append(p," not displayed),");
-					elementsNotIncluded=0; // for safety
-				}
-				///////outputChar('$');
-				// increment listindex until it is equal to _listelement->index
-				// MDH@11NOV2020 we use index 0 in sorting: if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
-				if(arrayelementindex<=showAtStart||arrayelementindex>=firstAtEnd){ // a displayable value
-					if(arrayelementindex==showAtStart||arrayelementindex==firstAtEnd){
-						p=appendll(p,arrayelementindex);
-						p=string_append_char(p,':');
-					}
-					// replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
-					Mstring* _arrayelementValueText=owned_string(_getValueText(_array->values[arrayelementindex],false),owner); // to be freed asap
-					if(_arrayelementValueText!=NULL){
-						p=string_append(p,string(_arrayelementValueText));
-						FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
-					}
-					// if there's more coming write a comma
-					if(arrayelementindex!=lastarrayelementindex)p=string_append_char(p,',');
-				}
-				// output("(%llu)",listindex); // DEBUG
-			}while(p!=NULL&&(++arrayelementindex)<=lastarrayelementindex);
-		}
-		p=string_append_char(p,')');
-		/////output("List=%s",string(p));
-		// if appending failed somewhere free s
-		if(NULL==p){FREE_STRING(result,owner);result=NULL;}
-	}
-	return disowned_string(result,owner);	
-}
 // MDH@02NOV2020: because lists can be very large, we adapt _getListText with a value telling it the maximum
 //				number of elements to display from the start and at the end
 // MDH@03NOV2020: showing all elements but prefixing the index when it differs from the expected list index (which is one above the last one shown)
@@ -3515,6 +3557,7 @@ long long isValueNull(Mvalue* value){
 		case VT_TEXT:result=(value->value._text!=NULL?M_FALSE:M_TRUE);break;
 		case VT_ARRAY:result=(value->value._array!=NULL?M_FALSE:M_TRUE);break;
 		case VT_LIST:result=(value->value._list!=NULL?M_FALSE:M_TRUE);break;
+		case VT_MATRIX:result=(value->value._matrix!=NULL?M_FALSE:M_TRUE);break;
 		case VT_MAP:result=(value->value._map!=NULL?M_FALSE:M_TRUE);break;
 		case VT_TOKEN:result=(value->value._token!=NULL?M_FALSE:M_TRUE);break;
 		case VT_UNDEFINED:result=M_TRUE;break;
@@ -3529,6 +3572,7 @@ long long isValueNull(Mvalue* value){
 
 long long isArrayUndefined(Marray* array){return(array!=NULL?M_FALSE:M_TRUE);}
 long long isListUndefined(Mlist* list){return(list!=NULL?M_FALSE:M_TRUE);}
+long long isMatrixUndefined(Mmatrix* matrix){return(matrix!=NULL?M_FALSE:M_TRUE);}
 long long isMapUndefined(Mmap* map){return(map!=NULL?M_FALSE:M_TRUE);}
 
 // MDH@25FEB2021
@@ -3572,6 +3616,7 @@ long long isValueUndefined(Mvalue* value){
 		case VT_TEXT:result=isTextUndefined(value->value._text);break; ////strlen(_value->value._text->_c)==0;
 		case VT_ARRAY:result=isArrayUndefined(value->value._array);break; ////Mlen(_value)==0;
 		case VT_LIST:result=isListUndefined(value->value._list);break; ////Mlen(_value)==0;
+		case VT_MATRIX:result=isMatrixUndefined(value->value._matrix);break;
 		case VT_MAP:result=isMapUndefined(value->value._map);break; ////Mlen(_value)==0;
 		case VT_TOKEN:result=isTokenUndefined(value->value._token);break; /////string_length(_value->value._token->text)==0;
 		case VT_UNDEFINED:result=M_TRUE;break;
@@ -3994,7 +4039,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
 		case VT_BIGINTEGER:return(mp_cmp(MP_INT_POINTER(value1->value._biginteger),MP_INT_POINTER(value2->value._biginteger))==MP_EQ);
 		case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
 		case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
-		case VT_ARRAY:case VT_LIST:case VT_MAP:break;
+		case VT_ARRAY:case VT_LIST:case VT_MATRIX:case VT_MAP:break;
 		case VT_DECIMAL:case VT_RATIONAL:break;
 		case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
 		case VT_REFERENCE: // TODO this might be hard

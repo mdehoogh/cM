@@ -6,6 +6,7 @@
 
 struct Mlist;
 struct Marray; // MDH@04NOV2020: we're going to have an array after all (so we can speed up sorting)
+struct Mmatrix;
 struct Mmap;
 struct Mreference;
 // MDH@03MAR2020: if we want to be able to wrap a function or an environment in a value we have to add them here
@@ -22,6 +23,7 @@ typedef union Mvalueunion{
     Mtext* _text;
     struct Mlist* _list;
     struct Marray* _array;
+		struct Mmatrix* _matrix;
     struct Mmap* _map;
     struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
     struct Mfunction* _function; // MDH@03MAR2020
@@ -97,42 +99,14 @@ typedef struct Mlistelement{
 // MDH@17APR2020: variable size dynamic allocations should be 'managed' so we can tell how big they are
 //                of course we know the size of char* obviously BUT we should NOT use REALLOC on it, in which case we loose track of it
 typedef struct Mlist{
-    Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
-    unsigned long long numberOfElements; // keep track of the total number of elements
-    Mvaluetype valuetype; // we can force a list to have elements of the same type
-    Mlistelement* _first;
-    Mlistelement* _last;
-    bool weak:1;
-    bool immutable:1;
+	Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
+	unsigned long long numberOfElements; // keep track of the total number of elements
+	Mvaluetype valuetype; // we can force a list to have elements of the same type
+	Mlistelement* _first;
+	Mlistelement* _last;
+	bool weak:1;
+	bool immutable:1;
 }Mlist;
-
-Mlist* __list(char* source/*,Mallocationowner owner_list*/);
-void free_list(Mlist* _list/*,Mallocationowner owner*/);
-#ifndef __PRODUCTION__
-Mlist* owned_list(Mlist * const _list,Mallocationowner owner_list);
-Mlist* disowned_list(Mlist * const _list,Mallocationowner owner_list);
-#define OWNED_LIST(_list,owner_list) owned_list(_list,owner_list)
-#define __LIST(source,owner_list) owned_list(__list(source),owner_list)
-#define DISOWNED_LIST(_list,owner_list) disowned_list(_list,owner_list)
-#define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
-#else
-#define OWNED_LIST(_list,owner_list) _list
-#define __LIST(source,owner_list) __list(source)
-#define DISOWNED_LIST(_list,owner_list) _list
-#define FREE_LIST(_list,owner_list) free_list(_list)
-#endif
-
-Mlist* _getListOfType(Mvaluetype valuetype);
-Mlist* listMadeWeak(Mlist * const list);
-Mlist* _getListCopy(Mlist const * const _list);
-Mlist* _getListIndices(Mlist const * const _list);
-Mlist* _getReversedList(Mlist const * const list); // MDH@19JUN2020: convenience method to reverse a list returns NULL on failure
-Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
-long long isListUndefined(Mlist* list);
-
-// Mlistelement* getAppendedListelement(Mlist * const _list); // MDH@27DEC2020
-/*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
-long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // MDH@23NOV2020: helper function to insert into a list with a certain index
 
 // MDH@04NOV2020: similar definitions for Marray
 typedef struct Marray{
@@ -163,6 +137,63 @@ Marray* disowned_array(Marray * const _array,Mallocationowner owner_array);
 #endif
 Marray* _getArrayCopy(Marray const * const array);
 void outputArray(char const * const prefix,Marray const * const array,char const * const suffix);
+
+Mvalue* _getValueOfArray(Marray* _array);
+Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd);
+
+Mlist* __list(char* source/*,Mallocationowner owner_list*/);
+void free_list(Mlist* _list/*,Mallocationowner owner*/);
+#ifndef __PRODUCTION__
+Mlist* owned_list(Mlist * const _list,Mallocationowner owner_list);
+Mlist* disowned_list(Mlist * const _list,Mallocationowner owner_list);
+#define OWNED_LIST(_list,owner_list) owned_list(_list,owner_list)
+#define __LIST(source,owner_list) owned_list(__list(source),owner_list)
+#define DISOWNED_LIST(_list,owner_list) disowned_list(_list,owner_list)
+#define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
+#else
+#define OWNED_LIST(_list,owner_list) _list
+#define __LIST(source,owner_list) __list(source)
+#define DISOWNED_LIST(_list,owner_list) _list
+#define FREE_LIST(_list,owner_list) free_list(_list)
+#endif
+
+Mlist* _getListOfType(Mvaluetype valuetype);
+Mlist* listMadeWeak(Mlist * const list);
+Mlist* _getListCopy(Mlist const * const _list);
+Mlist* _getListIndices(Mlist const * const _list);
+Mlist* _getReversedList(Mlist const * const list); // MDH@19JUN2020: convenience method to reverse a list returns NULL on failure
+Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
+long long isListUndefined(Mlist* list);
+
+// Mlistelement* getAppendedListelement(Mlist * const _list); // MDH@27DEC2020
+/*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // MDH@23NOV2020: helper function to insert into a list with a certain index
+
+// Mmatrix stuff
+typedef struct Mmatrix{
+	size_t numberOfRows;
+	size_t numberOfColumns;
+	Marray* _array;
+}Mmatrix;
+Mmatrix* disowned_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix);
+Mmatrix* owned_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix);
+Mmatrix* __matrix(long long numberOfRows,long long numberOfColumns);
+Mmatrix* _getMatrix(long long numberOfRows,long long numberOfColumns,Mvalue* defaultElementValue);
+void free_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix);
+#ifndef __PRODUCTION__
+Mmatrix* owned_matrix(Mmatrix * const _matrix,Mallocationowner owner_matrix);
+Mmatrix* disowned_matrix(Mmatrix * const _matrix,Mallocationowner owner_matrix);
+#define OWNED_MATRIX(_matrix,owner_matrix) owned_matrix((_matrix),(owner_matrix))
+#define __MATRIX(source,owner_matrix) owned_matrix(__matrix(source),owner_matrix)
+#define DISOWNED_MATRIX(_matrix,owner_matrix) disowned_matrix((_matrix),(owner_matrix))
+#define FREE_MATRIX(_matrix,owner_matrix) free_matrix((_matrix),(owner_matrix))
+#else
+#define OWNED_MATRIX(_matrix,owner_matrix) _matrix
+#define __MATRIX(source,owner_matrix) __matrix(source)
+#define DISOWNED_MATRIX(_matrix,owner_matrix) _matrix
+#define FREE_MATRIX(_matrix,owner_matrix) free_matrix(_matrix)
+#endif
+// end Mmatrix stuff
 
 typedef struct Mmapelement{
     Mvariable* _variable;
@@ -241,7 +272,6 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,char const * const source
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
-Mvalue* _getValueOfArray(Marray* _array);
 Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/);
 Mvalue* _getValueOfInteger(Minteger* _integer/*,Mallocationowner owner_integer*/);
 Mvalue* _getValueOfReal(Mfloat* _real/*,Mallocationowner owner_real*/);

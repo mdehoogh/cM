@@ -43,7 +43,6 @@ static unsigned long long arrayNextIndex(void * const iterator){
 	}
 	return 0;
 }
-
 /**
  * @brief returns an M array iterator into source M array \p array
  * 

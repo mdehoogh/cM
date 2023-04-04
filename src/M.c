@@ -5750,7 +5750,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								}else
 								if(inputChar==65){ // up arrow 
 									if(inputMode==IM_COMMAND){ // i.e. show previous command if any
-										if(commandIndex!=0&&_userInputCommand!=NULL)
+										if(commandIndex==0&&_userInputCommand!=NULL)
 											inputError("%s","Won't show previous commands when one is being entered.");
 										else
 										if(!commandDown())
