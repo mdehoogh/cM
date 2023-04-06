@@ -21,8 +21,15 @@ extern long long M_LL_INVALID;
 
 static struct termios orig_termios;
 
+/**
+ * @brief the global raw mode indicator 
+ * 
+ */
 static int16_t rawmode=-1;
-
+/**
+ * @brief disables raw mode
+ * 
+ */
 void disableRawmode(){
 	if(rawmode<0)return;
 	outputLine("Disabling character input mode.");
@@ -31,23 +38,44 @@ void disableRawmode(){
 }
 
 // MDH@23OCT2021: moved over from M.c as we need it in endOfInput() below
+/**
+ * @brief returns a new M string wrapped current timestamp text in format \p format
+ * 
+ * @param format 
+ * @return Mstring* a new M string wrapped current timestamp text in format \p format
+ */
 Mstring* _getTimestamp(char const * const format){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _timestamp=owned_string(__string(),owner);
-	if(_timestamp){
+	if(_timestamp!=NULL){
 		Mstring* p=string_setlength(_timestamp,50/*,owner*/);
-		if(p){
+		if(p!=NULL){
 			time_t now=time(NULL);
 			struct tm * nowlocal=localtime(&now);
-			p=string_setlength(p,strftime(p->_chars->chars,50,(format?format:"%Y-%m-%d %H:%M:%S"),nowlocal)/*,owner*/);
+			p=string_setlength(p,strftime(p->_chars->chars,50,(format!=NULL?format:"%Y-%m-%d %H:%M:%S"),nowlocal)/*,owner*/);
 		}
-		if(!p){FREE_STRING(_timestamp,owner);_timestamp=NULL;}
+		if(NULL==p){FREE_STRING(_timestamp,owner);_timestamp=NULL;}
 	}
 	return disowned_string(_timestamp,owner);
 }
-
+/**
+ * @brief the global (timestamped) output filename
+ * 
+ */
 Mstring* _timestampedOutputFilename=NULL;Mallocationowner owner_timestampedOutputFilename={MI_SESSION,__LINE__,1};
-size_t outputFilenamePrefixLength,outputFilenameSuffixLength;
-
+/**
+ * @brief the global output filename prefix length
+ * 
+ */
+size_t outputFilenamePrefixLength;
+/**
+ * @brief the global output filename suffix length
+ * 
+ */
+size_t outputFilenameSuffixLength;
+/**
+ * @brief responds to the end of user input
+ * @details renames the default output file name M.log to a timestamped output filename
+ */
 void endOfUserInput(){Mallocationowner owner=getOwner(__LINE__);
 	// return to the 'right' colors
 	resetOutputColor();
@@ -70,6 +98,12 @@ void endOfUserInput(){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // MDH@30JUN2020: let's allow a timeout (number of tenths of seconds to block for input every time)
+/**
+ * @brief enables raw mode, if not already enabled
+ * @details sets raw mode indicator to \p timeout
+ * 
+ * @param timeout 
+ */
 void enableRawmode(uint8_t timeout){
 	if(rawmode==timeout)return;
 	// output("Enabling character input mode with timeout %u.\n",timeout); // DEBUG
@@ -88,12 +122,27 @@ void enableRawmode(uint8_t timeout){
 
 ///////char inputChar='\0'; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
 // currently inputCharRead() blocks until a character can be read (and put in _c)
+/**
+ * @brief reads a single user input character (in raw mode)
+ * 
+ * @param _c the character read
+ * @return true on success
+ * @return false on failure
+ */
 bool inputCharRead(char* _c){
 	enableRawmode(0);
 	return(read(STDIN_FILENO,_c,1)==1);
 }
 // MDH@12JUL2020: even if updateFunction is NULL we switch to using a 1/10s timeout, only when updateFunction is not NULL do we execute the update function!!!!
 //				this is so that we can use NULL to read characters received as part of an escape sequence!!
+/**
+ * @brief read a single input character non blocking calling update function \p updateFunction when done
+ * 
+ * @param _c the chararacter read
+ * @param updateFunction the update function called
+ * @return true on success
+ * @return false on failure
+ */
 bool inputCharReadNonBlocking(char* _c,UpdateFunction updateFunction){
 	// if(!updateFunction)return inputCharRead(_c);
 	enableRawmode(1);
@@ -123,47 +172,119 @@ int getch(){
 //////char getInputChar(){return inputChar;}
 
 // interfacing with the console
+/**
+ * @brief moves the cursor one line up
+ * 
+ */
 void oneLineUp(){outputControlText("1A");} // ascertain that the previous line is visible
+/**
+ * @brief moves the cursor one line down
+ * 
+ */
 void oneLineDown(){outputControlText("1B");} // one line down
+/**
+ * @brief moves the cursor to the start of the line
+ * 
+ */
 void toStartOfLine(){outputChar('\r');} // replacing: '\r');}
+/**
+ * @brief clears the entire current cursor line
+ * 
+ */
 void clearLine(){
 	toStartOfLine();outputControlText("K");
 } // MDH@30OCT2019: adjusted to always to the start of the line before clearing it, this is to ascertain that any called does not need toStartOfLine() per se
-
+/**
+ * @brief moves the cursor \p pos positions to the left
+ * 
+ * @param pos 
+ */
 void moveCursorLeft(uint16_t pos){
 	if(pos)output(ES"%huD",pos);
 } // TODO can't use outputControlText here!!!
-
+/**
+ * @brief moves the cursor \p pos positions to the right
+ * 
+ * @param pos 
+ */
 void moveCursorRight(uint16_t pos){
 	if(pos)output(ES"%huC",pos);
 } // TODO can't use outputControlText here!!!
-
+/**
+ * @brief clears the screen from the current cursor position
+ * 
+ */
 void clearScreenFromCursor(){
 	outputControlText("J");
 }
+/**
+ * @brief clears the entire screen (starting at the cursor position)
+ * 
+ */
 void clearDisplay(){
 	clearScreenFromCursor();// replacing: outputControlText("2J");
 }
+/**
+ * @brief beeps
+ * 
+ */
 void beep(){outputChar('\a');} // replacing \a
+/**
+ * @brief removes the character behind the cursor
+ * 
+ */
 void removeLastCharacter(){outputChar('\b');}
+/**
+ * @brief hides the cursor
+ * 
+ */
 void hidecursor(){outputControlText("?25l");}
+/**
+ * @brief shows the cursor
+ * 
+ */
 void showcursor(){outputControlText("?25h");}
+/**
+ * @brief outputs a single empty line
+ * 
+ */
 void emptyline(){outputControlText("2K\r");}
+/**
+ * @brief performs a 'backspace' by moving the cursor left one position and clearing the screen from the cursor
+ * 
+ */
 void backspace(){outputControlText("D"); /* go left one character */ outputControlText("K"); /* clear the rest of the line */}
-
+/**
+ * @brief outputs text color text \p colorText
+ * 
+ * @param colortext 
+ */
 void setColor(char const * const colortext){
 	output(ES"38;5;%sm",colortext);
 }
+/**
+ * @brief outputs background color text \p colortext
+ * 
+ * @param colortext 
+ */
 void setBackColor(char const * const colortext){
 	output(ES"48;5;%sm",colortext);
 }
-
+/**
+ * @brief resets the output foreground and background colors
+ * 
+ */
 void resetOutputColor(){
 	setColor(getInfoColor());
 	setBackColor(getBackgroundColor());
 }
 
 // MDH@27FEB2020: delegating to outputInfo after resetting the output color
+/**
+ * @brief outputs text \p s and a newline character
+ * 
+ * @param s the text to output
+ */
 void outputLine(char* s){
 	resetOutputColor();
 	output("%s\n",s);
@@ -174,6 +295,9 @@ void activateColorscheme(){
 	clearScreenFromCursor(); // MDH@30OCT2019 replacing: clearDisplay();
 	///////outputLine((colorscheme?"Will assume white background!":"Will assume black background!"));
 }
+*/
+/**
+ * initializes the screen at the start of the M interpreter
 */
 void initDisplay(){
 	/*
@@ -187,9 +311,23 @@ void initDisplay(){
 	activateWrapmode(); // MDH@26JUN2020: sync the wrap mode to the initial setting
 	///////setWrapping(amWrapping()); // activate the current wrap mode!!!
 }
-
-static int windowRows=0,windowCols=0;
+/**
+ * @brief the global current window available character lines
+ * 
+ */
+static int windowRows=0;
+/**
+ * @brief the global available character positions per line of the current window
+ * 
+ */
+static int windowCols=0;
 // MDH@15MAR2020: could be useful (for automatic wrapping) to know the window size
+/**
+ * @brief updates the global number of window lines and window line character positions
+ * 
+ * @return true on success
+ * @return false on failure
+ */
 bool windowSizeDetermined() {
 	struct winsize ws;
 	if(ioctl(STDOUT_FILENO,TIOCGWINSZ,&ws)==-1||ws.ws_col==0)return false;
@@ -197,11 +335,32 @@ bool windowSizeDetermined() {
 	windowRows=ws.ws_row;
 	return true;
 }
+/**
+ * @brief returns the number of available window text lines
+ * 
+ * @return int the number of available window text lines
+ */
 int getNumberOfWindowTextLines(){return windowRows;}
+/**
+ * @brief returns the number of available character positions per text line
+ * 
+ * @return int 
+ */
 int getNumberOfWindowTextColumns(){return windowCols;}
-
+/**
+ * @brief updates and returns the number of available character positions per text line
+ * 
+ * @return int 
+ */
 int getCurrentNumberOfWindowTextColumns(){windowSizeDetermined();return windowCols;}
-
+/**
+ * @brief initializes a M interpreter session
+ * 
+ * @param outputfilenamePrefix the prefix of the M output file
+ * @param outputfilenameSuffix the suffix of the M output file
+ * @return true on success
+ * @return false on failure
+ */
 bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix){
 	_timestampedOutputFilename=owned_string(_getTimestamp(".%Y%m%d.%H%M%S"),owner_timestampedOutputFilename); // MDH@24JAN2023: replacing: getOwner(__LINE__));
   if(_timestampedOutputFilename&&string_prepend(_timestampedOutputFilename,outputfilenamePrefix))outputFilenamePrefixLength=strlen(outputfilenamePrefix);
@@ -213,13 +372,20 @@ bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix){
 
 // MDH@17OCT2019: instead of setting the back color we can return the text to be used in out to set the back color
 // set the backcolor
+/**
+ * @brief returns the (wrapped) background color text associated with the integer wrapped in \p _value 
+ * 
+ * @param _value 
+ * @return Mvalue* the (wrapped) background color text associated with the integer wrapped in \p _value 
+ */
 Mvalue* Mbc(Mvalue* _value){
-	long long ll=(_value?getValueInteger(_value):-1); // all negative colors default to the back color
+	long long ll=(_value!=NULL?getValueInteger(_value):-1); // all negative colors default to the back color
 	if(ll==M_LL_INVALID)return NULL;
 	char s[16];if(ll>=0)sprintf(s,"'\\033[48;5;%lldm",ll%256);else sprintf(s,"'\\033[48;5;%sm",getBackgroundColor());
 	////////////output("ANSI background color code: '%s'.\n",s);
-	char* _s=strdup(s);if(!_s)return NULL;
-	Mvalue* _textValue=_getTextValue(_s);free(_s);
+	char* _s=strdup(s);if(NULL==_s)return NULL;
+	Mvalue* _textValue=_getTextValue(_s);
+	free(_s);
 	return _textValue;
 	/* replacing:
 	Mstring* _valueText=_getValueText(_value,true);
@@ -230,13 +396,20 @@ Mvalue* Mbc(Mvalue* _value){
 	*/
 }
  // set text color
+/**
+ * @brief returns the (wrapped) output text color text associated with the integer wrapped in \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the (wrapped) output text color text associated with the integer wrapped in \p _value
+ */
 Mvalue* Mtc(Mvalue* _value){
-	long long ll=(_value?getValueInteger(_value):-1);
+	long long ll=(_value!=NULL?getValueInteger(_value):-1);
 	if(ll==M_LL_INVALID)return NULL;
 	char s[16];if(ll>=0)sprintf(s,"'\\033[38;5;%lldm",ll%256);else sprintf(s,"'\\033[38;5;%sm",getInfoColor());
 	////////output("ANSI foreground color code: '%s'.\n",s);
-	char* _s=strdup(s);if(!_s)return NULL;
-	Mvalue* _textValue=_getTextValue(_s);free(_s);
+	char* _s=strdup(s);if(NULL==_s)return NULL;
+	Mvalue* _textValue=_getTextValue(_s);
+	free(_s);
 	return _textValue;
 	/*
 	Mstring* _valueText=_getValueText(_value,true);

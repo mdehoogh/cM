@@ -469,8 +469,15 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
 		if(NULL==_valueList){outputBug("Failed to create the global value list.");return NULL;}
 		// MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
 		//				as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
-		long long valueIndex=appendedToList(_valueList,owner_valueList,(Mvalue*)DISOWNED(CALLOC_1(sizeof(Mvalue),'U',owner),owner),M_LL_INVALID);
-		if(valueIndex<=0){outputBug("Failed to store the global undefined value.");return NULL;}
+		Mvalue* _undefinedValue=CALLOC_1(sizeof(Mvalue),'U',owner);
+		long long valueIndex=appendedToList(_valueList,owner_valueList,_undefinedValue,M_LL_INVALID);
+		if(valueIndex<=0){
+			FREE_DISOWNED_1(_undefinedValue,'U',owner);
+			outputBug("Failed to store the global undefined value.");
+			return NULL;
+		}
+		OWNED(DISOWNED(_undefinedValue,owner),owner_value); // MDH@06APR2023: take over ownership of the appended value
+		//////output("Undefined value index #%lld.\n",valueIndex);
 		valueCount=valueIndex;
 		_valueList->weak=true; // MDH@11NOV2019: from now on a weak list i.e. elements are not added using assignValue but directly
 	}
@@ -2087,10 +2094,13 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		return 0;
 	}
 	// check validity of index first
-	long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
+	long long lastindex=(_list->_last!=NULL?_list->_last->index:0); // ASSERT lastindex nonnegative
 	// MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
 	// MDH@05NOV2019: if supposed to append the value, and the current last index is already equal to the maximum possible index, we consider the list to be full
-	if(index==M_LL_INVALID){if(lastindex==M_LL_MAX){outputError("Unable to append to a list: it is full");return 0;};index=lastindex+1;} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
+	if(index==M_LL_INVALID){
+		if(lastindex==M_LL_MAX){outputError("Unable to append to a list: it is full");return 0;};
+		index=lastindex+1;
+	} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
 	if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
 	// MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
 	if(index<0){output("%sIndex %lld of (new) list element too small.\n",M_ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
@@ -2106,7 +2116,10 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 			_listelement=_listelement->_next;
 		}
 		// if we're going to insert there will be a successor
-		if(_listelement->index!=index){_nextListelement=(_prevListelement!=NULL?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
+		if(_listelement->index!=index){
+			_nextListelement=(_prevListelement!=NULL?_prevListelement->_next:_list->_first);
+			_listelement=NULL;
+		} // so that we are forced to create one
 	}else // we'll be insertingappending/prepending, so the current last is the predecessor (and no successor)
 	if(index>0) // MdH@17OCT2019: when not prepending...
 		_prevListelement=_list->_last;
@@ -2116,7 +2129,11 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		if(NULL==_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
 	}
 	// MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
-	if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
+	if(!_list->weak){
+		assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
+		///////// if(Misdisowned(_value))SUBOWNED(OWNED(_value,owner_list),2); // MDH@15MAY2020: make _listelement owned by the given list
+	}else
+		_listelement->_value=_value;
 	// outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count); // DEBUG
 	// if replacing i.e. the index of _listelement matches index, we're done
 	// if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
@@ -4242,7 +4259,7 @@ Muserfunction* disowned_userfunction(Muserfunction * const _userfunction,Malloca
  * @param _userfunction 
  */
 void free_userfunction(Muserfunction* _userfunction){
-	if(!_userfunction)return;
+	if(NULL==_userfunction)return;
 	///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
 	// NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
 	free_list(_userfunction->_bodyCommandList);

@@ -70,21 +70,82 @@ const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BI
 // value token colors
 const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,REFERENCE_COLORS,VARIABLE_COLORS,NEW_VARIABLE_COLORS,VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
 
+/**
+ * @brief the global active color scheme indicator
+ * @details only possible values currently 0 (white) and 1 (black), toggle with C in control mode
+ */
 uint8_t colorscheme=0; // the active color scheme (either 0 for white, or 1 for black background), toggle with C in control mode
 
 // exposing certain colors
+/**
+ * @brief returns the current color scheme info color
+ * 
+ * @return const char* the current color scheme info color
+ */
 const char* getInfoColor(){return INFO_COLORS[colorscheme];}
+/**
+ * @brief returns the current color scheme background color
+ * 
+ * @return const char* the current color scheme background color
+ */
 const char* getBackgroundColor(){return BACKGROUND_COLORS[colorscheme];}
+/**
+ * @brief returns the current color scheme error color
+ * 
+ * @return const char* the current color scheme error color
+ */
 const char* getErrorColor(){return ERROR_COLORS[colorscheme];}
+/**
+ * @brief returns the current color scheme feedforward text color
+ * 
+ * @return const char* the current color scheme feedforward text color
+ */
 const char* getFeedForwardTextColor(){return FEED_FORWARD_TEXT_COLORS[colorscheme];}
+/**
+ * @brief returns the current color scheme manual feed forward text color
+ * 
+ * @return const char* the current color scheme manual feed forward text color
+ */
 const char* getManualFeedforwardTextColor(){return MANUAL_FEED_FORWARD_TEXT_COLORS[colorscheme];}
+/**
+ * @brief returns the current color scheme identifier continuation text color
+ * 
+ * @return const char* the current color scheme identifier continuation text color
+ */
 const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for generated feed forward text
+/**
+ * @brief returns the current color scheme auto completion text color
+ * 
+ * @return const char* the current color scheme auto completion text color
+ */
 const char* getAutoCompletionTextColor(){return AUTO_COMPLETION_TEXT_COLORS[colorscheme];} // MDH@27OCT2021: special color for generated auto completion text
+/**
+ * @brief returns the current color scheme comment color
+ * 
+ * @return const char* the current color scheme comment color
+ */
 const char* getCommentColor(){return COMMENT_COLORS[colorscheme];}
+/**
+ * @brief returns the current color scheme token color of the operator with index \p opid
+ * 
+ * @param opid the operator index
+ * @return const char* the current color scheme token color of the operator with index \p opid
+ */
 const char* getOperatorTokenColor(uint8_t opid){return OPERATOR_TOKEN_COLORS[opid][colorscheme];}
+/**
+ * @brief returns the token color of a value with token type \p tokentypeid
+ * 
+ * @param tokentypeid 
+ * @return const char* the token color of a value with token type \p tokentypeid
+ */
 const char* getValueTokenColor(uint8_t tokentypeid){return VALUE_TOKEN_COLORS[tokentypeid][colorscheme];}
 
 // display flags
+/**
+ * @brief returns the current color scheme
+ * @details currentlu only 0 (white) and 1 (black) are supported
+ * @return uint8_t the current color scheme
+ */
 uint8_t getColorscheme(){return colorscheme;}
 uint8_t setColorscheme(uint8_t newColorscheme){
 	colorscheme=(newColorscheme%NUMBER_OF_COLOR_SCHEMES);
