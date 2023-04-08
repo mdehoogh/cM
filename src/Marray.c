@@ -72,12 +72,13 @@ Miterator getArrayiterator(Marray* array){
 Mvalue* marray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner owner=getOwner(__LINE__);
 	// how about allowing length_value to be a list or array to fill the array with 
 	// returns an array that can store length_value values (if possible)
+	// MDH@09APR2023: now also allowing length_value to contain an array of dimension thus indicating that this will be a multi-dimensional array (instead of a flat array)
 	if(length_value!=NULL){
 		long long length;
 		if(length_value->type==VT_MAP){
 			Mmap* _map=length_value->value._map;
 			length=_map->numberOfElements<<1;
-			Marray* _result=owned_array(_getArray("marray",length),owner); // each key value pair uses 2 array elements
+			Marray* _result=owned_array(_getArray("marray",length,NULL),owner); // each key value pair uses 2 array elements
 			if(_result!=NULL){
 				Mvariable* variable;
 				Mmapelement* mapelement=_map->_first;
@@ -98,33 +99,73 @@ Mvalue* marray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner owner=g
 			}
 		}else
 		if(length_value->type==VT_ARRAY){
+			// MDH@09APR2023: we should actually use the positive integers in the array to initialize the array
 			Marray* _array=length_value->value._array;
+			unsigned long long numberOfDimensions=_array->numberOfElements;
+			// creating the dimensions backwards
+			Marray*_result=NULL;
+			Mvalue* fillValue=fill_value; // the fill value of the array at the given dimension
+			while(numberOfDimensions>0){
+				long long arrayLength=getValueInteger(_array->values[--numberOfDimensions]);
+				if(arrayLength>0){
+					_result=owned_array(_getArray("marray",arrayLength,fillValue),owner);
+					if(_array!=NULL){
+						fillValue=_getValueOfArray(disowned_array(_result,owner));
+					}else
+						outputError("Failed to create (sub)array");
+				}else
+					outputError("Invalid (sub)array length");
+			}
+			return fillValue;
+			/* replacing:
 			length=_array->numberOfElements;
 			Marray* _result=owned_array(_getArray("marray",length),owner);
 			if(_result!=NULL){
 				while(--length>=0)assignValue(&_result->values[length],_array->values[length]);
 				return _getValueOfArray(disowned_array(_result,owner));
 			}
+			*/
 		}else
 		if(length_value->type==VT_LIST){
+			// a list is problematic since we need the dimensions in reverse order
+			Mlist* _reversedList=owned_list(_getReversedList(length_value->value._list),owner);
+			if(_reversedList!=NULL){
+				Mlistelement* listelement=_reversedList->_first;
+				unsigned long long numberOfDimensions=_reversedList->numberOfElements;
+				Mvalue* fillValue=fill_value;
+				Marray* _result=NULL;
+				while(listelement!=NULL&&numberOfDimensions>0){
+					long long arrayLength=getValueInteger(listelement->_value);
+					if(arrayLength>0){
+						_result=owned_array(_getArray("marray",arrayLength,fillValue),owner);
+						if(_result!=NULL)
+							fillValue=_getValueOfArray(disowned_array(_result,owner));
+						else
+							outputError("Failed to create (sub)array");
+					}else
+						outputError("Invalid (sub)array length");
+					listelement=listelement->_next;
+				}
+				FREE_LIST(_reversedList,owner);
+				return fillValue;
+			}
+			/* replacing:
 			Mlist* _list=length_value->value._list;
 			length=_list->numberOfElements;
-			Marray* _result=owned_array(_getArray("marray",length),owner);
+			Marray* _result=owned_array(_getArray("marray",length,NULL),owner);
 			if(_result!=NULL){
 				Mlistelement* listelement=_list->_first;
 				unsigned long long arrayindex=0;
 				while(listelement!=NULL&&arrayindex<length){assignValue(&_result->values[arrayindex++],listelement->_value);listelement=listelement->_next;}
 				return _getValueOfArray(disowned_array(_result,owner));
 			}
+			*/
 		}else{ // not composite, interpret as a length
 			long long length=getValueInteger(length_value);
 			if(length>=0){
-				Marray* _result=owned_array(_getArray("marray",length),owner);
-				if(_result!=NULL){
-					if(fill_value!=NULL)
-						while(length>0)assignValue(&_result->values[--length],fill_value);
-					return _getValueOfArray(disowned_array(_result,owner));
-				}
+				Marray* _result=owned_array(_getArray("marray",length,fill_value),owner);
+				if(_result!=NULL)return _getValueOfArray(disowned_array(_result,owner));
+				outputError("Failed to create array");
 			}
 		}
 	}

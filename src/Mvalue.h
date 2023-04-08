@@ -110,17 +110,18 @@ typedef struct Mlist{
 
 // MDH@04NOV2020: similar definitions for Marray
 typedef struct Marray{
-    Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
-    unsigned long long numberOfElements; // keep track of the total number of elements
-    Mvaluetype valuetype; // we can force a list to have elements of the same type
-    Mvalue** values; // I suppose we need to have a pointer to an array of Mvalue pointers, alternatively if the number of elements is fixed, we could point to the Mvalue structures themselves?????
-    bool weak:1;
-    bool immutable:1;
+	Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
+	unsigned long long numberOfElements; // the number of values field "values" holds
+	unsigned long long numberOfDimensionsLeft; // MDH@08APR2023: the number of dimensions left (only for multidimensional arrays, so we can tell from the top-level array how many dimensions it has)
+	Mvaluetype valuetype; // we can force an array to have elements of the same type
+	Mvalue** values; // I suppose we need to have a pointer to an array of Mvalue pointers, alternatively if the number of elements is fixed, we could point to the Mvalue structures themselves?????
+	bool weak:1;
+	bool immutable:1;
 }Marray;
 long long isArrayUndefined(Marray* array);
 
 Marray* __array(char* source/*,Mallocationowner owner_list*/);
-Marray* _getArray(char* source,unsigned long long numberOfValues);
+Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const * fillValue);
 void free_array(Marray* _array/*,Mallocationowner owner*/);
 #ifndef __PRODUCTION__
 Marray* owned_array(Marray * const _array,Mallocationowner owner_array);

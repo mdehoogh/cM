@@ -3565,7 +3565,7 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			Mlist* list=value->value._list;
 			if(list){
 				unsigned long long listlength=list->numberOfElements;
-				Marray* _array=owned_array(_getArray("Ma",listlength),owner);
+				Marray* _array=owned_array(_getArray("Ma",listlength,NULL),owner);
 				if(_array){
 					_array->valuetype=list->valuetype;
 					if(listlength>0){
@@ -3589,7 +3589,7 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			Mmap* map=value->value._map;
 			if(map){
 				unsigned long long maplength=map->numberOfElements;
-				Marray* _array=owned_array(_getArray("Ma",maplength<<1),owner);
+				Marray* _array=owned_array(_getArray("Ma",maplength<<1,NULL),owner);
 				if(_array){
 					_array->valuetype=map->valuetype; // MDH@28MAR2023
 					if(maplength>0){ // something to copy over
@@ -3620,7 +3620,7 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			}else
 				outputBug("No (value) map to convert to an array!");
 		}else{ // a single value, to be wrapped in an array
-			Marray* _array=owned_array(_getArray("Ma",1),owner);
+			Marray* _array=owned_array(_getArray("Ma",1,NULL),owner);
 			if(_array!=NULL){
 				assignValue(_array->values,value); // pretty simple!
 				return _getValueOfArray(disowned_array(_array,owner));
@@ -4198,7 +4198,7 @@ Mvalue* _functionAppliedToArray(Marray* _array,OneArgumentFunction function,bool
 	// lists are to be added to the elements at the same position, so listwise
 	Marray* _result=NULL;
 	if(function!=NULL&&_array!=NULL){ // we need both a function and a list
-		_result=owned_array(_getArray("_functionAppliedToArray",_array->numberOfElements),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
+		_result=owned_array(_getArray("_functionAppliedToArray",_array->numberOfElements,NULL),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
 		if(_result!=NULL){
 			if(maintainsValuetype)_result->valuetype=_array->valuetype;
 			// using pointer arithmetic is the way to go
@@ -6789,7 +6789,7 @@ Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction b
 	// ASSERT the list is not empty
 	unsigned long long arraylength=(_array!=NULL?_array->numberOfElements:0);
 	// the number of elements in the array is the maximum of the number of elements in the array or the index of the list
-	Marray* _result=owned_array(_getArray("appliedToArrayAndList",MAX(arraylength,_list->_last->index)),owner);
+	Marray* _result=owned_array(_getArray("appliedToArrayAndList",MAX(arraylength,_list->_last->index),NULL),owner);
 	if(_result!=NULL){
 		if(maintainsValuetype)_result->valuetype=_array->valuetype; // MDH@29MAR2023: TODO should we do this????
 		// elements with the same index are to be added and stored under that index
@@ -6907,7 +6907,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 Marray* _appliedToArrays(Marray* _array1,Marray* _array2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@30MAR2023: it's debatable whether we want a elementwise binary operator application or every element with every other element
 	if(NULL==_array1)return _array2;if(NULL==_array2)return _array1;
-	Marray* _result=owned_array(_getArray("_appliedToArrays",MAX(_array1->numberOfElements,_array2->numberOfElements)),owner); // TODO if the types are the same use that?
+	Marray* _result=owned_array(_getArray("_appliedToArrays",MAX(_array1->numberOfElements,_array2->numberOfElements),NULL),owner); // TODO if the types are the same use that?
 	if(_result!=NULL){
 		if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array1->valuetype,_array2->valuetype);
 		unsigned long long arrayindex=0;
@@ -6935,7 +6935,7 @@ Mvalue* _appliedToArray(Marray* _array,Mvalue* _value,TwoArgumentFunction binary
 	if(_value!=NULL){
 		if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
 			// should create an array of the same length
-			Marray* _result=owned_array(_getArray("_appliedToArray",_array->numberOfElements),owner);
+			Marray* _result=owned_array(_getArray("_appliedToArray",_array->numberOfElements,NULL),owner);
 			if(_result!=NULL){
 				if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
 				unsigned long long arrayindex=0;
@@ -6968,7 +6968,7 @@ Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binar
 	if(_value!=NULL){
 		if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
 			// should create an array of the same length
-			Marray* _result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements),owner);
+			Marray* _result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements,NULL),owner);
 			if(_result!=NULL){
 				if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
 				unsigned long long arrayindex=0;
@@ -9821,7 +9821,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 						unsigned long long arraylength=(*up
 							?(lastRangeInteger>=rangeInteger?1+(lastRangeInteger-rangeInteger):0)
 							:(rangeInteger>=lastRangeInteger?1+(rangeInteger-lastRangeInteger):0));
-						_scalarRangeArray=owned_array(_getArray("_getScalarRangeArray",arraylength),owner);
+						_scalarRangeArray=owned_array(_getArray("_getScalarRangeArray",arraylength,NULL),owner);
 						if(_scalarRangeArray!=NULL){
 							if(arraylength>0){
 								Mvalue** valueholder=_scalarRangeArray->values;

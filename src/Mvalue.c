@@ -995,7 +995,7 @@ Mmatrix* __matrix(long long numberOfRows,long long numberOfColumns){Mallocationo
 	if(numberOfRows<=0||numberOfColumns<=0)return NULL;
 	Mmatrix* _matrix=(Mmatrix*)CALLOC_1(sizeof(Mmatrix),'M',owner);
 	if(NULL==_matrix)return NULL;
-	Marray* _array=_getArray("matrix",numberOfRows*numberOfColumns);
+	Marray* _array=_getArray("matrix",numberOfRows*numberOfColumns,NULL);
 	if(NULL==_array){free_matrix(_matrix,owner);return NULL;}
 	_matrix->_array=owned_array(_array,Msubowner(owner,1));
 	_matrix->numberOfRows=numberOfRows;
@@ -1828,19 +1828,28 @@ Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
 	return DISOWNED_ARRAY(_array,owner);
 }
 /**
- * @brief returns a new array containing \p numberOfValues M value slots
+ * @brief returns a new array with \p numberOfElements elements filled with \p fillValue
  * 
  * @param source 
- * @param numberOfValues the number of M value slots to create in the M array
- * @return Marray* a new array containing \p numberOfValues M value slots
+ * @param numberOfElements the number of array elements
+ * @param fillValue the (default) array element value
+ * @return Marray* a new array
  */
-Marray* _getArray(char* source,unsigned long long numberOfValues){Mallocationowner owner=getOwner(__LINE__);
+Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const * fillValue){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _array=owned_array(__array(source),owner);
 	if(NULL==_array)return NULL;
-	if(numberOfValues>0){ // _array->values should be initialized to accomodate the given number of values
-		_array->values=CALLOC(sizeof(Mvalue*),numberOfValues,-'a',Msubowner(owner,1));
-		if(NULL==_array->values){FREE_DISOWNED_1(_array,'A',owner);return NULL;}
-		_array->numberOfElements=numberOfValues; // OOPS almost forgot this!!!!
+	if(numberOfElements){ // _array->values should be initialized to accomodate the given number of values
+		// I need to allocated enough room for numberOfElements Mvalue*
+		_array->values=CALLOC(sizeof(Mvalue*),numberOfElements,-'a',Msubowner(owner,1));
+		if(_array->values!=NULL){
+			_array->numberOfElements=numberOfElements;
+			if(fillValue!=NULL){
+				while(numberOfElements>0)assignValue(&_array->values[--numberOfElements],fillValue); // assign the fillValue to each element in the array
+				_array->valuetype=fillValue->type; // the type of fillValue becomes the value type of the array
+				if(fillValue->type==VT_ARRAY)_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
+			}
+		}else
+			outputError("Failed to allocate memory for storing the array elements");
 	}
 	return DISOWNED_ARRAY(_array,owner);
 }
@@ -1900,7 +1909,7 @@ Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallo
 Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
 	if(array!=NULL){
 		register unsigned long long arrayindex=array->numberOfElements; // MDH@24NOV2020: HOORAY my first time use of 'register'
-		Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex),owner);
+		Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex,NULL),owner);
 		if(_array!=NULL){
 			if(arrayindex>0){
 				Mvalue **newvalueholder=_array->values+arrayindex,**valueholder=array->values+arrayindex;
@@ -3791,7 +3800,7 @@ Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction){M
 	if(_array!=NULL){
 		unsigned long long l=_array->numberOfElements;
 		if(l>0){
-			_result=owned_array(_getArray("appliedToArray",_array->numberOfElements),owner);
+			_result=owned_array(_getArray("appliedToArray",_array->numberOfElements,NULL),owner);
 			if(_result==NULL)return NULL;
 			do{
 				l--;

@@ -299,7 +299,7 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner own
 					// MDH@23MAR2023: should we return lists or arrays????? perhaps better to return arrays
 					while(numberOfRows>0){
 						numberOfRows--;
-						Mvalue* _rowValue=_getValueOfArray(_getArray("table",columnNamesList->numberOfElements));
+						Mvalue* _rowValue=_getValueOfArray(_getArray("table",columnNamesList->numberOfElements,NULL));
 						if(NULL==_rowValue){outputError("Failed to create a new table row; the table will be incomplete");break;}
 						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row; the table will be incomplete");break;}
 					}
