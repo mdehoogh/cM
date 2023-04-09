@@ -108,6 +108,10 @@ Mvalue* marray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner owner=g
 			while(numberOfDimensions>0){
 				long long arrayLength=getValueInteger(_array->values[--numberOfDimensions]);
 				if(arrayLength>0){
+					if(amVerbose()){
+						output("Filling %lld elements of array",arrayLength);
+						outputValue(" with ",fillValue,".\n");
+					}
 					_result=owned_array(_getArray("marray",arrayLength,fillValue),owner);
 					if(_array!=NULL){
 						fillValue=_getValueOfArray(disowned_array(_result,owner));

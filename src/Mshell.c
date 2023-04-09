@@ -2477,7 +2477,8 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 									if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
 							}
 						}else
-						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP){
+						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP&&pNewToken->expr->type!=TT_EXPRESSION){
+							// MDH@10APR2023: now allowed in TT_EXPR, so that we can have array results
 							newTokenType=TT_ERROR;
 							if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[pNewToken->expr->type]);
 						}
@@ -3560,23 +3561,26 @@ Mvalue* Mm(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value!=NULL){
+		outputValue("Casting '",value,"' to an array.\n");
 		if(value->type==VT_ARRAY)return value;
 		if(value->type==VT_LIST){
 			Mlist* list=value->value._list;
-			if(list){
-				unsigned long long listlength=list->numberOfElements;
+			if(list!=NULL){
+				// MDH@10APR2023: we actually want to have the same range so we should use the index of the last
+				//                element of the list as listlength NOT the number of elements!!!!!!
+				unsigned long long listlength=(list->_last!=NULL?list->_last->index:0); // replacing: list->numberOfElements;
 				Marray* _array=owned_array(_getArray("Ma",listlength,NULL),owner);
-				if(_array){
+				if(_array!=NULL){
 					_array->valuetype=list->valuetype;
 					if(listlength>0){
 						Mvalue** valueholder=_array->values;
 						Mlistelement* listelement=value->value._list->_first;
 						unsigned long long arrayindex=0;
 						while(listelement!=NULL){
-							assignValue(valueholder,listelement->_value);
-							if(++arrayindex==listlength)break; // done if we reached the end of the array
+							assignValue(&_array->values[listelement->index-1],listelement->_value);
+							// MDH@10APR2023: if(++arrayindex==listlength)break; // done if we reached the end of the array
 							listelement=listelement->_next;
-							valueholder++;
+							// MDH@10APR2023: valueholder++;
 						}
 					}
 					return _getValueOfArray(disowned_array(_array,owner));
@@ -6464,16 +6468,30 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
 				{
 					canbeindexedtheoretically=true;
-					Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0,false);
+					// MDH@10APR2023: CORRECTION 1
+					//                cutting off all succeeding list elements prevents us from creating an array
+					//                from an expression with multiple elements
+					//                therefore we decide here to allow for not limiting the maximum number of list elements
+					//                EFFECT: ok, this apparently helps creating a list result, but perhaps we want an array result
+					//                CORRECTION 2
+					//                if the resulting list has more than one element, we turn it into an array by applying Ma to it
+					//                CORRECTION 3
+					//                how about always mapping to an array??????
+					Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,0/* replacing: 1*/,0,false);
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					if(amVerboseDebugging())outputInfo("Going to wrap the list extracted!");
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
+					/* MDH@10APR2023: essentially what an expression should return is an array not a list
 					if(_expressionListValue->value._list->numberOfElements==1){
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
 					}else
-						_valueReference=owned_valuereference(_getValuereference(_expressionListValue),owner);
-					if(amVerboseDebugging())outputInfo("Extracted list wrapped!");
+					*/
+						_valueReference=owned_valuereference(_getValuereference(Ma(_expressionListValue)),owner);
+					// the reference count of _expressionListValue should be 0 now!!!
+					if(_expressionListValue!=NULL&&_expressionListValue->count)
+						outputBug("Expression list value reference count not 0");
+					////////if(amVerboseDebugging())outputInfo("Extracted list wrapped!");
 				}
 				break;
 			default:
