@@ -77,6 +77,12 @@ long long isANumericMatrix(Marray* array){
 	return M_LL_INVALID;
 }
 
+/**
+ * @brief returns the value type of elements of matrix \p array
+ * 
+ * @param array 
+ * @return Mvaluetype the value type of elements of matrix \p array
+ */
 static Mvaluetype getMatrixElementValuetype(Marray* array){
 	return(array->values[0]->value._array->values[0]->type);
 }
@@ -130,14 +136,66 @@ Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner owner=getO
 }
 
 /**
+ * @brief returns a square matrix with \p numberOfDiagonalValues of \p diagonalValues along the diagonal 
+ * 
+ * @param matrix_diagonal 
+ * @return Marray* the diagonal square matrix
+ */
+Marray* diagonalmatrix(Mvalue** diagonalValues,long long numberOfValues){Mallocationowner owner=getOwner(__LINE__);
+	if(diagonalValues!=NULL&&numberOfValues>0){
+		// every row is different but starts with being zero
+		Mvaluetype* valuetype=diagonalValues[0]->type;
+		Mvalue* zeroOfTypeValue=getValueZeroOfType(valuetype);
+		Mvalue* oneOfTypeValue=getValueOneOfType(valuetype);
+		Marray* _row=owned_array(_getArray(NULL,numberOfValues,zeroOfTypeValue),owner);
+		Marray* _rows=owned_array(_getArray(NULL,numberOfValues,_row),owner);
+		// fill the diagonal of _rows
+		for(long long rowIndex=0;rowIndex<numberOfValues;rowIndex++){
+			Marray* row=_rows->values[rowIndex]->value._array;
+			assignValue(&row->values[rowIndex],oneOfTypeValue);
+		}
+		return disowned_array(_rows,owner);
+	}
+	return NULL;
+}
+
+/**
  * @brief returns the inverse of matrix \p array1
  * 
  * @param array1 
  * @return Marray* the inverse of matrix \p array1
  */
-Marray* matrixinverse(Marray* array1){
-	if(isANumericMatrix(array1)==M_TRUE){
-
+Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LINE__);
+	if(isANumericMatrix(array)==M_TRUE){
+		long long numberOfArrayRows=getNumberOfMatrixRows(array);
+		if(numberOfArrayRows==getNumberOfMatrixColumns(array)){
+			// create an array of ones
+			Mvalue* oneOfTypeValue=getValueOneOfType(getMatrixElementValuetype(array));
+			Marray* diagonalOfOnes=owned_array(_getArray(NULL,numberOfArrayRows,oneOfTypeValue),owner);
+			if(diagonalOfOnes!=NULL){
+				Marray* unityMatrix=owned_array(diagonalmatrix(diagonalOfOnes->values,numberOfArrayRows),owner);
+				if(unity!=NULL){
+					// ok, ready to iterate over the columns of the 
+					Mvalue** arrayRows=array->values;
+					Mvalue** unityMatrixRows=unityMatrix->values;
+					long long colIndex;
+					for(colIndex=0;colIndex<numberOfArrayRows;colIndex++){
+						// step 1
+						// step 2
+					}
+					if(colIndex<0){FREE_ARRAY(unity,owner);return NULL;}
+					// step 3
+					// step 4
+					// the inverse is in the unity array
+					return _getValueOfArray(unity);
+				}else
+					outputError("Failed to create a unity matrix");
+			}else{
+				FREE_ARRAY(diagonalOfOnes,owner);
+				outputError("Failed to create the unity matrix diagonal");
+			}
+		}else
+			outputError("Can't determine the inverse of a non-square matrix");
 	}
 	return NULL;
 }
