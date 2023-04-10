@@ -60,3 +60,30 @@ long long isBigintegerNegative(Mbiginteger const * const biginteger){
 	long long bigintegerSign=getBigintegerSign(biginteger);
 	return(bigintegerSign==M_LL_INVALID?M_LL_INVALID:(bigintegerSign==M_NEGATIVE?M_TRUE:M_FALSE));
 }
+
+// MDH@24OCT2019: we need a method that can convert a big integer to an integer
+// TODO probably best to move this to Mbiginteger.c/h
+/**
+ * @brief get the long long equivalent of big integer \p biginteger
+ * @details returns M_LL_INVALID on failure
+ * @param biginteger 
+ * @return long long the equivalent of big integer \p biginteger
+ */
+long long getBigintegerInteger(Mbiginteger const * const biginteger){
+	long long result=M_LL_INVALID;
+	if(biginteger!=NULL){
+		if(amVerboseDebugging())
+			outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
+		if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&
+				mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+			result=mp_get_i64(MP_INT_POINTER(biginteger));
+			if(amVerboseDebugging())
+				outputInfo("Big integer converted to a small integer.");
+		}else
+			if(amVerboseDebugging())
+				outputInfo("Big integer cannot be converted to a small integer.");
+	}
+	if(amVerboseDebugging())
+		output("Small integer result: %lld.\n",result);
+	return result;
+}

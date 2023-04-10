@@ -3583,6 +3583,17 @@ long long isDecimalPositive(Mdecimal const * const decimal){long long decimalSig
  */
 long long isDecimalNegative(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?(decimalSign==M_NEGATIVE?M_TRUE:M_FALSE):M_LL_INVALID);}
 
+static mpd_t* decimalZero=NULL;
+/**
+ * @brief returns the global decimal constant equal to 0
+ * 
+ * @return const mpd_t* the global decimal constant equal to 0
+ */
+const mpd_t* getDecimalZero(){
+	if(NULL==decimalZero)decimalZero=__mpd(M_DECIMALCONTEXT->mpd_context,0);
+	return decimalZero;
+}
+
 // MDH@25AUG2019: I'd see that decimalOne should be an Mdecimal? we can leave it the way it is for now but instead require the context passed to __mpd to be non-NULL!! i.e. __mpd does no longer default to _decimalContext
 static mpd_t* decimalOne=NULL;
 // getDecimalOne() return a decimal but this is a decimal that should never be freed
@@ -3592,7 +3603,7 @@ static mpd_t* decimalOne=NULL;
  * @return const mpd_t* the global decimal constant equal to 1
  */
 const mpd_t* getDecimalOne(){
-	if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);
+	if(NULL==decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);
 	return decimalOne;
 }/* VALIDATED */
 /**

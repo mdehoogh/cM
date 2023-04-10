@@ -1654,7 +1654,7 @@ Mvalue* Mtype(Mvalue* value){
 	// every value should have a type text, even if NULL
 	// MDH@03NOV2019: actually _value should be the name of a variable because it not we cannot determine whether or not
 	//				the variable is mutable, that's why settype() requires the name of the variable (as text)
-	char result[4]="'\0\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
+	char result[6]="'\0\0\0\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
 	if(value!=NULL){
 		if(value->type==VT_REFERENCE){ // a variabler reference
 			Mvariable* referencedVariable=value->value._reference->variable;
@@ -1673,6 +1673,9 @@ Mvalue* Mtype(Mvalue* value){
 			}else
 			if(value->type==VT_ARRAY){
 				result[2]=getValueTypeCharacter(value->value._array->valuetype,false);
+				if(value->value._array->valuetype==VT_ARRAY){
+					result[3]=getValueTypeCharacter(value->value._array->values[0]->value._array->valuetype,false);
+				}
 			}
 		}
 	}

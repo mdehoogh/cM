@@ -357,6 +357,8 @@ bool mapAppendedToList(Mlist * const _list,Mallocationowner owner_list,Mmap cons
 bool mapAppendedToMaplist(Mlist * const _maplist,Mallocationowner owner_maplist,Mmap const * const _map);
 
 // all is... methods should now return a long long equal to M_TRUE, M_FALSE or M_LL_INVALID
+Mvalue* getValueZeroOfType(Mvaluetype valuetype);
+
 long long isValueZero(Mvalue* value);
 long long isValueOne(Mvalue* value);
 long long isValuePositive(Mvalue* value);
@@ -540,3 +542,11 @@ Mvalue* mfiles(Mvalue* wildcard_value);
 
 // MDH@08DEC2020
 Mvalue* _getValueOfTime(Mtime* _time);
+
+// MDH@10APR2023:
+long long isANumericValuetype(Mvaluetype valuetype);
+long long isNumeric(Mvalue* value);
+
+Mrational* _getRationalCopy(Mrational const * const rational);
+Mrational* _getValueRational(Mvalue const * const value);
+Mrational* getValueRational(Mvalue const * const value);

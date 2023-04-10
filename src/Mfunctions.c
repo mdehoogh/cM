@@ -573,56 +573,6 @@ Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){Mallocationowner owner=getOw
 // end math functions
 
 /**
- * @brief returns the negated value of \p _value
- * 
- * @param _value 
- * @return Mvalue* the negated value of \p _value
- */
-Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negate a value
-	if(_value!=NULL){
-		if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
-		if(_value->type==VT_FLOAT)return _getFloatValue(-_value->value._float->ld);
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mneg));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg));
-		if(_value->type==VT_BIGINTEGER)return _getValueOfBiginteger(_getNegatedBiginteger(_value->value._biginteger));
-		if(_value->type==VT_RATIONAL){
-			// this is done by negating the numerator but if the numerator equals NULL we should use -1
-			Mrational* rational=_value->value._rational;
-			if(rational!=NULL){
-				/////////outputValue("Negating rational '",_value,"'.\n");
-				Mbiginteger* _biNumerator=owned_biginteger(rational->num?_getNegatedBiginteger(rational->num):_getBiginteger(-1),owner); // negating the numerator
-				if(_biNumerator!=NULL){
-					////////outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
-					Mrational* _negRational=_getRational(_biNumerator,rational->den,(isFloatUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false);
-					FREE_BIGINTEGER(_biNumerator,owner);
-					return _getValueOfRational(disowned_rational(_negRational,owner));
-				}
-				outputError("Failed to negate the numerator of a rational");
-			}
-		}else
-		if(_value->type==VT_DECIMAL){
-			Mdecimal* decimal=_value->value._decimal;
-			if(decimal!=NULL){
-				Mdecimal* _negDecimal=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
-				if(_negDecimal!=NULL){
-					uint32_t status=0;
-					mpd_qcopy_negate(_negDecimal->mpd,decimal->mpd,&status);
-					if(status&0xEFBF){
-						FREE_DECIMAL(_negDecimal,owner);_negDecimal=NULL;
-						outputError("Failed to negate a decimal");
-						outputDecimalStatus(status);
-					}else // success, ascertain to copy the repeating field over as that remains the same on negating (assumedly)
-						_negDecimal->repeating=decimal->repeating;
-					if(_negDecimal!=NULL)return _getValueOfDecimal(disowned_decimal(_negDecimal,owner));
-				}
-			}
-		}
-	}
-	return NULL;
-}/* VALIDATED */
-
-/**
  * @brief returns the logical not of \p _value
  * 
  * @param _value 
@@ -726,18 +676,9 @@ Mvalue* Mscalar(Mvalue* _value){
  * @param _value 
  * @return long long M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
  */
-long long isnumeric(Mvalue* _value){
-	return(_value?(_value->type==VT_BIGINTEGER||_value->type==VT_DECIMAL||_value->type==VT_FLOAT||_value->type==VT_INTEGER||_value->type==VT_RATIONAL?M_TRUE:M_FALSE):M_LL_INVALID);
-}/* VALIDATED */
-/**
- * @brief returns M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
- * 
- * @param _value 
- * @return long long M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
- */
 Mvalue* Misnumeric(Mvalue* _value){
 	// MDH@04DEC2020: delegate to local helper function isnumeric 
-	return _getIntegerValue(isnumeric(_value));
+	return _getIntegerValue(isNumeric(_value));
 }/* VALIDATED */
 /**
  * @brief returns M_TRUE if \p _value wraps a list, M_FALSE or M_LL_INVALID otherwise

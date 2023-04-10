@@ -1,7 +1,7 @@
 #include "Mlocale.h"
 
 // unary functions
-Mvalue* Mneg(Mvalue* _value); // negate a value
+//////Mvalue* Mneg(Mvalue* _value); // negate a value
 Mvalue* Mbnot(Mvalue* _value); // binary not a value
 Mvalue* Mnot(Mvalue* _value); // not a value
 
@@ -13,7 +13,7 @@ Mvalue* Mpositive(Mvalue* _value);
 Mvalue* Mnegative(Mvalue* _value);
 Mvalue* Mscalar(Mvalue* _value);
 // MDH@28OCT2020: might come in handy
-long long isnumeric(Mvalue* _value); // helper that we could use elsewhere
+// MDH@10APR2023: moved as used in Mmatrix.c: long long isnumeric(Mvalue* _value); // helper that we could use elsewhere
 Mvalue* Misnumeric(Mvalue* _value);
 Mvalue* Misalist(Mvalue* _value);
 

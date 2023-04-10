@@ -1844,9 +1844,12 @@ Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const 
 		if(_array->values!=NULL){
 			_array->numberOfElements=numberOfElements;
 			if(fillValue!=NULL){
+				outputValue("Fill value: ",fillValue,".\n");
 				while(numberOfElements>0)assignValue(&_array->values[--numberOfElements],fillValue); // assign the fillValue to each element in the array
 				_array->valuetype=fillValue->type; // the type of fillValue becomes the value type of the array
-				if(fillValue->type==VT_ARRAY)_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
+				if(fillValue->type==VT_ARRAY)
+					_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
+				output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
 			}
 		}else
 			outputError("Failed to allocate memory for storing the array elements");
@@ -3451,6 +3454,22 @@ long long getValueSign(Mvalue const * const value){
 		if(value->type==VT_RATIONAL)return getRationalSign(value->value._rational);
 	}
 	return M_LL_INVALID;
+}
+
+/**
+ * @brief returns the zero of the value type \p valuetype
+ * 
+ * @param valuetype 
+ * @return Mvalue* the zero of the value type \p valuetype
+ */
+Mvalue* getValueZeroOfType(Mvaluetype valuetype){
+	// I'm going to returns the right numeric value wrapped
+	if(valuetype==VT_INTEGER)return _getIntegerValue(0);
+	if(valuetype==VT_BIGINTEGER)return _getValueOfBiginteger(_getBiginteger(0));
+	if(valuetype==VT_FLOAT)return _getFloatValue(0.0);
+	if(valuetype==VT_DECIMAL)return _getValueOfDecimal(__decimal(NULL,0,0));
+	if(valuetype==VT_RATIONAL)return _getValueOfRational(_getRational(_getBiginteger(0),NULL,M_LD_NAN,false));
+	return NULL;
 }
 
 // TODO turn the result type of isValueZero() into long long
@@ -5063,4 +5082,154 @@ Mvalue* _getValueOfTime(Mtime* _time){
 	// MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
 	_value->value._time=(disowned_time?owned_time(_time,owner_value_data):_time);
 	return _value;
+}
+
+/**
+ * @brief return M_TRUE if \p valuetype is a numeric value type, M_FALSE otherwise
+ * 
+ * @param valuetype 
+ * @return long long M_TRUE if \p valuetype is a numeric value type, M_FALSE otherwise
+ */
+long long isANumericValuetype(Mvaluetype valuetype){
+	return(valuetype==VT_BIGINTEGER||valuetype==VT_DECIMAL||valuetype==VT_FLOAT||valuetype==VT_INTEGER||valuetype==VT_RATIONAL?M_TRUE:M_FALSE);
+}/* VALIDATED */
+
+/**
+ * @brief returns M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
+ * @details returns M_LL_INVALID iff \p _value is NULL
+ * @param _value 
+ * @return long long M_TRUE if \p _value is numeric, M_FALSE or M_LL_INVALID otherwise
+ */
+long long isNumeric(Mvalue* _value){
+	return(_value!=NULL?isANumericValuetype(_value->type):M_LL_INVALID);
+}/* VALIDATED */
+
+/**
+ * @brief returns a copy of M rational \p _rational
+ * 
+ * @param _rational 
+ * @return Mrational* a copy of M rational \p _rational
+ */
+Mrational* _getRationalCopy(Mrational const * const _rational){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==_rational)return NULL;
+	// MDH@28MAR2023: the serious thing here is that _getRational ALWAYS creates a copy of the numerator and denominator passed in
+	//                therefore what we did here is no longer necessary
+	Mrational* _copyRational=owned_rational(_getRational(_rational->num,_rational->den,(_rational->delta!=NULL?_rational->delta->ld:M_LD_NAN),false),owner);
+	/* replacing:
+	Mbiginteger* _numeratorBiginteger=NULL;
+	Mbiginteger* _denominatorBiginteger=NULL;
+	if(_rational->num!=NULL){
+		_numeratorBiginteger=owned_biginteger(_getBigintegerCopy(_rational->num),owner);
+		if(NULL==_numeratorBiginteger)return NULL;
+	}
+	if(_rational->den!=NULL){
+		_denominatorBiginteger=owned_biginteger(_getBigintegerCopy(_rational->den),owner);
+		if(NULL==_denominatorBiginteger){FREE_BIGINTEGER(_numeratorBiginteger,owner);return NULL;}
+	}
+	Mrational* _copyRational=owned_rational(_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false),owner);
+	//// replacing:
+	//if(NULL==_numeratorBiginteger||(NULL==_denominatorBiginteger&&_rational->den!=NULL)){
+	//	FREE_BIGINTEGER(_numeratorBiginteger,owner);
+	//	FREE_BIGINTEGER(_denominatorBiginteger,owner);
+	//	return NULL;
+	//} // some error
+	//// MDH@13JUN2019: if we can't get a rational, free the numerator and denominator
+	//_copyRational=owned_rational(_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false),owner);
+	//FREE_BIGINTEGER(_numeratorBiginteger,owner);
+	//FREE_BIGINTEGER(_denominatorBiginteger,owner);
+	//if(NULL==_copyRational)return NULL;
+	*/
+	_copyRational->normalized=_rational->normalized; // copy the rational flag
+	return disowned_rational(_copyRational,owner);
+}
+
+// _getValueRational() returns a (new) rational from the value stored in _value
+/**
+ * @brief returns the wrapped M rational of \p value
+ * 
+ * @param value 
+ * @return Mrational* the wrapped M rational of \p value
+ */
+Mrational* _getValueRational(Mvalue const * const value){Mallocationowner owner=getOwner(__LINE__);
+	Mrational* _rational=NULL;
+	if(value!=NULL){
+		if(amVerboseDebugging())outputValue("Extracting the rational from '",value,"'.\n");
+		// MDH@28MAR2023: _getValueBiginteger will return a new big integer if value does not wrap a big integer
+		//                in which case we need to free that new big integer as _getRational does NOT wrap the numerator/denominator
+		switch(value->type){
+			case VT_INTEGER:
+				{
+					Mbiginteger* value_bi=owned_biginteger(_getValueBiginteger(value),owner);
+					if(NULL==value_bi){outputError("Failed to convert an integer to a big integer.");return NULL;}
+					_rational=owned_rational(_getRational(value_bi,NULL,M_LD_NAN,false),owner); // not to free what's wrapped in _value
+					FREE_BIGINTEGER(value_bi,owner);
+				}
+				break;
+			case VT_BIGINTEGER:
+				_rational=owned_rational(_getRational(_getValueBiginteger(value),NULL,M_LD_NAN,false),owner); // not to free what's wrapped in _value
+				break;
+			case VT_DECIMAL:
+				_rational=owned_rational(_getDecimalRational(value->value._decimal),owner);
+				/* replacing (and augmenting in case of a repeating fractional part):
+				{ // until we find a way to get the associated rational using the internal representation we stick to extracting the rational from the text representation of the decimal (which should be exact)
+					char* _decimalText=mpd_to_sci(_value->value._decimal->mpd,0);
+					if(_decimalText){_rational=_getDecimalTextRational(_decimalText,false);free(_decimalText);}else output("ERROR: Failed to obtain the text representation of a decimal.");
+				}
+				*/
+				break;
+			case VT_TEXT:
+				_rational=owned_rational(_getDecimalTextRational(value->value._text->_c),owner);
+				break;
+			case VT_RATIONAL:
+				_rational=owned_rational(_getRationalCopy(value->value._rational),owner); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
+				break;
+			case VT_FLOAT:
+				_rational=owned_rational(_getLongDoubleRational(value->value._float->ld,250),owner); // TODO how many iterations at most???
+				break;
+			case VT_LIST:
+				if(value->value._list->numberOfElements>1){
+					// MDH@28MAR2023: the following will also be problematic we do not release the big integers created
+					//                NOT allowing a numerator or denominator that cannot be converted to a big integer
+					Mvalue* numeratorValue=value->value._list->_first->_value;
+					Mvalue* denominatorValue=value->value._list->_first->_next->_value;
+					Mbiginteger* bi_num=NULL;
+					if(numeratorValue!=NULL){
+						bi_num=_getValueBiginteger(numeratorValue);
+						if(bi_num==NULL){outputError("Failed to convert the first listelement into a big integer");return NULL;}
+					}
+					Mbiginteger* bi_den=NULL;
+					if(denominatorValue!=NULL){
+						bi_den=_getValueBiginteger(denominatorValue);
+						if(bi_den==NULL){
+							// TODO whatever _getValueBiginteger returned hasn't be owned here, so call free_biginteger not FREE_BIGINTEGER
+							if(bi_num!=NULL&&numeratorValue!=NULL&&numeratorValue->type!=VT_BIGINTEGER)free_biginteger(bi_num);
+							outputError("Failed to convert the second list element to a big integer");
+							return NULL;
+						}
+					}
+					// either the numerator or the denominator needs to be non NULL (TODO why can't both be NULL???)
+					if(bi_num!=NULL||bi_den!=NULL)
+						_rational=owned_rational(_getRational(bi_num,bi_den,
+						(value->value._list->numberOfElements>2?getValueLongDouble(value->value._list->_first->_next->_next->_value):M_LD_NAN),
+						true),owner);
+					if(bi_num!=NULL&&numeratorValue!=NULL&&numeratorValue->type!=VT_BIGINTEGER)free_biginteger(bi_num);
+					if(bi_den!=NULL&&denominatorValue!=NULL&&denominatorValue->type!=VT_BIGINTEGER)free_biginteger(bi_den);
+				}
+				break;
+			default:break;
+		}
+	}
+	return disowned_rational(_rational,owner);
+}
+
+// MDH@11AUG2019: why wasn't this here before???
+/**
+ * @brief returns the M rational wrapped in \p value or a new M rational converted from whatever \p value wraps
+ * @details _getValueRational will always return a new M rational (even if \p value contains a rational itself)
+ * @param value 
+ * @return Mrational* the M rational wrapped in \p value or a new M rational converted from whatever \p value wraps
+ */
+Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner=getOwner(__LINE__);
+	if(value!=NULL&&value->type==VT_RATIONAL)return value->value._rational;
+	return _getValueRational(value);
 }
