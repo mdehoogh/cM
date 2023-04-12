@@ -13,3 +13,7 @@ Marray* matrixinverse(Marray* array1);
 
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2);
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2);
+
+// if you want to create a matrix or turn a numeric two-dimensional array into a matrix 
+// apply the matrix() function
+Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue);

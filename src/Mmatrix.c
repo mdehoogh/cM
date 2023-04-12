@@ -401,3 +401,71 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	*/
 	return NULL;
 }
+
+static bool allValuesAreNumeric(Mvalue** values,unsigned long long numberOfValues){
+	while(numberOfValues>0){
+		Mvalue* value=values[--numberOfValues];
+		if(value==NULL||!isANumericValuetype(value->type))
+			return false;
+	}
+	return true;
+}
+// MDH@12APR2023: you can use Mmatrix() to create a matrix
+/**
+ * @brief returns a new matrix
+ * @details both \p fillValue and \p colsValue can be NULL
+ *          if \p fillValue is NULL \p colsValue can be a one-dimensional array
+ *          to fill the matrix with
+ * @param rowsValue the number of rows the new matrix should have
+ * @param colsValue the number of columns the new matrix should have
+ * @param fillValue the value to put in every matrix element
+ * @return Mvalue* 
+ */
+Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue){
+	if(rowsValue!=NULL){
+		// if rowsValue should either be an integer or an array
+		long long numberOfRows=getValueInteger(rowsValue);
+		if(numberOfRows==M_LL_INVALID){
+
+		}else{
+			if(rowsValue->type==VT_ARRAY&&rowsValue->value._array!=NULL){
+				// let's take a look at the numberOfDimensionsLeft
+				long long dimensionsLeft=rowsValue->value._array->numberOfDimensionsLeft;
+				if(dimensionsLeft!=1){
+					if(dimensionsLeft==0){ // we'd have to check
+						// it requires two dimensions and all cells should be integer!!!
+						// this means that all values in the array must be arrays themselves
+						// and have the same number of elements to start with
+						Mvalue* firstArrayValue=rowsValue->value._array->values[0];
+						if(firstArrayValue!=NULL&&firstArrayValue->type==VT_ARRAY){
+							// check all the array values for being numeric
+							unsigned long long numberOfValues=firstArrayValue->value._array->numberOfElements;
+							if(isANumericValuetype(firstArrayValue->value._array->valuetype)==M_TRUE||
+									allValuesAreNumeric(firstArrayValue->value._array->values,numberOfValues)){
+								// the first value is an array with numberOfValues numeric values
+								// and so should all the other values as well
+								unsigned long long elementIndex=rowsValue->value._array->numberOfElements;
+								while(--elementIndex>0){
+									Mvalue* value=rowsValue->value._array->values[elementIndex];
+									if(value==NULL||
+											value->type==VT_ARRAY||
+											value->value._array->numberOfElements==numberOfValues||
+											(isANumericValuetype(value->value._array->valuetype)!=M_TRUE&&
+											 !allValuesAreNumeric(value->value._array->values,numberOfValues)))
+										break;
+								}	
+								// if not broken out of the loop due to not matching array element
+								if(elementIndex==0)dimensionsLeft=-1;
+							}
+						}
+					}
+					if(dimensionsLeft==-1)
+						rowsValue->value._array->numberOfDimensionsLeft=1;
+				}
+				if(abs(dimensionsLeft)==1)return rowsValue;
+			}else
+				outputError("Invalid first parameter to matrix() function: should either be the number of rows or a two-dimensional array");
+		}
+	}
+	return NULL;
+}
