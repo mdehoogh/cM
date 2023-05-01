@@ -14,7 +14,6 @@ Mvalue* getdc(Mvalue* value);
 Mvalue* getdp(Mvalue* value);
 Mvalue* setdp(Mvalue* value);
 
-mpd_context_t* get_default_mpd_context();
 // end Decimal stuff
 
 // Mcommand stuff

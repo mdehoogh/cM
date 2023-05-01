@@ -524,7 +524,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
 			case VT_TEXT:if(_value->value._text){FREE_TEXT(_value->value._text,owner_value_data);_value->value._text=NULL;}break;
 			case VT_ARRAY:if(_value->value._array){FREE_ARRAY(_value->value._array,owner_value_data);_value->value._array=NULL;}break;
 			case VT_LIST:if(_value->value._list){FREE_LIST(_value->value._list,owner_value_data);_value->value._list=NULL;}break;
-			case VT_MATRIX:if(_value->value._matrix){FREE_MATRIX(_value->value._matrix,owner_value_data);_value->value._matrix=NULL;}break;
+//			case VT_MATRIX:if(_value->value._matrix){FREE_MATRIX(_value->value._matrix,owner_value_data);_value->value._matrix=NULL;}break;
 			case VT_MAP:if(_value->value._map){FREE_MAP(_value->value._map,owner_value_data);_value->value._map=NULL;}break;
 			case VT_REFERENCE:if(_value->value._reference){FREE_REFERENCE(_value->value._reference,owner_value_data);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
 			case VT_FUNCTION:if(_value->value._function){FREE_FUNCTION(_value->value._function,owner_value_data);_value->value._function=NULL;}break;
@@ -979,7 +979,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
 	}
 	return disowned_list(_list,owner);
 }
-
+/*
 Mmatrix* disowned_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix){
 	if(NULL==_matrix)return NULL;
 	if(_matrix->_array!=NULL)disowned_array(_matrix->_array,owner_matrix);
@@ -1017,6 +1017,7 @@ void free_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix){
 		FREE_1(_matrix,'M');
 	}
 }
+*/
 
 /**
  * @brief return the first scalar in M value \p value
@@ -3602,7 +3603,7 @@ long long isValueNull(Mvalue* value){
 		case VT_TEXT:result=(value->value._text!=NULL?M_FALSE:M_TRUE);break;
 		case VT_ARRAY:result=(value->value._array!=NULL?M_FALSE:M_TRUE);break;
 		case VT_LIST:result=(value->value._list!=NULL?M_FALSE:M_TRUE);break;
-		case VT_MATRIX:result=(value->value._matrix!=NULL?M_FALSE:M_TRUE);break;
+//		case VT_MATRIX:result=(value->value._matrix!=NULL?M_FALSE:M_TRUE);break;
 		case VT_MAP:result=(value->value._map!=NULL?M_FALSE:M_TRUE);break;
 		case VT_TOKEN:result=(value->value._token!=NULL?M_FALSE:M_TRUE);break;
 		case VT_UNDEFINED:result=M_TRUE;break;
@@ -3617,7 +3618,7 @@ long long isValueNull(Mvalue* value){
 
 long long isArrayUndefined(Marray* array){return(array!=NULL?M_FALSE:M_TRUE);}
 long long isListUndefined(Mlist* list){return(list!=NULL?M_FALSE:M_TRUE);}
-long long isMatrixUndefined(Mmatrix* matrix){return(matrix!=NULL?M_FALSE:M_TRUE);}
+////long long isMatrixUndefined(Mmatrix* matrix){return(matrix!=NULL?M_FALSE:M_TRUE);}
 long long isMapUndefined(Mmap* map){return(map!=NULL?M_FALSE:M_TRUE);}
 
 // MDH@25FEB2021
@@ -3661,7 +3662,7 @@ long long isValueUndefined(Mvalue* value){
 		case VT_TEXT:result=isTextUndefined(value->value._text);break; ////strlen(_value->value._text->_c)==0;
 		case VT_ARRAY:result=isArrayUndefined(value->value._array);break; ////Mlen(_value)==0;
 		case VT_LIST:result=isListUndefined(value->value._list);break; ////Mlen(_value)==0;
-		case VT_MATRIX:result=isMatrixUndefined(value->value._matrix);break;
+//		case VT_MATRIX:result=isMatrixUndefined(value->value._matrix);break;
 		case VT_MAP:result=isMapUndefined(value->value._map);break; ////Mlen(_value)==0;
 		case VT_TOKEN:result=isTokenUndefined(value->value._token);break; /////string_length(_value->value._token->text)==0;
 		case VT_UNDEFINED:result=M_TRUE;break;
@@ -4084,7 +4085,8 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
 		case VT_BIGINTEGER:return(mp_cmp(MP_INT_POINTER(value1->value._biginteger),MP_INT_POINTER(value2->value._biginteger))==MP_EQ);
 		case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
 		case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
-		case VT_ARRAY:case VT_LIST:case VT_MATRIX:case VT_MAP:break;
+//		case VT_MATRIX:break;
+		case VT_ARRAY:case VT_LIST:case VT_MAP:break;
 		case VT_DECIMAL:case VT_RATIONAL:break;
 		case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
 		case VT_REFERENCE: // TODO this might be hard

@@ -42,7 +42,7 @@
 // VT_REF coming up next for storing (second-level) references (main variables are the first named values)
 // MDH@02NOV2020: VT_UNKNOWN added to indicate that the type is unknown in advance
 // MDH@08DEC2020: VT_DATE added
-typedef enum Mvaluetype {/*VT_UNKNOWN=-1,*/VT_UNDEFINED=0,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_ARRAY,VT_LIST,VT_MATRIX,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE,VT_FUNCTION,VT_ENVIRONMENT,VT_FILE,VT_TIME}Mvaluetype;
+typedef enum Mvaluetype {/*VT_UNKNOWN=-1,*/VT_UNDEFINED=0,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_ARRAY,VT_LIST/*,VT_MATRIX*/,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE,VT_FUNCTION,VT_ENVIRONMENT,VT_FILE,VT_TIME}Mvaluetype;
 
 // MDH@02NOV2020: if we can somehow define the value type to use when applying a binary operator to two values of a certain type 
 //                this is in particularly applicable to numeric data in which we can predict the type of the outcome based on the type of the two values

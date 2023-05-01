@@ -708,14 +708,6 @@ Mvalue* setdp(Mvalue* value){
 	return _getIntegerValue(olddecimalprecision);
 }
 
-// convenience method to obtain the wrapped mpd_context pointer
-/**
- * @brief returns the mpd_context wrapped in M_DECIMAL_CONTEXT
- * 
- * @return mpd_context_t* the mpd_context wrapped in M_DECIMAL_CONTEXT
- */
-mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT!=NULL?M_DECIMALCONTEXT->mpd_context:NULL);}
-
 // end Decimal support
 
 // very special M functions
@@ -6532,6 +6524,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
  * @param valuetype 
  * @return Mvalue* the 1 value in the given value type \p valuetype
  */
+/*
 Mvalue* _getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
 	switch(valuetype){
 		case VT_TIME:
@@ -6544,6 +6537,8 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner
 	}
 	return NULL;
 }
+*/
+
 /**
  * @brief returns the long double power of long double base \p base and wrapped exponent \p _powerValue
  * 
@@ -7373,7 +7368,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power,false); // MDH@02NOV2020 TODO: the input type is not always maintained for certain type combinations but sometimes it is
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power,false);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
-	if(isValueZero(_value2)==M_TRUE)return _getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
+	if(isValueZero(_value2)==M_TRUE)return getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
 	// MDH@26OCT2019: TODO same approach with any integer as in the other binary operators??????
 	// MDH@27OCT2019: let's deal with if either is a real first
 	// I suppose if the base or exponent is real, the result should also be real (because it will be approximate)
@@ -13686,6 +13681,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!completedValueValueFunction(_Menvironment,owner,"calendartime",Mcalendartime)
 				||!completedValueValueFunction(_Menvironment,owner,"time",Mparsetime)){
 				outputError("Failed to register the time functions");
+				return NULL;
+			}
+			// MDH@01MAY2023: register matrix functions
+			if(!completedValueValueValueFunction(_Menvironment,owner,"matrix",Mmatrix)
+					||!completedValueFunction(_Menvironment,owner,"diag",Mmatrixdiagonal)
+					||!completedValueValueFunction(_Menvironment,owner,"mult",Mmatrixproduct)
+					||!completedValueFunction(_Menvironment,owner,"inv",Mmatrixinverse)){
+				outputError("Failed to register the matrix functions");
 				return NULL;
 			}
 		}

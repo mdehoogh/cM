@@ -6,7 +6,7 @@
 
 struct Mlist;
 struct Marray; // MDH@04NOV2020: we're going to have an array after all (so we can speed up sorting)
-struct Mmatrix;
+/////struct Mmatrix;
 struct Mmap;
 struct Mreference;
 // MDH@03MAR2020: if we want to be able to wrap a function or an environment in a value we have to add them here
@@ -23,7 +23,7 @@ typedef union Mvalueunion{
     Mtext* _text;
     struct Mlist* _list;
     struct Marray* _array;
-		struct Mmatrix* _matrix;
+//		struct Mmatrix* _matrix;
     struct Mmap* _map;
     struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
     struct Mfunction* _function; // MDH@03MAR2020
@@ -171,11 +171,12 @@ long long isListUndefined(Mlist* list);
 long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // MDH@23NOV2020: helper function to insert into a list with a certain index
 
 // Mmatrix stuff
-typedef struct Mmatrix{
-	size_t numberOfRows;
-	size_t numberOfColumns;
-	Marray* _array;
-}Mmatrix;
+//typedef struct Mmatrix{
+//	size_t numberOfRows;
+//	size_t numberOfColumns;
+//	Marray* _array;
+//}Mmatrix;
+/*
 Mmatrix* disowned_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix);
 Mmatrix* owned_matrix(Mmatrix* _matrix,Mallocationowner owner_matrix);
 Mmatrix* __matrix(long long numberOfRows,long long numberOfColumns);
@@ -194,6 +195,7 @@ Mmatrix* disowned_matrix(Mmatrix * const _matrix,Mallocationowner owner_matrix);
 #define DISOWNED_MATRIX(_matrix,owner_matrix) _matrix
 #define FREE_MATRIX(_matrix,owner_matrix) free_matrix(_matrix)
 #endif
+*/
 // end Mmatrix stuff
 
 typedef struct Mmapelement{
