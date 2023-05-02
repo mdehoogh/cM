@@ -8274,75 +8274,6 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 
 // TODO these should return either TRUE, FALSE or UNDEFINED independent of the input type
 /**
- * @brief returns M_TRUE if \p _value1 is smaller than \p _value2, M_FALSE otherwise
- * 
- * @param _value1 
- * @param _value2 
- * @return long long 
- */
-static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	// ASSERT do not call when either is a list
-	if(NULL==_value1&&NULL==_value2)return M_FALSE; // both NULL, so equal, and therefore not smaller than
-	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
-	// MDH@02NOV2020: comparing texts
-	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
-		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
-		return(result<0?M_TRUE:M_FALSE); 
-	}
-	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return llsmallerthan;
-	}
-	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
-	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
-		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
-				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1!=NULL&&_rational2!=NULL){
-			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference!=NULL){
-				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
-				result=isRationalNegative(_rationalDifference);
-				FREE_RATIONAL(_rationalDifference,owner);
-			}else
-				outputError("Failed to compute the difference of two rationals");
-		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return result;
-	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		// creating two intermediate decimals that need to be freed asap
-		long long result=M_LL_INVALID;
-		Mdecimal 	*_decimal1=owned_decimal(_getValueDecimal(_value1),owner),
-							*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1!=NULL&&_decimal2!=NULL){
-			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference!=NULL){
-				if(amVerbose())
-					outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
-				result=isDecimalNegative(_decimalDifference);
-				FREE_DECIMAL(_decimalDifference,owner);
-			}else
-				outputError("Failed to compute the difference of two decimals");
-		}else
-			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return result;
-	}
-	return M_LL_INVALID;
-}
-/**
  * @brief returns M_TRUE if \p _value1 is smaller than \p _value2 , M_FALSE otherwise
  * @details deals with array and list arguments as well
  * @param _value1 
@@ -13687,7 +13618,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!completedValueValueValueFunction(_Menvironment,owner,"matrix",Mmatrix)
 					||!completedValueFunction(_Menvironment,owner,"diag",Mmatrixdiagonal)
 					||!completedValueValueFunction(_Menvironment,owner,"mult",Mmatrixproduct)
-					||!completedValueFunction(_Menvironment,owner,"inv",Mmatrixinverse)){
+					||!completedValueFunction(_Menvironment,owner,"inv",Mmatrixinverse)
+					||!completedValueFunction(_Menvironment,owner,"transpose",Mmatrixtranspose)
+					||!completedValueFunction(_Menvironment,owner,"trace",Mmatrixtrace)){
 				outputError("Failed to register the matrix functions");
 				return NULL;
 			}

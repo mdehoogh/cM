@@ -12,6 +12,7 @@ long long isANumericMatrix(Marray* array,bool update);
 //Marray* matrixinverse(Marray* array1);
 mpd_context_t* get_default_mpd_context();
 
+long long smallerthan(Mvalue* _value1,Mvalue* _value2);
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2);
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2);
 Mvalue* getValueOneOfType(Mvaluetype valuetype);
@@ -23,3 +24,5 @@ Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue);
 Mvalue* Mmatrixinverse(Mvalue* _value);
 Mvalue* Mmatrixproduct(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Mmatrixdiagonal(Mvalue* _value);
+Mvalue* Mmatrixtranspose(Mvalue* _value);
+Mvalue* Mmatrixtrace(Mvalue* _value);

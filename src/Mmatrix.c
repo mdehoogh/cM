@@ -163,6 +163,16 @@ static Mvaluetype getMatrixElementValuetype(Marray* array){
 }
 
 /**
+ * @brief returns a copy of matrix array
+ * 
+ * @param array 
+ * @return Marray* 
+ */
+static Marray* matrixcopy(Marray* array){
+	return _getArrayCopy(array);
+}
+
+/**
  * @brief returns the matrix product of two-dimensional arrays \p array1 and \p array2
  * @details the number of columns of \p array1 should equal the number of rows of \p array2
  *          both arrays need to be of a numeric type
@@ -280,95 +290,121 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
 	///////assert(isANumericMatrix(array)==M_TRUE);
 	long long numberOfArrayRows=getNumberOfMatrixRows(array);
 	if(numberOfArrayRows==getNumberOfMatrixColumns(array)){
-		// create an array of ones
-		Mvalue* oneOfTypeValue=getValueOneOfType(getMatrixElementValuetype(array));
-		Marray* diagonalOfOnes=OWNED_ARRAY(_getArray(NULL,numberOfArrayRows,oneOfTypeValue),owner);
-		if(diagonalOfOnes!=NULL){
-			Marray* unityMatrix=OWNED_ARRAY(diagonalmatrix(diagonalOfOnes->values,numberOfArrayRows),owner);
-			if(unityMatrix!=NULL){
-				// ok, ready to iterate over the columns of the 
-				Mvalue** arrayRows=array->values;
-				Mvalue** unityMatrixRows=unityMatrix->values;
-				long long colIndex;
-				// source: geeksforgeeks.org
-				// 1. interchange the row of matrix
-				for(long long rowIndex=numberOfArrayRows-1;rowIndex>0;rowIndex--){
-					if(arrayRows[rowIndex-1]->value._array->values[0]<arrayRows[rowIndex]->value._array->values[0]){
-						Mvalue* tempRow=arrayRows[rowIndex];
-						arrayRows[rowIndex]=arrayRows[rowIndex-1];
-						arrayRows[rowIndex-1]=tempRow;
-						// don't forget to do this on the unity matrix as well
-						tempRow=unityMatrixRows[rowIndex];
-						unityMatrixRows[rowIndex]=unityMatrixRows[rowIndex-1];
-						unityMatrixRows[rowIndex-1]=tempRow;
-					}
-				}
-				// 2. replace a row by sum of itself and another a constant multiple of another row
-				for(long long colIndex=0;colIndex<numberOfArrayRows;colIndex++){
-					for(long long rowIndex=0;rowIndex<numberOfArrayRows;rowIndex++){
-						if(colIndex!=rowIndex){
-							Mvalue* tempValue=divide(arrayRows[rowIndex]->value._array->values[colIndex],arrayRows[colIndex]->value._array->values[colIndex]);
-							for(long long elementIndex=0;elementIndex<numberOfArrayRows;elementIndex++)
-								assignValue(
-									&arrayRows[rowIndex]->value._array->values[elementIndex],
-									subtract(
-										arrayRows[rowIndex]->value._array->values[elementIndex],
-										multiply(arrayRows[colIndex]->value._array->values[elementIndex],tempValue)
-									)
-								);
-							// the same for the unity matrix
-							for(long long elementIndex=0;elementIndex<numberOfArrayRows;elementIndex++)
-								assignValue(
-									&unityMatrixRows[rowIndex]->value._array->values[elementIndex],
-									subtract(
-										unityMatrixRows[rowIndex]->value._array->values[elementIndex],
-										multiply(unityMatrixRows[colIndex]->value._array->values[elementIndex],tempValue)
-									)
-								);
+		Marray* _arrayCopy=OWNED_ARRAY(_getArrayCopy(array),owner); // TODO DONE needs to be owned at some point 
+		if(_arrayCopy!=NULL){
+			Marray* unityMatrix=NULL;
+			// create an array of ones
+			Mvalue* oneOfTypeValue=getValueOneOfType(getMatrixElementValuetype(array));
+			Marray* diagonalOfOnes=OWNED_ARRAY(_getArray(NULL,numberOfArrayRows,oneOfTypeValue),owner);
+			if(diagonalOfOnes!=NULL){
+				// TODO perhaps diagonalOfOnes needs to be freed anyway!!!!
+				unityMatrix=OWNED_ARRAY(diagonalmatrix(diagonalOfOnes->values,numberOfArrayRows),owner);
+				if(unityMatrix!=NULL){
+					// ok, ready to iterate over the columns of the 
+					Mvalue** arrayRows=_arrayCopy->values;
+					Mvalue** unityMatrixRows=unityMatrix->values;
+					long long colIndex;
+					// source: geeksforgeeks.org
+					// 1. interchange the row of matrix
+					for(long long rowIndex=numberOfArrayRows-1;rowIndex>0;rowIndex--){
+						// can't compare using < because we have to compare the values bro'
+						if(smallerthan(arrayRows[rowIndex-1]->value._array->values[0],arrayRows[rowIndex]->value._array->values[0])==M_TRUE){
+							Mvalue* tempRow=arrayRows[rowIndex];
+							arrayRows[rowIndex]=arrayRows[rowIndex-1];
+							arrayRows[rowIndex-1]=tempRow;
+							// don't forget to do this on the unity matrix as well
+							tempRow=unityMatrixRows[rowIndex];
+							unityMatrixRows[rowIndex]=unityMatrixRows[rowIndex-1];
+							unityMatrixRows[rowIndex-1]=tempRow;
 						}
 					}
-				}
-				// 3. multiply each row by a nonzero integer
-				//    divide row element by the diagonal element
-				for(long long rowIndex=0;rowIndex<numberOfArrayRows;rowIndex++){
-					Mvalue* tempValue=arrayRows[rowIndex]->value._array->values[rowIndex];
-					for(long long colIndex=0;colIndex<numberOfArrayRows;colIndex++)
-						assignValue(
-							&arrayRows[rowIndex]->value._array->values[colIndex],
-							divide(
-								arrayRows[rowIndex]->value._array->values[colIndex],
-								tempValue
-							)
-						);
-					// also for the unity matrix rows
-					for(long long colIndex=0;colIndex<numberOfArrayRows;colIndex++)
-						assignValue(
-							&unityMatrixRows[rowIndex]->value._array->values[colIndex],
-							divide(
-								unityMatrixRows[rowIndex]->value._array->values[colIndex],
-								tempValue
-							)
-						);
-				}
-				/*
-				for(colIndex=0;colIndex<numberOfArrayRows;colIndex++){
-					// step 1
-					// step 2
-				}
-				if(colIndex<0){FREE_ARRAY(unityMatrix,owner);return NULL;}
-				// step 3
-				// step 4
-				*/
-				// the inverse is in the unity array
-				return unityMatrix;
+					outputArray("Rows rearranged: ",_arrayCopy,"\n");
+					outputArray("\tUnity matrix: ",unityMatrix,"\n");
+					// 2. replace a row by sum of itself and another a constant multiple of another row
+					for(long long colIndex=0;colIndex<numberOfArrayRows;colIndex++){
+						output("Column=%lld.\n",colIndex);
+						for(long long rowIndex=0;rowIndex<numberOfArrayRows;rowIndex++){
+							output("\tRow=%lld.\n",rowIndex);
+							if(colIndex!=rowIndex){
+								Mvalue* tempValue=divide(
+													arrayRows[rowIndex]->value._array->values[colIndex],
+													arrayRows[colIndex]->value._array->values[colIndex]);
+								outputValue("\t\tTemp value: ",tempValue,"\n");
+								for(long long elementIndex=0;elementIndex<numberOfArrayRows;elementIndex++){
+									assignValue(
+										&arrayRows[rowIndex]->value._array->values[elementIndex],
+										subtract(
+											arrayRows[rowIndex]->value._array->values[elementIndex],
+											multiply(arrayRows[colIndex]->value._array->values[elementIndex],tempValue)
+										)
+									);
+									// also for the unity matrix
+									outputValue("\t\tTemp value: ",tempValue,"\n");
+									assignValue(
+										&unityMatrixRows[rowIndex]->value._array->values[elementIndex],
+										subtract(
+											unityMatrixRows[rowIndex]->value._array->values[elementIndex],
+											multiply(unityMatrixRows[colIndex]->value._array->values[elementIndex],tempValue)
+										)
+									);
+									outputValue("\t\tTemp value: ",tempValue,"\n");
+								}
+								output("\t\tElement loop done!\n");
+							}
+							output("\t\tRow test done!\n");
+						}
+						output("\t\tRow loop done!\n");
+						outputArray("\t\tRows replaced: ",_arrayCopy,"\n");
+						outputArray("\t\t\tUnity matrix: ",unityMatrix,"\n");
+					}
+					// 3. multiply each row by a nonzero integer
+					//    divide row element by the diagonal element
+					output("Normalization.\n");
+					for(long long rowIndex=0;rowIndex<numberOfArrayRows;rowIndex++){
+						output("\tRow=%lld.\n",rowIndex);
+						Mvalue* tempValue=arrayRows[rowIndex]->value._array->values[rowIndex];
+						if(tempValue==NULL){FREE_ARRAY(unityMatrix,owner);unityMatrix=NULL;break;}
+						outputValue("\t\tDivider:",tempValue,"\n");
+						for(long long colIndex=0;colIndex<numberOfArrayRows;colIndex++){
+							assignValue(
+								&arrayRows[rowIndex]->value._array->values[colIndex],
+								divide(
+									arrayRows[rowIndex]->value._array->values[colIndex],
+									tempValue
+								)
+							);
+							assignValue(
+								&unityMatrixRows[rowIndex]->value._array->values[colIndex],
+								divide(
+									unityMatrixRows[rowIndex]->value._array->values[colIndex],
+									tempValue
+								)
+							);
+						}
+						outputArray("\t\tNormalized: ",_arrayCopy,"\n");
+						outputArray("\t\tUnity matrix: ",unityMatrix,"\n");
+					}
+					/*
+					for(colIndex=0;colIndex<numberOfArrayRows;colIndex++){
+						// step 1
+						// step 2
+					}
+					if(colIndex<0){FREE_ARRAY(unityMatrix,owner);return NULL;}
+					// step 3
+					// step 4
+					*/
+				}else
+					outputError("Failed to create a unity matrix");
+				FREE_ARRAY(diagonalOfOnes,owner); // not bound in unityMatrix, so requires freeing
 			}else
 				outputError("Failed to create a unity matrix");
-		}else{
-			FREE_ARRAY(diagonalOfOnes,owner);
-			outputError("Failed to create the unity matrix diagonal");
-		}
+			FREE_ARRAY(_arrayCopy,owner);
+			if(unityMatrix!=NULL)return unityMatrix;
+			outputError("Failed to invert the matrix");
+		}else
+			outputError("Failed to copy the matrix to invert");
 	}else
-		outputError("Can't determine the inverse of a non-square matrix");
+		outputError("Can't invert a non-square matrix");
 	return NULL;
 }
 
@@ -589,29 +625,30 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
  * @param fillValue the value to put in every matrix element
  * @return Mvalue* 
  */
-Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue){Mallocationowner owner=getOwner(__LINE__);
-	long long numberOfColumns=(NULL==colsValue?0:getValueInteger(colsValue));
-	if(numberOfColumns>=0){
-		if(rowsValue!=NULL){
+Mvalue* Mmatrix(Mvalue* fillValue,Mvalue* rowsValue,Mvalue* colsValue){Mallocationowner owner=getOwner(__LINE__);
+	long long numberOfRows=(NULL==rowsValue?0:getValueInteger(rowsValue));
+	long long numberOfCols=(NULL==colsValue?0:getValueInteger(colsValue));
+	// rowsValue can be NULL or a positive integer
+	if(numberOfRows>=0&&numberOfCols>=0){ // acceptable number of rows and columns
+		if(fillValue!=NULL){
 			// if rowsValue should either be an integer or an array
-			if(rowsValue->type==VT_ARRAY){
-				if(numberOfColumns==0){ // no columns specified, so rowsValues should be a two-dimensional numeric array at least
-					// check if rowsValue holds a two-dimensional array with numeric values
+			if(fillValue->type==VT_ARRAY){
+				if(numberOfRows==0){ // no rows specified, so fillValues should be a two-dimensional numeric array at least
+					// check if fillValue holds a two-dimensional array with numeric values
 					// if it does the two-dimensional array is marked as being a matrix
 					// (this will force keeping the matrix a matrix (yet to be implemented though))
-					if(rowsValue->value._array!=NULL&&isANumericMatrix(rowsValue->value._array,true)!=M_TRUE)
-						outputError("First argument cannot be used as matrix");
+					if(fillValue->value._array!=NULL&&isANumericMatrix(fillValue->value._array,true)!=M_TRUE)
+						outputError("Argument does not represent an all numeric two-dimensional array");
 					// I'm going to be lenient in even returning rowsValue
-					return rowsValue;
-				}else{ // colsValue indicates the number of columns each to get the values in rowsValue
-					Marray* _matrix=OWNED_ARRAY(_getArray(NULL,numberOfColumns,rowsValue),owner);
+					return fillValue;
+				}else{ // rowsValue indicates the number of rows each to get the values in fillValue
+					Marray* _matrix=OWNED_ARRAY(_getArray(NULL,numberOfRows,fillValue),owner);
 					if(_matrix!=NULL)return _getValueOfArray(DISOWNED_ARRAY(_matrix,owner));
 				}
-			}else{
-				long long numberOfRows=getValueInteger(rowsValue);
+			}else{ // fillValue is NOT an array!!!!
 				if(numberOfRows>0){
 					// the columns is also allowed to be an array indicating the value to use as row
-					if(numberOfColumns<=0){ // not a number
+					if(numberOfCols<=0){ // not a number
 						if(colsValue->type==VT_ARRAY&&colsValue->value._array!=NULL){
 							Marray* rowsArray=OWNED_ARRAY(_getArray(NULL,numberOfRows,colsValue),owner);
 							if(rowsArray!=NULL){
@@ -622,17 +659,27 @@ Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue){Mallocati
 						}else
 							outputError("No initial row value specified!");
 					}else{ // multiple columns
-						Mvalue* initialRowValue=_getValueOfArray(_getArray(NULL,numberOfColumns,fillValue));
+						Mvalue* initialRowValue=_getValueOfArray(_getArray(NULL,numberOfCols,fillValue));
 						Marray* _array=OWNED_ARRAY(_getArray(NULL,numberOfRows,initialRowValue),owner);
 						if(isNumeric(fillValue))_array->numberOfDimensionsLeft=1; // mark as matrix
 						else outputError("The resulting two-dimensional array cannot be used as a matrix");
 						return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
 					}
-				}else	
-					outputError("Invalid first parameter to matrix() function: should either be the number of rows or a two-dimensional array");
+				}else
+					outputError("Missing number of matrix rows");
 			}
-		}
-	}
+		}else
+		if(numberOfRows>0&&numberOfCols>0){
+			Mvalue* initialRowValue=_getValueOfArray(_getArray(NULL,numberOfCols,NULL));
+			Marray* _array=OWNED_ARRAY(_getArray(NULL,numberOfRows,initialRowValue),owner);
+			// TODO DONE is a two-dimensional arrays of NULLs numeric????? I guess not!!!
+			//////if(isNumeric(fillValue))_array->numberOfDimensionsLeft=1;else // mark as matrix
+			outputError("The resulting two-dimensional array with NULL values cannot be used as a matrix");
+			return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
+		}else
+			outputError("Missing number of matrix rows and/or columns");
+	}else
+		outputError("The matrix rows and/or columns argument do not represent a positive integer");
 	return NULL;
 }
 
@@ -671,6 +718,12 @@ Mvalue* Mmatrixinverse(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__)
 	return NULL;
 }
 
+/**
+ * @brief returns a new matrix with the values in 1-dimensional array \p _value along the diagonal
+ * @details returns NULL if \p _value is NULL or not containing an array
+ * @param _value 
+ * @return Mvalue* a new matrix with the values in 1-dimensional array \p _value along the diagonal
+ */
 Mvalue* Mmatrixdiagonal(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value)return NULL;
 	if(_value->type==VT_ARRAY){
@@ -681,10 +734,138 @@ Mvalue* Mmatrixdiagonal(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__
 	return NULL;
 }	
 
+/**
+ * @brief returns the transpose of square matrix \p _value
+ * @returns NULL if \p _value does not contain a square matrix
+ * @param _value 
+ * @return Mvalue* the transpose of square matrix \p _value
+ */
 Mvalue* Mmatrixtranspose(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value)return NULL;
 	if(_value->type==VT_ARRAY){
-	}
-	outputError("Argument to the diagonal matrix function not an array");
+		// does being a matrix suffice????
+		Marray* array=_value->value._array;
+		if(isAMatrix(array)){
+			long long numberOfRows=getNumberOfMatrixRows(array);
+			if(numberOfRows==getNumberOfMatrixColumns(array)){
+				// create a copy of array
+				Marray* _array=OWNED_ARRAY(_getArrayCopy(array),owner);
+				if(NULL==_array){outputError("Failed to copy the matrix to transpose");return NULL;}
+				// transpose _array
+				// NOTE we're simply exchanging the pointers (and not using assignValue!!!)
+				Mvalue** arrayRows=_array->values;
+				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++){
+					Mvalue** arrayRowValues=arrayRows[rowIndex]->value._array->values; // the values in the row #rowIndex
+					for(long long colIndex=rowIndex+1;colIndex<numberOfRows;colIndex++){
+						Mvalue* tempValue=arrayRowValues[colIndex];
+						arrayRowValues[colIndex]=arrayRows[colIndex]->value._array->values[rowIndex];
+						arrayRows[colIndex]->value._array->values[rowIndex]=tempValue;
+					}
+				}
+				return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
+			}else
+				outputError("Argument to the transpose function not a square matrix");
+		}else
+			outputError("Argument to the transpose function not a matrix");
+	}else
+		outputError("Argument to the matrix transpose function not an array");
 	return NULL;
 }	
+
+/**
+ * @brief returns the trace of square matrix \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the trace of square matrix \p _value
+ */
+Mvalue* Mmatrixtrace(Mvalue* _value){
+	if(NULL==_value)return NULL;
+	if(_value->type==VT_ARRAY){
+		// does being a matrix suffice????
+		Marray* array=_value->value._array;
+		if(isANumericMatrix(array,true)){
+			long long numberOfRows=getNumberOfMatrixRows(array);
+			if(numberOfRows==getNumberOfMatrixColumns(array)){
+				Mvalue** arrayRows=array->values;
+				Mvalue* traceValue=getValueZeroOfType(getMatrixElementValuetype(array));
+				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++)
+					traceValue=add(traceValue,arrayRows[rowIndex]->value._array->values[rowIndex]);
+				return traceValue;
+			}else
+				outputError("Argument to the transpose function not a square matrix");
+		}else
+			outputError("Argument to the transpose function not a matrix");
+	}else
+		outputError("Argument to the matrix transpose function not an array");
+	return NULL;
+}
+
+/**
+ * @brief returns M_TRUE if \p _value1 is smaller than \p _value2, M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long 
+ */
+/*static*/ long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	// ASSERT do not call when either is a list
+	if(NULL==_value1&&NULL==_value2)return M_FALSE; // both NULL, so equal, and therefore not smaller than
+	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result<0?M_TRUE:M_FALSE); 
+	}
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+		return llsmallerthan;
+	}
+	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
+		long long result=M_LL_INVALID;
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
+			if(_rationalDifference!=NULL){
+				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
+				result=isRationalNegative(_rationalDifference);
+				FREE_RATIONAL(_rationalDifference,owner);
+			}else
+				outputError("Failed to compute the difference of two rationals");
+		}else
+			outputError("Failed to convert comparison operator arguments to rationals");
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		return result;
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		// creating two intermediate decimals that need to be freed asap
+		long long result=M_LL_INVALID;
+		Mdecimal 	*_decimal1=owned_decimal(_getValueDecimal(_value1),owner),
+							*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
+			if(_decimalDifference!=NULL){
+				if(amVerbose())
+					outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
+				result=isDecimalNegative(_decimalDifference);
+				FREE_DECIMAL(_decimalDifference,owner);
+			}else
+				outputError("Failed to compute the difference of two decimals");
+		}else
+			outputError("Failed to convert comparison arguments to decimals");
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		return result;
+	}
+	return M_LL_INVALID;
+}

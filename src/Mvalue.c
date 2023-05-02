@@ -1915,6 +1915,7 @@ Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwne
 		register unsigned long long arrayindex=array->numberOfElements; // MDH@24NOV2020: HOORAY my first time use of 'register'
 		Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex,NULL),owner);
 		if(_array!=NULL){
+			_array->numberOfDimensionsLeft=array->numberOfDimensionsLeft; // MDH@02MAY2023: let's copy this new field as well
 			if(arrayindex>0){
 				Mvalue **newvalueholder=_array->values+arrayindex,**valueholder=array->values+arrayindex;
 				do assignValue(--newvalueholder,*(--valueholder));while(--arrayindex>0);
