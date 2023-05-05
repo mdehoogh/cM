@@ -40,6 +40,76 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 }
 */
 /**
+ * @brief returns M_TRUE if \p _value1 is smaller than \p _value2, M_FALSE otherwise
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return long long 
+ */
+/*static*/ long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	// ASSERT do not call when either is a list
+	if(NULL==_value1&&NULL==_value2)return M_FALSE; // both NULL, so equal, and therefore not smaller than
+	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result<0?M_TRUE:M_FALSE); 
+	}
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+		return llsmallerthan;
+	}
+	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
+		long long result=M_LL_INVALID;
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
+				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
+		if(_rational1!=NULL&&_rational2!=NULL){
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
+			if(_rationalDifference!=NULL){
+				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
+				result=isRationalNegative(_rationalDifference);
+				FREE_RATIONAL(_rationalDifference,owner);
+			}else
+				outputError("Failed to compute the difference of two rationals");
+		}else
+			outputError("Failed to convert comparison operator arguments to rationals");
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		return result;
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		// creating two intermediate decimals that need to be freed asap
+		long long result=M_LL_INVALID;
+		Mdecimal 	*_decimal1=owned_decimal(_getValueDecimal(_value1),owner),
+							*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		if(_decimal1!=NULL&&_decimal2!=NULL){
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
+			if(_decimalDifference!=NULL){
+				if(amVerbose())
+					outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
+				result=isDecimalNegative(_decimalDifference);
+				FREE_DECIMAL(_decimalDifference,owner);
+			}else
+				outputError("Failed to compute the difference of two decimals");
+		}else
+			outputError("Failed to convert comparison arguments to decimals");
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		return result;
+	}
+	return M_LL_INVALID;
+}
+
+/**
  * @brief returns M_TRUE if \p array is a matrix i.e. a two-dimensional array, M_FALSE if it is not
  * @details returns M_LL_INVALID if \p array is NULL
  * @param array 
@@ -800,72 +870,115 @@ Mvalue* Mmatrixtrace(Mvalue* _value){
 	return NULL;
 }
 
+
 /**
- * @brief returns M_TRUE if \p _value1 is smaller than \p _value2, M_FALSE otherwise
- * 
- * @param _value1 
- * @param _value2 
- * @return long long 
+ * @brief returns the determinant of square matrix \p _value
+ * @details returns NULL if \p _value is not square
+ *          uses Heap's algorithm to generate all possible product permutations
+ * @param _value 
+ * @return Mvalue* the determinant of square matrix \p _value
  */
-/*static*/ long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	// ASSERT do not call when either is a list
-	if(NULL==_value1&&NULL==_value2)return M_FALSE; // both NULL, so equal, and therefore not smaller than
-	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
-	// MDH@02NOV2020: comparing texts
-	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
-		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
-		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
-		return(result<0?M_TRUE:M_FALSE); 
-	}
-	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
-		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return llsmallerthan;
-	}
-	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
-	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
-		long long result=M_LL_INVALID;
-		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
-				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1!=NULL&&_rational2!=NULL){
-			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference!=NULL){
-				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
-				result=isRationalNegative(_rationalDifference);
-				FREE_RATIONAL(_rationalDifference,owner);
+Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==_value)return NULL;
+	if(_value->type==VT_ARRAY){
+		// does being a matrix suffice????
+		Marray* array=_value->value._array;
+		if(isANumericMatrix(array,true)){
+			long long numberOfRows=getNumberOfMatrixRows(array);
+			if(numberOfRows==getNumberOfMatrixColumns(array)){
+				Mvalue** arrayRows=array->values;
+				Mvalue* determinantValue=NULL;
+				// we can use the first column and therefore exclude rows
+				// we know how many to exclude in total that is one less than the total number of rows
+				long long * permutation=(long long *)CALLOC(sizeof(long long),numberOfRows,-'x',owner);
+				long long * c=(long long *)CALLOC(sizeof(long long),numberOfRows,-'x',owner);
+				// keeping track of the cumulative product to add or subtract to the 
+				Mvalue* *cumproduct=(Mvalue**)CALLOC(sizeof(Mvalue*),numberOfRows,'X',owner);
+				if(c!=NULL&&permutation!=NULL&&cumproduct!=NULL){
+					// initialize the cumulative product to the cumulative product of the diagonal elements
+					assignValue(cumproduct,arrayRows[0]->value._array->values[0]);
+					for(long long rowIndex=1;rowIndex<numberOfRows;rowIndex++)
+						assignValue(cumproduct+rowIndex,
+							multiply(cumproduct[rowIndex-1],arrayRows[rowIndex]->value._array->values[rowIndex]));
+					assignValue(&determinantValue,cumproduct[numberOfRows-1]);
+					outputValue("Initial value determinant: ",determinantValue,"\n");
+					if(determinantValue!=NULL){
+						// initialize permutation to the possible row indices
+						long long rowIndex=numberOfRows;while(--rowIndex>=0)permutation[rowIndex]=rowIndex;
+						bool neg=false;
+						// permutate permutation
+						long long temp,swapi,i=1;
+						while(i<numberOfRows){
+							if(c[i]<i){
+								swapi=(i%2?c[i]:0);
+								temp=permutation[swapi];
+								permutation[swapi]=permutation[i];
+								permutation[i]=temp;
+								// use the ninimum of swapi and i to determine the first cum product to update
+								if(swapi>i)swapi=i;
+								// update all cumulative products starting at swapi
+								if(swapi==0){
+									assignValue(cumproduct,arrayRows[permutation[swapi]]->value._array->values[0]);
+									swapi++;
+								}
+								for(;swapi<numberOfRows;swapi++)
+									assignValue(cumproduct+swapi,
+										multiply(cumproduct[swapi-1],arrayRows[permutation[swapi]]->value._array->values[swapi]));
+								outputValue("Cum product: ",cumproduct[numberOfRows-1],"\n");
+								// increment the determinant with the new cumulative product
+								if(neg){ // toggle to false
+									neg=false;
+									assignValue(&determinantValue,add(determinantValue,cumproduct[numberOfRows-1]));
+								}else{ // toggle to true
+									neg=true;
+									assignValue(&determinantValue,subtract(determinantValue,cumproduct[numberOfRows-1]));
+								}
+								outputValue("Updated determinant: ",determinantValue,"\n");
+								c[i]++;
+								i=1;
+							}else
+								c[i++]=0;
+						}
+						// initialize determinantValue to the cumulative product of the diagonal elements
+						// NOTE c is already initialized to zeroes as we need them in Heap's algorithm
+						/* here's a Python implementation of Heap's algorithm (see heapsalgorithm.py)
+						def generate(n,A):
+							def swap(i,j):
+								temp=A[i]
+								A[i]=A[j]
+								A[j]=temp
+							c=[0]*n
+							i=1
+							count=1
+							print("1: ",A)
+							while i<n:
+								if c[i]<i:
+									if i%2:
+										swap(0,i)
+									else:
+										swap(c[i],i)
+									count+=1
+									print(count,": ",A)
+									c[i]+=1
+									i=1
+								else:
+									c[i]=0
+									i+=1
+						*/
+						// using Heap's algorithm to generate all permutations of the row indices of each cell to use
+					}else
+						outputError("Failed to initialize the determinant");
+				}
+				FREE_DISOWNED(permutation,numberOfRows,-'x',owner);
+				FREE_DISOWNED(c,numberOfRows,-'x',owner);
+				FREE_DISOWNED(cumproduct,numberOfRows,'X',owner);
+				outputValue("Determinant: ",determinantValue,"\n");
+				return determinantValue;
 			}else
-				outputError("Failed to compute the difference of two rationals");
+				outputError("Argument to the transpose function not a square matrix");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return result;
-	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		// creating two intermediate decimals that need to be freed asap
-		long long result=M_LL_INVALID;
-		Mdecimal 	*_decimal1=owned_decimal(_getValueDecimal(_value1),owner),
-							*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1!=NULL&&_decimal2!=NULL){
-			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
-			if(_decimalDifference!=NULL){
-				if(amVerbose())
-					outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
-				result=isDecimalNegative(_decimalDifference);
-				FREE_DECIMAL(_decimalDifference,owner);
-			}else
-				outputError("Failed to compute the difference of two decimals");
-		}else
-			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return result;
-	}
-	return M_LL_INVALID;
+			outputError("Argument to the transpose function not a matrix");
+	}else
+		outputError("Argument to the matrix transpose function not an array");
+	return NULL;
 }

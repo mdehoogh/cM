@@ -13620,6 +13620,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!completedValueValueFunction(_Menvironment,owner,"mult",Mmatrixproduct)
 					||!completedValueFunction(_Menvironment,owner,"inv",Mmatrixinverse)
 					||!completedValueFunction(_Menvironment,owner,"transpose",Mmatrixtranspose)
+					||!completedValueFunction(_Menvironment,owner,"det",Mmatrixdeterminant)
 					||!completedValueFunction(_Menvironment,owner,"trace",Mmatrixtrace)){
 				outputError("Failed to register the matrix functions");
 				return NULL;

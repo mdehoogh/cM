@@ -26,3 +26,4 @@ Mvalue* Mmatrixproduct(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Mmatrixdiagonal(Mvalue* _value);
 Mvalue* Mmatrixtranspose(Mvalue* _value);
 Mvalue* Mmatrixtrace(Mvalue* _value);
+Mvalue* Mmatrixdeterminant(Mvalue* _value);
