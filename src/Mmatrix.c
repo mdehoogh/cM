@@ -901,15 +901,25 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 						assignValue(cumproduct+rowIndex,
 							multiply(cumproduct[rowIndex-1],arrayRows[rowIndex]->value._array->values[rowIndex]));
 					assignValue(&determinantValue,cumproduct[numberOfRows-1]);
-					outputValue("Initial value determinant: ",determinantValue,"\n");
+					/////////outputValue("Initial value determinant: ",determinantValue,"\n");
 					if(determinantValue!=NULL){
+						//if(amVerbose())
+							outputValue("Determining the determinant of ",_value,".\n");
 						// initialize permutation to the possible row indices
 						long long rowIndex=numberOfRows;while(--rowIndex>=0)permutation[rowIndex]=rowIndex;
 						bool neg=false;
 						// permutate permutation
-						long long temp,swapi,i=1;
-						while(i<numberOfRows){
-							if(c[i]<i){
+						long long temp,swapi,i=1,count=0;
+						while(1){ // replacing: i<numberOfRows
+							if(i>=numberOfRows||c[i]<i){
+								//if(amVerbose()){
+									output("\tUpdated determinant after %s product #%lld",(neg?"subtracting":"adding"),++count);
+									outputValue(" (",cumproduct[numberOfRows-1],") of cells");
+									for(long long permIndex=0;permIndex<numberOfRows;permIndex++)
+										output(" (%lld,%lld)",permutation[permIndex],permIndex);
+									outputValue(": ",determinantValue,"\n");
+								//}
+								if(i>=numberOfRows)break;
 								swapi=(i%2?c[i]:0);
 								temp=permutation[swapi];
 								permutation[swapi]=permutation[i];
@@ -924,7 +934,7 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 								for(;swapi<numberOfRows;swapi++)
 									assignValue(cumproduct+swapi,
 										multiply(cumproduct[swapi-1],arrayRows[permutation[swapi]]->value._array->values[swapi]));
-								outputValue("Cum product: ",cumproduct[numberOfRows-1],"\n");
+								//outputValue("Cum product: ",cumproduct[numberOfRows-1],"\n");
 								// increment the determinant with the new cumulative product
 								if(neg){ // toggle to false
 									neg=false;
@@ -933,7 +943,6 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 									neg=true;
 									assignValue(&determinantValue,subtract(determinantValue,cumproduct[numberOfRows-1]));
 								}
-								outputValue("Updated determinant: ",determinantValue,"\n");
 								c[i]++;
 								i=1;
 							}else
@@ -969,10 +978,11 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 					}else
 						outputError("Failed to initialize the determinant");
 				}
+				if(amVerbose())
+					outputValue("Determinant: ",determinantValue,"\n");
 				FREE_DISOWNED(permutation,numberOfRows,-'x',owner);
 				FREE_DISOWNED(c,numberOfRows,-'x',owner);
 				FREE_DISOWNED(cumproduct,numberOfRows,'X',owner);
-				outputValue("Determinant: ",determinantValue,"\n");
 				return determinantValue;
 			}else
 				outputError("Argument to the transpose function not a square matrix");
