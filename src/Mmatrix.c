@@ -982,6 +982,9 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 					outputValue("Determinant: ",determinantValue,"\n");
 				FREE_DISOWNED(permutation,numberOfRows,-'x',owner);
 				FREE_DISOWNED(c,numberOfRows,-'x',owner);
+				// MDH@06MAY2023: we can't just release the Mvalue pointers without getting rid of the values
+				//                NOTE I should've stored these Mvalues in an array wrapped Mvalue
+				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++)assignValue(cumproduct+rowIndex,NULL);
 				FREE_DISOWNED(cumproduct,numberOfRows,'X',owner);
 				return determinantValue;
 			}else
