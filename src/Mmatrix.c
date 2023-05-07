@@ -117,8 +117,23 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
  */
 long long isAMatrix(Marray* array){
 	if(array!=NULL){
+		// when marked as a matrix, it is guaranteed to be a matrix
 		if(array->numberOfDimensionsLeft==1)return M_TRUE;
-		output("Number of dimensions left: %lld.\n",array->numberOfDimensionsLeft);
+		////output("Number of dimensions left: %lld.\n",array->numberOfDimensionsLeft);
+		// iterate over the values in the array and check that each is an array with the same number of elements
+		long long numberOfRows=array->numberOfElements;
+		if(numberOfRows>0){
+			Mvalue* firstElement=array->values[0];
+			if(firstElement!=NULL&&firstElement->type==VT_ARRAY){
+				long long numberOfColumns=firstElement->value._array->numberOfElements;
+				while(--numberOfRows>0){
+					Mvalue* elementValue=array->values[numberOfRows];
+					if(elementValue->type!=VT_ARRAY||elementValue->value._array->numberOfElements!=numberOfColumns)
+						return M_FALSE;
+				}
+				return M_TRUE;
+			}
+		}
 		return M_FALSE;
 	}
 	return M_LL_INVALID;
@@ -805,8 +820,8 @@ Mvalue* Mmatrixdiagonal(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__
 }	
 
 /**
- * @brief returns the transpose of square matrix \p _value
- * @returns NULL if \p _value does not contain a square matrix
+ * @brief returns the transpose of two-dimensional array \p _value
+ * @details returns NULL if \p _value is not a two-dimensional array with equal number of array elements in each row
  * @param _value 
  * @return Mvalue* the transpose of square matrix \p _value
  */
@@ -816,21 +831,22 @@ Mvalue* Mmatrixtranspose(Mvalue* _value){Mallocationowner owner=getOwner(__LINE_
 		// does being a matrix suffice????
 		Marray* array=_value->value._array;
 		if(isAMatrix(array)){
-			long long numberOfRows=getNumberOfMatrixRows(array);
-			if(numberOfRows==getNumberOfMatrixColumns(array)){
-				// create a copy of array
-				Marray* _array=OWNED_ARRAY(_getArrayCopy(array),owner);
-				if(NULL==_array){outputError("Failed to copy the matrix to transpose");return NULL;}
+			long long numberOfRows=getNumberOfMatrixRows(array),numberOfColumns=getNumberOfMatrixColumns(array);
+			// MDH@07MAY2023: the matrix does not need to be square or numeric at all
+			// each row in the transpose needs numberOfRows elements
+			Mvalue* row=_getValueOfArray(_getArray(NULL,numberOfRows,NULL));
+			if(row!=NULL){
+				Marray* _array=OWNED_ARRAY(_getArray(NULL,numberOfColumns,row),owner);
+				if(NULL==_array){outputError("Failed to initialize the transpose");return NULL;}
+				_array->numberOfDimensionsLeft=array->numberOfDimensionsLeft; // TODO should we do this?????
 				// transpose _array
 				// NOTE we're simply exchanging the pointers (and not using assignValue!!!)
-				Mvalue** arrayRows=_array->values;
+				Mvalue** arrayRows=array->values; // the original 'matrix'
 				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++){
 					Mvalue** arrayRowValues=arrayRows[rowIndex]->value._array->values; // the values in the row #rowIndex
-					for(long long colIndex=rowIndex+1;colIndex<numberOfRows;colIndex++){
-						Mvalue* tempValue=arrayRowValues[colIndex];
-						arrayRowValues[colIndex]=arrayRows[colIndex]->value._array->values[rowIndex];
-						arrayRows[colIndex]->value._array->values[rowIndex]=tempValue;
-					}
+					for(long long colIndex=0;colIndex<numberOfColumns;colIndex++)
+						assignValue(&_array->values[colIndex]->value._array->values[rowIndex],
+													arrayRowValues[colIndex]);
 				}
 				return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
 			}else
@@ -853,13 +869,13 @@ Mvalue* Mmatrixtrace(Mvalue* _value){
 	if(_value->type==VT_ARRAY){
 		// does being a matrix suffice????
 		Marray* array=_value->value._array;
-		if(isANumericMatrix(array,true)){
+		if(isANumericMatrix(array,false)){ // NOT forcing marking a numeric matrix as such
 			long long numberOfRows=getNumberOfMatrixRows(array);
 			if(numberOfRows==getNumberOfMatrixColumns(array)){
 				Mvalue** arrayRows=array->values;
 				Mvalue* traceValue=getValueZeroOfType(getMatrixElementValuetype(array));
-				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++)
-					traceValue=add(traceValue,arrayRows[rowIndex]->value._array->values[rowIndex]);
+				while(--numberOfRows>=0)
+					assignValue(&traceValue,add(traceValue,arrayRows[numberOfRows]->value._array->values[numberOfRows]));
 				return traceValue;
 			}else
 				outputError("Argument to the transpose function not a square matrix");
