@@ -465,7 +465,7 @@ static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
  * @param report 
  * @return int8_t 1 on success, a non positive integer on failure
  */
-int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
+static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
 
 	if(NULL==lastCommandToken){if(report)outputError("Empty command");return 0;}
 	
@@ -2050,7 +2050,7 @@ Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken cons
 			output("Evaluating subcommand '%s'.\n",string(_commandText));
 		}
 		Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
-		if(_evalEnvironment){
+		if(_evalEnvironment!=NULL){
 			_evalEnvironment->_name=owned_chars(_getChars(source),Msubowner(owner,1));
 			if(pushExecutionEnvironment(disowned_environment(_evalEnvironment,owner))){
 				// similar to getCommandValue() except starting at the given token instead (and without the verbose output)

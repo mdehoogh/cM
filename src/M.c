@@ -901,8 +901,10 @@ void updateAutoCompletionText(){
 		logToOutputFile("\t\tAuto completion text: '%s'.\n",string(_autoCompletionText));
 	}
 }
-/* MDH@20DEC2022: apparently not getting called anywhere anymore
-char getTokenTypeFeedforwardCharacter(TokenType tokenType){
+
+// MDH@25MAY2023: we can use it again
+// MDH@20DEC2022: apparently not getting called anywhere anymore
+static char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 	// some token types have an associated feed forward character!!!
 	switch(tokenType){
 		case TT_BINARY_aErU:return '=';
@@ -918,7 +920,21 @@ char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 	}
 	return '\0';
 }
-*/
+static char firstCommandClosingCharacter='\0';
+static void updateTheFirstCommandClosingCharacter(){
+	firstCommandClosingCharacter='\0';
+	Mtoken* lastCommandToken=(_userInputCommand!=NULL?_userInputCommand->_lastToken:NULL);
+	if(lastCommandToken!=NULL&&isTokenFinished(lastCommandToken)){ // the last command token is finished
+		firstCommandClosingCharacter=getTokenTypeFeedforwardCharacter(lastCommandToken->type);
+		// even if there's a first command closing character, it might not be allowed if the current token
+		if(firstCommandClosingCharacter){
+			inputInfo("First command closing character: '%c'.",firstCommandClosingCharacter);
+		}else{
+			inputInfo("No first command closing character!");
+		}
+	}
+}
+
 // MDH@24SEP2019: we do not always want to set the identifier continuation characters
 // MDH@03OCT2019: now excluding the last token immediate feed forward text because that is being taken care of whenever the last token (type) change
 //				because of this only the matching parentheses feed forward characters remain so TODO simplify this
@@ -927,11 +943,11 @@ char getTokenTypeFeedforwardCharacter(TokenType tokenType){
  * 
  * @return char* the C string with the auto completion text associated with the last user input command token
  */
-char* _getLastTokenAutoCompletionText(){// Mallocationowner owner=getOwner(__LINE__);
+static char* _getLastTokenAutoCompletionText(){// Mallocationowner owner=getOwner(__LINE__);
 	// MDH@20DEC2022: changed from "" to " ", as this is a bit dangerous since this way we get a 1-character string
-	char* tokenAutoCompletionText=" "; // on the stack (zero-terminated string)
+	char *tokenAutoCompletionText=" "; // on the stack (zero-terminated string)
 	if(amMatchingparentheses())
-	if(_userInputCommand&&_userInputCommand->_lastToken)
+	if(_userInputCommand!=NULL&&_userInputCommand->_lastToken!=NULL)
 	switch(_userInputCommand->_lastToken->type){
 		case TT_ASSIGNMENT:break;
 		case TT_BINARY_AeRu:case TT_BINARY_Aeru:case TT_BINARY_aERu:break;
@@ -962,7 +978,7 @@ char* _getLastTokenAutoCompletionText(){// Mallocationowner owner=getOwner(__LIN
 		default:break;
 	}
 	// MDH@25MAY2020: by returning a dynamic duplicate the caller needs to free it
-	return((*tokenAutoCompletionText)!=' '?strdup(tokenAutoCompletionText):NULL); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
+	return(tokenAutoCompletionText[0]!=' '?strdup(tokenAutoCompletionText):NULL); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
 }
 /*
 Mtokenautocompletiontext* disowned_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext,Mallocationowner owner_autocompletiontext){
@@ -3332,6 +3348,7 @@ unsigned long long numberOfSuggestedCharactersWritten=0; // MDH@23SEP2020: basic
  */
 void showSuggestedText(){
 	// ASSERT _suggestedText should not be NULL
+	if(NULL==_suggestedText)return;
 	// MDH@26SEP2019: behind cursor text now consists of two parts now: identifier continuation text and feed forward text
 	// 0. preparation
 	string_setlength(_suggestedText,0/*,owner_suggestedText*/); // clear the suggested text!!!
@@ -3639,6 +3656,7 @@ void updateLastTokenAutoCompletionText(bool onlyWhenNotAlreadyEndingTheSuggested
 	// MDH@25MAY2020: TODO _getLastTokenAutoCompletionText() returns a dynamically allocated char* (using strdup) which therefore is NOT under version control
 	free(setLastTokenAutoCompletionText(_lastTokenAutoCompletionText));
 	// inputInfo("Last token auto completion text updated.");
+	updateTheFirstCommandClosingCharacter();
 }
 /**
  * @brief sets the current user input command to \p command and outputs it
@@ -3986,7 +4004,8 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			if(amMatchingparentheses())if(_userInputCommand->_lastToken->type==TT_NEW_VARIABLE)if(string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			*/
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
-			setTokenType(lastCommandToken,TT_FUNCTION/*,endOfInput*/);if(endOfInput)updateLastTokenAutoCompletionText(false);
+			setTokenType(lastCommandToken,TT_FUNCTION/*,endOfInput*/);
+			if(endOfInput)updateLastTokenAutoCompletionText(false);
 			reoutputToken(lastCommandToken);
 			// MDH@20OCT2021 this is when an identifier is identified as a function!!!!
 			// DEBUG: outputChar('V');
@@ -4000,7 +4019,8 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		if(!getFunction(getExecutionEnvironment(),_identifierName)){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
 			// MDH@11MAR2020: ok, here we have an issue: 
-			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutoCompletionText(false);
+			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);
+			if(endOfInput)updateLastTokenAutoCompletionText(false);
 			reoutputToken(lastCommandToken);
 			// outputChar('U');
 			inputInfo("'%s' considered to be an existing variable.",_identifierName);
@@ -4074,7 +4094,8 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		}else
 		if(lastCommandToken->type==TT_NEW_VARIABLE){ // a new variable
 			if(variableExistsIndicator>0){ // now an existing variable
-				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutoCompletionText(false);
+				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);
+				if(endOfInput)updateLastTokenAutoCompletionText(false);
 				reoutputToken(lastCommandToken);
 				// DEBUG outputChar('X');
 				///// MDH@23SEP2019 removed: invalidateAutoCompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
@@ -6110,7 +6131,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		//				_manualFeedforwardText is only used in command and shell mode, not in control mode
 		//				perhaps it's better done at the prompt
 		//				TODO consider doing the same for feed forward texts?????
-		if(_manualFeedforwardText)deleteManualFeedforwardText(); //{FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;}
+		if(_manualFeedforwardText!=NULL)deleteManualFeedforwardText(); //{FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;}
 
 		// if eXit input character(s) received...
 		if(inputCharType=='x'){
