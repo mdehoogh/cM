@@ -2516,7 +2516,8 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				break;
 			case VT_ARRAY:
 				{
-					written+=outputChar('(');
+					// MDH@0.1.7.14+25JUN2023: too bad it doesn't use _getValueText() here, so we need to change ( and ) into [ and ] here as well
+					written+=outputChar('[');
 					Marray* _array=_value->value._array;
 					if(_array!=NULL){
 						unsigned long long arraylength=_array->numberOfElements;
@@ -2555,7 +2556,7 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 							}
 						}
 					}
-					written+=outputChar(')');
+					written+=outputChar(']');
 				}
 				break;
 			case VT_LIST:
@@ -2567,7 +2568,7 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 					// MDH@03NOV2020: it makes sense when dealing with sparse arrays to not show all the comma's
 					//				but show the index numbers instead (obviously it's hard to count)
 					//				let's decide to only write the set elements, and if the index difference is not 1 with the previous element write the index in front of the value
-					written+=outputChar('[');
+					written+=outputChar('(');
 					Mlist* _list=_value->value._list;
 					if(_list!=NULL&&_list->numberOfElements){
 						long long numberOfElementsNotWritten=_list->numberOfElements;
@@ -2616,7 +2617,7 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 							}
 						}
 					}
-					written+=outputChar(']');
+					written+=outputChar(')');
 				}
 				break;
 			case VT_MAP:

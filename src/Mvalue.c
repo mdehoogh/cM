@@ -1934,19 +1934,16 @@ Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwne
  * @return Mstring* the new M string containing the text representation of M array \p _array
  */
 Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
+	// MDH@0.1.7.14+25JUN2023: arrays should now be enclosed in square brackets (and lists in parentheses) 
 	// as this is more like a tuple than a list (Python equivalent data structures)
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	Mstring* result=owned_string(__string(),owner);
 	if(result!=NULL){
 		Mstring* p=result;
 		unsigned long long l=(_array?_array->numberOfElements:0);
-		if(report){
-			p=string_append_char(p,'a');
-			p=string_append_char(p,'(');
-			p=appendll(p,l);
-			p=string_append_char(p,')');
-		}
-		p=string_append_char(p,'('); // switch to using p in appends
+		//if(report)
+		{p=string_append_char(p,'a');p=string_append_char(p,'(');p=appendll(p,l);p=string_append_char(p,')');}
+		p=string_append_char(p,'['); // switch to using p in appends
 		if(l>0){
 			long long firstAtEnd=l+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
 			long long elementsNotIncluded=firstAtEnd-showAtStart-1;
@@ -1981,7 +1978,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 				// output("(%llu)",listindex); // DEBUG
 			}while(p!=NULL&&(++arrayelementindex)<=lastarrayelementindex);
 		}
-		p=string_append_char(p,')');
+		p=string_append_char(p,']');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
 		if(NULL==p){FREE_STRING(result,owner);result=NULL;}
@@ -2536,13 +2533,15 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
  * @return Mstring* the new M string containing the text representation of some elements of the M list \p _list
  */
 Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
+	// MDH@0.1.7.14+25JUN2023: lists should now be enclosed inside ( and ) instead of [ and ]
 	///////output("List to output.");char c;inputCharRead(&c);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE);
 	Mstring* result=owned_string(__string(),owner);
 	if(result!=NULL){
 		Mstring* p=result;
-		if(report){p=string_append_char(p,'l');p=string_append_char(p,'(');p=appendll(p,_list->numberOfElements);p=string_append_char(p,')');}
-		p=string_append_char(p,'['); // switch to using p in appends
+		//if(report)
+		{p=string_append_char(p,'l');p=string_append_char(p,'(');p=appendll(p,_list->numberOfElements);p=string_append_char(p,')');}
+		p=string_append_char(p,'('); // switch to using p in appends
 		/////////size_t l=_list->numberOfElements;
 		long long listelementindex=0,expectedlistindex=1; // this would be the expected list index
 		Mlistelement* _listelement=(_list?_list->_first:NULL);
@@ -2604,7 +2603,7 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 			_listelement=_listelement->_next;
 			*/
 		}
-		p=string_append_char(p,']');
+		p=string_append_char(p,')');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
 		if(NULL==p){FREE_STRING(result,owner);result=NULL;}

@@ -22,7 +22,7 @@ const char M_PATH_SEPARATOR =
 #else
 							  '/';
 #endif
-const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference","function","environment"};
+const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","array","list","map","reference","function","environment","file","time"};
 const char* const M_VARIABLE_NAME="M"; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
 const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function for getting previous results
 const char* const IFFUNCTION_NAME="if";
@@ -33,8 +33,8 @@ const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowi
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="defun"; // MDH@04MAR2020: the 'classic' approach is by defining a function with a fixed name which cannot be passed along
 const char* const DEFINEANONYMOUSFUNCTION_NAME="function"; // MDH@04MAR2020: an anonymous function that is to be assigned to a variable/argument
-const char* const MUTABLEVALUETYPECHARS="uoibdqftlmr"; // the characters associated with each of the value types
-const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters associated with each of the value types
+const char* const MUTABLEVALUETYPECHARS="uoibdqftalmr#$"; // the characters associated with each of the value types
+const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTALMR#$"; // the characters associated with each of the value types
 const char* const INFO_PREFIX=""; // MDH@27FEB2020: as for now NO actual info prefix text to use
 const char* const M_ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const M_WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
@@ -4382,15 +4382,6 @@ but <value><operator><value> here operator is a set of token types that separate
 				  without loosing the original expression we're evaluating
 Mtoken* expressionToken=NULL; // the current evaluation token
 */
-/**
- * getValueOfExpression() evaluates an expression, obviously this means that we need to have some sort of understanding of where expression occur in the syntax of the M language
- * @info: some information text on the expression type (used in messages)
- * @resulttype: one character to indicate the type of expression result value (e.g. 'i' stands for index, i.e. an index into a list variable)
- * @firstToken: the first token in the expression to process
- * @endTokenTypes[]: the tokens that end the expression
- * @endTokenTypeCount: the number of end tokens
- * returns: the last token processed (which should be one of the end tokens) or NULL if all tokens were processed, and the Mvalue the expression evaluates to
- */
 
 /**
  * @brief returns a copy of \p _token ready for evaluation
@@ -4524,6 +4515,23 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	if(amVerboseDebugging())
 		outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
+}
+
+// MDH@25JUN2023: now anything between [ and ] should be returned as an array not as a list
+/**
+ * @brief returns the array represented by the array literal (marked using the list tokens [ and ])
+ * 
+ * @return Mvalue* the array represented by the array literal
+ */
+Mvalue* getValueOfArray(){
+	return Ma(getValueOfList(TT_END_OF_LIST,0,0,false));
+	/* equivalent to
+	Mvalue* listValue=getValueOfList(TT_END_OF_LIST,0,0,false);
+	if(listValue!=NULL&&listValue->type==TT_LIST&&listValue->value._list){
+
+	}
+	return NULL;
+	*/
 }
 /**
  * @brief returns the evaluated value of a map in the expression being evaluated
@@ -6292,8 +6300,11 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST: // a list literal
+				// MDH@25JUN2023: what used to be considered a list should now be stored in an array, so whatever getValueOfList() returns should become an array!!!
+				//                now the question is whether or not we should make getValueOfList() returns an array or we should translate the returned value only here
+				//                but essentially it's possible better to checkout every call to getValueOfList() and determine if it should be converted to an array
 				canbeindexedtheoretically=true;
-				_valueReference=owned_valuereference(_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false)),owner);
+				_valueReference=owned_valuereference(_getValuereference(getValueOfArray()),owner); // replacing: getValueOfList(TT_END_OF_LIST,0,0,false)),owner);
 				break;
 			case TT_MAP: // a map literal
 				{
@@ -6321,12 +6332,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					if(amVerboseDebugging())outputInfo("Going to wrap the list extracted!");
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
-					/* MDH@10APR2023: essentially what an expression should return is an array not a list
+					// MDH@0.1.7.14+25JUN2023: we have to undo removing the reduction to a single value since (1+2) should return 3 not the array [3]
+					///* MDH@10APR2023: essentially what an expression should return is an array not a list, as well as mapping the result to an array, it should remain a list
 					if(_expressionListValue->value._list->numberOfElements==1){
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
 					}else
-					*/
-						_valueReference=owned_valuereference(_getValuereference(Ma(_expressionListValue)),owner);
+					//*/
+						_valueReference=owned_valuereference(_getValuereference(_expressionListValue),owner); // applying Ma to _expressionListValue removed!!!!
 					// the reference count of _expressionListValue should be 0 now!!!
 					if(_expressionListValue!=NULL&&_expressionListValue->count)
 						outputBug("Expression list value reference count not 0");
@@ -9133,6 +9145,15 @@ char* getSignificantTokenText(Mtoken* token){
  * which optionally starts with an assignment to a single variable, BUT it makes sense to allow for multiple assignments in a row?????
  * typically this assignee can be composite referencing indices or attributes in maps, obviously we can put this variable in some sort of structure
  * it composes a list of value references to which operators are to be applied
+ */
+/**
+ * getValueOfExpression() evaluates an expression, obviously this means that we need to have some sort of understanding of where expression occur in the syntax of the M language
+ * @info: some information text on the expression type (used in messages)
+ * @resulttype: one character to indicate the type of expression result value (e.g. 'i' stands for index, i.e. an index into a list variable)
+ * @firstToken: the first token in the expression to process
+ * @endTokenTypes[]: the tokens that end the expression
+ * @endTokenTypeCount: the number of end tokens
+ * returns: the last token processed (which should be one of the end tokens) or NULL if all tokens were processed, and the Mvalue the expression evaluates to
  */
 /**
  * @brief returns the result of the evaluation of the expression being evaluated
