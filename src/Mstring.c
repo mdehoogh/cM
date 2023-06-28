@@ -344,9 +344,10 @@ char string_removed_char(Mstring* const str,size_t pos){
 			Mchars* strchars=str->_chars; // str replaced by strchars
 			rc=strchars->chars[pos]; // remember the character that is being removed!!
 			// we have to move characters pos through str->length down
-			// NOTE we have \0 at position str->length, so we have to move that one as well!!!	
-			char c;	 
-			while(pos<l){strchars->chars[pos]=strchars->chars[pos+1];pos++;} // TODO certainly this could be written more efficiently
+			// NOTE we have \0 at position str->length, so we have to move that one as well!!!
+			// MDH@0.1.7.14+28JUN2023 CORRECTION we do not need to move '\0' since we've decremented str->length and the '\0' will be placed at the right position
+			//                                   so if pos=l-1 there's no need to move
+			while(++pos<l)strchars->chars[pos-1]=strchars->chars[pos]; // replacing: while(pos<l){strchars->chars[pos]=strchars->chars[pos+1];pos++;} // TODO certainly this could be written more efficiently
 		}
 	}
 	return rc;

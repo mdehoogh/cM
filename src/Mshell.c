@@ -467,14 +467,14 @@ static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
  */
 static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
 
-	if(NULL==lastCommandToken){if(report)outputError("Empty command");return 0;}
+	if(NULL==lastCommandToken){/*if(report)outputError("Empty command");*/return 0;}
 	
 	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
 	//	in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
 	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
 
 	// MDH@28FEB2020: if the current last command token is an error do NOT remove, but let the caller handle it!!!!
-	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Command is erroneous.");return -1;}
+	if(lastCommandToken->type==TT_ERROR){/*if(report)outputError("Command is erroneous.");*/return -1;}
 	/* replacing:
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
@@ -486,7 +486,7 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 	*/
 
 	// 3. if the last token is an operator of sorts the command is incomplete
-	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return -2;}
+	if(lastCommandToken->type<=8){/*if(report)outputError("Value behind operator at end of command missing");*/return -2;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
 	//				BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
@@ -504,9 +504,11 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 			expressionToken=expressionToken->expr;
 	if(expressionToken!=NULL){ // could be a problem
 		// MDH@16OCT2019: I made ] ) and } again point to the associated [ ( and {, which of course should be pointing to NULL if it does not the command is incomplete
+		/*
 		if(amVerbose())
 			if(report)
 				output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
+		*/
 		/*
 		TokenType expressionTypeToIgnore=TT_EXPRESSION;
 		if(expressionTypesToIgnore){
@@ -518,12 +520,12 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 		// if we're not supposed to ignore this expression type, check it
 		if(expressionToken->type!=expressionTokenTypeToIgnore)
 		switch(expressionToken->type){
-			case TT_LIST:{if(report)outputError("Missing end of list");return -3;}
-			case TT_FUNCTION_CALL:{if(report)outputError("Missing end of function call");return -4;}
-			case TT_MAP:{if(report)outputError("Missing end of map");return -5;}
+			case TT_LIST:{/*if(report)outputError("Missing end of list");*/return -3;}
+			case TT_FUNCTION_CALL:{/*if(report)outputError("Missing end of function call");*/return -4;}
+			case TT_MAP:{/*if(report)outputError("Missing end of map");*/return -5;}
 			default:
 				{
-					if(report)output("%sUnknown expression with first token of type %s left unfinished.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
+					//if(report)output("%sUnknown expression with first token of type %s left unfinished.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
 					return -6;
 				}
 		}
@@ -551,12 +553,12 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 
 	// 4. can't end with function of function call
 	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
-	if(lastCommandToken->type==TT_FUNCTION){if(report)outputError("Function call missing at end of command");return -7;}
-	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)outputError("Unfinished function call");return -8;}
-	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)outputError("Unfinished list");return -9;}
-	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)outputError("Unfinished string literal");return -10;}
-	if(lastCommandToken->type==TT_EXPRESSION){if(report)outputError("Unfinished expression");return -11;}
-	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return -12;}
+	if(lastCommandToken->type==TT_FUNCTION){/*if(report)outputError("Function call missing at end of command");*/return -7;}
+	if(lastCommandToken->type==TT_FUNCTION_CALL){/*if(report)outputError("Unfinished function call");*/return -8;}
+	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){/*if(report)outputError("Unfinished list");*/return -9;}
+	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){/*if(report)outputError("Unfinished string literal");*/return -10;}
+	if(lastCommandToken->type==TT_EXPRESSION){/*if(report)outputError("Unfinished expression");*/return -11;}
+	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){/*if(report)outputError("Unfinished map");*/return -12;}
 	
 	return 1;
 }
@@ -582,6 +584,7 @@ Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command
 	}
 	return(command?command->_lastToken:NULL);
 }
+
 /**
  * @brief returns the validity indicator (positive on success) of M command \p command owned by \p owner_command
  * @details cuts off any last command token that is a comment before returning the validity of the last command token
@@ -591,10 +594,16 @@ Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command
  * @return int8_t 
  */
 int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report){
+	// MDH@28JUN2023: SHOULD NOT CHANGE command, for now we can solve this by only allowing removal when report is true
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(NULL==command||NULL==command->_firstToken){if(report)outputError("Undefined or empty command");return 0;}
+	if(NULL==command||NULL==command->_firstToken)return 0; // replacing: {if(report)outputError("Undefined or empty command");return 0;}
 	Mtoken* lastCommandToken=command->_lastToken;
-	if(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
+	if(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT){
+		if(report)
+			lastCommandToken=removedLastCommandToken(command,owner_command);
+		else
+			lastCommandToken=lastCommandToken->prev;
+	}
 	// MDH@25FEB2021: inspecting the last command token now delegated to isAValidLastCommandTokenIndicator()!
 	return isAValidLastCommandTokenIndicator(lastCommandToken,TT_EXPRESSION,report);
 }
