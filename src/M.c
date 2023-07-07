@@ -2388,28 +2388,31 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 		Mtoken* commandToken=_userInputCommand->_firstToken; // TODO can we get rid of using commandcount-1 here????
 		while(commandToken!=NULL){
 			// if we bump into a comment we're done!!!
-			if(commandToken->type==TT_COMMENT)break;
-			// TODO there must be a better way to do the coloring!!!
-			if(color){
-				string_append(_commandText,ES"38;5;");/////output("Command text: '%s'.\n",string(_commandText));
-				string_append(_commandText,getTokenColor(commandToken->type));//////output("Command text: '%s'.\n",string(_commandText));
-				string_append_char(_commandText,'m');/////output("Command text: '%s'.\n",string(_commandText));
-			} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
-			// MDH@31OCT2019: for now decided NOT to show the whitespace inside the tokens (by replacing the first whitespace character with the end-of-string marker)
-			char firstWhitespaceTokenCharacter=(isTokenFinished(commandToken)?string_replacedchar(commandToken->text,'\0',getTokenSignificantCharacterCount(commandToken)):'\0');
-			string_append(_commandText,string(commandToken->text));
-			if(firstWhitespaceTokenCharacter)string_setchar(commandToken->text,firstWhitespaceTokenCharacter,getTokenSignificantCharacterCount(commandToken)); // put first whitespace character (if any) back
-			// MDH@03MAY2019: place an asterisk in front of the type to indicate that expr is NOT null!!
-			if(amAssisting()){
+			// MDH@08JUL2023: since we now allow comments in a command as well (that end with a newline character) we should simply skip it
+			// replacing: if(commandToken->type==TT_COMMENT)break;
+			if(commandToken->type!=TT_COMMENT){
+				// TODO there must be a better way to do the coloring!!!
 				if(color){
 					string_append(_commandText,ES"38;5;");/////output("Command text: '%s'.\n",string(_commandText));
-					string_append(_commandText,getInfoColor());/////output("Command text: '%s'.\n",string(_commandText));
+					string_append(_commandText,getTokenColor(commandToken->type));//////output("Command text: '%s'.\n",string(_commandText));
 					string_append_char(_commandText,'m');/////output("Command text: '%s'.\n",string(_commandText));
+				} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
+				// MDH@31OCT2019: for now decided NOT to show the whitespace inside the tokens (by replacing the first whitespace character with the end-of-string marker)
+				char firstWhitespaceTokenCharacter=(isTokenFinished(commandToken)?string_replacedchar(commandToken->text,'\0',getTokenSignificantCharacterCount(commandToken)):'\0');
+				string_append(_commandText,string(commandToken->text));
+				if(firstWhitespaceTokenCharacter)string_setchar(commandToken->text,firstWhitespaceTokenCharacter,getTokenSignificantCharacterCount(commandToken)); // put first whitespace character (if any) back
+				// MDH@03MAY2019: place an asterisk in front of the type to indicate that expr is NOT null!!
+				if(amAssisting()){
+					if(color){
+						string_append(_commandText,ES"38;5;");/////output("Command text: '%s'.\n",string(_commandText));
+						string_append(_commandText,getInfoColor());/////output("Command text: '%s'.\n",string(_commandText));
+						string_append_char(_commandText,'m');/////output("Command text: '%s'.\n",string(_commandText));
+					}
+					string_append_char(_commandText,'(');
+					if(commandToken->expr!=NULL)string_append_char(_commandText,'*');/////output("Command text: '%s'.\n",string(_commandText));}
+					string_append(_commandText,TOKENTYPE_STRING[commandToken->type]);/////output("Command text: '%s'.\n",string(_commandText));
+					string_append(_commandText,") ");/////output("Command text: '%s'.\n",string(_commandText));
 				}
-				string_append_char(_commandText,'(');
-				if(commandToken->expr!=NULL)string_append_char(_commandText,'*');/////output("Command text: '%s'.\n",string(_commandText));}
-				string_append(_commandText,TOKENTYPE_STRING[commandToken->type]);/////output("Command text: '%s'.\n",string(_commandText));
-				string_append(_commandText,") ");/////output("Command text: '%s'.\n",string(_commandText));
 			}
 			commandToken=commandToken->next;
 		}
@@ -5477,27 +5480,31 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							*/
 						}
 						int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,owner_userInputCommand,false);
-						/////////// do NOT do this twice... inputInfo("Valid command indicator: %d.",aValidCommandIndicator);
+						/////////// do NOT do this twice... 
+						inputInfo("Valid command indicator: %d.",aValidCommandIndicator);
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
 						if(aValidCommandIndicator<=0){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!
 							/////////inputInfo("User newline break");
-							inputCharType='W';
-							inputChar=M_NEWLINE_CHARACTER; // MDH@13OCT2020 replacing: '\\';
-							switch(aValidCommandIndicator){
-								case   0:inputInfo("Invalid or empty command.");break;
-								case  -1:{inputInfo("Erroneous command.");inputChar='\0';}break;
-								case  -2:inputInfo("Value behind operator at end of command missing.");break;
-								case  -3:inputInfo("Missing end of list.");break;
-								case  -4:inputInfo("Missing end of function call.");break;
-								case  -5:inputInfo("Missing end of map.");break;
-								case  -6:inputInfo("Unknown expression with first token left unfinished.");break;
-								case  -7:inputInfo("Function call missing at end of command.");break;
-								case  -8:inputInfo("Unfinished function call.");break;
-								case  -9:inputInfo("Unfinished list.");break;
-								case -10:inputInfo("Unfinished string literal.");break;
-								case -11:inputInfo("Unfinished expression.");break;
-								case -12:inputInfo("Unfinished map.");break;
-								default:inputInfo("Invalid command indicator %d.",aValidCommandIndicator);break;
+							// MDH@08JUL2023: comments may be finished 
+							if(_userInputCommand->_lastToken->type!=TT_COMMENT){
+								inputCharType='W';
+								inputChar=M_NEWLINE_CHARACTER; // MDH@13OCT2020 replacing: '\\';
+								switch(aValidCommandIndicator){
+									case   0:inputInfo("Invalid or empty command.");break;
+									case  -1:{inputInfo("Erroneous command.");inputChar='\0';}break;
+									case  -2:inputInfo("Value behind operator at end of command missing.");break;
+									case  -3:inputInfo("Missing end of list.");break;
+									case  -4:inputInfo("Missing end of function call.");break;
+									case  -5:inputInfo("Missing end of map.");break;
+									case  -6:inputInfo("Unknown expression with first token left unfinished.");break;
+									case  -7:inputInfo("Function call missing at end of command.");break;
+									case  -8:inputInfo("Unfinished function call.");break;
+									case  -9:inputInfo("Unfinished list.");break;
+									case -10:inputInfo("Unfinished string literal.");break;
+									case -11:inputInfo("Unfinished expression.");break;
+									case -12:inputInfo("Unfinished map.");break;
+									default:inputInfo("Invalid command indicator %d.",aValidCommandIndicator);break;
+								}
 							}
 						}
 					}
@@ -5936,8 +5943,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						}
 					}
 				}else
-				if(inputChar) // MDH@0.1.7.14+28JUN2023: I've added this so that any command currently considered an error would simply report that we're in an error and ignore the input
-				{ 
+				if(!inputChar) // MDH@0.1.7.14+28JUN2023: I've added this so that any command currently considered an error would simply report that we're in an error and ignore the input
+					beep(); // MDH@08JUL2023: TODO I wanted to do something here!!!!
+				else{ 
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//				we always need a command (being edited)
 					// MDH@01OCT2019: if the input character matches the first non-anonymous i.e. autogenerated feed forward character same functionality as right arrow (except now we know the character entered)
