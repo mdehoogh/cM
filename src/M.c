@@ -4346,6 +4346,7 @@ const uint8_t NO_USER_INPUT_ERROR=128;
  * @return uint8_t 
  */
 uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
+	// MDH@11JUL2023: now I have to ascertain that M_NEWLINE_CHARACTER on a comment is accepted instead of rejected
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
 	/////outputChar('1');
@@ -4542,6 +4543,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		/////if(amVerboseDebugging())inputInfo("O");
 	}
 	/////if(amVerboseDebugging())inputInfo("P");
+	/////inputInfo("%i",result);
 	return result;
 }
 
@@ -5438,7 +5440,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				if(!amVerboseDebugging())outputStatus(inputChar,inputCharType);
 			}
 			*/
-			logToOutputFile("\t\tInput char type: (%d)\n",inputCharType);
+			logToOutputFile("\t\tInput char type: %c(%d)\n",inputCharType,inputCharType);
 
 			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE getUserInputLength() is only defined in the other two modes)
 			// MDH@16APR2019: I want to use the Enter key (ASCII 13) to switch to the next mode, because the associated input character type is n which will ALWAYS break
@@ -5486,7 +5488,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						if(aValidCommandIndicator<=0){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!
 							/////////inputInfo("User newline break");
 							// MDH@08JUL2023: comments may be finished 
-							if(_userInputCommand->_lastToken->type!=TT_COMMENT){
+							// MDH@11JUL2023: prevent breaking out of the loop when the last token is a comment, because now comments are allowed at the end of each command line
+							//                which means that the Enter key simply becomes part of a comment that ends a line
+							// removing again: if(_userInputCommand->_lastToken->type!=TT_COMMENT){
+							// MDH@11JUL2023: doing so helped to prevent breaking BUT did not end the comment so a new line was NOT produced, so the next step is to find out why not!!!!
 								inputCharType='W';
 								inputChar=M_NEWLINE_CHARACTER; // MDH@13OCT2020 replacing: '\\';
 								switch(aValidCommandIndicator){
@@ -5505,7 +5510,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									case -12:inputInfo("Unfinished map.");break;
 									default:inputInfo("Invalid command indicator %d.",aValidCommandIndicator);break;
 								}
-							}
+							//}
 						}
 					}
 				}

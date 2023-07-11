@@ -468,14 +468,14 @@ static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
  */
 static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
 
-	if(NULL==lastCommandToken){/*if(report)outputError("Empty command");*/return 0;}
+	if(NULL==lastCommandToken){if(report)outputError("Empty command");return 0;}
 	
 	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
 	//	in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
 	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
 
 	// MDH@28FEB2020: if the current last command token is an error do NOT remove, but let the caller handle it!!!!
-	if(lastCommandToken->type==TT_ERROR){/*if(report)outputError("Command is erroneous.");*/return -1;}
+	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Command is erroneous.");return -1;}
 	/* replacing:
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
@@ -487,7 +487,7 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 	*/
 
 	// 3. if the last token is an operator of sorts the command is incomplete
-	if(lastCommandToken->type<=8){/*if(report)outputError("Value behind operator at end of command missing");*/return -2;}
+	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return -2;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
 	//				BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
@@ -521,12 +521,12 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 		// if we're not supposed to ignore this expression type, check it
 		if(expressionToken->type!=expressionTokenTypeToIgnore)
 		switch(expressionToken->type){
-			case TT_LIST:{/*if(report)outputError("Missing end of list");*/return -3;}
-			case TT_FUNCTION_CALL:{/*if(report)outputError("Missing end of function call");*/return -4;}
-			case TT_MAP:{/*if(report)outputError("Missing end of map");*/return -5;}
+			case TT_LIST:{outputError("Missing end of list");return -3;}
+			case TT_FUNCTION_CALL:{if(report)outputError("Missing end of function call");return -4;}
+			case TT_MAP:{if(report)outputError("Missing end of map");return -5;}
 			default:
 				{
-					//if(report)output("%sUnknown expression with first token of type %s left unfinished.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
+					if(report)output("%sUnknown expression with first token of type %s left unfinished.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
 					return -6;
 				}
 		}
@@ -554,12 +554,12 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 
 	// 4. can't end with function of function call
 	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
-	if(lastCommandToken->type==TT_FUNCTION){/*if(report)outputError("Function call missing at end of command");*/return -7;}
-	if(lastCommandToken->type==TT_FUNCTION_CALL){/*if(report)outputError("Unfinished function call");*/return -8;}
-	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){/*if(report)outputError("Unfinished list");*/return -9;}
-	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){/*if(report)outputError("Unfinished string literal");*/return -10;}
-	if(lastCommandToken->type==TT_EXPRESSION){/*if(report)outputError("Unfinished expression");*/return -11;}
-	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){/*if(report)outputError("Unfinished map");*/return -12;}
+	if(lastCommandToken->type==TT_FUNCTION){if(report)outputError("Function call missing at end of command");return -7;}
+	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)outputError("Unfinished function call");return -8;}
+	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)outputError("Unfinished list");return -9;}
+	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)outputError("Unfinished string literal");return -10;}
+	if(lastCommandToken->type==TT_EXPRESSION){if(report)outputError("Unfinished expression");return -11;}
+	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return -12;}
 	
 	return 1;
 }
@@ -599,10 +599,12 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
 	if(NULL==command||NULL==command->_firstToken)return 0; // replacing: {if(report)outputError("Undefined or empty command");return 0;}
 	Mtoken* lastCommandToken=command->_lastToken;
-	if(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT){
+	// MDH@11JUL2023: changed if into while to 'remove' all trailing comments
+	while(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT){
+		/* MDH@11JUL2023: probably best to never remove a comment last token
 		if(report)
 			lastCommandToken=removedLastCommandToken(command,owner_command);
-		else
+		else*/
 			lastCommandToken=lastCommandToken->prev;
 	}
 	// MDH@25FEB2021: inspecting the last command token now delegated to isAValidLastCommandTokenIndicator()!
@@ -1542,6 +1544,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 // MDH@19OCT2020: sometimes we want to know whether or not a certain character will finish the current token or start a new token (like when tabbing through the suggested text)
 //				for that we would need a way to ask for that information
 //				NOTE we're keeping commandCharacterAppended() as it is now although we're replicating code here
+// MDH@11JUL2023 NOTE: currently only called once (in characterContinuesToken)
 /**
  * @brief corrects the type of input character \p inputChar pointed to in \p inputCharacterType
  * 
@@ -1555,7 +1558,11 @@ static void correctInputCharacterType(Mtoken const * const token,char inputChar,
 	// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
 	//				there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
 	if(*inputCharacterType=='W'){ // whitespace isn't always 'functional' whitespace (i.e. they can be part of the actual command)
-		if(token->type==TT_ERROR||token->type==TT_COMMENT||token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
+		// MDH@11JUL2023: true whitespace ends a token, and a blank should NOT end a comment token, only a newline character should (although I doubt if a new line character gets here ever)
+		if(token->type==TT_COMMENT){
+			if(inputChar!=M_NEWLINE_CHARACTER)*inputCharacterType='w'; // a newline character should not be considered whitespace for sure
+		}else
+		if(token->type==TT_ERROR||token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
 	}else
 	if(*inputCharacterType==' '){ // indicating a new line request (but not in a string)
 		if(token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
@@ -1640,6 +1647,7 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 }
 
 // MDH@19OCT2020: this is a first approximation
+// MDH@11JUL2023: NOTE only called once when consuming feed forward characters
 /**
  * @brief returns true if input character \p inputChar of type \p inputCharacterType continues token \p token, false otherwise
  * 
@@ -1650,11 +1658,14 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
  * @return false 
  */
 bool characterContinuesToken(Mtoken const * const token,char inputChar,char inputCharacterType){
-	if(!token)return false;
-	if(token->type==TT_ERROR||token->type==TT_COMMENT)return true;
-	// ASSERT token is not NULL and neither a error or a comment
+	if(NULL==token)return false;
+	// MDH@11JUL2023: a comment no longer is automatically continued (since a newline character finishes it now)
+	if(token->type==TT_ERROR/*||token->type==TT_COMMENT*/)return true;
+	// ASSERT token is not NULL and not an error // replacing: neither a error or a comment
 	correctInputCharacterType(token,inputChar,&inputCharacterType);
-	if(inputCharacterType=='W')return true; // whitespace always continues the current token
+	///////output("(%i)",inputCharacterType);
+	if(inputCharacterType=='W'){/*outputChar('W');*/return true;} // whitespace always continues the current token
+	/////////outputChar('Q');
 	int8_t tokenType;
 	int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 	if(tokenType==TT_EXPRESSION)return false; // any non-whitespace characters ends an expression
@@ -1683,6 +1694,8 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	Mtoken* lastCommandToken=(command!=NULL?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
 	if(NULL==lastCommandToken){(*inputErrorFunction)("%sNo last command token.",M_BUG_PREFIX);return NULL;}
+	// MDH@11JUL2023: ignore comments!!!
+	while(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT&&isTokenFinished(lastCommandToken))lastCommandToken=lastCommandToken->prev;
 	// if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
@@ -1691,16 +1704,22 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	Mtoken* lastNonwhitespaceCommandToken=lastCommandToken;while(lastNonwhitespaceCommandToken->type==TT_WHITESPACE)lastNonwhitespaceCommandToken=lastNonwhitespaceCommandToken->prev;
 	if(lastNonwhitespaceCommandToken==lastCommandToken){ // not behind a whitespace (newline) token
 	*/
+		// MDH@11JUL2023 TODO DONE note that the following code matches the code in correctInputCharacterType, so 
+		correctInputCharacterType(lastCommandToken,inputChar,inputCharacterType);
+		/*
 		if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))*inputCharacterType='r'; // MDH@04NOV2019: changed into lowercase r as we're now using R for token of type reference!!!
 		// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 		// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
 		//				there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
 		if(*inputCharacterType=='W'){ // whitespace isn't always 'functional' whitespace (i.e. they can be part of the actual command)
+			// MDH@11JUL2023: since a comment is now allowed to end any input line, we remove turning W into w when processing a comment!!!!!
+			//                CORRECTION this would be a mistake since only blanks end up here, and should NOT end the comment as well!!!
 			if(lastCommandToken->type==TT_ERROR||lastCommandToken->type==TT_COMMENT||lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)*inputCharacterType='w';
 		}else
 		if(*inputCharacterType==' '){ // indicating a new line request (but not in a string)
 			if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)*inputCharacterType='w';
 		}
+		*/
 	/*
 	}
 	*/
@@ -1712,8 +1731,19 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			// not acceptable when not end of input or behind another new line token
 			if(!endOfInput||lastCommandToken->type==TT_WHITESPACE)return NULL;
 			newTokenType=TT_WHITESPACE;
-		}else // not the newline character (currently also `)
-			newTokenType=nextTokenType(lastCommandToken->type,*inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		}else{ // not the newline character (currently also `)
+			uint8_t lastSignificantCommandTokenType=lastCommandToken->type;
+			/* MDH@11JUL2023: skip all comments
+			if(lastSignificantCommandTokenType==TT_COMMENT){
+				Mtoken* lastSignificantCommandToken=lastCommandToken->prev;
+				while(lastSignificantCommandToken!=NULL&&(lastSignificantCommandTokenType=lastSignificantCommandToken->type)==TT_COMMENT)
+					lastSignificantCommandToken=lastSignificantCommandToken->prev;
+			}
+			*/
+			////////// while(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT)lastCommandToken=lastCommandToken->prev;
+			// MDH@11JUL2023: with the last command type possibly a comment, we have to look at the command token in front of the comment
+			newTokenType=nextTokenType(lastSignificantCommandTokenType,*inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		}
 #ifdef __DEBUG__
 	resetOutputColor();
 	printf("[%d+%c->%d]",_userInputCommand->_lastToken->type,inputCharacterType,newTokenType);
@@ -1837,11 +1867,12 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
 			// MDH@26OCT2020 TODO: shouldn't I be owning the new command token?????
-			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType/*,endOfInput*/);
+			// MDH@11JUL2023: since lastCommandToken is the last SIGNIFICANT command token (in front of any comments), we need now to pass command->_lastToken instead of lastCommandToken
+			lastCommandToken=_getNewCommandToken(command->_lastToken/* replacing: lastCommandToken */,newTokenType/*,endOfInput*/);
 			
 			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(false); // MDH@28FEB2020: a bit of a nuisance...
 
-			if(!lastCommandToken)return NULL;
+			if(NULL==lastCommandToken)return NULL;
 			/* replacing:
 			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,newTokenType);
 			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyUserInputCommand()!)
