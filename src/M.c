@@ -165,6 +165,7 @@ static char const * const GET_CALL_CHARACTERS="get()";
  * @return const char* the foreground color string of token type \p tokenType
  */
 static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
+	//if(tokenType==TT_COMMENT)return getCommentColor();
 	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
 	////////output("(%d)",tokentype_id);
 	switch(tokentype_id>>6){
@@ -178,6 +179,7 @@ static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
 			/////////outputChar('E');
 			return getErrorColor();
 	}
+	output("No token color");
 	return "";
 }
 /**
@@ -2724,6 +2726,23 @@ void prepareForEvaluatingCommand(){
  */
 long long allocationMarksAdded=0;
 
+/**
+ * @brief removes all comment tokens
+ * 
+ */
+void sanitizeCommand(){
+	Mtoken *nextToken,*token=(_userInputCommand!=NULL?_userInputCommand->_firstToken:NULL);
+	while(token!=NULL){
+		nextToken=token->next;
+		if(token->type==TT_COMMENT){
+			if(token->prev!=NULL)token->prev->next=nextToken;else _userInputCommand->_firstToken=nextToken;
+			if(token->next!=NULL)nextToken->prev=token->prev;else _userInputCommand->_lastToken=token->prev;
+			token->next=NULL; // to prevent all subsequent tokens to be freed!!!
+			FREE_TOKEN(token,owner_userInputCommand); // free this comment token alone
+		}
+		token=nextToken;
+	}
+}
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //				instead of returning a bool we could return the command text (or NULL if failing to do so????)
@@ -2763,6 +2782,10 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	///////////output("Requesting the command text!\n");
 	Mstring* _commandText=owned_string(_getCommandText(true),owner); // MDH@13MAR2020 TODO determine later???????
+
+	// MDH@12JUL2023: let's sanitize the command by removing all comments
+	sanitizeCommand();
+
 	//////////output("Command text '%s'.\n",string(_commandText));
 	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
 	clock_t before_evaluating=clock();
