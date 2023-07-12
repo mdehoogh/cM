@@ -1343,10 +1343,14 @@ char getUserInputCommandImmediateFeedforwardCharacter(){
 		case TT_SQSTRING:return '\''; // end a single quoted string literal
 		default:{
 			// MDH@20DEC2022: can we deal with adding the end function call argument character? either , or ) here??????
-			if(token->expr&&token->expr->type==TT_FUNCTION_CALL&&token->type!=TT_END_OF_FUNCTION_CALL&&token->expr->argument<=-4){ 
+			if(token->expr!=NULL&&token->expr->type==TT_FUNCTION_CALL&&token->type!=TT_END_OF_FUNCTION_CALL&&token->expr->argument<=-4){ 
 				// we need to know more, if all the arguments are given we need to predict ), otherwise a , unless the current argument is not yet valid
 				//if(!isTokenUnfinished(token)){ // the token may be considered finished
+				// MDH@12JUL2023: I think we should not return ')' in any case because ')' is probably already appended
+				if(token->expr->argument!=-4)return ',';
+				/* replacing:
 				return(token->expr->argument==-4?')':',');
+				*/
 			}
 			break;
 		}

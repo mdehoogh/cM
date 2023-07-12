@@ -2335,6 +2335,31 @@ bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationo
 	return false;
 }/* VALIDATED */
 /**
+ * @brief returns true, when successfully registering two (list and index) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
+ * 
+ * @param _environment 
+ * @param owner_environment 
+ * @param functionName 
+ * @param twoArgumentFunction 
+ * @return true 
+ * @return false 
+ */
+bool completedListIndexFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
+	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
+	if(_function!=NULL){
+		// OWNED(_function,owner);
+		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
+		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
+		_function->_parameterMap=owned_map(_getTokenTokenMap("list","index"),Msubowner(owner_environment,4));
+		if(_function->_parameterMap!=NULL){
+			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+			return true;
+		}
+		output("%sFailed to register list index function '%s'.\n",M_ERROR_PREFIX,functionName);
+	}
+	return false;
+}/* VALIDATED */
+/**
  * @brief returns true, when successfully registering two (list and value) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
  * @param _environment 
@@ -2350,6 +2375,7 @@ bool completedListValueFunction(Menvironment* const _environment,Mallocationowne
 		// OWNED(_function,owner);
 		_function->type=FT_INTERNAL_TWO_ARGUMENTS;
 		_function->functionunion.twoArgumentFunction=twoArgumentFunction;
+		// MDH@12JUL2023: "value" replaced by "index" because that's what it most likely is
 		_function->_parameterMap=owned_map(_getTokenTokenMap("list","value"),Msubowner(owner_environment,4));
 		if(_function->_parameterMap!=NULL){
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);

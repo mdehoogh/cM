@@ -13582,7 +13582,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
-			if(!completedListValueFunction(_Menvironment,owner,"removed",Mremoved)
+			if(!completedListIndexFunction(_Menvironment,owner,"removed",Mremoved)
 					||!completedListValueFunction(_Menvironment,owner,"push",Mpush)
 					||!completedListValueFunction(_Menvironment,owner,"append",Mpush)
 					||!completedListValueFunction(_Menvironment,owner,"shove",Mshove)
