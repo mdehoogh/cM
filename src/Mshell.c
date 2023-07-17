@@ -1694,8 +1694,10 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	Mtoken* lastCommandToken=(command!=NULL?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
 	if(NULL==lastCommandToken){(*inputErrorFunction)("%sNo last command token.",M_BUG_PREFIX);return NULL;}
-	// MDH@11JUL2023: ignore comments!!!
+	///* MDH@17JUL2023: most likely comment tokens are at this point in time unfinished so the following is not required!!!
+	// MDH@11JUL2023: ignore comments!!! NOTE this is apparently required since otherwise characters after an embedded comment are seen as erroneous!!!
 	while(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT&&isTokenFinished(lastCommandToken))lastCommandToken=lastCommandToken->prev;
+	//*/
 	// if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se

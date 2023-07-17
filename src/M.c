@@ -1306,6 +1306,11 @@ Mtokenautocompletiontext*  getAutoCompletionTextOfCharacterPrepended(char c,bool
 	return DISOWNED(result,owner);
 }
 */
+
+// MDH@13JUL2023: keeping track of the closers
+Mstring* _feedforwardClosers=NULL;Mallocationowner owner_feedforwardClosers=(Mallocationowner){MI_MAIN,__LINE__,1};
+void deleteFeedforwardClosers(){FREE_STRING(_feedforwardClosers,owner_feedforwardClosers);_feedforwardClosers=NULL;}
+
 // MDH@03OCT2019: it's essential to differentiate between current token dependent feed forward and other feed forward
 //				deleteLastTokenImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken stops being the current token or when the type of the current token changes
 //				updateUserInputCommandImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
@@ -2057,7 +2062,7 @@ size_t commandBlocks=0;
  * @return true on success
  * @return false on failure
  */
-bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!command)return false;Mallocationowner owner=getOwner(__LINE__);
+bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==command)return false;Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
@@ -2747,6 +2752,70 @@ void sanitizeCommand(){
 		token=nextToken;
 	}
 }
+/**
+ * @brief uncomments the current user input command and returns the last comment token if any
+ * 
+ * @return Mtoken* the comment token that ends the command
+ */
+Mtoken* uncommentCommand(){
+	Mtoken* endCommentToken=NULL;
+	Mtoken* firstToken=(_userInputCommand!=NULL?_userInputCommand->_firstToken:NULL);
+	if(firstToken!=NULL){
+		Mtoken *token=firstToken,*nextToken=firstToken;
+		while(1){
+			// ASSERT token should never be a comment token!!!
+			nextToken=nextToken->next;
+			if(nextToken==NULL)break;
+			if(nextToken->type!=TT_COMMENT){
+				endCommentToken=NULL;
+				////////assert(token!=NULL&&token->type!=TT_COMMENT); // TODO remove once M is sufficiently debugged
+				if(token->next!=nextToken)token->next=nextToken;
+				token=nextToken;
+			}else
+				endCommentToken=nextToken;
+		}
+		if(endCommentToken!=NULL)endCommentToken->prev->next=NULL;
+		if(amVerboseDebugging()){
+			size_t tokenCount=0;
+			while(firstToken!=NULL){
+				if(firstToken->type==TT_COMMENT)output("%sFailed to remove comment token #%zd.\n",M_ERROR_PREFIX,tokenCount);
+				firstToken=firstToken->next;
+				tokenCount++;
+			}
+			output("Number of non-comment tokens: %zd.\n",tokenCount);
+		}
+	}
+	return endCommentToken;
+}
+void recommentCommand(Mtoken* endCommentToken){
+	Mtoken *firstToken=(_userInputCommand!=NULL?_userInputCommand->_firstToken:NULL);
+	if(firstToken==NULL)return;
+	Mtoken *prevToken,*nextToken,*token=firstToken;
+	while(1){
+		nextToken=token->next;
+		if(nextToken==NULL)break;
+		if(nextToken->type==TT_COMMENT){outputBug("A comment encountered in the uncommented command");break;}
+		// if the predecessor of nextToken is not equal to token, we've skipped one or more comments
+		prevToken=nextToken->prev;
+		if(prevToken!=token){
+			while(prevToken!=NULL&&prevToken->prev!=token)prevToken=prevToken->prev;
+			token->next=prevToken;
+		}
+		token=nextToken;
+	}
+	if(endCommentToken!=NULL)token->next=endCommentToken;
+	if(amVerboseDebugging()){
+		// check!!!
+		size_t tokenCount=0;
+		while(firstToken!=NULL){
+			if(firstToken->type==TT_COMMENT)outputToken(firstToken,NULL);
+			outputChar('\n');
+			firstToken=firstToken->next;
+			tokenCount++;
+		}
+		output("Number of original tokens: %zd.\n",tokenCount);
+	}
+}
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //				instead of returning a bool we could return the command text (or NULL if failing to do so????)
@@ -2788,18 +2857,28 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	Mstring* _commandText=owned_string(_getCommandText(true),owner); // MDH@13MAR2020 TODO determine later???????
 
 	// MDH@12JUL2023: let's sanitize the command by removing all comments
-	sanitizeCommand();
+	// MDH@17JUL2023: 'removing' the comments temporarily allows us to uncomment the command after evaluation!!
+	Mtoken* endCommentToken=uncommentCommand(); 
+	// replacing: sanitizeCommand();
 
 	//////////output("Command text '%s'.\n",string(_commandText));
 	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
 	clock_t before_evaluating=clock();
 	
-	getExecutionEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
+	// MDH@17JUL2023: check if there are any command tokens at all
+	Mtoken* firstCommandToken=_userInputCommand->_firstToken->next;
+	if(firstCommandToken==NULL)output("No command tokens!");
+	
+	getExecutionEnvironment()->expressionToken=firstCommandToken;
+
+	 // initialize the (current) expression token
 	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	
 	// outputValue("Result value: '",*resultValue,"'.\n"); // DEBUG
 
 	long long elapsed_evaluating=(clock()-before_evaluating)/M_CLOCKS_PER_MS;
+
+	recommentCommand(endCommentToken);
 
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
 	if(elapsed_evaluating>0)
@@ -3156,7 +3235,7 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
 void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 	if(_cursormovement!=NULL&&
 			string_length(_immediateFeedforwardText)&&
-			string_append(_suggestedText,string(_immediateFeedforwardText)))
+			string_append(_suggestedText,string(_immediateFeedforwardText))!=NULL)
 		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
 	/* replacing:
 	if(!_cursormovement)return;
@@ -5257,6 +5336,15 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);
 	if(NULL==_immediateFeedforwardText)outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
 
+	// MDH@13JUL2023: closers are characters that end a (function call argument) (list), a array (element) or a map (element)
+	//                NOTE that with function calls the amount of argument list elements is limited, whereas in an array or map it is not
+	//                     essentially this means that with function calls we could technically put the argument separators in the closers
+	//                     and consume them one by one, whereas in arrays or maps the amount of elements is unlimited, and the element separator that we expect
+	//                     will always be the comma, which is a nuisance because it would prevent showing the closing parentheses to the user, unless
+	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
+	_feedforwardClosers=owned_string(__string(),owner_feedforwardClosers);
+	if(NULL==_feedforwardClosers)outputError("Failed to feed forward closing parentheses!");
+
 	_suggestedText=owned_string(__string(),owner_suggestedText);
 	if(NULL==_suggestedText)outputError("Failed to allow suggested text");
 	/* do not initialize _manualFeedforwardText because there's now a difference between manual feed forward being NULL or empty (not blocking vs blocking identifier continuation)
@@ -5412,6 +5500,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
+				string_setlength(_feedforwardClosers,0); // MDH@13JUL2023: get rid of the current list of feed forward closers
+
 				////outputChar('A');
 				if(/*!_manualFeedforwardText||*/string_length(_manualFeedforwardText)==0)
 					updateUserInputCommandImmediateFeedforwardText();
@@ -5514,7 +5604,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
 						if(aValidCommandIndicator<=0){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!
 							/////////inputInfo("User newline break");
-							// MDH@08JUL2023: comments may be finished 
+							// MDH@08JUL2023: comments may be finished
+							/* somehow can't finish an intermediate comment token somehow, otherwise the next line will given an error
+							// MDH@17JUL2023: if not doing this we'll loose them in _getCommandText() 
+							if(_userInputCommand->_lastToken->type==TT_COMMENT)finishToken(_userInputCommand->_lastToken); 
+							*/
 							// MDH@11JUL2023: prevent breaking out of the loop when the last token is a comment, because now comments are allowed at the end of each command line
 							//                which means that the Enter key simply becomes part of a comment that ends a line
 							// removing again: if(_userInputCommand->_lastToken->type!=TT_COMMENT){
@@ -6257,6 +6351,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					// MDH@18JUN2020: if the current command is not an original command 
+					// debugging: Mstring* _commandText=owned_string(_getCommandText(true),owner_userInputCommand);output("Registering command '%s'.\n",string(_commandText));FREE_STRING(_commandText,owner_userInputCommand);
 					if(!registerCommand(_userInputCommand,(commandIndex>0?owner_registeredcommands:owner_userInputCommand))){
 						if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
 							// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
