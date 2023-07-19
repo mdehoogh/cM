@@ -47,7 +47,8 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ALLOC
  * @brief the (module local) names of the modules in the same order as the abbreviations stored in MODULES
  * 
  */
-static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue","Msystem","Mtime","Miterator","Marray","Mlist","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
+static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue",
+"Msystem","Mtime","Miterator","Marray","Mlist","Moperations","Mmatrix","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
 /**
  * @brief the (module local) text representation of the sign of the type field in the owner structure
  * 

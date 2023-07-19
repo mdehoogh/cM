@@ -67,12 +67,13 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput);
 bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId);
 bool existsAsLocalVariable(char* identifierName,uint64_t identifierEnvironmentId); // MDH@25FEB2021: expose to the outside (in particular called from M.c)
-Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput);
+Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_command*/,char inputChar,char *inputCharacterType,bool endOfInput);
 
 // MDH@19OCT2020: some functions that we can use to determine what a character would do to the current token
 bool characterContinuesToken(Mtoken const * const token,char inputChar,char inputCharacterType);
 
-int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report); // returns negative values for invalid commands, 0 for invalid input, positive value for valid commands
+// MDH@18JUL2023: owner_command no longer required by isAValidCommandIndicator!!!
+int8_t isAValidCommandIndicator(Mcommand const * const command/*,Mallocationowner owner_command*/,bool report); // returns negative values for invalid commands, 0 for invalid input, positive value for valid commands
 
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount);
 

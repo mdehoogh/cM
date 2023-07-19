@@ -1264,7 +1264,7 @@ Mvalue* Mevalfunction(Mvalue* value){
 				evalInputChar=string_char(_evalValueText,pos++);
 				if(amVerbose())outputChar(evalInputChar);
 				evalInputCharType=INPUTCHARACTERTYPES[evalInputChar];
-				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,evalInputChar,&evalInputCharType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
+				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,owner,evalInputChar,&evalInputCharType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
 				if(newLastEvalCommandToken!=_evalCommand->_lastToken)_evalCommand->_lastToken=newLastEvalCommandToken; // update our eval command's last token TODO do we need to test here????
 				if(!_evalCommand->_lastToken)break;
 			}
@@ -1493,8 +1493,8 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
 	return _newCommandToken;
 }
-Mcommand* _getNewCommand(bool withFirstToken){
-	Mcommand* _command=CALLOC(sizeof(Mcommand),'K');
+Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=_getOwner(__LINE__);
+	Mcommand* _command=CALLOC(sizeof(Mcommand),'K',owner);
 	if(_command){
 		if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){

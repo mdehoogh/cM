@@ -2078,6 +2078,7 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==
 		// MDH@18JUN2020: NOTE commandIndex now stored in any command will equal 0 when it is a new command, so when it is being stored commandIndex will tell us whether it is a new command or not
 		//				as soon as we store the current command and it is a new command we store the index of the command i.e. where it is located in the list of registered commands
 		// if(commandIndex>0)command->sourceCommandIndex=(commandCount-commandIndex+1);
+		///////outputLine("Registering command!");
 		_registeredcommands[commandCount]=(Mregisteredcommand){owned_command(disowned_command(command,owner_command),owner_registeredcommands)};
 		if(commandIndex>0)_registeredcommands[commandCount].previousCommandIndex=commandCount-commandIndex+1; // will be positive for any positive commandIndex, because commandIndex is in [1,commandCount-1)
 		commandCount++;
@@ -2256,6 +2257,7 @@ bool removeLastUserInputCommandToken(){
 		tokenToRemove->expr->argument-=1;
 		inputInfo("Number of expected arguments: %lld.",-tokenToRemove->expr->argument-3);
 	}
+	/////////////////////outputInfo("Removing last command token!");
 	removedLastCommandToken(_userInputCommand,owner_userInputCommand); // NOT using the result (which would be the new last command token)
 	return true;
 }
@@ -2436,6 +2438,7 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
  * 
  */
 void clearCommand(){
+	///////output("Clearing the command!\n");
 	FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL; // MDH@28OCT2019: using the command now...
 	// numberOfLineCommandCharacters=0; // MDH@16OCT2020 not essential because a better place is when a (continued) prompt is displayed
 	free_userinputline(); // MDH@24SEP2020: essential BRO'
@@ -2747,6 +2750,7 @@ void sanitizeCommand(){
 			if(token->prev!=NULL)token->prev->next=nextToken;else _userInputCommand->_firstToken=nextToken;
 			if(token->next!=NULL)nextToken->prev=token->prev;else _userInputCommand->_lastToken=token->prev;
 			token->next=NULL; // to prevent all subsequent tokens to be freed!!!
+			//////////outputInfo("Freeing a command token!");
 			FREE_TOKEN(token,owner_userInputCommand); // free this comment token alone
 		}
 		token=nextToken;
@@ -2829,7 +2833,7 @@ void recommentCommand(Mtoken* endCommentToken){
 bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LINE__);
 	
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
-	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,owner_userInputCommand,true);
+	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand/*,owner_userInputCommand*/,true);
 	if(aValidCommandIndicator<=0){
 		// MDH@20FEB2020: this is what we did in isAValidCommand() before, but removed from it: if the command ends with an error, we remove the error token, unfinish the (new) last token, so we can re-use it
 		if(_userInputCommand!=NULL&&_userInputCommand->_lastToken!=NULL&&_userInputCommand->_lastToken->type==TT_ERROR){
@@ -3795,7 +3799,10 @@ void deleteUserInputCommand(){
 	numberOfLineCommandCharacters=0; // TODO is this the right place to do this?????? the principle should be that whenever _userInputCommand changes, we should compute numberOfLineCommandCharacters a new
 	if(NULL==_userInputCommand)return;
 	// if _userInputCommand is a registered command, it should NOT be freed
-	if(commandIndex==0)FREE_COMMAND(_userInputCommand,owner_userInputCommand);
+	if(commandIndex==0){
+		///////////////output("Freeing user input command!\n");
+		FREE_COMMAND(_userInputCommand,owner_userInputCommand);
+	}
 	_userInputCommand=NULL;
 }
 
@@ -3918,6 +3925,7 @@ bool createUserInputCommand(){
 	resetOutputColor(); // TODO do we need this here?????
 	// if(amVerboseDebugging())inputInfo("Creating the new user input command.");
 	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
+	///////output("Creating user input command!\n");
 	_userInputCommand=owned_command(_getNewCommand(true),owner_userInputCommand);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand!=NULL){
@@ -3960,6 +3968,8 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	
 	// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
 	if(amVerboseDebugging())inputInfo("Preparing the user input command for editing.");
+	////////////else output("Copying the user input command!\n");
+
 	///// NOT NEEDED using the false flag in _getNewCommand()!!!! _newUserInputCommand->_lastToken=NULL;_newUserInputCommand->_firstToken=NULL;
 	Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
 	// the essence is that _userInputCommand->_lastToken points to the last token in _userInputCommand->_firstToken
@@ -4028,6 +4038,7 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	}
 
 	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
+	////////output("Owning the new user input command!\n");
 	_userInputCommand=owned_command(disowned_command(_newUserInputCommand,owner),owner_userInputCommand); // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
 	return true;
 }
@@ -4503,11 +4514,13 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 
 	// MDH@28OCT2019: all the code that deals with updating the tokens 
 	//				NOTE passing in the address of _userInputCommand->_lastToken, so it can be changed!!!!
-	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(_userInputCommand,inputChar,inputCharacterType,endOfInput);
+	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(_userInputCommand/*,owner_userInputCommand*/,inputChar,inputCharacterType,endOfInput);
 	if(NULL==newLastCommandToEvaluateToken)return -1;
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
 		result|=NEW_TOKEN_CHARACTER;
+		//////outputLine("Owning the last command token!");
 		_userInputCommand->_lastToken=owned_token(newLastCommandToEvaluateToken,Msubowner(owner_userInputCommand,1)); // MDH@28MAY2020: take over ownership of the new last command token
+		//////outputLine("Last command token owned!");
 		outputUserInputCommandTokenColor();
 	}else{
 		// MDH@31OCT2019: show whitespace in the standard info color!!
@@ -5598,7 +5611,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							char c;inputCharRead(&c);
 							*/
 						}
-						int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,owner_userInputCommand,false);
+						int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand/*,owner_userInputCommand*/,false);
 						/////////// do NOT do this twice... 
 						inputInfo("Valid command indicator: %d.",aValidCommandIndicator);
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
@@ -6352,10 +6365,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					// MDH@18JUN2020: if the current command is not an original command 
 					// debugging: Mstring* _commandText=owned_string(_getCommandText(true),owner_userInputCommand);output("Registering command '%s'.\n",string(_commandText));FREE_STRING(_commandText,owner_userInputCommand);
+					if(amVerboseDebugging())
+						outputInfo("Registering command!");
 					if(!registerCommand(_userInputCommand,(commandIndex>0?owner_registeredcommands:owner_userInputCommand))){
 						if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
 							// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 							if(commandIndex==0){ // a new command being registered!!!
+								if(amVerboseDebugging())
+									outputInfo("Freeing command!");
 								FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
 								outputError("Failed to register the command! Probable cause: out of memory");
 							}else
@@ -6363,7 +6380,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						}
 					}else{
 						if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
-							if(amVerboseDebugging())outputInfo("Command registered!");
+							if(amVerboseDebugging())
+								outputInfo("Command registered!");
 							if(M_value!=NULL){
 								// perhaps we should store the command text not the command itself?????
 								// NOTE prepend a single quote is essential to get the text enquoted!!!

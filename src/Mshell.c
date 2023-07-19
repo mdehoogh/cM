@@ -200,6 +200,7 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 //				we can solve this by remembering ALL variables when they are created in every expression that is tokenized, this would be possible by creating a tokenizing environment where we remember all created variables in in the tokenizing process
 // MDH@04NOV2019: the reference token type added, so we can pass references to functions wrapped inside a value
 // MDH@08JUL2023: if we allow comments everywhere we have to remove C from the last element in each TRANSITIONS element, but changing it into c is also possible, to make it acceptable
+// MDH@18JUL2023: a comma behind an opening parenthesis should now also be allowed, therefore , was removed from the last element of EXPRESSION and added to the L_EL string
 /*
  "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","REF" ,"VAR"  ,"NEWVAR","PROP" ,"L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 /**
@@ -207,7 +208,7 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
  * 
  */
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*  , >?:	] }="}, /* EXPRESSION */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*    >?:	] }="}, /* EXPRESSION */ \
 {"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,"" ,"`R; CDS% )&*  , >?:	]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
 {"(","!-+~","" ,"=" ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*  , >?:	] }" }, /* ASSIGNMENT = */ \
 {"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ","C","`R; c  % )&*  , >?:	] }="}, /* Baeru finished bin.op. */ \
@@ -590,11 +591,11 @@ Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command
  * @brief returns the validity indicator (positive on success) of M command \p command owned by \p owner_command
  * @details cuts off any last command token that is a comment before returning the validity of the last command token
  * @param command 
- * @param owner_command 
+ * @paramXX owner_command 
  * @param report 
  * @return int8_t 
  */
-int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report){
+int8_t isAValidCommandIndicator(Mcommand const * const command/*,Mallocationowner owner_command*/,bool report){
 	// MDH@28JUN2023: SHOULD NOT CHANGE command, for now we can solve this by only allowing removal when report is true
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
 	if(NULL==command||NULL==command->_firstToken)return 0; // replacing: {if(report)outputError("Undefined or empty command");return 0;}
@@ -615,15 +616,15 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
  * @brief evaluates \p command owned by \p owner_command returning the result
  * 
  * @param command 
- * @param owner_command 
+ * @paramXX owner_command 
  * @param commandType 
  * @return Mvalue* the result of the evaluation of \p command
  */
-Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char commandType){
+static Mvalue* getCommandValue(Mcommand const * const command/*,Mallocationowner owner_command*/,char commandType){
 	if(NULL==command)return NULL;
 	// if(amVerboseDebugging())
 		if(outputCommandInfoFunction)(*outputCommandInfoFunction)(command); // MDH@04MAR2020: using the given output command info function
-	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,owner_command,amVerboseDebugging());
+	int8_t aValidCommandIndicator=isAValidCommandIndicator(command/*,owner_command*/,amVerboseDebugging());
 	if(aValidCommandIndicator<=0)return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerboseDebugging())
@@ -1683,17 +1684,19 @@ bool characterContinuesToken(Mtoken const * const token,char inputChar,char inpu
  * @brief appends input character \p inputChar of type \p inputCharacterType to M command \p command
  * 
  * @param command 
+ * @param owner_command
  * @param inputChar 
  * @param inputCharacterType 
  * @param endOfInput whether or not the character is entered at the end of input
  * @return Mtoken* 
  */
-Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput){
+Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_command*/,char inputChar,char *inputCharacterType,bool endOfInput){Mallocationowner owner=getOwner(__LINE__);
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
 	Mtoken* lastCommandToken=(command!=NULL?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
 	if(NULL==lastCommandToken){(*inputErrorFunction)("%sNo last command token.",M_BUG_PREFIX);return NULL;}
+	Mtoken* tokenToReturn=lastCommandToken; // MDH@18JUL2023: the token to return is either a new last command token (as stored in lastCommandToken) or command->_lastToken!!!
 	///* MDH@17JUL2023: most likely comment tokens are at this point in time unfinished so the following is not required!!!
 	// MDH@11JUL2023: ignore comments!!! NOTE this is apparently required since otherwise characters after an embedded comment are seen as erroneous!!!
 	while(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT&&isTokenFinished(lastCommandToken))lastCommandToken=lastCommandToken->prev;
@@ -1870,11 +1873,17 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
 			// MDH@26OCT2020 TODO: shouldn't I be owning the new command token?????
 			// MDH@11JUL2023: since lastCommandToken is the last SIGNIFICANT command token (in front of any comments), we need now to pass command->_lastToken instead of lastCommandToken
-			lastCommandToken=_getNewCommandToken(command->_lastToken/* replacing: lastCommandToken */,newTokenType/*,endOfInput*/);
-			
+			// MDH@18JUL2023: with owner_command now added to the parameters, we can immediately take ownership of a new last command token
+			//                TODO come up with a better idea to do this because theoretically lastCommandToken should be reowned at the moment it is assigned
+			//                     the problem here is that when we skipped comments, we would be returning a lastCommandToken which is NOT the registered last token
+			//                     and that's what's causing the problems!!!!
+			tokenToReturn=disowned_token(owned_token(_getNewCommandToken(command->_lastToken/* replacing: lastCommandToken */,newTokenType/*,endOfInput*/),owner),owner);
+			lastCommandToken=tokenToReturn; // MDH@18JUL2023: continue with tokenToReturn
+
 			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(false); // MDH@28FEB2020: a bit of a nuisance...
 
 			if(NULL==lastCommandToken)return NULL;
+
 			/* replacing:
 			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,newTokenType);
 			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyUserInputCommand()!)
@@ -2046,7 +2055,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 
 	if(newTokenType<0)finishToken(lastCommandToken);
 
-	return lastCommandToken;
+	return tokenToReturn; // will either be the newly created lastCommandToken, or command->_lastToken!!!
 
 }
 
@@ -2060,7 +2069,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
  * @return Mstring* 
  */
 static Mstring* getSubcommandText(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,Mstring const * const defaultSubcommandText){
-	if(defaultSubcommandText)return defaultSubcommandText;
+	if(defaultSubcommandText!=NULL)return defaultSubcommandText; // TODO is this correct??????
 	Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _subcommandText=owned_string(_getString(string(firstSubcommandToken->text)),owner);
 	if(!_subcommandText)return NULL;
@@ -2144,6 +2153,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 					outputChar(commandCharacter);
 				commandCharacterType=INPUTCHARACTERTYPES[commandCharacter];
 				newCommandToken=commandCharacterAppended(_command,commandCharacter,&commandCharacterType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
+				if(newCommandToken==NULL){output("%sFailed to append command character '%c' parsing '%s'!\n",M_ERROR_PREFIX,commandCharacter,commandText);break;}
 				// MDH@28MAY2020: take over ownership of the new token returned
 				if(newCommandToken!=_command->_lastToken)
 					_command->_lastToken=owned_token(newCommandToken,Msubowner(owner,1)); // update our eval command's last token TODO do we need to test here????
@@ -6377,7 +6387,11 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// use only the first element if the list only has one element, otherwise use the list itself
 					// MDH@0.1.7.14+25JUN2023: we have to undo removing the reduction to a single value since (1+2) should return 3 not the array [3]
 					///* MDH@10APR2023: essentially what an expression should return is an array not a list, as well as mapping the result to an array, it should remain a list
-					if(_expressionListValue->value._list->numberOfElements==1){
+					// MDH@18JUL2023: instead of testing the number of elements we should check whether the last assigned index equals 1
+					if(_expressionListValue->value._list->_first==NULL)
+						_valueReference=NULL;
+					else
+					if(_expressionListValue->value._list->_last->index==1){ // replacing: if(_expressionListValue->value._list->numberOfElements==1){
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
 					}else
 					//*/
@@ -9775,10 +9789,10 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 													// MDH@28OCT2020: we're not expecting any non-printable characters can also be present
 													whitespace&=(inputCharType=='W'||inputChar<=32);
 													if(!whitespace){
-														lastCommandToken=commandCharacterAppended(_command,inputChar,&inputCharType,false);
+														lastCommandToken=commandCharacterAppended(_command/*,owner*/,inputChar,&inputCharType,false);
 														if(NULL==lastCommandToken)break; // some error
 														if(lastCommandToken!=_command->_lastToken){
-															_command->_lastToken=lastCommandToken;
+															_command->_lastToken=owned_token(lastCommandToken,Msubowner(owner,1)); // do NOT forget to take over ownership
 															if(report)outputChar('|');
 														}
 														if(report)outputChar(inputChar);
@@ -9792,7 +9806,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 											if(inputChar){outputError("Failed to parse a body command");break;}
 											if(!commandContinued){ // command not continued on the next line, therefore we should register the command
 												// if the command is somehow invalid we should abort, and discard the result, this is done by ascertaining tokenValue to be NULL
-												bool aValidCommandIndicator=isAValidCommandIndicator(_command,owner,false);
+												bool aValidCommandIndicator=isAValidCommandIndicator(_command/*,owner*/,false);
 												// 0 means an empty command (e.g. a comment)
 												if(aValidCommandIndicator!=0){
 													Mvalue* tokenValue=(aValidCommandIndicator>0?_getValueOfToken(_command->_firstToken):NULL);
