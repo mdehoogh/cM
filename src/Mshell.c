@@ -1699,6 +1699,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 	Mtoken* tokenToReturn=lastCommandToken; // MDH@18JUL2023: the token to return is either a new last command token (as stored in lastCommandToken) or command->_lastToken!!!
 	///* MDH@17JUL2023: most likely comment tokens are at this point in time unfinished so the following is not required!!!
 	// MDH@11JUL2023: ignore comments!!! NOTE this is apparently required since otherwise characters after an embedded comment are seen as erroneous!!!
+	if(*inputCharacterType!='W')
 	while(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT&&isTokenFinished(lastCommandToken))lastCommandToken=lastCommandToken->prev;
 	//*/
 	// if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
