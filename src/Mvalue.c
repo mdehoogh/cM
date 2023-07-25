@@ -1207,7 +1207,7 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
  * @param owner_variable 
  * @return Mvariable* a new M variable with name \p name and value type \p valuetype
  */
-static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){
+Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){
 	// MDH@21OCT2020: A HA we should allow the name of a variable to be empty (as in maps)
 	if(NULL==name/*||strlen(name)==0*/)return NULL;//Mallocationowner owner=getOwner(__LINE__);
 	Mchars* name_chars=_getChars(name);
@@ -1672,9 +1672,9 @@ Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvalue
 				Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
 				if(_map!=NULL){
 					_mapelement1->_variable=_getVariableWithName(name1,valuetype1,true,Msubowner(owner,2));
-					_mapelement2->_variable=_getVariableWithName(name2,VT_TOKEN,true,Msubowner(owner,2));
-					_mapelement3->_variable=_getVariableWithName(name3,VT_TOKEN,true,Msubowner(owner,2));
-					_mapelement4->_variable=_getVariableWithName(name4,VT_TOKEN,true,Msubowner(owner,2));
+					_mapelement2->_variable=_getVariableWithName(name2,valuetype2,true,Msubowner(owner,2));
+					_mapelement3->_variable=_getVariableWithName(name3,valuetype3,true,Msubowner(owner,2));
+					_mapelement4->_variable=_getVariableWithName(name4,valuetype4,true,Msubowner(owner,2));
 					if(_mapelement1->_variable!=NULL&&_mapelement2->_variable!=NULL&&_mapelement3->_variable!=NULL&&_mapelement4->_variable!=NULL){
 						_map->_first=_mapelement1;
 						_mapelement1->_next=_mapelement2;

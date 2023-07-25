@@ -102,6 +102,11 @@ Mfunction* _getFunction(Menvironment* const _environment,Mallocationowner owner_
 // MDH@20DEC2022: we're going to need this to keep track of the expected number of function arguments
 long long getNumberOfFunctionParameters(char const * const functionName);
 
+// MDH@26JUL2023: a single function to register system functions can replace all the completed...Function functions defined below
+Mstring* _getFunctionText(Mfunction const * const function,char const * const functionName);
+bool registerFunction(Menvironment* const _environment,Mallocationowner owner_environment,char const * const functionName,Function function,size_t numberOfArguments,char const * const * const argumentNames,Mvalue const * const * const defaultValues);
+
+// replacing:
 bool completedFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction);
 bool completedValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
@@ -151,3 +156,4 @@ Mvalue* Mget(Mvalue* _variableNameValue);
 // MDH@05DEC2020: for getting and setting the locale
 Mvalue* Msetlocale(Mvalue* _localeValue);
 Mvalue* Mlocalesettings();
+

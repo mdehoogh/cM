@@ -355,6 +355,12 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){Mallocationowner owner=
 				///printf("\n%s","start");
 				Mfunction* _function=_functionmapelement->_function;
 				if(_function!=NULL){
+					Mstring* _functionText=owned_string(_getFunctionText(_function,string(_functionmapelement->_name)),owner);
+					if(_functionText!=NULL){
+						p=string_append(p,string(_functionText));
+						FREE_STRING(_functionText,owner);
+					}
+					/* replacing:
 					///printf("\n%s","func");
 					p=string_append(p,string(_functionmapelement->_name)); // _name moved from _function to _functionmapelement
 					if(NULL==p)break;
@@ -370,6 +376,7 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){Mallocationowner owner=
 					}
 					///printf("\n%s","params");
 					string_append_char(p,')');
+					*/
 				}
 				_functionmapelement=_functionmapelement->_next;
 				if(_functionmapelement!=NULL)p=string_append(p,", "); // only when there's a next map element to process

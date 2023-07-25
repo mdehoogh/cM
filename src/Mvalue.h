@@ -324,8 +324,7 @@ void outputList(char const * const prefix,Mlist const * const list,char const * 
 void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
 
 Mstring* _getValueText(Mvalue const * const _value,bool dequoted); // flag only applicable to string values!!!
-Mvalue* _getStringValue(Mstring const * const _string); // MDH@28SEP2020: why wasn't this here so far?????
-
+///////Mvalue* _getStringValue(Mstring const * const _string); // MDH@28SEP2020: why wasn't this here so far?????
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(Mvalue const * const _value);
@@ -397,6 +396,9 @@ Mlistelement* disowned_listelement(Mlistelement * const _listelement,Mallocation
 #else
 #define FREE_LISTELEMENT(_listelement,weak,owner_listelement) free_listelement(_listelement,weak)
 #endif
+
+// MDH@22JUL2023: we can define a generic M function like this
+typedef Mvalue* (*Function(void)); // to be accepted by registering any function passing in the names of the arguments, and their default values to the registerFunction function
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
@@ -492,6 +494,8 @@ typedef struct Mfunctionmap{
     Mfunctionmapelement* _first;
     Mfunctionmapelement* _last;
 }Mfunctionmap;
+
+Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable);
 
 //Mvalue* getFunction(Mfunctionlist functionlist,char* name);
 

@@ -25,6 +25,7 @@ extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user
 extern const char* const DEFINEANONYMOUSFUNCTION_NAME; // the name of the define user function function
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
+extern const char* const M_BUG_PREFIX;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char * const VALUETYPENAMES[];
@@ -1255,7 +1256,8 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
  * @return the value of the existing variable with name \p name in M environment \p _environment
  */
 Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name){
-	if(!_environment||!name){outputError("No environment or name specified");return NULL;}
+	if(NULL==_environment||NULL==name){outputError("No environment or name specified");return NULL;}
+	output("Looking for the value of variable '%s' in environment '%s'.\n",name,string(_getEnvironmentName(_environment)));
 	Mvariable* variable=getVariable(_environment,name,false);
 	if(NULL==variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
 	return variable->_value;
@@ -2617,6 +2619,7 @@ bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mall
 	}
 	return false;
 }/* VALIDATED */
+
 /**
  * @brief returns true, when successfully registering four (tokens) argument function \p fourArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -2692,6 +2695,83 @@ unsigned long long getNumberOfFunctionCommands(char const * const functionName){
 	if(NULL==function||function->type!=FT_USER){if(NULL==function)output("%sFunction '%s' not found.\n",M_ERROR_PREFIX,functionName);return -1;}
 	return (function->functionunion._userfunction->_bodyCommandList!=NULL?function->functionunion._userfunction->_bodyCommandList->numberOfElements:0);
 }
+
+// MDH@22JUL2023: an alternative way to store a function is by passing in the names and the default values
+// a helper function
+/**
+ * @brief returns the text representation of the definition of function \p function with name \p functionName
+ * 
+ * @param function 
+ * @param functionName 
+ * @return Mstring* the text representation of the definition of function \p function with name \p functionName
+ */
+Mstring* _getFunctionText(Mfunction const * const function,char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _s=owned_string(_getString(functionName),owner);
+	///printf("\n%s","name");
+	// I guess we might show the parameter map (if any)
+	Mstring* p=string_append_char(_s,'(');
+	if(function->_parameterMap!=NULL){
+		Mstring* _parameterMapText=owned_string(_getMapText(function->_parameterMap,false,false,false),owner); // do NOT show curly braces, quotes or missing defaults
+		if(_parameterMapText!=NULL){
+			string_append(p,string(_parameterMapText));
+			FREE_STRING(_parameterMapText,owner);
+		}
+	}
+	///printf("\n%s","params");
+	string_append_char(p,')');
+	return disowned_string(_s,owner);
+}
+
+// MDH@26JUL2023: it's easier to pass in the argumentNames and a array literal with default values
+bool registerFunction(Menvironment * const _environment,Mallocationowner owner_environment,char const * const functionName,Function function,size_t numberOfArguments,char const * const argumentNames[],Mvalue const * const defaultValues[]){Mallocationowner owner=getOwner(__LINE__);
+	if(numberOfArguments<=5){
+		Mmap* _argumentMap=(numberOfArguments>0?owned_map(__map("function"),owner):NULL);
+		if(numberOfArguments==0||_argumentMap!=NULL){
+			Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
+			if(_function!=NULL){
+				_function->_parameterMap=NULL; // just in case
+				switch(numberOfArguments){
+					case 0:_function->type=FT_INTERNAL_NO_ARGUMENTS;_function->functionunion.noArgumentFunction=function;break;
+					case 1:_function->type=FT_INTERNAL_ONE_ARGUMENT;_function->functionunion.oneArgumentFunction=function;break;
+					case 2:_function->type=FT_INTERNAL_TWO_ARGUMENTS;_function->functionunion.twoArgumentFunction=function;break;
+					case 3:_function->type=FT_INTERNAL_THREE_ARGUMENTS;_function->functionunion.threeArgumentFunction=function;break;
+					case 4:_function->type=FT_INTERNAL_FOUR_ARGUMENTS;_function->functionunion.fourArgumentFunction=function;break;
+					case 5:_function->type=FT_INTERNAL_FIVE_ARGUMENTS;_function->functionunion.fiveArgumentFunction=function;break;
+				}
+				// replacing: _function->type=numberOfArguments+FT_INTERNAL_NO_ARGUMENTS;
+				if(numberOfArguments>0){
+					_argumentMap->numberOfElements=numberOfArguments; // OOPS forgot this initially!!!
+					Mmapelement *_mapelement,*_prevmapelement=NULL;
+					for(size_t argumentIndex=0;argumentIndex<numberOfArguments;argumentIndex++){
+						/////////DEBUGGING outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
+						_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+						_mapelement->_variable=_getVariableWithName(argumentNames[argumentIndex],defaultValues[argumentIndex]!=NULL?defaultValues[argumentIndex]->type:VT_UNDEFINED,true,Msubowner(owner,2));
+						if(defaultValues[argumentIndex]!=NULL)assignValue(&_mapelement->_variable->_value,defaultValues[argumentIndex]);
+						if(NULL==_prevmapelement)
+							_argumentMap->_first=owned_mapelement(disowned_mapelement(_mapelement,owner),Msubowner(owner,3)); // BUG FIX owner_environment changed to (the actual) owner
+						else
+							_prevmapelement->_next=owned_mapelement(disowned_mapelement(_mapelement,owner),Msubowner(owner,3)); // BUG FIX owner_environment changed to (the actual) owner
+						_prevmapelement=_mapelement;
+					}
+					_argumentMap->_last=_mapelement;
+					///DEBUGGING output("Argument map constructed!\n");
+					_function->_parameterMap=owned_map(disowned_map(_argumentMap,owner),Msubowner(owner_environment,2));
+				}
+				Mstring* _functionText=owned_string(_getFunctionText(_function,functionName),owner);
+				if(_functionText!=NULL){output("'%s' registered.\n",string(_functionText));FREE_STRING(_functionText,owner);} ///DEBUGGING
+				return true;
+			}
+			output("%sFailed to register internal function '%s'.\n",M_ERROR_PREFIX,functionName);
+		}else
+		if(_argumentMap!=NULL){
+			output("%sFailed to create the argument map of internal function '%s'.\n",M_ERROR_PREFIX,functionName);
+			FREE_MAP(_argumentMap,owner);
+		}
+	}else
+		output("%sToo many arguments in internal function '%s' specfied!\n",M_BUG_PREFIX,functionName);
+	return false;
+}
+
 /*
 bool registerFunctionCommand(const char* const functionName,Mtoken* _command,Mallocationowner owner_command){Mallocationowner owner=getOwner(__LINE__);
 	if(!functionName||!_command)return false;
@@ -2785,9 +2865,9 @@ Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value){Mallocationowner owner=g
  * @return Mvalue* the value of the variable with name \p _variableNameValue in the current execution environment
  */
 Mvalue* Mget(Mvalue* _variableNameValue){Mallocationowner owner=getOwner(__LINE__);
-	if(_variableNameValue){
+	if(_variableNameValue!=NULL){
 		Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
-		if(_variableName){
+		if(_variableName!=NULL){
 			Mvalue* _get=getValue(getExecutionEnvironment(),string(_variableName));
 			FREE_STRING(_variableName,owner);
 			return _get;
@@ -2864,10 +2944,11 @@ Mvalue* Mlocalesettings(){Mallocationowner owner=getOwner(__LINE__);
  */
 bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment){
 
-	if(!completedValueFunction(_environment,owner_environment,"get",Mget))return false;
+	if(!registerFunction(_environment,owner_environment,"get",Mget,1,(char*[]){"variable name"},(Mvalue*[]){_getTextValue("\"")}))return false; // replacing: completedFunction(...)
 	if(!completedValueValueFunction(_environment,owner_environment,"set",Mset))return false;
 
-	if(!completedValueFunction(_environment,owner_environment,"setlocale",Msetlocale))return false;
+	if(!registerFunction(_environment,owner_environment,"setlocale",Msetlocale,1,(char*[]){"locale identifier"},(Mvalue*[]){_getTextValue("\"en_US.UTF-8")}))return false; // replacing: completedValueFunction(...)
+
 	if(!completedFunction(_environment,owner_environment,"localesettings",Mlocalesettings))return false;
 
 	// variable functions
@@ -2881,7 +2962,7 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	if(!completedValueValueFunction(_environment,owner_environment,"irands",Mirands))return false;
 
 	// math functions
-	if(!completedFloatFunction(_environment,owner_environment,"cos",Mcos))return false;
+	if(!registerFunction(_environment,owner_environment,"cos",Mcos,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false; // replacing: completedFloatFunction(...)
 	if(!completedFloatFunction(_environment,owner_environment,"cordiccos",Mcordiccos))return false;
 	if(!completedFloatFunction(_environment,owner_environment,"sin",Msin))return false;
 	if(!completedFloatFunction(_environment,owner_environment,"cordicsin",Mcordicsin))return false;
