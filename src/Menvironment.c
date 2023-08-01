@@ -1784,6 +1784,11 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
 	if(value!=NULL&&(immutableValue!=NULL||valuetypeSpecified)){
 		switch(value->type){
 			case VT_MAP:case VT_LIST:break;
+			case VT_TEXT:
+			  {
+					variable=getVariable(NULL,value->value._text->_c,false);
+					break;
+				}
 			case VT_REFERENCE:
 				{
 					variable=value->value._reference->variable;
@@ -1909,7 +1914,10 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
  * @return true 
  * @return false 
  */
-bool completedFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction){
+bool registerNoArgumentFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction){
+	// MDH@01AUG2023: delegating to registerFunction prevents having to replace all completedFunction calls
+	return registerFunction(_environment,owner_environment,functionName,noArgumentFunction,0,NULL,NULL);
+	/* replacing:
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
 		_function->type=FT_INTERNAL_NO_ARGUMENTS;
@@ -1919,6 +1927,7 @@ bool completedFunction(Menvironment* const _environment,Mallocationowner owner_e
 		return true;
 	}
 	return false;
+	*/
 }/* VALIDATED */
 // MDH@03JUN2020: if we assume that _function (in all following methods) is disowned, we can simply take over ownership
 // MDH@24JAN2023: the parameter map is hosted by the function and should be a subowner of the function
@@ -2934,6 +2943,7 @@ Mvalue* Mlocalesettings(){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // these internal functions do NOT have a body as M defined functions have...
+// MDH@01AUG2023: completedFunction now delegates to registerFunction adding 0,NULL,NULL as arguments
 /**
  * @brief registers all internal functions in M environment \p _environment
  * 
@@ -2945,51 +2955,53 @@ Mvalue* Mlocalesettings(){Mallocationowner owner=getOwner(__LINE__);
 bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment){
 
 	if(!registerFunction(_environment,owner_environment,"get",Mget,1,(char*[]){"variable name"},(Mvalue*[]){_getTextValue("\"")}))return false; // replacing: completedFunction(...)
-	if(!completedValueValueFunction(_environment,owner_environment,"set",Mset))return false;
+	
+	if(!registerFunction(_environment,owner_environment,"set",Mset,2,(char*[]){"variable name","value"},(Mvalue*[]){_getTextValue("\""),NULL}))return false; // replacing: completedFunction(...)
+	// replacing: if(!completedValueValueFunction(_environment,owner_environment,"set",Mset))return false;
 
 	if(!registerFunction(_environment,owner_environment,"setlocale",Msetlocale,1,(char*[]){"locale identifier"},(Mvalue*[]){_getTextValue("\"en_US.UTF-8")}))return false; // replacing: completedValueFunction(...)
 
-	if(!completedFunction(_environment,owner_environment,"localesettings",Mlocalesettings))return false;
+	if(!registerNoArgumentFunction(_environment,owner_environment,"localesettings",Mlocalesettings))return false;
 
 	// variable functions
 
 	// MDH@02NOV2020: random functions
-	if(!completedFunction(_environment,owner_environment,"rand",Mrand))return false;
-	if(!completedValueFunction(_environment,owner_environment,"rands",Mrands))return false;
-	if(!completedValueFunction(_environment,owner_environment,"srand",Msrand))return false;
+	if(!registerNoArgumentFunction(_environment,owner_environment,"rand",Mrand))return false;
+	if(!registerFunction(_environment,owner_environment,"rands",Mrands,1,(char*[]){"number of random rationals from [0,1) to return"},(Mvalue*[]){_getIntegerValue(1)}))return false;
+	if(!registerFunction(_environment,owner_environment,"srand",Msrand,1,(char*[]){"the integer seed to initialize the random number generator"},(Mvalue*[]){NULL}))return false;
 	// TODO can we have an completedInteger and completedIntegerInteger function here????
-	if(!completedValueFunction(_environment,owner_environment,"irand",Mirand))return false;
-	if(!completedValueValueFunction(_environment,owner_environment,"irands",Mirands))return false;
+	if(!registerFunction(_environment,owner_environment,"irand",Mirand,1,(char*[]){"the upper bound to the random non-negative integer to generate"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"irands",Mirands,2,(char*[]){"the number of random integers to return","the upper bound to the random non-negative integer to generate"},(Mvalue*[]){NULL,NULL}))return false;
 
 	// math functions
 	if(!registerFunction(_environment,owner_environment,"cos",Mcos,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false; // replacing: completedFloatFunction(...)
-	if(!completedFloatFunction(_environment,owner_environment,"cordiccos",Mcordiccos))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"sin",Msin))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"cordicsin",Mcordicsin))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"tan",Mtan))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"cosh",Mcosh))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"sinh",Msinh))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"tanh",Mtanh))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"sqrt",Msqrt))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"log",Mlog))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"log10",Mlog10))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"floor",Mfloor))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"trunc",Mtrunc))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"round",Mround))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"ceil",Mceil))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"exp",Mexp))return false;
-	if(!completedFloatFunction(_environment,owner_environment,"dexp",Mdexp))return false;
+	if(!registerFunction(_environment,owner_environment,"cordiccos",Mcordiccos,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"sin",Msin,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"cordicsin",Mcordicsin,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"tan",Mtan,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"cosh",Mcosh,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"sinh",Msinh,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"tanh",Mtanh,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"sqrt",Msqrt,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"log",Mlog,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"log10",Mlog10,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"floor",Mfloor,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"trunc",Mtrunc,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"round",Mround,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"ceil",Mceil,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"exp",Mexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"dexp",Mdexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag
-	if(!completedValueFunction(_environment,owner_environment,"type",Mtype))return false;
-	if(!completedValueTextValueFunction(_environment,owner_environment,"settype",Msettype))return false;
-	if(!completedFloatFloatFunction(_environment,owner_environment,"pow",Mpow))return false;
+	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"a value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"settype",Msettype,2,(char*[]){"a variable name","a type character","immutable flag"},(Mvalue*[]){NULL,_getTextValue("'u"),getValueOneOfType(VT_INTEGER)}))return false;
+	if(!registerFunction(_environment,owner_environment,"pow",Mpow,1,(char*[]){"a value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 
-	if(!completedFunction(_environment,owner_environment,"break",Mbreak))return false;
-	if(!completedValueFunction(_environment,owner_environment,"return",Mreturn))return false;
+	if(!registerNoArgumentFunction(_environment,owner_environment,"break",Mbreak))return false;
+	if(!registerFunction(_environment,owner_environment,"return",Mreturn,1,(char*[]){"a result value"},(Mvalue*[]){NULL}))return false;
 
-	if(!completedValueFunction(_environment,owner_environment,"out",Mout))return false;
+	if(!registerFunction(_environment,owner_environment,"out",Mout,1,(char*[]){"a value to output"},(Mvalue*[]){NULL}))return false;
 
-	if(!completedThreeIntegersFunction(_environment,owner_environment,"brgb",Mbrgb))return false;
-	if(!completedThreeIntegersFunction(_environment,owner_environment,"trgb",Mtrgb))return false;
+	if(!registerFunction(_environment,owner_environment,"brgb",Mbrgb,3,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
+	if(!registerFunction(_environment,owner_environment,"trgb",Mtrgb,1,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
 	return true;
 }/* VALIDATED */

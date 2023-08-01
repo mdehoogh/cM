@@ -1489,33 +1489,44 @@ void outputRational(const char* const prefix,const Mrational* const _rational,co
  * @return Mbiginteger* the truncated big integer of \p rational 
  */
 Mbiginteger* _rational2biginteger(Mrational* _rational){Mallocationowner owner=getOwner(__LINE__);
-	Mbiginteger* _biginteger=(_rational!=NULL?owned_biginteger(__biginteger(),owner):NULL);
-	if(_biginteger!=NULL){
-		if(_rational->den!=NULL){
-			// if the numerator is NULL or 0 _biginteger should remain what it is (i.e. 0)
-			if(_rational->num!=NULL&&isBigintegerZero(_rational->num)!=M_TRUE){
-				Mbiginteger* absnum=NULL;
-				bool neg=mp_isneg(MP_INT_POINTER(_rational->num));
-				if(neg){
-					absnum=owned_biginteger(__biginteger(),owner);
-					if(absnum&&mp_neg(MP_INT_POINTER(_rational->num),MP_INT_POINTER(absnum))!=MP_OKAY){FREE_BIGINTEGER(absnum,owner);absnum=NULL;}
-				}else 
-					absnum=_rational->num;
-				// we need absnum, if we haven't got one, negating the negative numerator failed
-				if(absnum!=NULL||mp_div(MP_INT_POINTER(absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
-					outputError("Failed to (integer) divide the rational numerator by its denominator");
-					FREE_BIGINTEGER(_biginteger,owner);
-					_biginteger=NULL;
-				}else
-				if(absnum!=NULL&&neg){ // we have to negate _biginteger
-					if(mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY)
-					{FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;}
-					FREE_BIGINTEGER(absnum,owner); // free absnum
+	if(_rational==NULL)return NULL;
+	Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
+	if(_biginteger==NULL){outputError("Failed to create a big integer");return NULL;}
+	if(_rational->den!=NULL){
+		// if the numerator is NULL or 0 _biginteger should remain what it is (i.e. 0)
+		if(_rational->num!=NULL&&isBigintegerZero(_rational->num)!=M_TRUE){
+			Mbiginteger* absnum=NULL;
+			bool neg=mp_isneg(MP_INT_POINTER(_rational->num));
+			if(neg){
+				absnum=owned_biginteger(__biginteger(),owner);
+				if(absnum!=NULL){
+					if(mp_neg(MP_INT_POINTER(_rational->num),MP_INT_POINTER(absnum))!=MP_OKAY){
+						FREE_BIGINTEGER(absnum,owner);absnum=NULL;
+						outputError("Failed to negate a numerator truncating a rational");
+					}else
+						outputError("Failed to create a big integer");
 				}
+			}else 
+				absnum=_rational->num;
+			// we need absnum, if we haven't got one, negating the negative numerator failed
+			if(absnum!=NULL){
+				if(mp_div(MP_INT_POINTER(absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
+					FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
+					output("%sFailed to divide numerator",M_ERROR_PREFIX);outputBiginteger(" ",absnum," ");outputBiginteger("by denominator ",_rational->den,NULL);output(".\n");
+				}else
+				if(neg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
+					FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
+					outputError("Failed to negate a big integer");
+				}
+				if(neg)FREE_BIGINTEGER(absnum,owner);
+			}else{
+				FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
 			}
-		}else{ // copy the numerator
-			if(mp_copy(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_biginteger))!=MP_OKAY)
-			{outputError("Failed to copy the rational numerator");FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;}
+		}
+	}else{ // copy the numerator
+		if(mp_copy(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_biginteger))!=MP_OKAY){
+			FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
+			outputError("Failed to copy the rational numerator");
 		}
 	}
 	return disowned_biginteger(_biginteger,owner);

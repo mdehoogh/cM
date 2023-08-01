@@ -5007,7 +5007,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			output("Function %s registered.\n",MFUNCTION_NAME);
 	}
 
-	if(!completedFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables)){
+	if(!/*completedFunction*/registerNoArgumentFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables)){
 		errorflags|=16;
 		outputWarning("Failed to register the variables() function");
 	}

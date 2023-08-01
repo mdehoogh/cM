@@ -13459,27 +13459,28 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			// register if, while and for special functions
 			// MDH@20DEC2020: one additional token of the if function
-			if(!completedValueTokenTokenTokenFunction(_Menvironment,owner,IFFUNCTION_NAME,Miffunction))return false;
+			if(!registerFunction(_Menvironment,owner,IFFUNCTION_NAME,Miffunction,4,(char*[]){"if condition","true clause","false clause","undefined clause"},(Mvalue*[]){NULL,NULL,NULL,NULL}))return false;
+			// replacing: if(!completedValueTokenTokenTokenFunction(_Menvironment,owner,IFFUNCTION_NAME,Miffunction))return false;
 			output("If function created!\n");
 			// MDH@21DEC2020: all while arguments are like with do() also tokens now
-			if(!completedTokenListFunction(_Menvironment,owner,WHILEFUNCTION_NAME,Mwhilefunction))return false;
+			if(!registerFunction(_Menvironment,owner,WHILEFUNCTION_NAME,Mwhilefunction,2,(char*[]){"while condition","while body"},(Mvalue*[]){getValueOneOfType(VT_INTEGER),NULL}))return false;
 			output("While function created!\n");
 			// replacing: if(!completedTokenTokenFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
 			
-			if(!completedTokenListFunction(_Menvironment,owner,FORFUNCTION_NAME,Mforfunction))return false; // MDH@23DEC2020: just like while no initial evaluation before executing
+			if(!/*completedTokenListFunction*/registerFunction(_Menvironment,owner,FORFUNCTION_NAME,Mforfunction,2,(char*[]){"for condition","for body"},(Mvalue*[]){getValueOneOfType(VT_INTEGER),NULL}))return false; // MDH@23DEC2020: just like while no initial evaluation before executing
 			output("For function created!\n");
-			if(!completedTokenTokenTokenTokenTokenFunction(_Menvironment,owner,FORWITHFUNCTION_NAME,Mforwithfunction))return false;
+			if(!/*completedTokenTokenTokenTokenTokenFunction*/registerFunction(_Menvironment,owner,FORWITHFUNCTION_NAME,Mforwithfunction,5,(char*[]){"initialization","condition","increment","body","result"},(Mvalue*[]){NULL,NULL,NULL,NULL,NULL}))return false;
 
 			// MDH@05AUG2019: the do function has a single token to process
-			if(!completedTokenListFunction(_Menvironment,owner,DOFUNCTION_NAME,Mdofunction))return false;
-			if(!completedValueFunction(_Menvironment,owner,EVALFUNCTION_NAME,Mevalfunction))return false;
+			if(!/*completedTokenListFunction*/registerFunction(_Menvironment,owner,DOFUNCTION_NAME,Mdofunction,2,(char*[]){"local variable map","do body"},(Mvalue*[]){_getMapValue(VT_UNDEFINED,false,NULL),NULL}))return false;
+			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,EVALFUNCTION_NAME,Mevalfunction,1,(char*[]){"text to evaluate"},(Mvalue*[]){_getTextValue("\'"),NULL}))return false;
 			// MDH@28OCT2020: no longer internal functions as defined in Menvironment.h/c but moved over here because they need command parsing features
-			if(!completedStringMapTokenFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
-			if(!completedMapMapListFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
+			if(!/*completedStringMapTokenFunction*/registerFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME,Mdefinefunction,3,(char*[]){"function name","argument map","function body"},(Mvalue*[]){NULL,NULL,NULL}))return false;
+			if(!/*completedMapMapListFunction*/registerFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction,3,(char*[]){"parameter map","local variables map","body"},(Mvalue*[]){NULL,NULL,NULL}))return false;
 
 			// MDH@22DEC2020: register the with() and endwith() function
-			if(!completedMapFunction(_Menvironment,owner,"with",Mwith))return false;
-			if(!completedValueFunction(_Menvironment,owner,"end",Mendwith))return false;
+			if(!/*completedMapFunction*/registerFunction(_Menvironment,owner,"with",Mwith,1,(char*[]){"local variables map"},(Mvalue*[]){NULL}))return false;
+			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,"end",Mendwith,1,(char*[]){"result value"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER)}))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 			// if(!completedValueFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
@@ -13674,8 +13675,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 			// MDH@10DEC2020: register system function(s)
-			if(!completedFunction(_Menvironment,owner,"systemvariables",Msystemvariables)
-				||!completedFunction(_Menvironment,owner,"clearenv",Mclearenv)
+			if(!registerNoArgumentFunction(_Menvironment,owner,"systemvariables",Msystemvariables)
+				||!registerNoArgumentFunction(_Menvironment,owner,"clearenv",Mclearenv)
 				||!completedValueFunction(_Menvironment,owner,"getenv",Mgetenv)
 				||!completedValueFunction(_Menvironment,owner,"unsetenv",Munsetenv)
 				||!completedValueValueFunction(_Menvironment,owner,"setenv",Msetenv)
@@ -13685,8 +13686,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;				
 			}
 			// MDH@08DEC2020: register time functions
-			if(!completedFunction(_Menvironment,owner,"now",Mnow)
-				||!completedFunction(_Menvironment,owner,"gettimezone",Mgettimezone)
+			if(!registerNoArgumentFunction(_Menvironment,owner,"now",Mnow)
+				||!registerNoArgumentFunction(_Menvironment,owner,"gettimezone",Mgettimezone)
 				||!completedValueFunction(_Menvironment,owner,"settimezone",Msettimezone)
 				||!completedValueValueFunction(_Menvironment,owner,"calendartime",Mcalendartime)
 				||!completedValueValueFunction(_Menvironment,owner,"time",Mparsetime)){

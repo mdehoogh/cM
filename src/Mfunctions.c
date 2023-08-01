@@ -1316,6 +1316,12 @@ Mvalue* Mrand(){Mallocationowner owner=getOwner(__LINE__); // to return a random
 		outputError("Failed to create the numerator of the rational random number");
 	return NULL;
 }
+/**
+ * @brief returns a non-negative random integer below \b upper
+ * 
+ * @param upper the upper bound to the returned integer
+ * @return long long a non-negative random integer below \b upper
+ */
 static long long randominteger(long long upper){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT upper should be in (0,RAND_MAX]
 	long long r=M_LL_INVALID;

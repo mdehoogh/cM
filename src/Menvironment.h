@@ -106,8 +106,8 @@ long long getNumberOfFunctionParameters(char const * const functionName);
 Mstring* _getFunctionText(Mfunction const * const function,char const * const functionName);
 bool registerFunction(Menvironment* const _environment,Mallocationowner owner_environment,char const * const functionName,Function function,size_t numberOfArguments,char const * const * const argumentNames,Mvalue const * const * const defaultValues);
 
-// replacing:
-bool completedFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction);
+bool registerNoArgumentFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction);
+// TODO the folling 'completed... functions will become obsolete soon
 bool completedValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);

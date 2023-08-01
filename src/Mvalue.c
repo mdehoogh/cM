@@ -3899,10 +3899,14 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner o
 								if(_remainder!=NULL){
 									_dividend=owned_biginteger(__biginteger(),owner);
 									if(_dividend!=NULL){
+										outputBiginteger("Integer dividing ",_twicenum,NULL);outputBiginteger(" by ",_twiceden,".\n");
 										bool success=(mp_div(MP_INT_POINTER(_twicenum),MP_INT_POINTER(_twiceden),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
 										// increment _dividend if _remainder larger than denominator
-										if(success&&mp_cmp(MP_INT_POINTER(_remainder),MP_INT_POINTER(_rational->den))==MP_GT&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
-										if(success&&neg&&mp_neg(MP_INT_POINTER(_dividend),MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
+										if(success){
+											outputBiginteger("Integer dividing ",_twicenum,NULL);outputBiginteger(" by ",_twiceden,"=");outputBiginteger(NULL,_dividend,NULL);outputBiginteger(":",_remainder,".\n");
+											if(mp_cmp(MP_INT_POINTER(_remainder),MP_INT_POINTER(_rational->den))==MP_GT&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
+											if(neg&&mp_neg(MP_INT_POINTER(_dividend),MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
+										}
 										if(!success){FREE_BIGINTEGER(_dividend,owner);_dividend=NULL;}
 									}else 
 										outputError("Failed to create big integer dividend");
