@@ -39,6 +39,29 @@ static Mvaluetype getMatchingArrayValuetype(Mvaluetype arrayValuetype,Mvaluetype
 }
 
 /**
+ * @brief returns the list containing the result of applying \p oneArgumentFunction to each corresponding element in \p _list
+ * 
+ * @param _list 
+ * @param oneArgumentFunction 
+ * @param maintainsValuetype the list containing the result of applying \p oneArgumentFunction to each corresponding element in \p _list
+ * @return Mlist* 
+ */
+/*
+Mlist* _appliedToListElements(Mlist* _list,OneArgumentFunction oneArgumentFunction,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	Mlist* _result=(NULL==_list?NULL:owned_list(_getListOfType(maintainsValuetype?_list->valuetype:VT_UNDEFINED),owner)); // TODO if the types are the same use that?
+	if(_result!=NULL){
+		// elements with the same index are to be added and stored under that index
+		Mlistelement* _listelement=_list->_first;
+		while(_listelement){
+			if(appendedToList(_result,owner,oneArgumentFunction(_listelement->_value),_listelement->index)<=0)break;
+			_listelement=_listelement->_next;
+		}
+		return disowned_list(_result,owner);
+	}
+	return NULL;
+}
+*/
+/**
  * @brief applies binary operator \p binaryoperator to the elements in \p list1 and \p list2
  * 
  * @param _list1 
@@ -242,7 +265,22 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 	}
 	return resultValue;
 }
-
+/*
+Marray* _appliedToArrayElements(Marray* _array,OneArgumentFunction oneArgumentFunction,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
+	Marray* _result=(NULL==_array?NULL:owned_array(_getArray("_appliedToArrayElements",_array->numberOfElements,NULL),owner)); // TODO if the types are the same use that?
+	if(_result!=NULL){
+		if(maintainsValuetype)_result->valuetype=_array->valuetype;
+		unsigned long long arrayindex=0;
+		while(arrayindex<_result->numberOfElements){
+			// leaving it up to the binary operator what will be the result of applying it with one of the arguments equal to NULL
+			assignValue(&_result->values[arrayindex],oneArgumentFunction(_array->values[arrayindex]));
+			arrayindex++;
+		}
+		return disowned_array(_result,owner);
+	}
+	return NULL;
+}
+*/
 /**
  * @brief applies \p binaryoperator to the elements in M array \p _array1 and M array \p _array2
  * 
@@ -343,9 +381,9 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
 		if(_value->type==VT_FLOAT)return _getFloatValue(-_value->value._float->ld);
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mneg));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mneg,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg,VT_UNDEFINED));
 		if(_value->type==VT_BIGINTEGER)return _getValueOfBiginteger(_getNegatedBiginteger(_value->value._biginteger));
 		if(_value->type==VT_RATIONAL){
 			// this is done by negating the numerator but if the numerator equals NULL we should use -1

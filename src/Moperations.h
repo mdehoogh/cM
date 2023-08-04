@@ -1,6 +1,11 @@
 #include "Mlist.h"
 
 // helper functions
+/*
+Marray* _appliedToArrayElements(Marray* _array,OneArgumentFunction oneArgumentFunction,bool maintainsValuetype);
+Mlist* _appliedToListElements(Mlist* _list,OneArgumentFunction oneArgumentFunction,bool maintainsValuetype);
+Mmap* _appliedToMapElements(Mmap* _map,OneArgumentFunction oneArgumentFunction,bool maintainsValuetype);
+*/
 Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator,bool maintainsValuetype);
 Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype);
 Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype);

@@ -858,11 +858,11 @@ Mtext* _getText(char const * const text){//Mallocationowner owner=getOwner(__LIN
  * @param c 
  * @return Mtext* the M text pointer holding a single character C string initialized to \p c
  */
-Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
+Mtext* _getCharText(char c,char quote){Mallocationowner owner=getOwner(__LINE__); // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
 	Mtext* _charText=NULL;
-	Mstring* _charString=owned_string(_getString("\""),owner);
-	if(_charString){
-		if(string_append_char(_charString,c))_charText=owned_text(_getText(string(_charString)),owner);
+	Mstring* _charString=owned_string(__string(),owner);
+	if(_charString!=NULL){
+		if((!quote||string_append_char(_charString,quote))&&string_append_char(_charString,c))_charText=owned_text(_getText(string(_charString)),owner);
 		FREE_STRING(_charString,owner);
 	}
 	return disowned_text(_charText,owner);
@@ -878,7 +878,7 @@ Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text 
 Mstring* _getQuotedTextString(char const * const text,char quote){Mallocationowner owner=getOwner(__LINE__);
 	if(text!=NULL){
 			Mstring* _quotedTextString=owned_string(__string("_getQuotedTextString()"),owner);
-			if(_quotedTextString){
+			if(_quotedTextString!=NULL){
 				if((!quote||string_append_char(_quotedTextString,quote))&&string_append(_quotedTextString,text))
 					return disowned_string(_quotedTextString,owner);
 				FREE_STRING(_quotedTextString,owner);

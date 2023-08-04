@@ -1647,16 +1647,74 @@ bool isValueImmutable(Mvalue* value){
 	}
 	return result;
 }
+
 /**
  * @brief returns the (text representation of) type and immutable flag of \p value
  * @param value the value of which to return the text representing the type and immutable flag
  * @return the (text representation of) type and immutable flag of \p value
  */
-Mvalue* Mtype(Mvalue* value){
+Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==value)return NULL;
+
+	// MDH@04AUG2023: if value is composite we want to know the types of the contained values
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mtype,VT_UNDEFINED));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mtype,VT_UNDEFINED));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mtype,VT_UNDEFINED));
+	// if value is a reference we're going to return a map with fields 'variable' 'valuetype' and the types of the value of that variable
+	if(value->type==VT_REFERENCE){
+		///////////char src[6]="Mtype";
+		Mvariable* referencedVariable=value->value._reference->variable;
+		Mmap* _map=owned_map(_getThreeArgumentMap("references","referenced variable type","referenced value type",VT_TEXT,VT_UNDEFINED,VT_UNDEFINED),owner);
+		if(NULL==_map){outputError("Failed to create type result map!");return NULL;}
+		outputMap("Initialized result map: ",_map,".\n");
+		if(referencedVariable!=NULL){
+			////output("Creating map elements.\n");
+			Mmapelement* _mapelement1=_map->_first;
+			Mmapelement* _mapelement2=_mapelement1->_next;
+			Mmapelement* _mapelement3=_mapelement2->_next;
+			////output("Map elements created.\n");
+			// initialize map element 1 which should hold the name of the referenced variable
+			Mstring* referencedVariableName=owned_string(_getQuotedTextString(referencedVariable->_name->chars,'\''),owner);
+			if(referencedVariableName!=NULL){
+				assignValue(&_mapelement1->_variable->_value,_getTextValue(string(referencedVariableName))); // NOTE _getTextValue will call _getText which will duplicate ...->chars so that's Ok
+				FREE_STRING(referencedVariableName,owner);
+			}
+			assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable),'\'')));
+			assignValue(&_mapelement3->_variable->_value,Mtype(referencedVariable->_value));
+		}
+		outputMap("Result map: ",_map,".\n");
+		/* replacing:
+		Mmap* _map=owned_map(__map(src),owner);
+		if(referencedVariable!=NULL){
+			//output("Creating map elements.\n");
+			Mmapelement* _mapelement1=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('A');
+			Mmapelement* _mapelement2=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('B');
+			Mmapelement* _mapelement3=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('C');
+			//output("Map elements created.\n");
+			_map->numberOfElements=3;
+			_map->_first=_mapelement1;_mapelement1->_next=_mapelement2;_mapelement2->_next=_mapelement3;_map->_last=_mapelement3;
+			// initialize map element 1 which should hold the name of the referenced variable
+			_mapelement1->_variable=owned_variable(_getVariable(_getChars("'references"),VT_TEXT,true),Msubowner(owner,2));
+			assignValue(&_mapelement1->_variable->_value,_getTextValue(referencedVariable->_name->chars)); // NOTE _getTextValue will call _getText which will duplicate ...->chars so that's Ok
+			// initialize map element 2 which should show the type of the variable
+			_mapelement2->_variable=owned_variable(_getVariable(_getChars("'referenced variable type"),VT_TEXT,true),Msubowner(owner,2));
+			assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable))));
+			// initialize map element 3 which should show the type of the variable's value
+			_mapelement3->_variable=owned_variable(_getVariable(_getChars("'referenced value type"),VT_TEXT,true),Msubowner(owner,2));
+			assignValue(&_mapelement3->_variable->_value,Mtype(referencedVariable->_value));
+		}
+		*/
+		return(NULL==_map?NULL:getValueOfMap(disowned_map(_map,owner)));
+	}
+
 	// every value should have a type text, even if NULL
 	// MDH@03NOV2019: actually _value should be the name of a variable because it not we cannot determine whether or not
 	//				the variable is mutable, that's why settype() requires the name of the variable (as text)
-	char result[6]="'\0\0\0\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
+	char result[]="'\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
+	// MDH@04AUG2023: composite types and reference type already handled above
+	result[1]=getValueTypeCharacter(value->type,isValueImmutable(value));
+	/* replacing:
+	char result[5]="'\0\0\0\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
 	if(value!=NULL){
 		if(value->type==VT_REFERENCE){ // a variabler reference
 			Mvariable* referencedVariable=value->value._reference->variable;
@@ -1681,6 +1739,7 @@ Mvalue* Mtype(Mvalue* value){
 			}
 		}
 	}
+	*/
 	/* ewplacing:
 	switch(_value->type){
 		case VT_UNDEFINED:result[1]='-';break;
@@ -2754,6 +2813,7 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 					for(size_t argumentIndex=0;argumentIndex<numberOfArguments;argumentIndex++){
 						/////////DEBUGGING outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
 						_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+						_mapelement->_next=NULL; // TODO do we need this?????
 						_mapelement->_variable=_getVariableWithName(argumentNames[argumentIndex],defaultValues[argumentIndex]!=NULL?defaultValues[argumentIndex]->type:VT_UNDEFINED,true,Msubowner(owner,2));
 						if(defaultValues[argumentIndex]!=NULL)assignValue(&_mapelement->_variable->_value,defaultValues[argumentIndex]);
 						if(NULL==_prevmapelement)
@@ -2993,7 +3053,7 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	if(!registerFunction(_environment,owner_environment,"dexp",Mdexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag
 	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"a value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"settype",Msettype,2,(char*[]){"a variable name","a type character","immutable flag"},(Mvalue*[]){NULL,_getTextValue("'u"),getValueOneOfType(VT_INTEGER)}))return false;
+	if(!registerFunction(_environment,owner_environment,"settype",Msettype,3,(char*[]){"a variable name","a type character","immutable flag"},(Mvalue*[]){NULL,_getTextValue("'u"),getValueOneOfType(VT_INTEGER)}))return false;
 	if(!registerFunction(_environment,owner_environment,"pow",Mpow,1,(char*[]){"a value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 
 	if(!registerNoArgumentFunction(_environment,owner_environment,"break",Mbreak))return false;

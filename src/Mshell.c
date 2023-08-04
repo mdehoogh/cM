@@ -3689,9 +3689,9 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
  * @return Mvalue* the wrapped M decimal represented by \p value
  */
 Mvalue* Md(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	if(value!=NULL&&value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Md));
-	if(value!=NULL&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Md));
-  if(value!=NULL&&value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Md)); // MDH@28MAR2023
+	if(value!=NULL&&value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Md,VT_UNDEFINED));
+	if(value!=NULL&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Md,VT_UNDEFINED));
+  if(value!=NULL&&value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Md,VT_UNDEFINED)); // MDH@28MAR2023
 	Mvalue* dValue=value;
 	if(value!=NULL&&value->type!=VT_DECIMAL){
 		Mdecimal* _decimal=NULL;
@@ -3720,9 +3720,9 @@ Mvalue* Mo(Mvalue* value){ // little-endian representation list to return
 	if(value!=NULL){
 		// TODO deal with all types possible
 		switch(value->type){
-			case VT_ARRAY:return _getValueOfArray(appliedToArray(value->value._array,Mo));
-			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,Mo));
-			case VT_MAP:return _getValueOfMap(appliedToMap(value->value._map,Mo)); // MDH@28MAR2023
+			case VT_ARRAY:return _getValueOfArray(appliedToArray(value->value._array,Mo,VT_UNDEFINED));
+			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,Mo,VT_UNDEFINED));
+			case VT_MAP:return _getValueOfMap(appliedToMap(value->value._map,Mo,VT_UNDEFINED)); // MDH@28MAR2023
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,true);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
@@ -3740,9 +3740,9 @@ Mvalue* Mo(Mvalue* value){ // little-endian representation list to return
 Mvalue* MO(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endian decimal representation list to return
 	if(value!=NULL){
 		switch(value->type){
-			case VT_ARRAY:return _getValueOfArray(appliedToArray(value->value._array,MO));
-			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,MO));
-			case VT_MAP:return _getValueOfMap(appliedToMap(value->value._map,MO)); // MDH@28MAR2023
+			case VT_ARRAY:return _getValueOfArray(appliedToArray(value->value._array,MO,VT_UNDEFINED));
+			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,MO,VT_UNDEFINED));
+			case VT_MAP:return _getValueOfMap(appliedToMap(value->value._map,MO,VT_UNDEFINED)); // MDH@28MAR2023
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,false);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
@@ -3761,9 +3761,9 @@ Mvalue* MO(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endi
  */
 Mvalue* Mi(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
 	if(value==NULL)return NULL;
-	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mi));
-	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mi));
-	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mi)); // MDH@28MAR2023
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mi,VT_UNDEFINED));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mi,VT_UNDEFINED));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mi,VT_UNDEFINED)); // MDH@28MAR2023
 	if(amVerboseDebugging())outputValue("Converting '",value,"' to an integer.\n");
 	long long ll=getValueInteger(value);
 	return(ll!=M_LL_INVALID?_getIntegerValue(ll):NULL);
@@ -3778,9 +3778,9 @@ Mvalue* Mi(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* Mb(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
 	if(value==NULL)return NULL;
-	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mb));
-	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mb));
-	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mb));
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mb,VT_UNDEFINED));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mb,VT_UNDEFINED));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mb,VT_UNDEFINED));
 	if(amVerboseDebugging())outputValue("Converting '",value,"' to a big integer.\n");
 	Mvalue* bValue=value;
 	if(value->type!=VT_BIGINTEGER)bValue=_getValueOfBiginteger(_getValueBiginteger(value));
@@ -3922,9 +3922,9 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 Mvalue* MQ(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==value)return NULL;
 	if(value->type==VT_RATIONAL)return value; // if the value holds a rational itself, return just that
-	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,MQ));
-	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,MQ));
-	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,MQ));
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,MQ,VT_UNDEFINED));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,MQ,VT_UNDEFINED));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,MQ,VT_UNDEFINED));
 	Mvalue* _rationalValue=NULL;
 	if(value->type==VT_FLOAT)
 		_rationalValue=_getValueOfList(_getLongDoubleRationalList(value->value._float->ld,250));
@@ -3944,9 +3944,9 @@ Mvalue* MQ(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* Mq(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==value)return NULL;
-	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mq));
-	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mq));
-	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mq));
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mq,VT_UNDEFINED));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mq,VT_UNDEFINED));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mq,VT_UNDEFINED));
 	if(value->type==VT_RATIONAL){
 		Mrational* rational=value->value._rational;
 		if(rational==NULL||floatIsUndefinedOrZero(rational->delta))return value;
@@ -3988,9 +3988,9 @@ Mvalue* Mq(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* Mf(Mvalue* value){
 	if(NULL==value||value->type==VT_FLOAT)return value;
-	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mf));
-	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mf));
-	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mf));
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mf,VT_UNDEFINED));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mf,VT_UNDEFINED));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mf,VT_UNDEFINED));
 	bool report=amVerboseDebugging(); //||(M_MODULE_DEBUGGING&MM_SHELL);
 	long double ld=M_LD_NAN;
 	if(report){outputValue("Converting '",value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[value->type]);}

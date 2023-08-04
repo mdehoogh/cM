@@ -203,6 +203,7 @@ typedef struct Mmapelement{
     struct Mmapelement* _next;
 }Mmapelement;
 
+Mmapelement* __mapelement(char const * const source);
 long long free_mapelement(Mmapelement* _mapelement,bool weak);
 #ifndef __PRODUCTION__
 Mmapelement* owned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
@@ -222,7 +223,7 @@ typedef struct Mmap{
     bool immutable:1;
 }Mmap;
 
-Mmap* __map(char* source); // MDH@01NOV2020
+Mmap* __map(char const * const source); // MDH@01NOV2020
 void free_map(Mmap* _map);
 #ifndef __PRODUCTION__
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map);
@@ -238,6 +239,8 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue);
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
 Mmap* _getListMap(char* name,Mvalue* _listValue);
 Mmap* _getMapMap(char* name,Mvalue* _mapValue);
+// MDH@04AUG2023
+Mmap* _getThreeArgumentMap(char const * const name1,char const * const name2,char const * const name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3);
 
 Mmap* _getStringStringMap(char* name1,char* name2);
 Mmap* _getFloatFloatMap(char* name1,char* name2);
@@ -264,7 +267,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 // and allow asking for a reference value wrapper
 Mvalue* _getIntegerValue(long long ll);
-Mvalue* _getCharTextValue(char _c);
+Mvalue* _getCharTextValue(char c,char quote);
 
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
 // MDH@28MAY2020 TODO shouldn't we rename these to _getValueOfReference etc.
@@ -407,9 +410,9 @@ typedef Mvalue* (*ThreeArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argume
 typedef Mvalue* (*FourArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value);
 typedef Mvalue* (*FiveArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value,Mvalue* _argument5Value);
 
-Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction); // MDH@22NOV2020
-Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
-Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
+Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype); // MDH@22NOV2020
+Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype);
+Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype);
 
 // some conversion functions that might be moved to some more specialized 'module'
 Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero); // TODO probably to be moved to Mrational.h/c

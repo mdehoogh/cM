@@ -131,7 +131,7 @@ void free_text(Mtext* _text/*,Mallocationowner owner*/);
 Mtext* owned_text(Mtext* _text,Mallocationowner owner_text);
 
 Mtext* _getText(char const * const _c);
-Mtext* _getCharText(char _char);
+Mtext* _getCharText(char c,char quote);
 
 // MDH@07DEC2020: convenience method to create a Mstring from a character string
 Mstring* _getQuotedTextString(char const * const c,char quote); // specifically used by

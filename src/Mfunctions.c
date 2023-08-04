@@ -35,8 +35,9 @@ Mvalue* Mfloor(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
 		*/
 		// composite types
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mfloor));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mfloor));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mfloor,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mfloor,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mfloor,VT_UNDEFINED));
 		// scalar values
 		if(_value->type==VT_FLOAT)return _getFloatValue(floorl(_value->value._float->ld));
 		if(_value->type==VT_RATIONAL)return _getValueOfBiginteger(_getRationalInteger(_value->value._rational,true,false));
@@ -57,8 +58,9 @@ Mvalue* Mtrunc(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
 		if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
 		*/
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtrunc));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtrunc));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mtrunc,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtrunc,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtrunc,VT_UNDEFINED));
 		if(_value->type==VT_FLOAT)return _getFloatValue(truncl(_value->value._float->ld));
 		if(_value->type==VT_RATIONAL)return _getValueOfBiginteger(_getRationalInteger(_value->value._rational,true,true));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_getDecimalInteger(_value->value._decimal,true,true));
@@ -78,8 +80,9 @@ Mvalue* Mceil(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
 		if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
 		*/
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mceil,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil,VT_UNDEFINED));
 		if(_value->type==VT_FLOAT)return _getFloatValue(ceill(_value->value._float->ld));
 		if(_value->type==VT_RATIONAL)return _getValueOfBiginteger(_getRationalInteger(_value->value._rational,false,false));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_getDecimalInteger(_value->value._decimal,false,false));
@@ -130,8 +133,9 @@ Mvalue* Mround(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
 		if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
 		*/
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mround));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mround));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mround,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mround,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mround,VT_UNDEFINED));
 		if(_value->type==VT_FLOAT)return _getFloatValue(roundl(_value->value._float->ld));
 		if(_value->type==VT_RATIONAL)return _getValueOfBiginteger(_getRoundedRationalInteger(_value->value._rational));
 		if(_value->type==VT_DECIMAL)return _getValueOfBiginteger(_getRoundedDecimalInteger(_value->value._decimal));
@@ -149,9 +153,9 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 		if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msin));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msin,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin,VT_UNDEFINED));
 		if(_value->type==VT_RATIONAL)return _getValueOfRational(_qsinorcos(_value->value._rational,true));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_dsine(NULL,_value->value._decimal)); // match the precision as used by the argument
 			/* replacing what was way to slow:
@@ -253,9 +257,9 @@ Mvalue* Mcordicsin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
 		*/
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcordicsin));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcordicsin,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin,VT_UNDEFINED));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_dcordicsine(NULL,_value->value._decimal));
 	}
 	return NULL;
@@ -273,9 +277,9 @@ Mvalue* Mcordiccos(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
 		*/
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcordiccos));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordiccos));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordiccos));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcordiccos,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordiccos,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordiccos,VT_UNDEFINED));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_dcordiccosine(NULL,_value->value._decimal));
 	}
 	return NULL;
@@ -291,9 +295,9 @@ Mvalue* Mcos(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(cosl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(cos(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcos));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcos));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcos));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcos,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcos,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcos,VT_UNDEFINED));
 		if(_value->type==VT_RATIONAL)return _getValueOfRational(_qsinorcos(_value->value._rational,false));
 		if(_value->type==VT_DECIMAL)return _getValueOfDecimal(_dcosine(NULL,_value->value._decimal));
 	}
@@ -308,9 +312,9 @@ Mvalue* Mcos(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
 Mvalue* Mtan(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		// composite application
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mtan));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtan));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtan));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mtan,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtan,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtan,VT_UNDEFINED));
 		// scalar arguments
 		if(_value->type==VT_FLOAT)return _getFloatValue(tanl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(tan(_value->value._integer->ll));
@@ -336,9 +340,9 @@ Mvalue* Mcosh(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(coshl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(cosh(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcosh));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcosh));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcosh));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mcosh,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcosh,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcosh,VT_UNDEFINED));
 	}
 	return NULL;
 }/* VALIDATED */
@@ -352,9 +356,9 @@ Mvalue* Msinh(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinhl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sinh(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msinh));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msinh));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msinh));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msinh,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msinh,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msinh,VT_UNDEFINED));
 	}
 	return NULL;
 }/* VALIDATED */
@@ -362,9 +366,9 @@ Mvalue* Mtanh(Mvalue*  _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(tanhl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(tanh(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mtanh));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtanh));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtanh));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mtanh,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtanh,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtanh,VT_UNDEFINED));
 	}
 	return NULL;
 }/* VALIDATED */
@@ -378,9 +382,9 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mexp));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mexp,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp,VT_UNDEFINED));
 		// use decimal conversion
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal){
@@ -411,9 +415,9 @@ Mvalue* Mdexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mexp));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mexp,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp,VT_UNDEFINED));
 		// use decimal conversion
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal!=NULL){
@@ -434,9 +438,9 @@ Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(logl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(log(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog,VT_UNDEFINED));
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
@@ -465,9 +469,9 @@ Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(log10l(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(log10(_value->value._integer->ll));
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog10));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog10,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10,VT_UNDEFINED));
 		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
@@ -496,8 +500,9 @@ Mvalue* Msqrt(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->type==VT_FLOAT)return _getFloatValue(sqrtl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sqrt(_value->value._integer->ll));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msqrt));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msqrt));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msqrt,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msqrt,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msqrt,VT_UNDEFINED));
 		// the square root of big integer, decimal and rational values has to be computed by conversion to decimals first
 		// TODO although for rationals we could divide the square root of the numerator by the square root of the denominator
 		// we've got a function in Mdecimal.h/c to explicitly convert a value (if possible) to a decimal (if the value wraps a decimal that is returned (instead of a new copy of this wrapped decimal) and that decimal should NOT be freed (see below))
@@ -581,9 +586,9 @@ Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){Mallocationowner owner=getOw
 Mvalue* Mnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not a value
 	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(!_value->value._integer->ll);
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mnot));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mnot,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot,VT_UNDEFINED));
 	}
 	return NULL;
 }/* VALIDATED */
@@ -597,9 +602,9 @@ Mvalue* Mnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not
 Mvalue* Mbnot(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__); // not a value
 	if(_value!=NULL){
 		if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
-		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mbnot));
-		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot));
-		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot));
+		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mbnot,VT_UNDEFINED));
+		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot,VT_UNDEFINED));
+		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot,VT_UNDEFINED));
 	}
 	return NULL;
 }/* VALIDATED */
@@ -1361,8 +1366,9 @@ static long long randominteger(long long upper){Mallocationowner owner=getOwner(
  */
 Mvalue* Mirand(Mvalue* _upperValue){Mallocationowner owner=getOwner(__LINE__);
 	if(_upperValue!=NULL){
-		if(_upperValue->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_upperValue->value._array,Mirand));
-		if(_upperValue->type==VT_LIST)return _getValueOfList(appliedToList(_upperValue->value._list,Mirand));
+		if(_upperValue->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_upperValue->value._array,Mirand,VT_UNDEFINED));
+		if(_upperValue->type==VT_LIST)return _getValueOfList(appliedToList(_upperValue->value._list,Mirand,VT_UNDEFINED));
+		if(_upperValue->type==VT_MAP)return _getValueOfMap(appliedToMap(_upperValue->value._map,Mirand,VT_UNDEFINED));
 		long long upper=getValueInteger(_upperValue);
 		if(upper>0&&upper<=RAND_MAX){
 			long long r=randominteger(upper);
