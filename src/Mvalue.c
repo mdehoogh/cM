@@ -268,7 +268,7 @@ Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_ma
 	if(NULL==_mapelement)return NULL;
 	if(_mapelement->_next!=NULL)owned_mapelement(_mapelement->_next,owner_mapelement);
 	if(_mapelement->_variable!=NULL)owned_variable(_mapelement->_variable,Msubowner(owner_mapelement,1));
-	output("Owning a map element!\n");
+	//DEBUGGINGoutput("Owning a map element!\n");
 	return OWNED(_mapelement,owner_mapelement);
 }
 /**
@@ -280,9 +280,9 @@ Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_ma
  */
 Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
 	if(NULL==_mapelement)return NULL;
-	output("Disowning a map element!\n");
+	//DEBUGGINGoutput("Disowning a map element!\n");
 	if(_mapelement->_variable!=NULL){
-		output("Disowning map element variable '%s'.\n",_mapelement->_variable->_name,".\n");
+		//DEBUGGINGoutput("Disowning map element variable '%s'.\n",_mapelement->_variable->_name,".\n");
 		disowned_variable(_mapelement->_variable,owner_mapelement);
 	}
 	if(_mapelement->_next!=NULL)disowned_mapelement(_mapelement->_next,owner_mapelement);
@@ -355,10 +355,10 @@ Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
  */
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
 	if(NULL==_map)return NULL;
-  output("Disowning map!\n");
+  //DEBUGGINGoutput("Disowning map!\n");
 	if(_map->_creator!=NULL){output("Creator: '%s'.\n",_map->_creator);disowned_chars(_map->_creator,owner_map);} // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
 	if(_map->_first!=NULL)disowned_mapelement(_map->_first,owner_map);
-	output("Map disowned!\n");
+	//DEBUGGINGoutput("Map disowned!\n");
 	return DISOWNED(_map,owner_map);
 }
 #endif
@@ -724,22 +724,24 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
  * @param owner_reference 
  * @return Mreference* \p _reference owned by \p owner_reference
  */
-Mreference* owned_reference(Mreference* _reference,Mallocationowner owner_reference){return DISOWNED(_reference,owner_reference);}
+Mreference* owned_reference(Mreference* _reference,Mallocationowner owner_reference){return OWNED(_reference,owner_reference);}
 /**
  * @brief returns \p _reference disowned by \p owner_reference
  * 
  * @param _reference 
  * @param owner_reference 
  * @return Mreference* \p _reference disowned by \p owner_reference
- */Mreference* disowned_reference(Mreference* _reference,Mallocationowner owner_reference){return OWNED(_reference,owner_reference);}
+ */
+Mreference* disowned_reference(Mreference* _reference,Mallocationowner owner_reference){return DISOWNED(_reference,owner_reference);}
 #endif
 void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
-	if(!reference)return;
-	if(reference->variable){
-		if(reference->variable->referencecount==0)
-			outputBug("Count of referenced variable already zero.");
-		else
+	if(NULL==reference)return;
+	if(reference->variable!=NULL){
+		if(reference->variable->referencecount>0){
 			reference->variable->referencecount--;
+			reference->variable=NULL; // to be safe
+		}else
+			outputBug("Count of referenced variable already zero.");
 	}
 	FREE_1(reference,'Q'/*,owner_reference*/);
 }
@@ -753,9 +755,9 @@ Mreference* _getReference(Mvariable* _variable){Mallocationowner owner=getOwner(
 	// MDH@11MAR2020: variable can now be NULL
 	Mreference* _reference=CALLOC_1(sizeof(Mreference),'Q',owner);
 	if(NULL==_reference)return NULL;
-	_reference->variable=SUBOWNED(_variable,1);
+	_reference->variable=SUBOWNED(_variable,1); // TODO is this correct???? or should it be: owned_variable(_variable,subowner(owner,1));
 	if(_variable!=NULL)_reference->referenceindex=(++_variable->referencecount); // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
-	return DISOWNED(_reference,owner);
+	return disowned_reference(_reference,owner);
 }
 /**
  * @brief returns a new M value wrapping M reference \p _reference

@@ -1257,7 +1257,7 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
  */
 Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name){
 	if(NULL==_environment||NULL==name){outputError("No environment or name specified");return NULL;}
-	output("Looking for the value of variable '%s' in environment '%s'.\n",name,string(_getEnvironmentName(_environment)));
+	//DEBUGGINGoutput("Looking for the value of variable '%s' in environment '%s'.\n",name,string(_getEnvironmentName(_environment)));
 	Mvariable* variable=getVariable(_environment,name,false);
 	if(NULL==variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
 	return variable->_value;
@@ -1660,13 +1660,14 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mtype,VT_UNDEFINED));
 	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mtype,VT_UNDEFINED));
 	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mtype,VT_UNDEFINED));
+
 	// if value is a reference we're going to return a map with fields 'variable' 'valuetype' and the types of the value of that variable
 	if(value->type==VT_REFERENCE){
 		///////////char src[6]="Mtype";
 		Mvariable* referencedVariable=value->value._reference->variable;
 		Mmap* _map=owned_map(_getThreeArgumentMap("references","referenced variable type","referenced value type",VT_TEXT,VT_UNDEFINED,VT_UNDEFINED),owner);
 		if(NULL==_map){outputError("Failed to create type result map!");return NULL;}
-		outputMap("Initialized result map: ",_map,".\n");
+		//DEBUGGINGoutputMap("Initialized result map: ",_map,".\n");
 		if(referencedVariable!=NULL){
 			////output("Creating map elements.\n");
 			Mmapelement* _mapelement1=_map->_first;
@@ -1682,29 +1683,30 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable),'\'')));
 			assignValue(&_mapelement3->_variable->_value,Mtype(referencedVariable->_value));
 		}
-		outputMap("Result map: ",_map,".\n");
-		/* replacing:
-		Mmap* _map=owned_map(__map(src),owner);
-		if(referencedVariable!=NULL){
-			//output("Creating map elements.\n");
-			Mmapelement* _mapelement1=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('A');
-			Mmapelement* _mapelement2=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('B');
-			Mmapelement* _mapelement3=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('C');
-			//output("Map elements created.\n");
-			_map->numberOfElements=3;
-			_map->_first=_mapelement1;_mapelement1->_next=_mapelement2;_mapelement2->_next=_mapelement3;_map->_last=_mapelement3;
-			// initialize map element 1 which should hold the name of the referenced variable
-			_mapelement1->_variable=owned_variable(_getVariable(_getChars("'references"),VT_TEXT,true),Msubowner(owner,2));
-			assignValue(&_mapelement1->_variable->_value,_getTextValue(referencedVariable->_name->chars)); // NOTE _getTextValue will call _getText which will duplicate ...->chars so that's Ok
-			// initialize map element 2 which should show the type of the variable
-			_mapelement2->_variable=owned_variable(_getVariable(_getChars("'referenced variable type"),VT_TEXT,true),Msubowner(owner,2));
-			assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable))));
-			// initialize map element 3 which should show the type of the variable's value
-			_mapelement3->_variable=owned_variable(_getVariable(_getChars("'referenced value type"),VT_TEXT,true),Msubowner(owner,2));
-			assignValue(&_mapelement3->_variable->_value,Mtype(referencedVariable->_value));
-		}
-		*/
-		return(NULL==_map?NULL:getValueOfMap(disowned_map(_map,owner)));
+		//DEBUGGINGoutputMap("Result map: ",_map,".\n");
+		//* replacing:
+		// Mmap* _map=owned_map(__map(src),owner);
+		// if(referencedVariable!=NULL){
+		// 	//output("Creating map elements.\n");
+		// 	Mmapelement* _mapelement1=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('A');
+		// 	Mmapelement* _mapelement2=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('B');
+		// 	Mmapelement* _mapelement3=owned_mapelement(__mapelement(src),Msubowner(owner,1));//outputChar('C');
+		// 	//output("Map elements created.\n");
+		// 	_map->numberOfElements=3;
+		// 	_map->_first=_mapelement1;_mapelement1->_next=_mapelement2;_mapelement2->_next=_mapelement3;_map->_last=_mapelement3;
+		// 	// initialize map element 1 which should hold the name of the referenced variable
+		// 	_mapelement1->_variable=owned_variable(_getVariable(_getChars("'references"),VT_TEXT,true),Msubowner(owner,2));
+		// 	assignValue(&_mapelement1->_variable->_value,_getTextValue(referencedVariable->_name->chars)); // NOTE _getTextValue will call _getText which will duplicate ...->chars so that's Ok
+		// 	// initialize map element 2 which should show the type of the variable
+		// 	_mapelement2->_variable=owned_variable(_getVariable(_getChars("'referenced variable type"),VT_TEXT,true),Msubowner(owner,2));
+		// 	assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable))));
+		// 	// initialize map element 3 which should show the type of the variable's value
+		// 	_mapelement3->_variable=owned_variable(_getVariable(_getChars("'referenced value type"),VT_TEXT,true),Msubowner(owner,2));
+		// 	assignValue(&_mapelement3->_variable->_value,Mtype(referencedVariable->_value));
+		// }
+		///
+		// MDH@07AUG2023: OOPS don't call getValueOfMap but _getValueOfMap!!!
+		return(NULL==_map?NULL:_getValueOfMap(disowned_map(_map,owner)));
 	}
 
 	// every value should have a type text, even if NULL

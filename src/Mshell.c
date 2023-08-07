@@ -4471,7 +4471,7 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner
  * @param weak whether or not the result list should be flagged as weak
  * @return Mvalue* the evaluated list from the current expression being evaluated
  */
-Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){Mallocationowner owner=getOwner(__LINE__);
+static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
 	if(amVerboseDebugging())
 		output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
@@ -4577,7 +4577,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
  * 
  * @return Mvalue* the array represented by the array literal
  */
-Mvalue* getValueOfArray(){
+static Mvalue* getValueOfArray(){
 	return Ma(getValueOfList(TT_END_OF_LIST,0,0,false));
 	/* equivalent to
 	Mvalue* listValue=getValueOfList(TT_END_OF_LIST,0,0,false);
@@ -4592,7 +4592,7 @@ Mvalue* getValueOfArray(){
  * 
  * @return Mvalue* the evaluated value of a map in the expression being evaluated
  */
-Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
+static Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // MDH@17JUL2019: one of five functions that use and advance the current expression token
 	Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
 	/* MDH@27MAY2020 replacing:
@@ -4645,7 +4645,7 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
  * @param _argumentMap 
  * @return Mvalue* the evaluated value of a function call in the expression being evaluated
  */
-Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
+static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
 	////////Mvalue* _resultValue=NULL;
 	switch(_function->type){
 		case FT_USER:
@@ -4703,7 +4703,8 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 			if(amVerboseDebugging())output("Calling no-argument function '%s'.\n",functionName);
 			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
-			if(amVerboseDebugging()){output("Applying one-argument function '%s'",functionName);outputValue(" to '",_argumentMap->_first->_variable->_value,"'.\n");}
+			if(amVerboseDebugging())
+			{output("Applying one-argument function '%s'",functionName);outputValue(" to '",_argumentMap->_first->_variable->_value,"'.\n");}
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:
 			{
@@ -9247,7 +9248,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		Mvaluereference* _valuereference;
 		Mformulaelement* formula=(Mformulaelement*)OWNED(__formulaelement("root"),owner); // replacing: CALLOC_1(sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
-		size_t formulaElementCount=(_formulaelement?1:0);
+		size_t formulaElementCount=(_formulaelement!=NULL?1:0);
 
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 
@@ -9446,7 +9447,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					if(_formulaelement->_prev!=NULL)_formulaelement=_formulaelement->_prev;
 					// is there a formula element in front of it that has not yet been applied?????
 					if(amVerboseDebugging())
-						outputValue("Result: '",_result,"'.\n");
+						outputValue("Value of expression: '",_result,"'.\n");
 				}else{ // we have to apply the next operator BEFORE applying this operator
 					_formulaelement->_next->_prev=_formulaelement; // point the next formula element to me, so it's knows that the operator behind it has not yet been applied
 					_formulaelement=_formulaelement->_next; // skip applying the current operator for now

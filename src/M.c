@@ -2885,7 +2885,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	 // initialize the (current) expression token
 	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	
-	// outputValue("Result value: '",*resultValue,"'.\n"); // DEBUG
+	//outputValue("Result value: '",*resultValue,"'.\n"); // DEBUG
 
 	long long elapsed_evaluating=(clock()-before_evaluating)/M_CLOCKS_PER_MS;
 
@@ -6395,7 +6395,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								if(NULL==string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
 									outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
 								else
-								if(amVerboseDebugging())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
+								if(amVerboseDebugging())
+									output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
 							}
 						}
 					}
@@ -6410,7 +6411,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 					// garbage collection: remove any values not used anymore...
 					// if(amVerboseDebugging())
-					if(amVerbose())
+					if(amVerboseDebugging())
 						outputInfo("Removing unreferenced values.");
 					size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
 					if(amVerbose())
