@@ -1173,6 +1173,35 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 	return false;
 }/* VALIDATED */
 
+// helper functions for Mtype()
+// NOTE these three functions should always be used to convert between a character and a value type
+// TODO in time these essential methods might be moved to Mexecution.c/h
+/**
+ * @brief returns the character equivalent of value type \p valuetype
+ * @param valuetype 
+ * @param immutable 
+ * @return char the character equivalent of value type \p valuetype
+ */
+char getValueTypeCharacter(Mvaluetype valuetype,bool immutable){
+	return(immutable?IMMUTABLEVALUETYPECHARS[valuetype]:MUTABLEVALUETYPECHARS[valuetype]);
+}
+/**
+ * @brief returns true if the composite value stored in \p value is immutable, false otherwise
+ * 
+ * @param value 
+ * @return true 
+ * @return false 
+ */
+bool isValueImmutable(Mvalue* value){
+	bool result=true; // by default any value is immutable
+	if(value!=NULL){
+		if(value->type==VT_MAP)result=value->value._map->immutable;else
+		if(value->type==VT_LIST)result=value->value._list->immutable;else
+		if(value->type==VT_ARRAY)result=value->value._array->immutable;
+	}
+	return result;
+}
+
 // MDH@14NOV2019: sometimes we need a setValue that does not use assignValue() because we do not want to copy the (composite) value passed in
 /**
  * @brief sets the value of variable with name \p name in M environment \p _environment to \p _value directly
@@ -1208,11 +1237,12 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 				}
 				return true; // releasing the value is my responsibility now...
 			}
-			output("%sCannot set variable '%s': the new value is of the wrong type.\n",M_ERROR_PREFIX,name);
+			output("%sCannot set variable '%s': the new value ",M_ERROR_PREFIX,name);
+			outputValue("(",_value,") is of the wrong type");output(" (%c).\n",getValueTypeCharacter(_value->type,isValueImmutable(_value)));
 		}else
 		if(variable->_value!=NULL){
 			output("%sCannot change the value of variable '%s'",M_ERROR_PREFIX,name);
-			outputValue("from '",variable->_value,"'");
+			outputValue(" from '",variable->_value,"'");
 			outputValue(" to '",_value,"': it is not mutable.\n");
 		}else
 			output("%sCannot initialize the value of variable '%s': it is not mutable!\n",M_ERROR_PREFIX,name);
@@ -1595,18 +1625,7 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
 // END FUNCTION STUFF
 
 // the internal functions
-// helper functions for Mtype()
-// NOTE these three functions should always be used to convert between a character and a value type
-// TODO in time these essential methods might be moved to Mexecution.c/h
-/**
- * @brief returns the character equivalent of value type \p valuetype
- * @param valuetype 
- * @param immutable 
- * @return char the character equivalent of value type \p valuetype
- */
-char getValueTypeCharacter(Mvaluetype valuetype,bool immutable){
-	return(immutable?IMMUTABLEVALUETYPECHARS[valuetype]:MUTABLEVALUETYPECHARS[valuetype]);
-}
+
 /**
  * @brief returns the mutable value type of the character equivalent \p valuetypechar
  * 
@@ -1630,22 +1649,6 @@ char getMutableValueTypeCharacter(char valuetypechar){
 	p=strchr(IMMUTABLEVALUETYPECHARS,valuetypechar);
 	if(p!=NULL)return MUTABLEVALUETYPECHARS[p-IMMUTABLEVALUETYPECHARS]; // NOTE I can determine the index (position) in the array by subtracting the start pointer (representing 0)!
 	return '\0';
-}
-/**
- * @brief returns true if the composite value stored in \p value is immutable, false otherwise
- * 
- * @param value 
- * @return true 
- * @return false 
- */
-bool isValueImmutable(Mvalue* value){
-	bool result=true; // by default any value is immutable
-	if(value!=NULL){
-		if(value->type==VT_MAP)result=value->value._map->immutable;else
-		if(value->type==VT_LIST)result=value->value._list->immutable;else
-		if(value->type==VT_ARRAY)result=value->value._array->immutable;
-	}
-	return result;
 }
 
 /**
@@ -1839,12 +1842,17 @@ static bool allMapAttributesAreOfType(Mmap* map,Mvaluetype valuetype){
  */
 Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
 	// check the types first, both should be strings
+	if(value==NULL)return NULL;
+	// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
+	if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+	if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+	if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
 	Mvariable* variable=NULL;
-	bool valuetypeSpecified=(valuetypeValue!=NULL&&valuetypeValue->type==VT_TEXT&&strlen(valuetypeValue->value._text->_c)>0); // the value type is specified (and there is at least one character), if not specified will NOT change the value type
+	bool valuetypeSpecified=(valuetypeValue!=NULL&&valuetypeValue->type==VT_TEXT/*&&strlen(valuetypeValue->value._text->_c)>0*/); // the value type is specified (and there is at least one character), if not specified will NOT change the value type
 	// TODO should we force value type to be text???? for now yes
 	if(value!=NULL&&(immutableValue!=NULL||valuetypeSpecified)){
 		switch(value->type){
-			case VT_MAP:case VT_LIST:break;
+			//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
 			case VT_TEXT:
 			  {
 					variable=getVariable(NULL,value->value._text->_c,false);
@@ -1857,8 +1865,10 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
 					if(NULL==variable){output("%s",M_ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");return NULL;}
 					break;
 				}
-			default:outputError("Can not set the type of values that are scalar or text (representing the name of a variable)");return NULL;
+			default:outputError("Cannot set the type of values that are scalar or text (representing the name of a variable)");return NULL;
 		}
+	}
+	if(variable==NULL)return NULL;
 		// set the valuetype
 		// no longer allowing uppercase to be used as a shortcut to immutability?????? yes, we can still do that
 		long long immutable=M_LL_INVALID; // whether we should change the immutable flag
@@ -1961,8 +1971,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
 			}else
 			if(amVerbose())output("%sUnable to change the mutability of a value of type %s.\n",M_ERROR_PREFIX,VALUETYPENAMES[value->type]);
 		}
-	}
-	return Mtype(value);
+	return Mtype(variable->_value);
 }/* INVALIDATED */
 
 /**

@@ -3854,7 +3854,64 @@ Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mv
 	}
 	return disowned_array(_result,owner);	
 }
+/**
+ * @brief applies the function in \p functionunion to each element of \p _array as first argument, and \p additionalArguments as additional arguments
+ * @details returns NULL if \p _array is NULL or does not contain any elements, or when failing to create an array with as many elements as \p _array holds
+ * @param _array 
+ * @param functionunion 
+ * @param numberOfAdditionalArguments 
+ * @param additionalArguments 
+ * @return Marray* returns the array of applying the function in \p functionunion to each element of \p _array as first argument, and \p additionalArguments as additional arguments
+ */
+Marray* applyFunctionToArray(Marray const * const _array,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments){Mallocationowner owner=getOwner(__LINE__);
+	unsigned long long l=(_array!=NULL?_array->numberOfElements:0);
+	Marray* _result=(l>0?owned_array(_getArray("applyFunctionToArray",l,NULL),owner):NULL);
+	if(NULL==_result)return NULL;
+	do{
+		l--;
+		Mvalue* functionValue=NULL;
+		switch(numberOfAdditionalArguments){
+			case 0:functionValue=functionunion.oneArgumentFunction(_array->values[l]);break;
+			case 1:functionValue=functionunion.twoArgumentFunction(_array->values[l],additionalArguments[0]);break;
+			case 2:functionValue=functionunion.threeArgumentFunction(_array->values[l],additionalArguments[0],additionalArguments[1]);break;
+			case 3:functionValue=functionunion.fourArgumentFunction(_array->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2]);break;
+			case 4:functionValue=functionunion.fiveArgumentFunction(_array->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2],additionalArguments[3]);break;
+		}
+		assignValue(&_result->values[l],functionValue);
+	}while(l>0);
+	return disowned_array(_result,owner);
+}
+
 // helpers
+/**
+ * @brief 
+ * 
+ * @param _list 
+ * @param functionunion 
+ * @param numberOfAdditionalArguments 
+ * @param additionalArguments 
+ * @return Mlist* 
+ */
+Mlist* applyFunctionToList(Mlist const * const _list,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments){Mallocationowner owner=getOwner(__LINE__);
+	unsigned long long l=(_list!=NULL?_list->numberOfElements:0);
+	Mlist* _result=(l>0?owned_list(_getListOfType(VT_UNDEFINED),owner):NULL);
+	if(NULL==_result)return NULL;
+	Mlistelement* _listelement=_list->_first;
+	while(_listelement!=NULL){
+		Mvalue* functionValue=NULL;
+		switch(numberOfAdditionalArguments){
+			case 0:functionValue=functionunion.oneArgumentFunction(_listelement->_value);break;
+			case 1:functionValue=functionunion.twoArgumentFunction(_listelement->_value,additionalArguments[0]);break;
+			case 2:functionValue=functionunion.threeArgumentFunction(_listelement->_value,additionalArguments[0],additionalArguments[1]);break;
+			case 3:functionValue=functionunion.fourArgumentFunction(_listelement->_value,additionalArguments[0],additionalArguments[1],additionalArguments[2]);break;
+			case 4:functionValue=functionunion.fiveArgumentFunction(_listelement->_value,additionalArguments[0],additionalArguments[1],additionalArguments[2],additionalArguments[3]);break;
+		}
+		if(appendedToList(_result,owner,functionValue,_listelement->index)<=0)break; // TODO add error message here!!!
+		_listelement=_listelement->_next;
+	}
+	return disowned_list(_result,owner);
+}
+// TODO replacing
 /**
  * @brief returns the new M list containing the result of applying one argument function \p oneArgumentFunction to each element of M list \p _list
  * 
@@ -3874,6 +3931,35 @@ Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction,Mvalue
 	return disowned_list(_result,owner);
 }/* VALIDATED */
 
+/**
+ * @brief 
+ * 
+ * @param _map 
+ * @param functionunion 
+ * @param numberOfAdditionalArguments 
+ * @param additionalArguments 
+ * @return Mmap* 
+ */
+Mmap* applyFunctionToMap(Mmap const * const _map,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments){Mallocationowner owner=getOwner(__LINE__);
+	unsigned long long l=(_map!=NULL?_map->numberOfElements:0);
+	Mmap* _result=(l>0?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
+	if(NULL==_result)return NULL;
+	Mmapelement* _mapelement=_map->_first;
+	while(_mapelement!=NULL){
+		Mvalue* functionValue=NULL;
+		switch(numberOfAdditionalArguments){
+			case 0:functionValue=functionunion.oneArgumentFunction(_mapelement->_variable->_value);break;
+			case 1:functionValue=functionunion.twoArgumentFunction(_mapelement->_variable->_value,additionalArguments[0]);break;
+			case 2:functionValue=functionunion.threeArgumentFunction(_mapelement->_variable->_value,additionalArguments[0],additionalArguments[1]);break;
+			case 3:functionValue=functionunion.fourArgumentFunction(_mapelement->_variable->_value,additionalArguments[0],additionalArguments[1],additionalArguments[2]);break;
+			case 4:functionValue=functionunion.fiveArgumentFunction(_mapelement->_variable->_value,additionalArguments[0],additionalArguments[1],additionalArguments[2],additionalArguments[3]);break;
+		}
+		if(appendedToMap(_result,owner,_mapelement->_variable->_name->chars,functionValue)!=1)break; // TODO add an error message, and/or do not break
+		_mapelement=_mapelement->_next;
+	}
+	return disowned_map(_result,owner);
+}
+// TODO replacing
 /**
  * @brief returns the new M map containing the result of applying one argument function \p oneArgumentFunction to each attribute value of M map \p _map
  * 

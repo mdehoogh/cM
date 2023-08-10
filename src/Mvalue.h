@@ -410,10 +410,6 @@ typedef Mvalue* (*ThreeArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argume
 typedef Mvalue* (*FourArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value);
 typedef Mvalue* (*FiveArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value,Mvalue* _argument5Value);
 
-Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype); // MDH@22NOV2020
-Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype);
-Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype);
-
 // some conversion functions that might be moved to some more specialized 'module'
 Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero); // TODO probably to be moved to Mrational.h/c
 Mbiginteger* _getRoundedRationalInteger(Mrational* _rational);
@@ -499,6 +495,16 @@ typedef struct Mfunctionmap{
 }Mfunctionmap;
 
 Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable);
+
+// MDH@10AUG2023: a generic function to apply any given function to an array, list or map is to replace the appliedToArray, appliedToList and appliedToMap functions eventually
+Marray* applyFunctionToArray(Marray const * const _array,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments);
+Mlist* applyFunctionToList(Mlist const * const _list,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments);
+Mmap* applyFunctionToMap(Mmap const * const _map,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments);
+// TODO to be replaced:
+Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype); // MDH@22NOV2020
+Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype);
+Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype);
+
 
 //Mvalue* getFunction(Mfunctionlist functionlist,char* name);
 
