@@ -575,12 +575,12 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
  * @param biginteger 
  * @return Mdecimal* the decimal equivalent of \p biginteger
  */
-Mdecimal* _getBigintegerDecimal(Mbiginteger const * const biginteger){Mallocationowner owner=getOwner(__LINE__);
+Mdecimal* _getBigintegerDecimal(Mbiginteger const * const biginteger,mpd_context_t const * mpd_context){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _bigintegerDecimal=NULL;
 	if(biginteger!=NULL){
 		Mstring* _bigintegerText=owned_string(_getBigintegerText(biginteger),owner);
 		if(_bigintegerText!=NULL){
-			_bigintegerDecimal=owned_decimal(_getTextDecimal(string(_bigintegerText),0),owner);
+			_bigintegerDecimal=owned_decimal(_getTextDecimal(string(_bigintegerText),0,mpd_context),owner);
 			FREE_STRING(_bigintegerText,owner);
 		}
 	}
@@ -606,18 +606,20 @@ long double getDecimalLongDouble(Mdecimal* _decimal){
 
 // MDH@09OCT2019: TODO think we forgot to take the delta into account (if any)
 /**
- * @brief returns the decimal equivalent of rational \p _rational
+ * @brief returns the decimal equivalent of rational \p _rational in decimal context \p mpd_context
  * 
  * @param _rational 
- * @return Mdecimal* the decimal equivalent of rational \p _rational
+ * @param mpd_context
+ * @return Mdecimal* the decimal equivalent of rational \p _rational in decimal context \p mpd_context
  */
-Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowner owner=getOwner(__LINE__);
+Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t const * mpd_context){Mallocationowner owner=getOwner(__LINE__);
 	if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
 	// _decimalText is a local variable that when set should be freed before returning!!!
 	Mstring* _decimalText=NULL;
 	Mbiginteger *numerator=_rational->num,*denominator=_rational->den; // shortcut to the rational numerator and denominator
 	uint64_t repeating=0;
 	if(denominator!=NULL){
+		if(NULL==mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
 		// local variables to be freed at the end (so NOT before)
 		// MDH@15OCT2019: take the sign into account
 		Mbiginteger *_nonnegativenumerator=(mp_isneg(MP_INT_POINTER(numerator))?owned_biginteger(_getBigintegerNeg(numerator),owner):numerator);
@@ -639,7 +641,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 					Mlistelement* _remainderListelement=NULL;
 					*/
 					uint64_t remainderIndex,remainderCount=0; // where we found a match
-					long long decimalsLeft=M_DECIMALCONTEXT->mpd_context->prec+2; // stop as soon as we have sufficient decimals
+					long long decimalsLeft=mpd_context->prec+2; // stop as soon as we have sufficient decimals
 					if(amVerbose())output("Number of decimals to determine: %llu.\n",decimalsLeft);
 					Mstring* _digitText; // for storing the dividend digit character
 					MbigintegerListelement* _remainderListelement=NULL;
@@ -735,7 +737,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 	// parse _decimalText to a decimal
 	Mdecimal* _decimal=NULL;
 	if(_decimalText!=NULL){
-		_decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating),owner);
+		_decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating,mpd_context),owner);
 		if(_decimal==NULL)
 			output("%sFailed to parse decimal text '%s' of the corresponding rational",M_ERROR_PREFIX,string(_decimalText));
 		else 
@@ -785,7 +787,7 @@ bool mpd_error(mpd_context_t const * const mpd_context){return(mpd_getstatus(mpd
 /* replacing:
 void Mdecimalraphandler(mpd_context_t* mpd_context){
 }
-
+*/
 size_t mpd_context_count=0;
 
 const size_t MAXIMUM_NUMBER_OF_CONTEXTS=2; // quick fix to ascertain to use the same context over and over again
@@ -999,11 +1001,12 @@ Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){Ma
 	Mdecimal* _decimal=NULL;
 	if(d1!=NULL&&d2!=NULL){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
+			mpd_context_t* mpd_context=get_mpd_context(MAX(d1->prec,d2->prec)); // MDH@13AUG2023: need to use the same decimal
 			Mrational *_r1=owned_rational(_getDecimalRational(d1),owner),*_r2=owned_rational(_getDecimalRational(d2),owner);
 			if(_r1!=NULL&&_r2!=NULL){
 				Mrational* _r=owned_rational(_getRationalSum(_r1,_r2),owner); // compute the sum of two rationals
 				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r),owner);
+					_decimal=owned_decimal(_getRationalDecimal(_r,mpd_context),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
 					outputError("Failed to compute the sum of two rational decimals");
@@ -1061,7 +1064,7 @@ Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const
 			if(_r1!=NULL&&_r2!=NULL){
 				Mrational* _r=owned_rational(_getRationalDifference(_r1,_r2),owner); // compute the product of two rationals
 				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r),owner);
+					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
 					outputError("Failed to compute the difference of two rationalized decimals");
@@ -1119,7 +1122,7 @@ Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d
 			if(_r1!=NULL&&_r2!=NULL){
 				Mrational* _r=owned_rational(_getRationalQuotient(_r1,_r2),owner); // compute the quotient of two rationals
 				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r),owner);
+					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
 					outputError("Failed to compute the quotient of two rationals");
@@ -1180,7 +1183,7 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
 			if(_r1!=NULL&&_r2!=NULL){
 				Mrational* _r=owned_rational(_getRationalProduct(_r1,_r2),owner); // compute the product of two rationals
 				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r),owner);
+					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
 					outputError("Failed to compute the product of two rational decimals");
@@ -1195,12 +1198,13 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
 }
 
 /**
- * @brief returns a M decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
+ * @brief returns a M decimal parsed from \p decimalText using the decimal context \p mpd_context and repeating number of digits \p repeating
  * @param decimalText
  * @param repeating
+ * @param mpd_context the mpd context to use
  * @returns 
  */
-Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){Mallocationowner owner=getOwner(__LINE__);
+Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating,mpd_context_t const * mpd_context){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _textDecimal=NULL;
 	if(decimalText!=NULL&&strlen(decimalText)){
 		if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
@@ -1209,7 +1213,7 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){Mal
 		_textDecimal=owned_decimal(__decimal(NULL,0,repeating),owner);
 		if(_textDecimal!=NULL){
 			uint32_t status=0;
-			mpd_qset_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context,&status); // NOTE here we have to pass in the default decimal context
+			mpd_qset_string(_textDecimal->mpd,decimalText,(mpd_context!=NULL?mpd_context:M_DECIMALCONTEXT->mpd_context),&status); // NOTE here we have to pass in the default decimal context
 			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_textDecimal,owner);
 				output("%sFailed to parse decimal '%s' (error status: %" PRIu32 ").\n",M_ERROR_PREFIX,decimalText,status);

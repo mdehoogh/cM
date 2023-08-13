@@ -70,14 +70,16 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
 
 // CONVERSION
-Mdecimal* _getBigintegerDecimal(Mbiginteger const * const _biginteger); // MDH@08OCT2019
+Mdecimal* _getBigintegerDecimal(Mbiginteger const * const _biginteger,mpd_context_t const * mpd_context); // MDH@08OCT2019
 
 long double getDecimalLongDouble(Mdecimal* _decimal); /// MDH@09OCT2019: moved over here from M.c
 
-Mdecimal* _getRationalDecimal(Mrational const * const _rational); // converts a rational to a decimal
+// MDH@13AUG2023: adding the mpd_context to use (when NULL the default decimal context will be used)
+Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t const * mpd_context); // converts a rational to a decimal
 Mrational* _getDecimalRational(Mdecimal const * const decimal); // converts a decimal back to a rational
 
-Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating);
+// MDH@13AUG2023: adding mpd_context to use overriding the default decimal context if non-NULL
+Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating,mpd_context_t const * mpd_context);
 
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
 

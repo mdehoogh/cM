@@ -509,7 +509,7 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 															Mvalue* _varianceRationalValue=_getValueOfRational(disowned_rational(_varianceRational,owner));
 															if(_varianceRationalValue!=NULL&&appendedToMap(_statisticsMap,owner,"variance",_varianceRationalValue)>0){
 																// MDH@20MAR2023: convert rational to decimal (just like what Msqrt() does)
-																Mdecimal* _varianceDecimal=owned_decimal(_getRationalDecimal(_varianceRational),owner);
+																Mdecimal* _varianceDecimal=owned_decimal(_getRationalDecimal(_varianceRational,NULL),owner);
 																if(_varianceDecimal!=NULL){
 																	Mdecimal* _stddevDecimal=owned_decimal(_getDecimalSqrt(_varianceDecimal),owner);
 																	FREE_DECIMAL(_varianceDecimal,owner);

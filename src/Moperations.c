@@ -538,7 +538,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		Mvalue* _sumValue=NULL;
 		if(_sumRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_sumValue=_getValueOfDecimal(_getRationalDecimal(_sumRational));
+				_sumValue=_getValueOfDecimal(_getRationalDecimal(_sumRational,NULL));
 				FREE_RATIONAL(_sumRational,owner);
 			}else
 				_sumValue=_getValueOfRational(disowned_rational(_sumRational,owner));
@@ -547,7 +547,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 	}
 	// if either is a decimal, compute the sum decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner);
 		Mdecimal* _sumDecimal=owned_decimal(_getDecimalSum(_decimal1,_decimal2),owner); // _dadd replaced by _getDecimalSum that takes the repeating decimal digits into account as well
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
@@ -669,7 +669,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		Mvalue* _differenceValue=NULL;
 		if(_differenceRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_differenceValue=_getValueOfDecimal(_getRationalDecimal(_differenceRational));
+				_differenceValue=_getValueOfDecimal(_getRationalDecimal(_differenceRational,NULL));
 				FREE_RATIONAL(_differenceRational,owner);
 			}else
 				_differenceValue=_getValueOfRational(disowned_rational(_differenceRational,owner));
@@ -678,7 +678,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	}
 	// if either is a decimal, compute the difference decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		Mdecimal* _differenceDecimal=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner); // _dsub replaced by _getDecimalDifference which takes repeating decimal digits into account as well
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore

@@ -3309,12 +3309,13 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,c
 
 // DECIMAL EXTRACTION
 /**
- * @brief returns the M decimal represented by M value \p value
+ * @brief returns the M decimal represented by M value \p value in decimal context \p mpd_context
  * 
  * @param value 
- * @return Mdecimal* 
+ * @param mpd_context
+ * @return Mdecimal* the M decimal represented by M value \p value in decimal context \p mpd_context
  */
-Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+Mdecimal* _getValueTextDecimal(Mvalue* value,mpd_context_t const * mpd_context){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@09OCT2019: delegating to _getTextDecimal() is preferable over doing it ourselves
 	Mdecimal* _valueTextDecimal=NULL;
 	if(value!=NULL){
@@ -3324,7 +3325,7 @@ Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__
 			Mstring* _valueText=owned_string(_getValueText(value,true),owner); // TODO will there be any brackets around a repeating part of a 
 			setlocale(LC_ALL,locale);
 			if(_valueText!=NULL){
-				_valueTextDecimal=owned_decimal(_getTextDecimal(string(_valueText),0),owner);
+				_valueTextDecimal=owned_decimal(_getTextDecimal(string(_valueText),0,mpd_context),owner);
 				FREE_STRING(_valueText,owner);
 			}else
 				outputError("Failed to create the text trying to convert a value to a decimal");
@@ -3357,13 +3358,13 @@ Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__
  * @param value 
  * @return Mdecimal* the M decimal represented by M value \p value
  */
-Mdecimal* _getValueDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+Mdecimal* _getValueDecimal(Mvalue* value,mpd_context_t const * mpd_context){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(value!=NULL){
 		if(value->type!=VT_LIST&&value->type!=VT_MAP){
 			switch(value->type){
 				case VT_DECIMAL:_decimal=owned_decimal(_getDecimalCopy(value->value._decimal),owner);break;
-				case VT_INTEGER:_decimal=owned_decimal(__decimal(NULL,value->value._integer->ll,0),owner);break; // MDH@29AUG2019: replacing a call to _getDecimal()
+				case VT_INTEGER:_decimal=owned_decimal(__decimal(mpd_context,value->value._integer->ll,0),owner);break; // MDH@29AUG2019: replacing a call to _getDecimal()
 				case VT_BIGINTEGER:
 					{
 						// NOTE we need to make a copy of the big integer because otherwise FREE_RATIONAL() below would free the big integer wrapped inside the value, which would be a terrible mistake
@@ -3375,16 +3376,16 @@ Mdecimal* _getValueDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE
 						FREE_BIGINTEGER(_numerator,owner);
 						*/
 						if(_rational!=NULL){
-							_decimal=owned_decimal(_getRationalDecimal(_rational),owner);
+							_decimal=owned_decimal(_getRationalDecimal(_rational,mpd_context),owner); // TODO decimal context to use here?
 							FREE_RATIONAL(_rational,owner);
 						}
 					}
 					break;
 				case VT_RATIONAL:
-					_decimal=owned_decimal(_getRationalDecimal(value->value._rational),owner);
+					_decimal=owned_decimal(_getRationalDecimal(value->value._rational,mpd_context),owner); // TODO which dc to use here?
 					break;
 				default:
-					_decimal=owned_decimal(_getValueTextDecimal(value),owner); // delegates to _getValueTextDecimal() which always parses the decimal from the text representation of the value
+					_decimal=owned_decimal(_getValueTextDecimal(value,mpd_context),owner); // delegates to _getValueTextDecimal() which always parses the decimal from the text representation of the value
 					break;
 			}
 		}
@@ -3396,10 +3397,11 @@ Mdecimal* _getValueDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE
  * @brief returns the M decimal stored in M value \p value
  * @details returns NULL if \p value does not wrap an M decimal
  * @param value 
+ * @param mpd_context
  * @return Mdecimal* the M decimal stored in M value \p value
  */
-Mdecimal* getValueDecimal(Mvalue* value){
-	return(value?(value->type==VT_DECIMAL?value->value._decimal:_getValueDecimal(value)):NULL);
+Mdecimal* getValueDecimal(Mvalue* value,mpd_context_t const * mpd_context){
+	return(value?(value->type==VT_DECIMAL?value->value._decimal:_getValueDecimal(value,mpd_context)):NULL);
 }
 // END DECIMAL EXTRACTION
 

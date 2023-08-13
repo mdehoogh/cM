@@ -417,10 +417,10 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational);
 Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero);
 Mdecimal* _getRoundedDecimal(Mdecimal* _decimal);
 
-Mdecimal* _getValueDecimal(Mvalue* _value);
-Mdecimal* getValueDecimal(Mvalue* _value);
+Mdecimal* _getValueDecimal(Mvalue* _value,mpd_context_t const * mpd_context);
+Mdecimal* getValueDecimal(Mvalue* _value,mpd_context_t const * mpd_context);
 
-Mdecimal* _getValueTextDecimal(Mvalue* value); // MDH@09OCT2019: delegates to _getTextDecimal() in Mdecimal.h/c, guarantees to return a new decimal from parsing the value text representation (unless the value wraps a decimal itself)
+Mdecimal* _getValueTextDecimal(Mvalue* value,mpd_context_t const * mpd_context); // MDH@09OCT2019: delegates to _getTextDecimal() in Mdecimal.h/c, guarantees to return a new decimal from parsing the value text representation (unless the value wraps a decimal itself)
 
 bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2); //MDH@05NOV2019: moved over from Menvironment.h/c as we need it in Mlist's find() function
 

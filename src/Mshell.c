@@ -3682,26 +3682,29 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 }
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
 // TODO we should delegate to (_)getValueDecimal
+// MDH@13AUG2023: added precision so we can get the decimal in any precision we want
 /**
- * @brief returns the wrapped M decimal represented by \p value
+ * @brief returns the wrapped M decimal represented by \p value with \p precision number of decimal digits
  * 
  * @param value 
- * @return Mvalue* the wrapped M decimal represented by \p value
+ * @param precision
+ * @return Mvalue* the wrapped M decimal represented by \p value with \p precision number of decimal digits
  */
-Mvalue* Md(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Md(Mvalue* value,Mvalue* precisionValue){Mallocationowner owner=getOwner(__LINE__);
 	if(value!=NULL&&value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Md,VT_UNDEFINED));
 	if(value!=NULL&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Md,VT_UNDEFINED));
   if(value!=NULL&&value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Md,VT_UNDEFINED)); // MDH@28MAR2023
 	Mvalue* dValue=value;
 	if(value!=NULL&&value->type!=VT_DECIMAL){
 		Mdecimal* _decimal=NULL;
+		mpd_context_t* mpd_context=(precisionValue!=NULL?get_mpd_context(getValueInteger(precisionValue)):NULL);
 		switch(value->type){
 			// TODO all other types_
-			case VT_INTEGER:_decimal=owned_decimal(__decimal(NULL,value->value._integer->ll,0),owner);break;
-			case VT_BIGINTEGER:_decimal=owned_decimal(_getBigintegerDecimal(value->value._biginteger),owner);break;
-			case VT_RATIONAL:_decimal=owned_decimal(_getRationalDecimal(value->value._rational),owner);break;
+			case VT_INTEGER:_decimal=owned_decimal(__decimal(mpd_context,value->value._integer->ll,0),owner);break;
+			case VT_BIGINTEGER:_decimal=owned_decimal(_getBigintegerDecimal(value->value._biginteger,mpd_context),owner);break;
+			case VT_RATIONAL:_decimal=owned_decimal(_getRationalDecimal(value->value._rational,mpd_context),owner);break;
 			case VT_FLOAT: // TODO check whether somewhere I am converting a long double without using text
-			default:_decimal=owned_decimal(_getValueTextDecimal(value),owner);break;
+			default:_decimal=owned_decimal(_getValueTextDecimal(value,mpd_context),owner);break;
 		}
 		// TODO if _decimal is NULL perhaps we should return NULL?????
 		if(_decimal!=NULL)dValue=_getValueOfDecimal(disowned_decimal(_decimal,owner));
@@ -6835,7 +6838,7 @@ Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteg
 					return _getValueOfRational(disowned_rational(_decimalRationalPower,owner));
 				}
 			}else{ // base is a 'true' decimal
-				Mdecimal* _exponentDecimal=owned_decimal(_getBigintegerDecimal(exponentBiginteger),owner);
+				Mdecimal* _exponentDecimal=owned_decimal(_getBigintegerDecimal(exponentBiginteger,NULL),owner);
 				Mdecimal* _decimalPower=owned_decimal(_getDecimalPower(baseValue->value._decimal->mpd,_exponentDecimal->mpd,getContextOfDecimals(baseValue->value._decimal,_exponentDecimal)),owner);
 				FREE_DECIMAL(_exponentDecimal,owner);
 				return _getValueOfDecimal(disowned_decimal(_decimalPower,owner));
@@ -7028,7 +7031,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										// let's show the decimal representation of this value
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_pk),/*_getBigintegerCopy*/(_qk),M_LD_NAN,false),owner);
 										if(_rational!=NULL){
-											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
+											_decimal=owned_decimal(_getRationalDecimal(_rational,NULL),owner);FREE_RATIONAL(_rational,owner);
 											if(_decimal!=NULL){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
 										}
 										output(".\n");
@@ -7063,7 +7066,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,")");
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_distancenumerator),/*_getBigintegerCopy*/(_distancedenominator),M_LD_NAN,false),owner);
 										if(_rational!=NULL){
-											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
+											_decimal=owned_decimal(_getRationalDecimal(_rational,NULL),owner);FREE_RATIONAL(_rational,owner);
 											if(_decimal!=NULL){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
 										}
 										outputChar('\n');
@@ -7179,7 +7182,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										bool decimalprecisionreached=false;
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_num),/*_getBigintegerCopy*/(_den),M_LD_NAN,false),owner);
 										if(_rational!=NULL){
-											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
+											_decimal=owned_decimal(_getRationalDecimal(_rational,NULL),owner);FREE_RATIONAL(_rational,owner);
 											if(_decimal!=NULL){
 												if(mpd_iszero(_decimal->mpd)==MP_YES)decimalprecisionreached=true;
 												outputDecimal("=",_decimal,NULL);
@@ -7259,7 +7262,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 		// computing with true decimals is fine, but with a decimal that is a rational approximation (i.e. with repeating) we're in trouble
 		// a rational with a delta should be purified
 		// we can do the decimal approximation first
-		Mdecimal* _rootArgumentDecimal=owned_decimal(_getValueDecimal(rootArgumentValue),owner);
+		Mdecimal* _rootArgumentDecimal=owned_decimal(_getValueDecimal(rootArgumentValue,NULL),owner);
 		if(_rootArgumentDecimal!=NULL){
 			uint32_t status=0;
 			if(amVerbose())
@@ -7268,7 +7271,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 			Mdecimalcontext* _decimalcontext=getDecimalcontext(_rootArgumentDecimal->prec);
 			mpd_context_t* mpd_context=(_decimalcontext!=NULL?_decimalcontext->mpd_context:get_default_mpd_context());
 			if(mpd_context!=NULL){
-				Mdecimal* _rootDegreeDecimal=owned_decimal(_getBigintegerDecimal(rootDegreeBiginteger),owner);
+				Mdecimal* _rootDegreeDecimal=owned_decimal(_getBigintegerDecimal(rootDegreeBiginteger,mpd_context),owner);
 				if(_rootDegreeDecimal!=NULL){
 					if(amVerbose())
 						outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
@@ -7599,7 +7602,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 			}else{ // not integer based exponent (so if the exponent is a decimal is does not have a repeating part), so use decimals
 				// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
 				// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
-				Mdecimal *_baseDecimal=getValueDecimal(_value1),*_exponentDecimal=getValueDecimal(_value2);
+				Mdecimal *_baseDecimal=getValueDecimal(_value1,NULL),*_exponentDecimal=getValueDecimal(_value2,NULL);
 				if(_value1->type!=VT_DECIMAL)owned_decimal(_baseDecimal,owner);
 				if(_value2->type!=VT_DECIMAL)owned_decimal(_exponentDecimal,owner);
 				if(_baseDecimal!=NULL&&_exponentDecimal!=NULL){
@@ -7612,9 +7615,9 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						if(amVerbose())outputInfo("Computing the power of a rational.");
 						// the result is the quotient of the power of the numerator divided by the power of the denominator of the associated rational
 						Mrational* _baseRational=getValueRational(_value1);if(_value1->type!=VT_RATIONAL)owned_rational(_baseRational,owner);
-						Mdecimal* _baseNumDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->num),owner);
+						Mdecimal* _baseNumDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->num,mpd_context),owner);
 						Mdecimal* _numPowerDecimal=owned_decimal(_getDecimalPower(_baseNumDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
-						Mdecimal* _baseDenDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->den),owner);
+						Mdecimal* _baseDenDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->den,mpd_context),owner);
 						Mdecimal* _denPowerDecimal=owned_decimal(_getDecimalPower(_baseDenDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
 						_powerDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 						// the quotient of the numerator and denominator power is the end result
@@ -7813,7 +7816,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		return _getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner));
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else 
 		if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
 		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
@@ -7941,7 +7944,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		return subtract(_value1,multiply(_value2,_getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner)))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else 
 		if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
 		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
@@ -8407,8 +8410,8 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1,NULL),owner)
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2,NULL),owner);
 		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference!=NULL){
@@ -8489,8 +8492,8 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1,NULL),owner)
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2,NULL),owner);
 		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference!=NULL){
@@ -8574,8 +8577,8 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1,NULL),owner)
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2,NULL),owner);
 		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference!=NULL){
@@ -8658,8 +8661,8 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1,NULL),owner)
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2,NULL),owner);
 		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference!=NULL){
@@ -8756,8 +8759,8 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
-						,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1,NULL),owner)
+						,*_decimal2=owned_decimal(_getValueDecimal(_value2,NULL),owner);
 		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference!=NULL){
@@ -13530,7 +13533,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!completedValueFunction(_Menvironment,owner,"f",Mf)
 					||!completedValueFunction(_Menvironment,owner,"q",Mq)
 					||!completedValueFunction(_Menvironment,owner,"Q",MQ)
-					||!completedValueFunction(_Menvironment,owner,"d",Md)
+					||!completedValueValueFunction(_Menvironment,owner,"d",Md)
 					||!completedValueFunction(_Menvironment,owner,"o",Mo)
 					||!completedValueFunction(_Menvironment,owner,"O",MO)){
 				outputError("Failed to register value type conversion functions");

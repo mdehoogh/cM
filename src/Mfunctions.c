@@ -386,7 +386,7 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp,VT_UNDEFINED));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp,VT_UNDEFINED));
 		// use decimal conversion
-		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
+		Mdecimal* _decimal=getValueDecimal(_value,NULL);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal){
 			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
 			if(_result){
@@ -419,7 +419,7 @@ Mvalue* Mdexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp,VT_UNDEFINED));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp,VT_UNDEFINED));
 		// use decimal conversion
-		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
+		Mdecimal* _decimal=getValueDecimal(_value,NULL);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(_dexp(NULL,_decimal),owner);
 			if(_value->type!=VT_DECIMAL)FREE_DECIMAL(_decimal,owner);
@@ -441,7 +441,7 @@ Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog,VT_UNDEFINED));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog,VT_UNDEFINED));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog,VT_UNDEFINED));
-		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
+		Mdecimal* _decimal=getValueDecimal(_value,NULL);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
 			if(_result!=NULL){
@@ -472,7 +472,7 @@ Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Mlog10,VT_UNDEFINED));
 		if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10,VT_UNDEFINED));
 		if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10,VT_UNDEFINED));
-		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
+		Mdecimal* _decimal=getValueDecimal(_value,NULL);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		if(_decimal!=NULL){
 			Mdecimal* _result=owned_decimal(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
 			if(_result!=NULL){
@@ -506,7 +506,7 @@ Mvalue* Msqrt(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		// the square root of big integer, decimal and rational values has to be computed by conversion to decimals first
 		// TODO although for rationals we could divide the square root of the numerator by the square root of the denominator
 		// we've got a function in Mdecimal.h/c to explicitly convert a value (if possible) to a decimal (if the value wraps a decimal that is returned (instead of a new copy of this wrapped decimal) and that decimal should NOT be freed (see below))
-		Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
+		Mdecimal* _decimal=getValueDecimal(_value,NULL);if(_value->type!=VT_DECIMAL)owned_decimal(_decimal,owner);
 		Mdecimal* _result=owned_decimal(_getDecimalSqrt(_decimal),owner); // MDH@20MAR2023: delegate to _getDecimalSqrt added to Mdecimal.c, and take ownership!!
 		if(_value->type!=VT_DECIMAL)FREE_DECIMAL(_decimal,owner);
 		return _getValueOfDecimal(disowned_decimal(_result,owner));

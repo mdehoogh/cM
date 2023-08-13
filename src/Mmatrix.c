@@ -89,8 +89,8 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal 	*_decimal1=owned_decimal(_getValueDecimal(_value1),owner),
-							*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
+		Mdecimal 	*_decimal1=owned_decimal(_getValueDecimal(_value1,NULL),owner),
+							*_decimal2=owned_decimal(_getValueDecimal(_value2,NULL),owner);
 		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference!=NULL){
@@ -589,7 +589,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		Mvalue* _productValue=NULL;
 		if(_productRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_productValue=_getValueOfDecimal(_getRationalDecimal(_productRational));
+				_productValue=_getValueOfDecimal(_getRationalDecimal(_productRational,NULL)); // TODO what decimal context should be use here except for the default?
 				FREE_RATIONAL(_productRational,owner);
 			}else
 				_productValue=_getValueOfRational(disowned_rational(_productRational,owner));
@@ -600,7 +600,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		if(amVerboseDebugging())
 			{outputValue("Multiplying decimals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		Mdecimal* _productDecimal=owned_decimal(_getDecimalProduct(_decimal1,_decimal2),owner); // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
@@ -664,7 +664,7 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		Mvalue* _quotientValue=NULL;
 		if(_quotientRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_quotientValue=_getValueOfDecimal(_getRationalDecimal(_quotientRational));
+				_quotientValue=_getValueOfDecimal(_getRationalDecimal(_quotientRational,NULL)); // TODO what decimal context to use here?
 				FREE_RATIONAL(_quotientRational,owner);
 			}else
 				_quotientValue=_getValueOfRational(disowned_rational(_quotientRational,owner));
@@ -673,7 +673,7 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	}
 	// if either is a decimal, compute the quotient decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else 
 		if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); 
 		// after adding the two rationals we do not need the newly created rationals anymore		
