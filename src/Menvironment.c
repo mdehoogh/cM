@@ -685,7 +685,7 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
 		variable=_variableMapelement->_variable;
 		if(variable!=NULL) // defined
 			if(strcmp(variable->_name->chars,name)) // not the same as name
-				if(variable->immutable) // a constant
+				if(variable->unlockCode) // a constant
 					if(areValuesEqual(variable->_value,value))
 						break;
 		_variableMapelement=_variableMapelement->_next;
@@ -1142,7 +1142,7 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 	{output("Setting the value of '%s'",name);outputValue(" to '",_value,"'.\n");}
 	Mvariable* variable=getVariable(_environment,name,report);
 	if(variable!=NULL){
-		if(NULL==variable->_value||!variable->immutable){
+		if(NULL==variable->_value||variable->unlockCode==0){
 			if(report)
 				output("Value of variable '%s' to set.\n",variable->_name);
 			// _value needs to be of the right type
@@ -1218,8 +1218,9 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 	if(!name){outputError("No variable specified to set the value of");return false;}
 	Mvariable* variable=getVariable(_environment,name,amVerbose());
 	if(variable!=NULL){
-		if(NULL==variable->_value||!variable->immutable){
-			if(amVerbose())output("Variable '%s' to set.\n",variable->_name);
+		if(NULL==variable->_value||variable->unlockCode==0){
+			if(amVerbose())
+				output("Variable '%s' to set.\n",variable->_name);
 			// _value needs to be of the right type
 			// MDH@03NOV2019: unless it's null (i.e. the type of _value->type is VT_UNDEFINED)
 			if(NULL==_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type||_value->type==VT_UNDEFINED){
@@ -1683,7 +1684,7 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				assignValue(&_mapelement1->_variable->_value,_getTextValue(string(referencedVariableName))); // NOTE _getTextValue will call _getText which will duplicate ...->chars so that's Ok
 				FREE_STRING(referencedVariableName,owner);
 			}
-			assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable),'\'')));
+			assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->unlockCode>0),'\'')));
 			assignValue(&_mapelement3->_variable->_value,Mtype(referencedVariable->_value));
 		}
 		//DEBUGGINGoutputMap("Result map: ",_map,".\n");
@@ -1835,6 +1836,61 @@ static bool allMapAttributesAreOfType(Mmap* map,Mvaluetype valuetype){
 }
 
 /**
+ * @brief locks i.e. mutes the variables indicated by \p variableNameValue
+ * 
+ * @param value 
+ * @return Mvalue* the unlock code for the indicated variable
+ */
+Mvalue* Mlock(Mvalue* variableNameValue){
+
+}
+/**
+ * @brief unlocks the variable with name \p variableNameValue locked before using unlock code \p unlockCodeValue
+ * 
+ * @param variableNameValue 
+ * @param unlockCodeValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE on failure, M_LL_INVALID if the input was incorrect
+ */
+Mvalue* Munlock(Mvalue* variableNameValue,Mvalue* unlockCodeValue){
+	if(variableNameValue!=NULL){
+		// can we use the same unlock code on multiple variables? yes, I suppose so, or not of course
+		if(variableNameValue->type==VT_ARRAY)return applyFunctionToArray(variableNameValue->value._array,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+		if(variableNameValue->type==VT_LIST)return applyFunctionToArray(variableNameValue->value._list,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+		if(variableNameValue->type==VT_MAP)return applyFunctionToMap(variableNameValue->value._map,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+		Mvariable* variable=NULL;
+		long long result=M_FALSE;
+		switch(variableNameValue->type){
+			//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
+			case VT_TEXT:
+			  {
+					variable=getVariable(NULL,variableNameValue->value._text->_c,false);
+					break;
+				}
+			case VT_REFERENCE:
+				{
+					variable=variableNameValue->value._reference->variable;
+					// it's best NOT to create the variable if it does not yet exist although we could
+					if(NULL==variable)
+						output("%s",M_ERROR_PREFIX);
+						outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
+					break;
+				}
+			default:
+				outputError("Cannot unlock values that are scalar or text (representing the name of a variable)");
+		}
+		if(variable!=NULL){
+			long long unlockCode=getValueInteger(unlockCodeValue);
+			if(variable->unlockCode==unlockCode){
+				variable->unlockCode=0;
+				return _getIntegerValue(M_TRUE);
+			}
+		}
+		return _getIntegerValue(M_FALSE);
+	}
+	return _getIntegerValue(M_LL_INVALID);
+}
+
+/**
  * @brief to set the type and immutable flag of a variable or composite value to type \p valuetypeValue and immutability \p immutableValue
  * @param value
  * @param valuetypeValue
@@ -1954,8 +2010,8 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
 		if(immutable!=M_LL_INVALID){
 			bool immutableflag=(immutable==M_TRUE);
 			if(variable!=NULL){
-				variable->immutable=immutableflag;
-				if(amVerbose())output("Variable '%s' is now %smutable.\n",(variable->immutable?"im":""));
+				variable->unlockCode=(immutableflag?rand()+1:0);
+				if(amVerbose())output("Variable '%s' is now %smutable.\n",(variable->unlockCode>0?"im":""));
 			}else
 			if(value->type==VT_ARRAY){
 				value->value._array->immutable=immutableflag;

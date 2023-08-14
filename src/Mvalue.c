@@ -36,7 +36,7 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
   * @return long long M_TRUE, M_FALSE or M_LL_INVALID
   */
 long long isImmutable(Mvariable* _variable){
-	return(_variable!=NULL?(_variable->immutable?M_TRUE:M_FALSE):M_LL_INVALID);
+	return(_variable!=NULL?(_variable->unlockCode>0?M_TRUE:M_FALSE):M_LL_INVALID);
 }
 /**
  * @brief sets the immutable flag of \p _variable to \p immutable
@@ -45,10 +45,10 @@ long long isImmutable(Mvariable* _variable){
  * @param immutable 
  * @return long long M_TRUE, M_FALSE or M_LL_INVALID
  */
-long long setImmutable(Mvariable* _variable,bool immutable){
+long long setImmutable(Mvariable* _variable,long long unlockCode){
 	if(NULL==_variable)return M_LL_INVALID;
-	long long result=(_variable->immutable?M_TRUE:M_FALSE);
-	_variable->immutable=immutable;
+	long long result=(_variable->unlockCode>0?M_TRUE:M_FALSE);
+	_variable->unlockCode=unlockCode;
 	return result;
 }
 
@@ -95,20 +95,20 @@ void free_variable(Mvariable* _variable,bool weak){
 //				it's a bit of a nuisance that we create it in such a way that the caller has to take care of the ownership of _name but that makes sense because we pass in Mchars (which is already managed)
 // MDH@11JUN2020: by allowing _name to be disowned to start with we can free it when we fail to bind it
 /**
- * @brief returns an M variable with name \p name of value type \p valuetype with immutable flag equal to \p immutable
+ * @brief returns an M variable with name \p name of value type \p valuetype with unlock code equal to \p unlockCode
  * 
  * @param _name 
  * @param valuetype 
- * @param immutable 
- * @return Mvariable* an M variable with name \p name of value type \p valuetype with immutable flag equal to \p immutable
+ * @param unlockCode 
+ * @return Mvariable* an M variable with name \p name of value type \p valuetype with unlock code equal to \p unlockCode
  */
-Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
+Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,long long unlockCode){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@14NOV2019: maps might have attributes with no name (i.e. the empty string)
 	if(_name!=NULL){
 		Mvariable* _variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
 		if(_variable!=NULL){
 			_variable->_name=(Misdisowned(_name)?owned_chars(_name,Msubowner(owner,1)):_name); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
-			_variable->immutable=immutable;
+			_variable->unlockCode=unlockCode;
 			_variable->valuetype=valuetype;
 			// output("Returning new disowned variable '%s'.\n",_name); // DEBUG
 			return disowned_variable(_variable,owner);
@@ -1228,12 +1228,12 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
  * @param owner_variable 
  * @return Mvariable* a new M variable with name \p name and value type \p valuetype
  */
-Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){
+Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,long long unlockCode,Mallocationowner owner_variable){
 	// MDH@21OCT2020: A HA we should allow the name of a variable to be empty (as in maps)
 	if(NULL==name/*||strlen(name)==0*/)return NULL;//Mallocationowner owner=getOwner(__LINE__);
 	Mchars* name_chars=_getChars(name);
 	if(NULL==name_chars)return NULL;
-	Mvariable* _variable=owned_variable(_getVariable(name_chars,valuetype,immutable),owner_variable);
+	Mvariable* _variable=owned_variable(_getVariable(name_chars,valuetype,unlockCode),owner_variable);
 	if(NULL==_variable)free_chars(name_chars,1,strlen(name)+1,'\''); // MDH@15MAR2023: TODO we should change free_chars, to NOT need any arguments since we can determine these from the contained C string pointer!
 	return _variable;
 }
@@ -1318,7 +1318,7 @@ Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE
 					if(_mapelement!=NULL){
 						// create a variable with the same name and value as the variable in mapelement
 						// MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
-						_mapelement->_variable=_getVariableWithName(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/,Msubowner(owner,2));
+						_mapelement->_variable=_getVariableWithName(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->unlockCode/*true*/,Msubowner(owner,2));
 						if(_mapelement->_variable!=NULL){
 							assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the value over
 							if(_map->_last!=NULL)_map->_last->_next=_mapelement; // make the current last point to the new last

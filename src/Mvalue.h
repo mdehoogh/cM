@@ -65,10 +65,10 @@ typedef struct Mvariable{
     Mvaluetype valuetype; // MDH@01MAY2019: fixed type variables can only be assigned once, after that any value that is assigned to it has to have the same type as the first value
     Mvalue* _value;
     size_t referencecount; // MDH@04NOV2019: keep track of all its references
-    bool immutable:1; // whether or not mutable
+    long long unlockCode; //// when not zero locked!!! bool immutable:1; // whether or not mutable
 }Mvariable;
 long long isImmutable(Mvariable* _variable); // MDH@10JAN2020
-long long setImmutable(Mvariable* _variable,bool immutable); // MDH@10JAN2020
+long long setImmutable(Mvariable* _variable,long long unlockCode); // MDH@10JAN2020
 
 typedef struct Mreference{
     Mvariable* variable;
@@ -388,7 +388,7 @@ Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable);
 #define FREE_VARIABLE(_variable,weak,owner_variable) free_variable(_variable,weak)
 #endif
 
-Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
+Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,long long unlockCode);
 
 long long free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/); // returning the number of successive list elements freed
 
@@ -494,7 +494,7 @@ typedef struct Mfunctionmap{
     Mfunctionmapelement* _last;
 }Mfunctionmap;
 
-Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable);
+Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,long long unlockCode,Mallocationowner owner_variable);
 
 // MDH@10AUG2023: a generic function to apply any given function to an array, list or map is to replace the appliedToArray, appliedToList and appliedToMap functions eventually
 Marray* applyFunctionToArray(Marray const * const _array,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments);
