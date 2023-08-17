@@ -2117,7 +2117,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
  */
 /*unsigned*/ long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_list){outputError("No list to append to");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
-	if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
+	if(_list->unlockCode>0){outputError("Unable to change the list: it is immutable");return 0;}
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
 	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
@@ -2227,7 +2227,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
  */
 long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_list){outputError("No list to insert into");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
-	if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
+	if(_list->unlockCode>0){outputError("Unable to change the list: it is immutable");return 0;}
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
 	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
@@ -2404,7 +2404,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	long long result=(_map!=NULL&&attributeName!=NULL?M_FALSE:M_LL_INVALID);
 	if(result!=M_LL_INVALID){
-		if(!_map->immutable){ // the map is mutable
+		if(!_map->unlockCode){ // the map is mutable
 			// MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
 			if(NULL==_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
 				if(report)
@@ -2466,7 +2466,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 long long removedFromMap(Mmap* _map,Mallocationowner owner_map,char const * const attributeName){
 	long long result=(_map!=NULL&&attributeName!=NULL?M_FALSE:M_LL_INVALID);
 	if(result!=M_LL_INVALID){
-		if(!_map->immutable){ // the map is mutable
+		if(!_map->unlockCode){ // the map is mutable
 			Mmapelement *mapelement=_map->_first,*previousmapelement=NULL;
 			while(mapelement!=NULL&&mapelement->_variable&&strcmp(mapelement->_variable->_name->chars,attributeName)){previousmapelement=mapelement;mapelement=previousmapelement->_next;}
 			if(mapelement!=NULL){ // found

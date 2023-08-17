@@ -79,7 +79,7 @@ Mvalue* Mclear(Mvalue* value){
 				result=0;
 				Mmap* map=value->value._map;
 				if(map){
-					if(!map->immutable){
+					if(!map->unlockCode){
 						result=map->numberOfElements-free_mapelement(disowned_mapelement(map->_first,getValueOwner()),map->weak);
 						if(result<=0){
 								map->_first=NULL;
@@ -95,7 +95,7 @@ Mvalue* Mclear(Mvalue* value){
 				result=0;
 				Mlist* list=value->value._list;
 				if(list!=NULL){
-					if(!list->immutable){
+					if(!list->unlockCode){
 						result=list->numberOfElements-free_listelement(disowned_listelement(list->_first,getValueOwner()),list->weak);
 						if(result<=0){
 							list->_first=NULL;
@@ -197,7 +197,7 @@ Mvalue* Mpop(Mvalue* listValue){ // remove and return the last value i.e. opposi
 		Mlist* list=listValue->value._list;
 		if(list!=NULL){
 			if(list->_first!=NULL){
-				if(!list->immutable){
+				if(!list->unlockCode){
 					Mvalue* lastValue=NULL;
 					// unfortunately a list is single linked so we have to traverse the entire list to reach the end
 					Mlistelement *beforelast=NULL,*last=list->_first;
@@ -232,7 +232,7 @@ Mvalue* Mpull(Mvalue* listValue){ // remove and return the first value
 		if(list!=NULL){
 			Mlistelement* first=list->_first;
 			if(first!=NULL){
-				if(!list->immutable){
+				if(!list->unlockCode){
 					Mvalue* firstValue=first->_value; // remember the pointer to the first value
 					assignValue(&first->_value,NULL); // dereference the current value
 					list->_first=first->_next; // make the list start with the successor of the original first
@@ -261,7 +261,7 @@ Mvalue* removedFromList(Mlist* list,Mallocationowner owner_list,long long listIn
 	Mvalue* removedValue=NULL;
 	if(list!=NULL){
 		if(listIndex>0){
-			if(!list->immutable){
+			if(!list->unlockCode){
 				Mlistelement *previouslistelement=NULL,*listelement=list->_first;
 				while(listelement!=NULL){
 					if(listelement->index==listIndex){ // got it
@@ -298,7 +298,7 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
 	if(listValue!=NULL&&listValue->type==VT_LIST){
 		Mlist* list=listValue->value._list;
 		if(list!=NULL){
-			if(!list->immutable){
+			if(!list->unlockCode){
 				if(listIndexValue!=NULL&&listIndexValue->type!=VT_MAP){ // list index/indices defined and not a map
 					if(listIndexValue->type==VT_LIST){ // multiple
 						Mlist* indexList=listIndexValue->value._list;

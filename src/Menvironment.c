@@ -960,7 +960,7 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 		// if it does not yet exist, try to create it
 		if(NULL==_variable){ // the variable doesn't exist in the given environment (and also not in any of it's parents)
 			// TODO why would we add the variable to the first immutable variable map?????
-			while(environment!=NULL&&(NULL==environment->_variableMap||environment->_variableMap->immutable))environment=getValueEnvironment(environment->_parent);
+			while(environment!=NULL&&(NULL==environment->_variableMap||environment->_variableMap->unlockCode>0))environment=getValueEnvironment(environment->_parent);
 			Mmap* map=(environment!=NULL?environment->_variableMap:NULL); // the map to add the variable
 			if(map){
 				if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
@@ -1195,9 +1195,9 @@ char getValueTypeCharacter(Mvaluetype valuetype,bool immutable){
 bool isValueImmutable(Mvalue* value){
 	bool result=true; // by default any value is immutable
 	if(value!=NULL){
-		if(value->type==VT_MAP)result=value->value._map->immutable;else
-		if(value->type==VT_LIST)result=value->value._list->immutable;else
-		if(value->type==VT_ARRAY)result=value->value._array->immutable;
+		if(value->type==VT_MAP)result=value->value._map->unlockCode>0;else
+		if(value->type==VT_LIST)result=value->value._list->unlockCode>0;else
+		if(value->type==VT_ARRAY)result=value->value._array->unlockCode>0;
 	}
 	return result;
 }
@@ -1842,7 +1842,60 @@ static bool allMapAttributesAreOfType(Mmap* map,Mvaluetype valuetype){
  * @return Mvalue* the unlock code for the indicated variable
  */
 Mvalue* Mlock(Mvalue* variableNameValue){
-
+	if(variableNameValue!=NULL){
+		if(variableNameValue->type==VT_ARRAY){
+			if(variableNameValue->value._array->unlockCode==0){
+				variableNameValue->value._array->unlockCode=1+rand();
+				return _getIntegerValue(variableNameValue->value._array->unlockCode);
+			}
+			outputError("Cannot lock an array again!");
+		}else
+		if(variableNameValue->type==VT_LIST){
+			if(variableNameValue->value._list->unlockCode==0){
+				variableNameValue->value._list->unlockCode=1+rand();
+				return _getIntegerValue(variableNameValue->value._list->unlockCode);
+			}
+			outputError("Cannot lock an list again!");
+		}else
+		if(variableNameValue->type==VT_MAP){
+			if(variableNameValue->value._map->unlockCode==0){
+				variableNameValue->value._map->unlockCode=1+rand();
+				return _getIntegerValue(variableNameValue->value._map->unlockCode);
+			}
+			outputError("Cannot lock an map again!");
+		}else{
+			Mvariable* variable=NULL;
+			switch(variableNameValue->type){
+				//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
+				case VT_TEXT:
+					{
+						variable=getVariable(NULL,variableNameValue->value._text->_c,false);
+						break;
+					}
+				case VT_REFERENCE:
+					{
+						variable=variableNameValue->value._reference->variable;
+						// it's best NOT to create the variable if it does not yet exist although we could
+						if(NULL==variable){
+							output("%s",M_ERROR_PREFIX);
+							outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
+						}
+						break;
+					}
+				default:
+					outputError("Cannot unlock values that are scalar or text (representing the name of a variable)");
+			}
+			if(variable!=NULL){
+				// don't lock if already locked!!!!
+				if(variable->unlockCode==0){
+					variable->unlockCode=1+rand();
+					return _getIntegerValue(variable->unlockCode);
+				}
+				output("Variable '%s' is already locked!",M_ERROR_PREFIX,variable->_name->chars);
+			}
+		}
+	}
+	return _getIntegerValue(M_LL_INVALID);
 }
 /**
  * @brief unlocks the variable with name \p variableNameValue locked before using unlock code \p unlockCodeValue
@@ -1852,182 +1905,174 @@ Mvalue* Mlock(Mvalue* variableNameValue){
  * @return Mvalue* M_TRUE on success, M_FALSE on failure, M_LL_INVALID if the input was incorrect
  */
 Mvalue* Munlock(Mvalue* variableNameValue,Mvalue* unlockCodeValue){
-	if(variableNameValue!=NULL){
+	if(variableNameValue!=NULL&&unlockCodeValue!=NULL&&unlockCodeValue->type==VT_INTEGER){
+		long long unlockCode=unlockCodeValue->value._integer->ll;
 		// can we use the same unlock code on multiple variables? yes, I suppose so, or not of course
-		if(variableNameValue->type==VT_ARRAY)return applyFunctionToArray(variableNameValue->value._array,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
-		if(variableNameValue->type==VT_LIST)return applyFunctionToArray(variableNameValue->value._list,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
-		if(variableNameValue->type==VT_MAP)return applyFunctionToMap(variableNameValue->value._map,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
-		Mvariable* variable=NULL;
-		long long result=M_FALSE;
-		switch(variableNameValue->type){
-			//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
-			case VT_TEXT:
-			  {
-					variable=getVariable(NULL,variableNameValue->value._text->_c,false);
-					break;
-				}
-			case VT_REFERENCE:
-				{
-					variable=variableNameValue->value._reference->variable;
-					// it's best NOT to create the variable if it does not yet exist although we could
-					if(NULL==variable)
-						output("%s",M_ERROR_PREFIX);
-						outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
-					break;
-				}
-			default:
-				outputError("Cannot unlock values that are scalar or text (representing the name of a variable)");
-		}
-		if(variable!=NULL){
-			long long unlockCode=getValueInteger(unlockCodeValue);
-			if(variable->unlockCode==unlockCode){
-				variable->unlockCode=0;
-				return _getIntegerValue(M_TRUE);
+		if(variableNameValue->type==VT_ARRAY){
+			// replacing: return applyFunctionToArray(variableNameValue->value._array,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+		}else
+		if(variableNameValue->type==VT_LIST){
+			// replacing: return applyFunctionToArray(variableNameValue->value._list,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+		}else
+		if(variableNameValue->type==VT_MAP){
+			// replacing: return applyFunctionToMap(variableNameValue->value._map,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+		}else{
+			Mvariable* variable=NULL;
+			long long result=M_FALSE;
+			switch(variableNameValue->type){
+				//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
+				case VT_TEXT:
+					{
+						variable=getVariable(NULL,variableNameValue->value._text->_c,false);
+						break;
+					}
+				case VT_REFERENCE:
+					{
+						variable=variableNameValue->value._reference->variable;
+						// it's best NOT to create the variable if it does not yet exist although we could
+						if(NULL==variable){
+							output("%s",M_ERROR_PREFIX);
+							outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
+						}
+						break;
+					}
+				default:
+					outputError("Cannot unlock values that are scalar or text (representing the name of a variable)");
 			}
+			if(variable!=NULL){
+				long long unlockCode=getValueInteger(unlockCodeValue);
+				if(variable->unlockCode==unlockCode){
+					variable->unlockCode=0;
+					return _getIntegerValue(M_TRUE);
+				}
+				output("%sUnlock code given (%lld) does not match the unlock code of variable '%s'.",M_ERROR_PREFIX,unlockCode,variable->_name->chars);
+			}else
+				outputError("Cannot unlock this type! Only variables and complex values can be (un)locked!");
+			return _getIntegerValue(M_FALSE);
 		}
-		return _getIntegerValue(M_FALSE);
 	}
 	return _getIntegerValue(M_LL_INVALID);
 }
 
 /**
- * @brief to set the type and immutable flag of a variable or composite value to type \p valuetypeValue and immutability \p immutableValue
+ * @brief to set the type and immutable flag of a variable or composite value represented by \p value to type \p valuetypeValue
  * @param value
  * @param valuetypeValue
- * @param immutableValue
+ * @return M_TRUE on success, M_FALSE on failure, M_LL_INVALID on invalid input
  */
-Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
+Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/){
 	// check the types first, both should be strings
-	if(value==NULL)return NULL;
-	// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
-	if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-	if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-	if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-	Mvariable* variable=NULL;
-	bool valuetypeSpecified=(valuetypeValue!=NULL&&valuetypeValue->type==VT_TEXT/*&&strlen(valuetypeValue->value._text->_c)>0*/); // the value type is specified (and there is at least one character), if not specified will NOT change the value type
-	// TODO should we force value type to be text???? for now yes
-	if(value!=NULL&&(immutableValue!=NULL||valuetypeSpecified)){
-		switch(value->type){
-			//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
-			case VT_TEXT:
-			  {
-					variable=getVariable(NULL,value->value._text->_c,false);
-					break;
+	long long result=M_LL_INVALID;
+	if(value!=NULL&&valuetypeValue!=NULL&&valuetypeValue->type==VT_TEXT){
+		// we should locate the character in either MUTABLE
+		char valuetypechar=valuetypeValue->value._text->_c[0]; // can be either lowercase or uppercase in both cases acceptable
+		char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
+		/* MDH@17AUG2023: best not to allow changing mutability
+		if(!mutablevaluetypechar){output("%s",M_ERROR_PREFIX);outputValue("Invalid value type specification '",valuetypeValue,"'.\n");return NULL;}
+		long long immutable=(mutablevaluetypechar==valuetypechar?M_FALSE:M_TRUE); // if the same we received the mutable variant
+		*/
+		Mvaluetype valuetype=getCharacterOfMutableValueType(mutablevaluetypechar);
+		// MDH@17AUG2023: if the type is set of a complex data type, we should set the type on that complex value type instead!!!!
+		if(value->type==VT_ARRAY){
+			// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
+			if(value->value._array->valuetype!=valuetype){
+				if(allArrayElementsAreOfType(value->value._array,valuetype)){
+					//value->value._array->immutable=immutable;
+					value->value._array->valuetype=valuetype;
+					return _getIntegerValue(M_TRUE);
 				}
-			case VT_REFERENCE:
-				{
-					variable=value->value._reference->variable;
-					// it's best NOT to create the variable if it does not yet exist although we could
-					if(NULL==variable){output("%s",M_ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");return NULL;}
-					break;
+				result=M_FALSE;
+				outputError("Unable to change the array value type: not all current elements are of the new type");
+			}else{
+				result=M_TRUE;
+				if(amVerbose())output("The list is already of the requested value type.");
+			}
+		}else
+		if(value->type==VT_LIST){
+			// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
+			if(value->value._list->valuetype!=valuetype){
+				if(allListElementsAreOfType(value->value._list,valuetype)){
+					//value->value._list->immutable=immutable;
+					value->value._list->valuetype=valuetype;
+					return _getIntegerValue(M_TRUE);
 				}
-			default:outputError("Cannot set the type of values that are scalar or text (representing the name of a variable)");return NULL;
+				result=M_FALSE;
+				outputError("Unable to change the list value type: not all current elements are of the new type");
+			}else{
+				result=M_TRUE;
+				if(amVerbose())output("The list is already of the requested value type.");
+			}
+		}else
+		if(value->type==VT_MAP){
+			if(value->value._map->valuetype!=valuetype){
+				if(allMapAttributesAreOfType(value->value._map,valuetype)){
+					//value->value._list->immutable=immutable;
+					value->value._map->valuetype=valuetype;
+					return _getIntegerValue(M_TRUE);
+				}
+				result=M_FALSE;
+				outputError("Unable to change the map value type: not all current attributes are of the new type");
+			}else{
+				result=M_TRUE;
+				if(amVerbose())output("The map is already of the requested type.");
+			}
 		}
-	}
-	if(variable==NULL)return NULL;
-		// set the valuetype
-		// no longer allowing uppercase to be used as a shortcut to immutability?????? yes, we can still do that
-		long long immutable=M_LL_INVALID; // whether we should change the immutable flag
-		Mvaluetype valuetype=VT_UNDEFINED;
-		if(valuetypeSpecified){ // a value type defined
-			// we should locate the character in either MUTABLE
-			char valuetypechar=valuetypeValue->value._text->_c[0];
-			char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
-			if(!mutablevaluetypechar){output("%s",M_ERROR_PREFIX);outputValue("Invalid value type specification '",valuetypeValue,"'.\n");return NULL;}
-			immutable=(mutablevaluetypechar==valuetypechar?M_FALSE:M_TRUE); // if the same we received the mutable variant
-			valuetype=getCharacterOfMutableValueType(mutablevaluetypechar);
-			/* replacing (which we would need to change whenever (IM)MUTABLEVALUETYPECHARS would change, which of course is easy to forget):
-			switch(valuetypechar){ // use the first character (which will be '\0' if the default value is used!!!)
-				case 'U':immutable=M_TRUE;
-				case 'u':valuetype=VT_UNDEFINED;break;
-				case 'I':immutable=M_TRUE;
-				case 'i':valuetype=VT_INTEGER;break;
-				case 'D':immutable=M_TRUE;
-				case 'd':valuetype=VT_DECIMAL;break;
-				case 'Q':case 'R':immutable=M_TRUE;
-				case 'q':case 'r':valuetype=VT_RATIONAL;break;
-				case 'B':immutable=M_TRUE;
-				case 'b':valuetype=VT_BIGINTEGER;break;
-				case 'F':immutable=M_TRUE;
-				case 'f':valuetype=VT_FLOAT;break;
-				case 'T':immutable=M_TRUE;
-				case 't':valuetype=VT_TEXT;break;
-				case 'L':immutable=M_TRUE;
-				case 'l':valuetype=VT_LIST;break;
-				case 'M':immutable=M_TRUE;
-				case 'm':valuetype=VT_MAP;break;
-				default:outputError("Unrecognized value type");return NULL;
+		/* replacing:
+		// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
+		if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+		if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+		if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+		*/
+		else{
+			Mvariable* variable=NULL;
+			// TODO should we force value type to be text???? for now yes
+			switch(value->type){
+				//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
+				case VT_TEXT:
+					{
+						variable=getVariable(NULL,value->value._text->_c,false);
+						break;
+					}
+				case VT_REFERENCE:
+					{
+						variable=value->value._reference->variable;
+						// it's best NOT to create the variable if it does not yet exist although we could
+						if(NULL==variable){output("%s",M_ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");}
+						break;
+					}
+				default:outputError("Cannot set the type of values that are scalar or text (representing the name of a variable)");return NULL;
+			}
+			result=M_FALSE;
+			if(variable!=NULL){
+				// set the valuetype
+				if(valuetype!=variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
+					// you cannot change the type of a variable that its current value is not (unless the value is undefined or the type of the value is undefined)
+					if(variable->_value==NULL||variable->_value->type==VT_UNDEFINED){
+						variable->valuetype=valuetype; // update the value type
+						result=M_TRUE;
+					}else
+						output("%sUnable to change the value type of %s to '%c' when its value is of type '%c'.\n",M_ERROR_PREFIX,variable->_name,MUTABLEVALUETYPECHARS[valuetype],MUTABLEVALUETYPECHARS[variable->_value->type]);
+				}else{
+					output("%sVariable '%s' already of the requested type!",M_WARNING_PREFIX,variable->_name->chars);
+					result=M_TRUE;
+				}
+			}
+			/* MDH@17AUG2023: too complex to allow setting mutability using settype() as well!!! see Mlock() and Munlock() for doing so
+			if(immutable!=M_LL_INVALID){
+				bool immutableflag=(immutable==M_TRUE);
+				if(variable!=NULL){
+					variable->unlockCode=(immutableflag?rand()+1:0);
+					if(amVerbose())
+						output("Variable '%s' is now %smutable.\n",(variable->unlockCode>0?"im":""));
+					return _getIntegerValue(variable->unlockCode);
+				}else
+					output("%sUnable to change the mutability of a value of type %s.\n",M_ERROR_PREFIX,VALUETYPENAMES[value->type]);
 			}
 			*/
 		}
-		// if a third argument is specified it takes precedence over what the second argument says
-		if(immutableValue!=NULL)immutable=isValueOne(immutableValue); // accepting all values that represent 1 to be considered true
-		// only change the type when a (valid) value type was specified
-		if(valuetypeSpecified){
-			if(variable!=NULL){
-				if(valuetype!=variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
-					// you cannot change the type of a variable that its current value is not (unless the value is undefined or the type of the value is undefined)
-					if(variable->_value!=NULL&&variable->_value->type!=valuetype&&variable->_value->type!=VT_UNDEFINED){
-						output("%sUnable to change the value type of %s to '%c' when its value is of type '%c'.\n",M_ERROR_PREFIX,variable->_name,MUTABLEVALUETYPECHARS[valuetype],MUTABLEVALUETYPECHARS[variable->_value->type]);
-						return NULL;
-					}
-					variable->valuetype=valuetype; // update the value type
-				}
-				// see below: if(immutable!=M_LL_INVALID)variable->immutable=(immutable==M_TRUE);
-			}else{
-				// MDH@05NOV2019: only allow the change of the valuetype of list/map elements if all the current values in the list are already of that type (or of a supertype)
-				if(value->type==VT_ARRAY){
-					// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
-					if(value->value._array->valuetype!=valuetype){
-						if(allArrayElementsAreOfType(value->value._array,valuetype))
-							value->value._array->valuetype=valuetype;
-						else
-							outputError("Unable to change the array value type: not all current elements are of the new type");
-					}else
-					if(amVerbose())output("The list is already of the requested value type.");
-				}else
-				if(value->type==VT_LIST){
-					// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
-					if(value->value._list->valuetype!=valuetype){
-						if(allListElementsAreOfType(value->value._list,valuetype))
-							value->value._list->valuetype=valuetype;
-						else
-							outputError("Unable to change the list value type: not all current elements are of the new type");
-					}else 
-					if(amVerbose())output("The list is already of the requested value type.");
-				}else
-				if(value->type==VT_MAP){
-					if(value->value._map->valuetype!=valuetype){
-						if(allMapAttributesAreOfType(value->value._map,valuetype))
-							value->value._map->valuetype=valuetype;
-						else
-							outputError("Unable to change the map value type: not all current attributes are of the new type");
-					}else 
-					if(amVerbose())output("The map is already of the requested type.");
-				}
-			}
-		}
-		if(immutable!=M_LL_INVALID){
-			bool immutableflag=(immutable==M_TRUE);
-			if(variable!=NULL){
-				variable->unlockCode=(immutableflag?rand()+1:0);
-				if(amVerbose())output("Variable '%s' is now %smutable.\n",(variable->unlockCode>0?"im":""));
-			}else
-			if(value->type==VT_ARRAY){
-				value->value._array->immutable=immutableflag;
-				if(amVerbose())output("Array '%s' is now %smutable.\n",(value->value._array->immutable?"im":""));
-			}else
-			if(value->type==VT_LIST){
-				value->value._list->immutable=immutableflag;
-				if(amVerbose())output("List '%s' is now %smutable.\n",(value->value._list->immutable?"im":""));
-			}else
-			if(value->type==VT_MAP){
-				value->value._map->immutable=immutableflag;
-				if(amVerbose())output("List '%s' is now %smutable.\n",(value->value._list->immutable?"im":""));
-			}else
-			if(amVerbose())output("%sUnable to change the mutability of a value of type %s.\n",M_ERROR_PREFIX,VALUETYPENAMES[value->type]);
-		}
-	return Mtype(variable->_value);
+	}else
+		outputError("Invalid input to M function settype()!");
+	return _getIntegerValue(result);
 }/* INVALIDATED */
 
 /**
@@ -3118,9 +3163,12 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	if(!registerFunction(_environment,owner_environment,"ceil",Mceil,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 	if(!registerFunction(_environment,owner_environment,"exp",Mexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 	if(!registerFunction(_environment,owner_environment,"dexp",Mdexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag
-	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"a value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"settype",Msettype,3,(char*[]){"a variable name","a type character","immutable flag"},(Mvalue*[]){NULL,_getTextValue("'u"),getValueOneOfType(VT_INTEGER)}))return false;
+	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag MDH@17AUG2023: immutable flag removed again, use lock() to make a variable or complex value immutable
+	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"lock",Mlock,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"settype",Msettype,2,(char*[]){"a variable name or complex value","a type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false;
+	if(!registerFunction(_environment,owner_environment,"unlock",Munlock,2,(char*[]){"a variable name or complex value","the unlock code"},(Mvalue*[]){NULL,NULL}))return false;
+
 	if(!registerFunction(_environment,owner_environment,"pow",Mpow,1,(char*[]){"a value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 
 	if(!registerNoArgumentFunction(_environment,owner_environment,"break",Mbreak))return false;

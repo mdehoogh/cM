@@ -100,23 +100,25 @@ typedef struct Mlistelement{
 //                of course we know the size of char* obviously BUT we should NOT use REALLOC on it, in which case we loose track of it
 typedef struct Mlist{
 	Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
+	long long unlockCode; // MDH@17AUG2023: replaces immutable flag
 	unsigned long long numberOfElements; // keep track of the total number of elements
 	Mvaluetype valuetype; // we can force a list to have elements of the same type
 	Mlistelement* _first;
 	Mlistelement* _last;
 	bool weak:1;
-	bool immutable:1;
+	// replacing: bool immutable:1;
 }Mlist;
 
 // MDH@04NOV2020: similar definitions for Marray
 typedef struct Marray{
 	Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
+	long long unlockCode; // MDH@17AUG2023: replaces immutable flag
 	unsigned long long numberOfElements; // the number of values field "values" holds
 	long long numberOfDimensionsLeft; // MDH@08APR2023: the number of dimensions left (only for multidimensional arrays, so we can tell from the top-level array how many dimensions it has)
 	Mvaluetype valuetype; // we can force an array to have elements of the same type
 	Mvalue** values; // I suppose we need to have a pointer to an array of Mvalue pointers, alternatively if the number of elements is fixed, we could point to the Mvalue structures themselves?????
 	bool weak:1;
-	bool immutable:1;
+	// replacing: bool immutable:1;
 }Marray;
 long long isArrayUndefined(Marray* array);
 
@@ -214,13 +216,14 @@ Mmapelement* disowned_mapelement(Mmapelement * const _mapelement,Mallocationowne
 #endif
 
 typedef struct Mmap{
-    Mchars* _creator; // MDH@01NOV2020: replacing: char *_creator;
-    unsigned long long numberOfElements; // keep track of the total number of variables
-    Mvaluetype valuetype; // the type all values in the map should have
-    Mmapelement* _first;
-    Mmapelement* _last;
-    bool weak:1;
-    bool immutable:1;
+	Mchars* _creator; // MDH@01NOV2020: replacing: char *_creator;
+	long long unlockCode; // MDH@17AUG2023
+	unsigned long long numberOfElements; // keep track of the total number of variables
+	Mvaluetype valuetype; // the type all values in the map should have
+	Mmapelement* _first;
+	Mmapelement* _last;
+	bool weak:1;
+	// replacing: bool immutable:1;
 }Mmap;
 
 Mmap* __map(char const * const source); // MDH@01NOV2020
