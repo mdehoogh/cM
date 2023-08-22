@@ -5426,6 +5426,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
+// MDH@22AUG2023: when a variable is locked one cannot assign to it, or if a composite value is locked an element cannot be set!!!!
 /**
  * @brief sets the referenced value object to \p _newValue
  * 
@@ -5581,11 +5582,13 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 														if((*valueholder)->type==VT_MAP){
 															// MDH@23OCT2020: same here
 															// removing: if(_flattenedIndexList->valuetype!=VT_INTEGER){
+															// MDH@22AUG2023: the map can be locked????
+															Mmap* valueholderMap=(*valueholder)->value._map;
+															if(valueholderMap->unlockCode==0){
 																// MDH@06APR2020: if indexorattributenameListelementValue can now also be a list of indices we need to iterate over the list elements and apply each list element as an index
 																//				so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
 																//				which means that we can only retrieve successive elements from maps
 																//				we could flatten the value here????? so if it is a list we get the list of indices here
-																Mmap* valueholderMap=(*valueholder)->value._map;
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
 																if(report)
 																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
@@ -5634,73 +5637,82 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																}
 																if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
-															/*}else
-																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
-															if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+																if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
+																	output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+															}else{ // map is locked, and therefore immutable
+																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
+																outputError("Map is locked, and therefore immutable!");
+															}
 														}else
 														if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){ // MDH@23NOV2020: either a list or an array being indexed
 															if(_flattenedIndexList->valuetype==VT_INTEGER){
 																// we either have a list or an array (bit of a nuisance to have to do it this way?????)
 																Mlist* valueholderList=((*valueholder)->type==VT_LIST?(*valueholder)->value._list:NULL);
 																Marray* valueholderArray=((*valueholder)->type==VT_ARRAY?(*valueholder)->value._array:NULL);
-																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
-																if(report)
-																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
-																// 'iterating' over all index list elements
-																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
-																if(valueIndexListelement!=NULL){
-																	Mvalue** newValueholder;
-																	while(valueholderList!=NULL||valueholderArray!=NULL){
-																		// output("%c\n",'D'); // DEBUG
-																		// outputList("Value holder list: ",valueholderList,".");
-																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
-																		if(indexorattributenameListelementValue!=NULL){
-																			long long listIndex=M_LL_INVALID;
-																			if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
-																			if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
-																			// MDH@19JUN2020 M_LL_INVALID allowed as index indicating appending: if(listIndex!=M_LL_INVALID){
-																			if(valueholderList!=NULL){ // MDH@23NOV2020: a list
-																				newValueholder=(listIndex!=M_LL_INVALID?getValueHolderAtIndex(valueholderList,listIndex):NULL);
-																				if(NULL==newValueholder){
-																					listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
-																					if(listIndex>0){
-																						if(amVerboseDebugging())
-																						{output("List after appending NULL at index %lld",listIndex);outputList(": '",valueholderList,"'.\n");}
-																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
-																						// if(amVerboseDebugging())output("List element at index #%zd retrieved.\n",listIndex);
-																						// register in the assigned index list
-																						if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getIntegerValue(listIndex),M_LL_INVALID)<=0)
-																						{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
-																					}else
-																						output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
+																if((valueholderList!=NULL&&valueholderList->unlockCode==0)||(valueholderArray!=NULL&&valueholderArray->unlockCode==0)){
+																	Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
+																	if(report)
+																		outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
+																	// 'iterating' over all index list elements
+																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
+																	if(valueIndexListelement!=NULL){
+																		Mvalue** newValueholder;
+																		while(valueholderList!=NULL||valueholderArray!=NULL){
+																			// output("%c\n",'D'); // DEBUG
+																			// outputList("Value holder list: ",valueholderList,".");
+																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
+																			if(indexorattributenameListelementValue!=NULL){
+																				long long listIndex=M_LL_INVALID;
+																				if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
+																				if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
+																				// MDH@19JUN2020 M_LL_INVALID allowed as index indicating appending: if(listIndex!=M_LL_INVALID){
+																				if(valueholderList!=NULL){ // MDH@23NOV2020: a list
+																					newValueholder=(listIndex!=M_LL_INVALID?getValueHolderAtIndex(valueholderList,listIndex):NULL);
+																					if(NULL==newValueholder){
+																						listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
+																						if(listIndex>0){
+																							if(amVerboseDebugging())
+																							{output("List after appending NULL at index %lld",listIndex);outputList(": '",valueholderList,"'.\n");}
+																							newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
+																							// if(amVerboseDebugging())output("List element at index #%zd retrieved.\n",listIndex);
+																							// register in the assigned index list
+																							if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getIntegerValue(listIndex),M_LL_INVALID)<=0)
+																							{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
+																						}else
+																							output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
+																					}
+																				}else{ // MDH@23NOV2020: an array (and we're NOT going to create an element that's not there like we do with a list!!!!)
+																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
+																					if(report)
+																						if(newValueholder!=NULL)
+																							output("New value holder reference value #%llu in array.\n",listIndex);
 																				}
-																			}else{ // MDH@23NOV2020: an array (and we're NOT going to create an element that's not there like we do with a list!!!!)
-																				newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
-																				if(report)
-																					if(newValueholder!=NULL)
-																						output("New value holder reference value #%llu in array.\n",listIndex);
+																				//}else	newValueholder=NULL;
 																			}
-																			//}else	newValueholder=NULL;
+																			valueIndexListelement=valueIndexListelement->_next;
+																			if(NULL==valueIndexListelement)break;
+																			// we have another property 'index', so we should have a value holder map
+																			if(NULL==newValueholder||NULL==(*newValueholder))break;
+																			valueholderList=((*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
+																			valueholderArray=((*newValueholder)->type==VT_ARRAY?(*newValueholder)->value._array:NULL);
+																			// output("%c\n",'E'); // DEBUG
 																		}
-																		valueIndexListelement=valueIndexListelement->_next;
-																		if(NULL==valueIndexListelement)break;
-																		// we have another property 'index', so we should have a value holder map
-																		if(NULL==newValueholder||NULL==(*newValueholder))break;
-																		valueholderList=((*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
-																		valueholderArray=((*newValueholder)->type==VT_ARRAY?(*newValueholder)->value._array:NULL);
-																		// output("%c\n",'E'); // DEBUG
+																		// output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
+																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																	}
-																	// output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
-																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
+																	if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
+																}else{
+																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
+																	if(valueholderList!=NULL)outputError("List is locked, and therefore immutable!");else
+																	if(valueholderArray!=NULL)outputError("Array is locked, and therefore immutable!");
 																}
-																if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
 														}else
 															_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-														if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+														if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
+															output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 													}
 												}
 											}
@@ -5735,7 +5747,10 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 											outputList("Flattened index list: '",_flattenedIndexList,"'.\n");
 										if(_flattenedIndexList->_first!=_flattenedIndexList->_last){ // more than one element: replace the value by the reversed list (which is disowned to start with!!!!)
 											Mlist* _rereversedIndexList=owned_list(_getReversedList(_flattenedIndexList),owner);
-											if(_rereversedIndexList!=NULL)assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));else outputBug("Failed to reverse an index list");
+											if(_rereversedIndexList!=NULL)
+												assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));
+											else 
+												outputBug("Failed to reverse an index list");
 										}else // replace the value by the first value in the flattened index list
 											assignValue(&indexorattributenameListelement->_value,_flattenedIndexList->_first->_value);
 									}
@@ -5875,6 +5890,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 			char* variableName=_valuereference->_name->chars;
 			Menvironment* executionEnvironment=getExecutionEnvironment();
 			Mvariable* variable=getVariable(executionEnvironment,variableName,false); // if the variable exists, variable will be non-NULL
+			//MDH@23AUG2023 NOTE: setValue() checks whether or not the variable is locked, and won't allow changing its value unless NULL TODO should we also lock when NULL??
 			if((variable!=NULL||addVariable(executionEnvironment,owner,variableName,VT_UNDEFINED,false))
 				&&setValue(executionEnvironment,variableName,_newValue)){
 				// NOTE even if the value itself is NULL, its address is never NULL

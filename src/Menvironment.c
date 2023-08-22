@@ -1905,20 +1905,108 @@ Mvalue* Mlock(Mvalue* variableNameValue){
  * @return Mvalue* M_TRUE on success, M_FALSE on failure, M_LL_INVALID if the input was incorrect
  */
 Mvalue* Munlock(Mvalue* variableNameValue,Mvalue* unlockCodeValue){
-	if(variableNameValue!=NULL&&unlockCodeValue!=NULL&&unlockCodeValue->type==VT_INTEGER){
+	long long result=M_LL_INVALID;
+	if(unlockCodeValue!=NULL&&unlockCodeValue->type==VT_INTEGER){
 		long long unlockCode=unlockCodeValue->value._integer->ll;
+		if(unlockCode>0){
+			if(variableNameValue!=NULL){
+				// can we use the same unlock code on multiple variables? yes, I suppose so, or not of course
+				if(variableNameValue->type==VT_ARRAY){
+					result=M_FALSE;
+					if(variableNameValue->value._array->unlockCode>0){
+						if(unlockCode==variableNameValue->value._array->unlockCode){
+							variableNameValue->value._array->unlockCode=0;
+							result=M_TRUE;
+						}
+					}else
+						outputError("Array already unlocked!");
+					// replacing: return applyFunctionToArray(variableNameValue->value._array,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+				}else
+				if(variableNameValue->type==VT_LIST){
+					result=M_FALSE;
+					if(variableNameValue->value._list->unlockCode>0){
+						if(unlockCode==variableNameValue->value._list->unlockCode){
+							variableNameValue->value._list->unlockCode=0;
+							result=M_TRUE;
+						}
+					}else
+						outputError("List already unlocked!");
+					// replacing: return applyFunctionToArray(variableNameValue->value._list,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+				}else
+				if(variableNameValue->type==VT_MAP){
+					result=M_FALSE;
+					if(variableNameValue->value._map->unlockCode>0){
+						if(unlockCode==variableNameValue->value._map->unlockCode){
+							variableNameValue->value._map->unlockCode=0;
+							result=M_TRUE;
+						}
+					}else
+						outputError("Map already unlocked!");
+				}else{
+					Mvariable* variable=NULL;
+					switch(variableNameValue->type){
+						//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
+						case VT_TEXT:
+							{
+								variable=getVariable(NULL,variableNameValue->value._text->_c,false);
+								break;
+							}
+						case VT_REFERENCE:
+							{
+								variable=variableNameValue->value._reference->variable;
+								// it's best NOT to create the variable if it does not yet exist although we could
+								if(NULL==variable){
+									output("%s",M_ERROR_PREFIX);
+									outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
+								}
+								break;
+							}
+						default:
+							outputError("Cannot unlock values that are scalar or text (representing the name of a variable)");
+					}
+					if(variable!=NULL){
+						long long unlockCode=getValueInteger(unlockCodeValue);
+						if(variable->unlockCode==unlockCode){
+							variable->unlockCode=0;
+							result=M_TRUE;
+						}else{
+							result=M_FALSE;
+							output("%sUnlock code given (%lld) does not match the unlock code of variable '%s'.",M_ERROR_PREFIX,unlockCode,variable->_name->chars);
+						}
+					}else
+						outputError("Cannot unlock this type! Only variables and complex values can be (un)locked!");
+				}
+			}else
+				outputError("Undefined variable name or complex value.");
+		}else
+			outputError("The given unlock code is invalid, as it is not positive.");
+	}else
+	if(unlockCodeValue==NULL)
+		outputError("No unlock code specified!");
+	else
+		outputError("Unlock code not an integer!");
+	return _getIntegerValue(result);
+}
+/**
+ * @brief returns M_TRUE when \p variableNameValue is locked, M_FALSE otherwise
+ * @details return M_LL_INVALID if \p variableNameValue can be locked/unlocked
+ * @param variableNameValue 
+ * @return Mvalue* M_TRUE when \p variableNameValue is locked, M_FALSE otherwise
+ */
+Mvalue* Mlocked(Mvalue* variableNameValue){
+	long long result=M_LL_INVALID;
+	if(variableNameValue!=NULL){
 		// can we use the same unlock code on multiple variables? yes, I suppose so, or not of course
 		if(variableNameValue->type==VT_ARRAY){
-			// replacing: return applyFunctionToArray(variableNameValue->value._array,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+			result=(variableNameValue->value._array->unlockCode>0?M_TRUE:M_FALSE);
 		}else
 		if(variableNameValue->type==VT_LIST){
-			// replacing: return applyFunctionToArray(variableNameValue->value._list,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+			result=(variableNameValue->value._list->unlockCode>0?M_TRUE:M_FALSE);
 		}else
 		if(variableNameValue->type==VT_MAP){
-			// replacing: return applyFunctionToMap(variableNameValue->value._map,(Mfunctionunion)Munlock,1,(Mvalue*[]){unlockCodeValue});
+			result=(variableNameValue->value._map->unlockCode>0?M_TRUE:M_FALSE);
 		}else{
 			Mvariable* variable=NULL;
-			long long result=M_FALSE;
 			switch(variableNameValue->type){
 				//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
 				case VT_TEXT:
@@ -1936,22 +2024,15 @@ Mvalue* Munlock(Mvalue* variableNameValue,Mvalue* unlockCodeValue){
 						}
 						break;
 					}
-				default:
-					outputError("Cannot unlock values that are scalar or text (representing the name of a variable)");
 			}
-			if(variable!=NULL){
-				long long unlockCode=getValueInteger(unlockCodeValue);
-				if(variable->unlockCode==unlockCode){
-					variable->unlockCode=0;
-					return _getIntegerValue(M_TRUE);
-				}
-				output("%sUnlock code given (%lld) does not match the unlock code of variable '%s'.",M_ERROR_PREFIX,unlockCode,variable->_name->chars);
-			}else
+			if(variable!=NULL)
+				result=(variable->unlockCode>0?M_TRUE:M_FALSE);				
+			else
 				outputError("Cannot unlock this type! Only variables and complex values can be (un)locked!");
-			return _getIntegerValue(M_FALSE);
 		}
-	}
-	return _getIntegerValue(M_LL_INVALID);
+	}else
+		outputError("Undefined variable name or complex value.");
+	return _getIntegerValue(result);
 }
 
 /**
@@ -3166,6 +3247,7 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag MDH@17AUG2023: immutable flag removed again, use lock() to make a variable or complex value immutable
 	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
 	if(!registerFunction(_environment,owner_environment,"lock",Mlock,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"locked",Mlocked,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
 	if(!registerFunction(_environment,owner_environment,"settype",Msettype,2,(char*[]){"a variable name or complex value","a type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false;
 	if(!registerFunction(_environment,owner_environment,"unlock",Munlock,2,(char*[]){"a variable name or complex value","the unlock code"},(Mvalue*[]){NULL,NULL}))return false;
 
