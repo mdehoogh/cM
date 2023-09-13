@@ -33,8 +33,8 @@ const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowi
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="defun"; // MDH@04MAR2020: the 'classic' approach is by defining a function with a fixed name which cannot be passed along
 const char* const DEFINEANONYMOUSFUNCTION_NAME="function"; // MDH@04MAR2020: an anonymous function that is to be assigned to a variable/argument
-const char* const MUTABLEVALUETYPECHARS="uoibdqftalmr#$"; // the characters associated with each of the value types
-const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTALMR#$"; // the characters associated with each of the value types
+const char* const MUTABLEVALUETYPECHARS="uoibdqrtalmrfe#$"; // the characters associated with each of the value types
+const char* const IMMUTABLEVALUETYPECHARS="UOIBDQRTALMRFE#$"; // the characters associated with each of the value types
 const char* const INFO_PREFIX=""; // MDH@27FEB2020: as for now NO actual info prefix text to use
 const char* const M_ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const M_WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
@@ -3322,6 +3322,11 @@ Mvalue* NAI_value=NULL;
  * 
  */
 Mvalue* UNDEFINED_value=NULL; // the value containing the text to show when a value equals UNDEFINED
+/**
+ * @brief the global constant with the abbreviation characters for every M value type stored in M value TYPES
+ * 
+ */
+Mvalue* TYPES_value=NULL; // MDH@12SEP2023: the map containing all the type abbreviation characters
 /**
  * @brief returns the long double representing a Not-A-Real stored in NAF_value
  * 
@@ -13338,6 +13343,13 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	UNDEFINED_value=__value("undefined");
 	if(NULL==UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
 
+	TYPES_value=_getMapValue(VT_TEXT,false,NULL);
+	Mmap* TYPES_map=NULL;
+	if(TYPES_value!=NULL)
+		TYPES_map=TYPES_value->value._map;
+	else
+		outputError("Failed to initialize the TYPES constant");
+
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
 	//				therefore it shouldn't be a token value 
 	/*
@@ -13388,6 +13400,38 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
+			// MDH@12SEP2023: if we have a types map
+			if(TYPES_map!=NULL){
+				if(!addVariable(_Menvironment,owner,"TYPES",VT_MAP,true)){
+					outputError("Failed to register the TYPES constant");
+					return false;
+				}
+				if(!setValue(_Menvironment,"TYPES",TYPES_value)){
+					outputError("Failed to initialize the constant TYPES");
+					return false;
+				}
+				// uoibdqftalmr#$ the mutable value type chars
+				Mallocationowner valueOwner=getValueOwner();
+				appendedToMap(TYPES_map,valueOwner,"undefined",_getTextValue("'u"));
+				appendedToMap(TYPES_map,valueOwner,"token",_getTextValue("'o"));
+				appendedToMap(TYPES_map,valueOwner,"integer",_getTextValue("'i"));
+				appendedToMap(TYPES_map,valueOwner,"biginteger",_getTextValue("'b"));
+				appendedToMap(TYPES_map,valueOwner,"rational",_getTextValue("'q"));
+				appendedToMap(TYPES_map,valueOwner,"real",_getTextValue("'r"));
+				appendedToMap(TYPES_map,valueOwner,"decimal",_getTextValue("'d"));
+				appendedToMap(TYPES_map,valueOwner,"text",_getTextValue("'t"));
+				appendedToMap(TYPES_map,valueOwner,"array",_getTextValue("'a"));
+				appendedToMap(TYPES_map,valueOwner,"list",_getTextValue("'l"));
+				appendedToMap(TYPES_map,valueOwner,"map",_getTextValue("'m"));
+				appendedToMap(TYPES_map,valueOwner,"reference",_getTextValue("'r"));
+				appendedToMap(TYPES_map,valueOwner,"function",_getTextValue("'f"));
+				appendedToMap(TYPES_map,valueOwner,"environment",_getTextValue("'e"));
+				appendedToMap(TYPES_map,valueOwner,"file",_getTextValue("'#"));
+				appendedToMap(TYPES_map,valueOwner,"time",_getTextValue("'$"));
+				Mlock(TYPES_value); // does this work?????
+			}else
+				outputError("Failed to initialize the TYPES map");
+
 			/* MDH@13JUN2019: allow user to change the decimal precision
 			if(!DP_value||!addVariable(_Menvironment,"$decimalprecision",VT_INTEGER,false)||!setValue(_Menvironment,"$decimalprecision",DP_value)){
 				outputInfo("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");

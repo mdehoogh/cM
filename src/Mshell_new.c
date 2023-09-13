@@ -2023,6 +2023,7 @@ Mvalue* NAF_value=NULL;
 Mvalue* NAI_value=NULL;
 // Mvalue* NULL_value=NULL; // the value containing the text to show when a value equals NULL
 Mvalue* UNDEFINED_value=NULL; // the value containing the text to show when a value equals UNDEFINED
+Mvalue* TYPES_value=NULL; // the map containing all abbreviations used in setting a type using settype()
 
 long double getNAR(){return NAF_value->value._float->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
@@ -6634,6 +6635,10 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	UNDEFINED_value=__value();
 	if(!UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
 
+  // MDH@12SEP2023: we're going to store all the available types in a TYPES map
+	TYPES_value=_getMapValue(VT_TEXT);
+	MMap* TYPES_map=TYPES_value.value->map;
+	
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
 	//                therefore it shouldn't be a token value 
 	/*
@@ -6678,6 +6683,8 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
+			// MDH@12SEP2023: I like to add a TYPES variable with the type names of all the possible types
+			TYPES_value
 			/* MDH@13JUN2019: allow user to change the decimal precision
 			if(!DP_value||!addVariable(_Menvironment,"$decimalprecision",VT_INTEGER,false)||!setValue(_Menvironment,"$decimalprecision",DP_value)){
 				outputInfo("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");

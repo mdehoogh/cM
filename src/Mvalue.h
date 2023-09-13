@@ -14,23 +14,23 @@ struct Mfunction;
 struct Menvironment;
 // MDH@04NOV2019: we need a variable reference not a value reference as used in M.c, so I've introduced Mreference in Mexecution.c instead!!!! struct Mvaluereference; // MDH@26OCT2019: being able to store a value reference in a value coming up next...
 typedef union Mvalueunion{
-    Mtoken* _token;
-    Minteger* _integer;
-    Mbiginteger* _biginteger; // most convenient to immediately point to the Mbiginteger structure
-    Mdecimal* _decimal; // no longer pointing to the mpd_t structure, as we're going to store the number of repeating decimals as well!!!
-    Mrational* _rational;
-    Mfloat* _float;
-    Mtext* _text;
-    struct Mlist* _list;
-    struct Marray* _array;
+	Mtoken* _token;
+	Minteger* _integer;
+	Mbiginteger* _biginteger; // most convenient to immediately point to the Mbiginteger structure
+	Mdecimal* _decimal; // no longer pointing to the mpd_t structure, as we're going to store the number of repeating decimals as well!!!
+	Mrational* _rational;
+	Mfloat* _float;
+	Mtext* _text;
+	struct Mlist* _list;
+	struct Marray* _array;
 //		struct Mmatrix* _matrix;
-    struct Mmap* _map;
-    struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
-    struct Mfunction* _function; // MDH@03MAR2020
-    struct Menvironment* _environment; // MDH@03MAR2020
-    struct Mfile* _file; // MDH@28SEP2020 (defined in Mexecution.h)
-    struct Mtime* _time; // MDH@08DEC2020 (defined in Mexecution.h)
-    //////////struct Muserfunction* _userfunction;
+	struct Mmap* _map;
+	struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
+	struct Mfunction* _function; // MDH@03MAR2020
+	struct Menvironment* _environment; // MDH@03MAR2020
+	struct Mfile* _file; // MDH@28SEP2020 (defined in Mexecution.h)
+	struct Mtime* _time; // MDH@08DEC2020 (defined in Mexecution.h)
+	//////////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
 // a Value is either a number (numeric literal), a string literal, a list of values or a map
