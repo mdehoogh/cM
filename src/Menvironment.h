@@ -40,7 +40,7 @@ Mvalue* Mexists(Mvalue* _value);
 Mvaluetype getVariableType(const Menvironment* const _environment,const char* const name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
 Mvaluetype getVariableValueType(const Menvironment* const _environment,const char* const name); // same as getVariableType() if a type is defined for the given variable
 
-Mstring* _getCompletion(const char* const name,bool functionidentifiersaswell); // returns the remainder of variables/functions shared by all variables/functions that start with name, if not shared by all variables/functions all first continuation characters are returned
+Mstring* _getCompletion(char * name,bool functionidentifiersaswell); // returns the remainder of variables/functions shared by all variables/functions that start with name, if not shared by all variables/functions all first continuation characters are returned
 
 // write access
 bool setVariableType(Menvironment const * const _environment,char const * const name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type

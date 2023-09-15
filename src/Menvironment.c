@@ -797,6 +797,9 @@ size_t getNumberOfMatchingCharacters(char const * s1,char const * s2){
 }
 // MDH@24SEP2019: because I decided to return either a completion text, or all characters available to obtain an existing variable/function, I return an Mstring* not a char* anymore with the first character either 1 or 2
 // MDH@04NOV2019: with references it is possible that the length of \p name is 0, so I change l>0 into l>=0 (forcing l to -1 when name is NULL)
+// MDH@15SEP2023: name may now also contain property names (i.e. period separated property names), which complicates stuff
+//                it means that we should complete the last property but of course it must exist (in the map)
+//                NOTE name no longer is considered a char const * const because we're going to adapt it if it refers to a property!!!!
 /**
  * @brief return the completion of variable name \p name in the current execution environment and its parents
  * 
@@ -804,21 +807,51 @@ size_t getNumberOfMatchingCharacters(char const * s1,char const * s2){
  * @param functionidentifiersaswell 
  * @return Mstring* the completion of variable name \p name in the current execution environment and its parents
  */
-Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
+Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 	Mstring* _completion=__string(); // this result will start with '\0' indicating that there is no completion or characters from available variables/functions
 	if(_completion!=NULL){
 		size_t completionlength=0; // the number of characters to be copied of completion (which will point to the first character in the completion string)
-		int l=(name!=NULL?strlen(name):-1);
+		signed long l=(name!=NULL?strlen(name):-1);
 		if(l>=0){
 			unsigned char completiontype=1; // the completion type (either 1 or 2)
-			if(string_append_char(_completion,completiontype)){ // completion type appended!!!
+			if(string_append_char(_completion,completiontype)!=NULL){ // completion type appended!!!
 				// check all active environments
 				char* completion=NULL; // the current completion string
 				Menvironment* _environment=getExecutionEnvironment();
 				while(_environment!=NULL){
 					// check variables
 					Mmap* variableMap=_environment->_variableMap;
-					if(variableMap!=NULL){
+					// MDH@15SEP2023: what if we're looking for completion of a property name? In that case we may have to iterate over multiple 'properties'
+					//                'name' is always supposed to be that 'property' name
+					while(variableMap!=NULL){
+						// determine the position of the first period (if any)
+						char* _period=strstr(name,".");
+						// when no period is present in name, we have reached the final 'property'
+						if(_period==NULL)break;
+						// if a period is found we ascertain that name ends at this period (by putting a NUL character at that position)
+						// which means that 'name' is the property name we should try to find in map
+						// NOTE that if _period is not NULL, name should be present in the map as variable
+						// ASSERT _period is not NULL
+						*_period='\0';
+						// if 'name' is NOT present in the map we can't find a continuation
+						Mmapelement* mapelement=variableMap->_first;
+						while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,name)))
+							mapelement=mapelement->_next;
+						variableMap=NULL; // this is essential because otherwise it would still look for a continuation
+						if(NULL==mapelement)break; // NOT found means there will not be a completion 
+						// ASSERT 'name' was found in 'variableMap'
+						if(NULL==mapelement->_variable)break; // very unlikely though
+						if(NULL==mapelement->_variable->_value)break; // very unlikely
+						if(mapelement->_variable->_value->type!=VT_MAP)break; // if not a map no continuation will be found
+						// ASSERT the value of 'name' is a map
+						variableMap=mapelement->_variable->_value->value._map;
+						// ascertain to point to the next property to find
+						name=_period+1;
+					}
+					// ASSERT name does now no longer contain a period, and variableMap points to the map with variables to match with name
+					if(variableMap!=NULL){ 
+						l=strlen(name); // OOPS do NOT forget this!!!
+						////////output(name);//////outputMap(NULL,variableMap,NULL);
 						size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,vnl;
 						char *variablename;
 						// as long as variable is defined, and the variable's name is not equal to the given name, continue
@@ -834,6 +867,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 									if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
 										if(completiontype==1){
 											if(completion!=NULL){
+												output("'%s'",completion);
 												numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(variablename+l,completion);
 												if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
 												if(completionlength==0){ // too bad
@@ -851,15 +885,15 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 											}
 										}else{ // completiontype==2
 											// don't add twice!!!
-											if(string_find_char(_completion,(*(variablename+l)),0)<0)if(NULL==string_append_char(_completion,*(variablename+l)))completiontype=0;			   
+											if(string_find_char(_completion,(*(variablename+l)),0)<0)if(NULL==string_append_char(_completion,*(variablename+l)))completiontype=0;
 										}
-										if(completiontype==0)break; // something went wrong
+										//////////if(completiontype==0)break; // something went wrong
 									}
 								}
 							}
+							if(completiontype==0)break;
 							variableMapelement=variableMapelement->_next;
 						}
-						if(completiontype==0)break; // OOPS apparently contradictory continuations
 					}
 					if(functionidentifiersaswell){
 						// check functions

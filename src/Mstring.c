@@ -509,12 +509,13 @@ Mstring* string_setchar(Mstring* const str,char c,size_t pos){
  * @return char* the C string being returned
  */
 char* _stringstart(const Mstring* const str,size_t length){
-	if(!str)return NULL;
+	if(NULL==str)return NULL;
+	if(NULL==str->_chars)return NULL;
 	// MDH@17APR2020 inserting ->_chars
 	str->_chars->chars[str->length]='\0'; // mark the end of the string
 	char* _result=strdup(str->_chars->chars); // create a copy of the entire string // MDH@02MAY2020 TODO should we return an Mchars* instead???????
 	// MDH@14JAN2021: can't actually do this because in that case we wouldn't know how many characters to free??????? yes we can do that but it's unmanaged so you simply need to call free() on the returned pointer!!!!
-	if(_result)if(length>0&&length<str->length)_result[length]='\0'; // 'cut off' the part we don't want!!
+	if(_result!=NULL)if(length>0&&length<str->length)_result[length]='\0'; // 'cut off' the part we don't want!!
 	return _result;
 }
 
@@ -595,8 +596,8 @@ char* string_remainder(Mstring* const str,size_t firstpos){
  * @return char* the C string pointer on success, or NULL on failure
  */
 char* string(Mstring* const str){
-	if(str==NULL)return NULL;
-	if(str->_chars)str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
+	if(NULL==str)return NULL;
+	if(str->_chars!=NULL)str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
 	return str->_chars->chars;
 	// MDH@21JUN2019: replacing: return (str?str->chars:NULL);
 }

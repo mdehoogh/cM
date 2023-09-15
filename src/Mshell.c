@@ -1375,7 +1375,11 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 	char* lastPropertySeparator=strrchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
 	if(lastPropertySeparator!=NULL){
 		name[lastPropertySeparator-name]='\0'; // pretend the name to end at the last property separator
-		if(report>0)output("Looking for map variable '%s'.\n",name);else if(report<0)(*inputInfoFunction)("Looking for map variable '%s'.\n",name);
+		if(report>0)
+			output("Looking for map variable '%s'.\n",name);
+		else 
+		if(report<0)
+			(*inputInfoFunction)("Looking for map variable '%s'.\n",name);
 		variable=getVariable(_environment,name,report>0); // getVariable() uses output() and we can only use that when report>0
 		name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER; // put the last property separator back
 		if(NULL==variable)return -2; // if this happens the part in front of the period does not denote an existing variable (and it should)
@@ -6459,7 +6463,8 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				}
 				expressionToken=nextEnvironmentExpressionToken();
 				// if(amDebugging())
-				if(amVerboseDebugging())if(*outputTokenFunction){output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
+				if(amVerboseDebugging())
+					if(*outputTokenFunction){output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 				if(expressionToken->type==TT_LIST){
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
 					if(indexListValue!=NULL&&indexListValue->type==VT_LIST&&indexListValue->value._list){
@@ -13428,7 +13433,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				appendedToMap(TYPES_map,valueOwner,"environment",_getTextValue("'e"));
 				appendedToMap(TYPES_map,valueOwner,"file",_getTextValue("'#"));
 				appendedToMap(TYPES_map,valueOwner,"time",_getTextValue("'$"));
-				Mlock(TYPES_value); // does this work?????
+				Mlock(TYPES_value); // to lock the map itself (locking the variable does NOT suffice)
 			}else
 				outputError("Failed to initialize the TYPES map");
 

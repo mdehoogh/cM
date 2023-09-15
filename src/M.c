@@ -713,6 +713,8 @@ char getFirstManualFeedforwardCharacterRemoved(){
 // MDH@28OCT2019: not needed here anymore... Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the sequence of tokens starting with _userInputCommand->_firstToken
 // MDH@02OCT2019: might need this in multiple places!!
 // MDH@04NOV2019: added TT_REFERENCE tokens as well
+// MDH@15SEP2023: inIndentifierToken is only called from updateLastTokenIdentifierContinuation and should include property completion as well
+//                so adding TT_PROPERTY
 /**
  * @brief returns true if \p lastCommandToken is an identier token, false otherwise
  * 
@@ -721,7 +723,7 @@ char getFirstManualFeedforwardCharacterRemoved(){
  * @return false if \p lastCommandToken is not an identifier token
  */
 bool inIdentifierToken(Mtoken* lastCommandToken){
-	return(lastCommandToken!=NULL?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE||lastCommandToken->type==TT_REFERENCE:false);
+	return(lastCommandToken!=NULL?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_PROPERTY||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE||lastCommandToken->type==TT_REFERENCE:false);
 }
 
 /* MDH@28OCT2019 replacing: 
@@ -2284,7 +2286,23 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 	if(canHaveAnIdentifierContinuation){ // theoretically we could have identifier continuation
 		if(userInputCommandIdentifierContinuationNeedsUpdating){ // not blocked
 			// MDH@04NOV2019: if inside a reference, skip the reference 'operator' at the start of the reference when requesting completion text
-			Mstring* _completionText=owned_string(_userInputCommand->_lastToken->type!=TT_REFERENCE?_getCompletion(string(_userInputCommand->_lastToken->text),true):_getCompletion(string_remainder(_userInputCommand->_lastToken->text,1),false),owner);
+			// MDH@15SEP2023: we'd like to be able to complete a map property as well, which means we will have include everything up until the
+			//                original variable name
+			Mstring* _identifier=owned_string(_getString(_userInputCommand->_lastToken->type!=TT_REFERENCE?string(_userInputCommand->_lastToken->text):string_remainder(_userInputCommand->_lastToken->text,1)),owner);
+			Mtoken* token=_userInputCommand->_lastToken;
+			/////inputInfo("Token: '%s' of type '%i'.",string(token->text),token->type);
+			if(token->type==TT_PROPERTY){
+				// let's go back and prefix all property so far up until the variable token
+				//inputInfo("Looking for the completion of property '%s'.",string(token->text));
+				do{
+					token=token->prev;
+					string_prepend(_identifier,string(token->text));
+				}while(token->type==TT_PROPERTY);
+			}
+			//////inputInfo("Looking for the completion of '%s'.",string(_identifier));
+			// MDH@15SEP2023 TODO when should we look for functions as well, NOT when this is a reference or a property CHECK THIS!!!! 
+			Mstring* _completionText=owned_string(_getCompletion(string(_identifier),_userInputCommand->_lastToken->type!=TT_REFERENCE&&_userInputCommand->_lastToken->type!=TT_PROPERTY),owner);
+			FREE_STRING(_identifier,owner);
 			// need at least two characters (the type and something text behind it)
 			// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
 			if(_completionText!=NULL){
