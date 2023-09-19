@@ -800,6 +800,8 @@ size_t getNumberOfMatchingCharacters(char const * s1,char const * s2){
 // MDH@15SEP2023: name may now also contain property names (i.e. period separated property names), which complicates stuff
 //                it means that we should complete the last property but of course it must exist (in the map)
 //                NOTE name no longer is considered a char const * const because we're going to adapt it if it refers to a property!!!!
+// MDH@19SEP2023: because indices can also be used in dot notation identifiers, it is possible that it is an array or list
+//                and not a map, and I want to accomodate for completion of map properties as well of those structures
 /**
  * @brief return the completion of variable name \p name in the current execution environment and its parents
  * 
@@ -820,10 +822,16 @@ Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 				Menvironment* _environment=getExecutionEnvironment();
 				while(_environment!=NULL){
 					// check variables
+					// MDH@19SEP2023: we're starting out with this map which isn't part of a value as such which
+					//                we do want to use to check out, unless we keep track of the type separately?????
+					//                how about mapping it to a Mvalueunion?????
+					//                essentially Mvalueunion stores a pointer
 					Mmap* variableMap=_environment->_variableMap;
+					Marray* variableArray=NULL;
+					Mlist* variableList=NULL;
 					// MDH@15SEP2023: what if we're looking for completion of a property name? In that case we may have to iterate over multiple 'properties'
 					//                'name' is always supposed to be that 'property' name
-					while(variableMap!=NULL){
+					while(variableMap!=NULL||variableArray!=NULL||variableList!=NULL){
 						// determine the position of the first period (if any)
 						char* _period=strstr(name,".");
 						// when no period is present in name, we have reached the final 'property'
@@ -833,23 +841,55 @@ Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 						// NOTE that if _period is not NULL, name should be present in the map as variable
 						// ASSERT _period is not NULL
 						*_period='\0';
-						// if 'name' is NOT present in the map we can't find a continuation
-						Mmapelement* mapelement=variableMap->_first;
-						while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,name)))
-							mapelement=mapelement->_next;
-						variableMap=NULL; // this is essential because otherwise it would still look for a continuation
-						if(NULL==mapelement)break; // NOT found means there will not be a completion 
-						// ASSERT 'name' was found in 'variableMap'
-						if(NULL==mapelement->_variable)break; // very unlikely though
-						if(NULL==mapelement->_variable->_value)break; // very unlikely
-						if(mapelement->_variable->_value->type!=VT_MAP)break; // if not a map no continuation will be found
-						// ASSERT the value of 'name' is a map
-						variableMap=mapelement->_variable->_value->value._map;
+						Mvalue* variableValue=NULL;
+						// if 'name' is NOT present in the map/list/array we can't find a continuation
+						if(variableMap!=NULL){
+							Mmapelement* mapelement=variableMap->_first;
+							while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,name)))
+								mapelement=mapelement->_next;
+							if(mapelement!=NULL&&mapelement->_variable!=NULL)
+								variableValue=mapelement->_variable->_value;
+							variableMap=NULL;
+						}else{
+							// name ought to translate to an integer number between 1 and the total number of elements
+							/////////output("/%s/",name);
+							int index=atoi(name);
+							/////////output("%i",index);
+							if(variableArray!=NULL){
+								if(index>0&&index<=variableArray->numberOfElements)
+									variableValue=variableArray->values[index-1];
+								variableArray=NULL;
+							}else{ // ASSERT it must be a list
+								if(variableList->_first!=NULL&&index>=variableList->_first->index){
+									Mlistelement* listelement=variableList->_first;
+									while(listelement!=NULL&&index<listelement->index)
+										listelement=listelement->_next;
+									if(listelement!=NULL&&index==listelement->index)
+										variableValue=listelement->_value;
+								}
+								variableList=NULL;
+							}
+						}
+						if(variableValue==NULL)break;
+						//////outputValue("'",variableValue,"'");
+						if(variableValue->type==VT_MAP){
+							variableMap=variableValue->value._map;
+							/////outputMap("MAP(",variableMap,")");
+						}else
+						if(variableValue->type==VT_LIST){
+							variableList=variableValue->value._list;
+							/////outputList("LIST(",variableList,")");
+						}else
+						if(variableValue->type==VT_ARRAY){
+							variableArray=variableValue->value._array;
+							/////outputArray("ARRAY(",variableArray,")");
+						}
 						// ascertain to point to the next property to find
 						name=_period+1;
 					}
 					// ASSERT name does now no longer contain a period, and variableMap points to the map with variables to match with name
 					if(variableMap!=NULL){ 
+						/////////outputMap("'",variableMap,"'");
 						l=strlen(name); // OOPS do NOT forget this!!!
 						////////output(name);//////outputMap(NULL,variableMap,NULL);
 						size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,vnl;
