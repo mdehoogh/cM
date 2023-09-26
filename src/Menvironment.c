@@ -586,32 +586,54 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 	// MDH@25OCT2020 removing: if(l==0){if(report)outputError("Undefined variable name");return NULL;}
 	// MDH@12MAR2020: if `name` refers to a property in a map variable we have to determine if that property exists or not and return it if it does
 	//				in combination with containsVariable() we decided to 
+	// MDH@26SEP2023: the same as we did with predicting identifier continuation we should now also allow array/list indexes in the property name
 	char* nextPropertySeparator=strchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
 	if(nextPropertySeparator!=NULL){
 		char* propertySeparator=name;
 		// the 'root' name must be a variable in the current (environment) variable map
-		propertySeparator[nextPropertySeparator-propertySeparator]='\0'; // pointer arithmetic
-		Mvariable* mapVariable=getVariable(_environment,propertySeparator,report);
-		propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER;
-		if(NULL==mapVariable)return NULL;
-		if(NULL==mapVariable->_value)return NULL;
-		if(mapVariable->_value->type!=VT_MAP)return NULL;
-		// it's a map so now we can check all properties
-		Mmap* map=mapVariable->_value->value._map;
-		Mmapelement* mapelement;
-		// starting out with a map and a list of 'dot' seperated property names
-		while(map!=NULL){
+		*nextPropertySeparator='\0'; // MDH@26SEP2023: much easier then: propertySeparator[nextPropertySeparator-propertySeparator]='\0'; // pointer arithmetic
+		Mvariable* variable=getVariable(_environment,propertySeparator,report);
+		//////// *nextPropertySeparator=M_PROPERTY_SEPARATOR_CHARACTER; // replacing: propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER;
+		if(NULL==variable){outputError("Variable not found!");return NULL;}
+		if(NULL==variable->_value){outputError("Variable not set!");return NULL;}
+		Mvalue* value=variable->_value; // should be a map, list or array
+		while(value!=NULL&&nextPropertySeparator!=NULL){
+			//////outputValue("'",value,"'");
 			propertySeparator=nextPropertySeparator+1; // the first position after the 'dot' so containing the 
 			nextPropertySeparator=strchr(propertySeparator,M_PROPERTY_SEPARATOR_CHARACTER);
-			if(nextPropertySeparator!=NULL)propertySeparator[nextPropertySeparator-propertySeparator]='\0';
-			if(report)output("Looking for property '%s' in '%s'.\n",propertySeparator,name);
-			mapelement=map->_first;while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,propertySeparator)))mapelement=mapelement->_next;
-			if(nextPropertySeparator!=NULL)propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER; // put the property separator character back where it belongs
-			if(NULL==mapelement)return NULL; // if we did not find a matching map element (property) definitely not an existing property
-			// ASSERT matching 'property' found
-			if(NULL==nextPropertySeparator)return mapelement->_variable; // if no next property to look for we can return the associated (map) variable
+			if(nextPropertySeparator!=NULL)*nextPropertySeparator='\0'; // replacing: propertySeparator[nextPropertySeparator-propertySeparator]='\0';
+			//////outputValue("'",value,"'");
+			if(value->type==VT_MAP){
+				Mmap* map=value->value._map;
+				value=NULL;
+				if(report)output("Looking for property '%s' in '%s'.\n",propertySeparator,name);
+				Mmapelement* mapelement=(map!=NULL?map->_first:NULL);
+				while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,propertySeparator)))
+					mapelement=mapelement->_next;
+				if(NULL==mapelement||mapelement->_variable==NULL)return NULL;
+				if(NULL==nextPropertySeparator)return mapelement->_variable;
+				value=mapelement->_variable->_value;
+			}else
+			if(value->type==VT_ARRAY){ // a list or an array
+				Marray* array=value->value._array;
+				value=NULL;
+				if(array!=NULL){
+					long long index=atoll(propertySeparator);
+					if(report)output("Looking for element '%s' in '%s'.\n",propertySeparator,name);
+					if(index>0&&index<=array->numberOfElements)value=array->values[index-1];
+				}
+			}else
+			if(value->type==VT_LIST){
+				Mlist* list=value->value._list;
+				value=NULL;
+				Mlistelement* listelement=(list!=NULL?list->_first:NULL);
+				while(listelement!=NULL&&listelement->index<index)listelement=listelement->_next;
+				if(listelement!=NULL&&index==listelement->index)value=listelement->_value;
+			}else
+				value=NULL;
+			if(value!=NULL)*(propertySeparator-1)=M_PROPERTY_SEPARATOR_CHARACTER;
+			///////if(nextPropertySeparator!=NULL)*nextPropertySeparator=M_PROPERTY_SEPARATOR_CHARACTER; // replacing: propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER; // put the property separator character back where it belongs
 			// ASSERT because there is a next property the property must have a map associated with it, so let's update map
-			map=(mapelement->_variable!=NULL&&mapelement->_variable->_value!=NULL&&mapelement->_variable->_value->type==VT_MAP?mapelement->_variable->_value->value._map:NULL);
 		}
 		// if we get here we definitely did not find the final property
 		if(report)output("Property '%s' not found.\n",name);
@@ -647,16 +669,15 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 	}
 	if(report)output("Looking for variable '%s' in '%s'.\n",name,environment->_name->chars);
 	///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
-	Mmapelement* _variableMapelement=variableMap->_first;
+	Mmapelement* variableMapelement=variableMap->_first;
 	// as long as variable is defined, and the variable's name is not equal to the given name, continue
-	while(_variableMapelement!=NULL&&
-			(NULL==_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name->chars,name)))
-		_variableMapelement=_variableMapelement->_next;
+	while(variableMapelement!=NULL&&
+			(NULL==variableMapelement->_variable||strcmp(variableMapelement->_variable->_name->chars,name)))
+		variableMapelement=variableMapelement->_next;
 	// MDH@20JUL2019: if found return
-	if(_variableMapelement!=NULL){
-		if(report)
-			output("Variable '%s' found in environment '%s'.\n",name,environment->_name->chars);
-		return _variableMapelement->_variable;
+	if(variableMapelement!=NULL){
+		if(report)output("Variable '%s' found in environment '%s'.\n",name,environment->_name->chars);
+		return variableMapelement->_variable;
 	}
 	if(report)output("Variable '%s' NOT found in environment '%s'.\n",name,environment->_name->chars);
 	// if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
@@ -853,7 +874,7 @@ Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 						}else{
 							// name ought to translate to an integer number between 1 and the total number of elements
 							/////////output("/%s/",name);
-							int index=atoi(name);
+							long long index=atoll(name);
 							/////////output("%i",index);
 							if(variableArray!=NULL){
 								if(index>0&&index<=variableArray->numberOfElements)
@@ -1724,6 +1745,35 @@ char getMutableValueTypeCharacter(char valuetypechar){
 	p=strchr(IMMUTABLEVALUETYPECHARS,valuetypechar);
 	if(p!=NULL)return MUTABLEVALUETYPECHARS[p-IMMUTABLEVALUETYPECHARS]; // NOTE I can determine the index (position) in the array by subtracting the start pointer (representing 0)!
 	return '\0';
+}
+
+// MDH@26SEP2023: it's a good idea to distinguish obtaining variable/property and array/list/map element types
+/**
+ * @brief returns the type of \p value
+ * @details \p value supposedly represents the name of a variable or a map property (which is stored as a variable)
+ * @param value 
+ * @return Mvalue* the type of the variable(s) represented by \p value
+ */
+Mvalue* Mvtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+
+	if(NULL==value)return NULL;
+	
+	// MDH@26SEP2023: arrays or lists of variable names can be requested
+	if(value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(value->value._array,Mvtype,VT_UNDEFINED));
+	if(value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mvtype,VT_UNDEFINED));
+	if(value->type==VT_MAP)return _getValueOfMap(appliedToMap(value->value._map,Mvtype,VT_UNDEFINED));
+	// ASSERT not a composite value
+	// TODO what happens with a reference??????
+	Mstring* _valueText=owned_string(_getValueText(value,true),owner);
+	if(NULL==_valueText)return NULL;
+	output("Looking for the type of variable '%s'.\n",string(_valueText));
+	// NOTE getVariable() will also check parent environments!!!
+	Mvariable* variable=getVariable(getExecutionEnvironment(),string(_valueText),true);
+	//////output("Releasing...");
+	FREE_STRING(_valueText,owner);
+	/////output("Done!\n");
+	/////output("Value type: '%i'.",(variable!=NULL?variable->valuetype:-1));
+	return(variable!=NULL?_getCharTextValue((variable->unlockCode>0?IMMUTABLEVALUETYPECHARS[variable->valuetype]:MUTABLEVALUETYPECHARS[variable->valuetype]),'\''):NULL);
 }
 
 /**
@@ -3319,6 +3369,7 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	if(!registerFunction(_environment,owner_environment,"exp",Mexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 	if(!registerFunction(_environment,owner_environment,"dexp",Mdexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag MDH@17AUG2023: immutable flag removed again, use lock() to make a variable or complex value immutable
+	if(!registerFunction(_environment,owner_environment,"vtype",Mvtype,1,(char*[]){"a variable/property name"},(Mvalue*[]){NULL}))return false; // MDH@26SEP2023
 	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
 	if(!registerFunction(_environment,owner_environment,"lock",Mlock,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
 	if(!registerFunction(_environment,owner_environment,"locked",Mlocked,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
