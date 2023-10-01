@@ -1887,57 +1887,53 @@ Mvalue* Msetvartype(Mvalue* variableValue,Mvalue* valuetypeValue){Mallocationown
  */
 Mvalue* Meltype(Mvalue* compositeValue){
 	// compositive values like array, list and map have element types
-	if(NULL==compositeValue)return NULL;
-	// we may copy most of Mtype() from below
 	if(compositeValue!=NULL){
-		if(compositeValue->type==VT_ARRAY){
-			// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
-			return _getCharTextValue((compositeValue->value._array->unlockCode>0
-									?IMMUTABLEVALUETYPECHARS[compositeValue->value._array->valuetype]
-									:MUTABLEVALUETYPECHARS[compositeValue->value._array->valuetype]),'\'');
-		}
-		if(compositeValue->type==VT_LIST){
-			// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
-			return _getCharTextValue((compositeValue->value._list->unlockCode>0
-									?IMMUTABLEVALUETYPECHARS[compositeValue->value._list->valuetype]
-									:MUTABLEVALUETYPECHARS[compositeValue->value._list->valuetype]),'\'');
-		}
-		if(compositeValue->type==VT_MAP){
-			return _getCharTextValue((compositeValue->value._map->unlockCode>0
-									?IMMUTABLEVALUETYPECHARS[compositeValue->value._map->valuetype]
-									:MUTABLEVALUETYPECHARS[compositeValue->value._map->valuetype]),'\'');
-		}
-		/* replacing:
-		// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
-		if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-		if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-		if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-		*/
 		Mvariable* variable=NULL;
 		// TODO should we force value type to be text???? for now yes
-		switch(compositeValue->type){
-			//////////case VT_ARRAY:case VT_MAP:case VT_LIST:break;
-			case VT_TEXT:
-				{
-					variable=getVariable(NULL,compositeValue->value._text->_c,false);
-					if(variable==NULL)
-						output("%sCan't set the element type: '%s' is undefined!",M_ERROR_PREFIX,compositeValue->value._text->_c);
-					break;
-				}
-			case VT_REFERENCE:
-				{
-					variable=compositeValue->value._reference->variable;
-					// it's best NOT to create the variable if it does not yet exist although we could
-					if(NULL==variable){
-						output("%s",M_ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",compositeValue,"'.\n");
-					}
-					break;
-				}
-			default:
-				outputError("Cannot set the type of element values that are scalar or text (representing the name of a variable)");
+		if(compositeValue->type==VT_TEXT){
+			variable=getVariable(NULL,compositeValue->value._text->_c,false);
+			if(variable==NULL){
+				output("%sCan't get the element type of non-existing variable '%s'!\n",M_ERROR_PREFIX,compositeValue->value._text->_c);
+				return NULL;
+			}
+		}else
+		if(compositeValue->type==VT_REFERENCE){
+			variable=compositeValue->value._reference->variable;
+			// it's best NOT to create the variable if it does not yet exist although we could
+			if(NULL==variable){
+				output(M_ERROR_PREFIX);
+				outputValue("Cannot get the element type of a non-existing variable reference '",compositeValue,"'.\n");
+				return NULL;
+			}
 		}
-		if(variable!=NULL)
-			return Meltype(variable->_value);
+		Mvalue* value=(NULL==variable?compositeValue:variable->_value);
+		if(value!=NULL){
+			if(value->type==VT_ARRAY){
+				// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
+				return _getCharTextValue((value->value._array->unlockCode>0
+										?IMMUTABLEVALUETYPECHARS[value->value._array->valuetype]
+										:MUTABLEVALUETYPECHARS[value->value._array->valuetype]),'\'');
+			}
+			if(value->type==VT_LIST){
+				// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
+				return _getCharTextValue((value->value._list->unlockCode>0
+										?IMMUTABLEVALUETYPECHARS[value->value._list->valuetype]
+										:MUTABLEVALUETYPECHARS[value->value._list->valuetype]),'\'');
+			}
+			if(value->type==VT_MAP){
+				return _getCharTextValue((value->value._map->unlockCode>0
+										?IMMUTABLEVALUETYPECHARS[value->value._map->valuetype]
+										:MUTABLEVALUETYPECHARS[value->value._map->valuetype]),'\'');
+			}
+			output(M_ERROR_PREFIX);
+			outputValue("Cannot get the element type of '",value,"': it is not a map, array or list!\n");
+			/* replacing:
+			// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
+			if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+			if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+			if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+			*/
+		}
 	}
 	// fall-through
 	return NULL;
@@ -1959,6 +1955,70 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 		long long immutable=(mutablevaluetypechar==valuetypechar?M_FALSE:M_TRUE); // if the same we received the mutable variant
 		*/
 		Mvaluetype valuetype=getCharacterOfMutableValueType(mutablevaluetypechar);
+		Mvariable* variable=NULL;
+		// TODO should we force value type to be text???? for now yes
+		if(compositeValue->type==VT_TEXT){
+			variable=getVariable(NULL,compositeValue->value._text->_c,false);
+			if(variable==NULL){
+				output("%sCan't set the element type of non-existing variable '%s'!\n",M_ERROR_PREFIX,compositeValue->value._text->_c);
+				return NULL;
+			}
+		}else
+		if(compositeValue->type==VT_REFERENCE){
+			variable=compositeValue->value._reference->variable;
+			// it's best NOT to create the variable if it does not yet exist although we could
+			if(NULL==variable){
+				output(M_ERROR_PREFIX);
+				outputValue("Cannot set the element type of an non-existing variable through reference '",compositeValue,"'.\n");
+				return NULL;
+			}
+		}
+		Mvalue* value=(NULL==variable?compositeValue:variable->_value);
+		if(value!=NULL){
+			if(value->type==VT_ARRAY){
+				if(value->value._array->unlockCode==0){
+					// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
+					value->value._array->valuetype=valuetype;
+					return _getCharTextValue((value->value._array->unlockCode>0
+										?IMMUTABLEVALUETYPECHARS[value->value._array->valuetype]
+										:MUTABLEVALUETYPECHARS[value->value._array->valuetype]),'\'');
+				}
+				output(M_ERROR_PREFIX);
+				outputValue("Cannot set the element type of locked array '",value,"'.\n");
+			}else
+			if(value->type==VT_LIST){
+				if(value->value._list->unlockCode==0){
+					value->value._list->valuetype=valuetype;
+					// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
+					return _getCharTextValue((value->value._list->unlockCode>0
+											?IMMUTABLEVALUETYPECHARS[value->value._list->valuetype]
+											:MUTABLEVALUETYPECHARS[value->value._list->valuetype]),'\'');
+				}
+				output(M_ERROR_PREFIX);
+				outputValue("Cannot set the element type of locked list '",value,"'.\n");
+			}else
+			if(value->type==VT_MAP){
+				if(value->value._map->unlockCode==0){
+					value->value._map->valuetype=valuetype;
+					return _getCharTextValue((value->value._map->unlockCode>0
+											?IMMUTABLEVALUETYPECHARS[value->value._map->valuetype]
+											:MUTABLEVALUETYPECHARS[value->value._map->valuetype]),'\'');
+				}
+				output(M_ERROR_PREFIX);
+				outputValue("Cannot set the element type of locked map '",value,"'.\n");
+			}else{
+				output(M_ERROR_PREFIX);
+				outputValue("Cannot set the element type of '",value,"': it is not a map, array or list!\n");
+			}
+			/* replacing:
+			// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
+			if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+			if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+			if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+			*/
+		}
+	}
+	/* replacing:
 		// MDH@17AUG2023: if the type is set of a complex data type, we should set the type on that complex value type instead!!!!
 		if(compositeValue->type==VT_ARRAY){
 			// if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
@@ -2000,14 +2060,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 				outputError("Unable to change the map value type: not all current attributes are of the new type");
 			}else
 				if(amVerbose())output("The map is already of the requested type.");
-		}
-		/* replacing:
-		// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
-		if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-		if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-		if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-		*/
-		else{
+		}else{
 			Mvariable* variable=NULL;
 			// TODO should we force value type to be text???? for now yes
 			switch(compositeValue->type){
@@ -2037,7 +2090,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 				output("%sCan't change the element type of the value of locked variable '%s'.",M_ERROR_PREFIX,variable->_name->chars);
 			}
 		}
-	}
+	}*/
 	// fall-through
 	return NULL;
 }
@@ -2175,14 +2228,14 @@ Mvalue* Mlock(Mvalue* variableNameValue){
 				variableNameValue->value._list->unlockCode=1+rand();
 				return _getIntegerValue(variableNameValue->value._list->unlockCode);
 			}
-			outputError("Cannot lock an list again!");
+			outputError("Cannot lock a list again!");
 		}else
 		if(variableNameValue->type==VT_MAP){
 			if(variableNameValue->value._map->unlockCode==0){
 				variableNameValue->value._map->unlockCode=1+rand();
 				return _getIntegerValue(variableNameValue->value._map->unlockCode);
 			}
-			outputError("Cannot lock an map again!");
+			outputError("Cannot lock a map again!");
 		}else{
 			Mvariable* variable=NULL;
 			switch(variableNameValue->type){
@@ -2198,7 +2251,7 @@ Mvalue* Mlock(Mvalue* variableNameValue){
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
 							output("%s",M_ERROR_PREFIX);
-							outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
+							outputValue("Cannot unlock non-existing referenced variable '",variableNameValue,"'.\n");
 						}
 						break;
 					}
@@ -2211,7 +2264,7 @@ Mvalue* Mlock(Mvalue* variableNameValue){
 					variable->unlockCode=1+rand();
 					return _getIntegerValue(variable->unlockCode);
 				}
-				output("Variable '%s' is already locked!",M_ERROR_PREFIX,variable->_name->chars);
+				output("Variable '%s' is already locked!\n",M_ERROR_PREFIX,variable->_name->chars);
 			}
 		}
 	}
