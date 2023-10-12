@@ -8188,16 +8188,97 @@ long long integerShift(long long integer,long long shift){
  * @param _value2 
  * @return Mvalue* p _value1 shifted left by \p _value2
  */
-Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL;
-	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftleft,false);
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftleft,false);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft,false);
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mshiftleft,false);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mshiftleft,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mshiftleft,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mshiftleft,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@25OCT2019: if either value is zero the result is the first value
 	// ASSERT neither value zero
 	// TODO deal with integers separately
 	// do NOT allow shifting by anything that cannot be converted to an integer
+	// MDH@12OCT2023: shifting left integers is dangerous as the result might become too large in which case we'd best
+	//                decide to shift big integers 
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&
+		 (_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mvalue* result=NULL;
+		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
+		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),
+		     invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
+		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
+		// ASSERT both integers are considered valid (i.e. not invalid)
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
+			// perhaps we can shift in steps in _biginteger2 is too large?????
+			if(mp_iszero(MP_INT_POINTER(_biginteger2))==MP_YES){ // can't happen (see above)
+				result=_value1;
+			}else{
+				Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
+				Mbiginteger* _intmaxbiginteger=owned_biginteger(_getBiginteger(INT_MAX),owner);
+				if(mp_isneg(MP_INT_POINTER(_biginteger2))==MP_YES){
+					// negate _biginteger2
+					if(mp_abs(MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_biginteger2))==MP_OKAY){ /////MP_INT_POINTER(_biginteger2)->sign=MP_ZPOS;
+						// how about shifting in groups of INT_MAX
+						do{
+							int integer2=INT_MAX;
+							if(mp_cmp(MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_intmaxbiginteger))!=MP_GT){
+								integer2=mp_get_i64(MP_INT_POINTER(_biginteger2));
+								mp_zero(MP_INT_POINTER(_biginteger2));
+							}else
+							if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
+								outputError("Failed to subtract shift left maximum");
+								FREE_BIGINTEGER(_biginteger,owner);
+								_biginteger=NULL;
+							}
+							if(_biginteger!=NULL&&mp_div_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
+								outputError("Failed to shift right");
+								FREE_BIGINTEGER(_biginteger,owner);
+								_biginteger=NULL;
+							}
+						}while(_biginteger!=NULL&&mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO);
+					}else{
+						FREE_BIGINTEGER(_biginteger,owner);
+						_biginteger=NULL;
+					}
+				}else{
+					do{
+						int integer2=INT_MAX;
+						if(mp_cmp(MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_intmaxbiginteger))!=MP_GT){
+							integer2=mp_get_i64(MP_INT_POINTER(_biginteger2));
+							mp_zero(MP_INT_POINTER(_biginteger2));
+						}else
+						if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
+							outputError("Failed to subtract shift left maximum");
+							FREE_BIGINTEGER(_biginteger,owner);
+							_biginteger=NULL;
+						}
+						if(_biginteger!=NULL&&mp_mul_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger))!=MP_OKAY){
+							outputError("Failed to shift left");
+							FREE_BIGINTEGER(_biginteger,owner);
+							_biginteger=NULL;
+						}
+					}while(_biginteger!=NULL&&mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO);
+				}
+				if(_biginteger!=NULL){
+					// convert back to small integer if possible
+					if(mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+						result=_getIntegerValue(mp_get_i64(MP_INT_POINTER(_biginteger)));
+						FREE_BIGINTEGER(_biginteger,owner);
+					}else
+						result=_getValueOfBiginteger(disowned_biginteger(_biginteger,owner));
+				}
+				FREE_BIGINTEGER(_intmaxbiginteger,owner);
+			}
+		}	
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
+		return result;
+	}
+	// MDH@12OCT2023 END
+
 	long long shiftleftinteger=getValueInteger(_value2);
 	if(shiftleftinteger==M_LL_INVALID)return NULL;
 	///////////if(shiftleftinteger==0)return _value1; // return _value1 if no need to shift!!
@@ -8207,7 +8288,9 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftleftBiginteger=owned_biginteger(_getBigintegerCopy(_value1->value._biginteger),owner); // make a copy of the big integer to shift left
 		if(_shiftleftBiginteger!=NULL){
-			if((shiftleftinteger<0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger)))!=MP_OKAY){
+			if((shiftleftinteger<0
+			    ?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger),NULL)
+					:mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger)))!=MP_OKAY){
 				FREE_BIGINTEGER(_shiftleftBiginteger,owner);_shiftleftBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
 			}else 
@@ -8282,6 +8365,88 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@26OCT2019: if either value is zero return _value1
 	// ASSERT neither value is zero
 	// do NOT allow shifting by anything that cannot be converted to an integer
+
+	// MDH@12OCT2023: shifting left integers is dangerous as the result might become too large in which case we'd best
+	//                decide to shift big integers 
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&
+		 (_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mvalue* result=NULL;
+		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
+		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),
+		     invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
+		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
+		// ASSERT both integers are considered valid (i.e. not invalid)
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(_biginteger1!=NULL&&_biginteger2!=NULL){
+			// perhaps we can shift in steps in _biginteger2 is too large?????
+			if(mp_iszero(MP_INT_POINTER(_biginteger2))==MP_YES){ // can't happen (see above)
+				result=_value1;
+			}else{
+				Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
+				Mbiginteger* _intmaxbiginteger=owned_biginteger(_getBiginteger(INT_MAX),owner);
+				if(mp_isneg(MP_INT_POINTER(_biginteger2))==MP_YES){
+					// negate _biginteger2
+					if(mp_abs(MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_biginteger2))==MP_OKAY){ /////MP_INT_POINTER(_biginteger2)->sign=MP_ZPOS;
+						// how about shifting in groups of INT_MAX
+						do{
+							int integer2=INT_MAX;
+							if(mp_cmp(MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_intmaxbiginteger))!=MP_GT){
+								integer2=mp_get_i64(MP_INT_POINTER(_biginteger2));
+								mp_zero(MP_INT_POINTER(_biginteger2));
+							}else
+							if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
+								outputError("Failed to subtract shift left maximum");
+								FREE_BIGINTEGER(_biginteger,owner);
+								_biginteger=NULL;
+							}
+							if(_biginteger!=NULL&&mp_mul_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger))!=MP_OKAY){
+								outputError("Failed to shift left");
+								FREE_BIGINTEGER(_biginteger,owner);
+								_biginteger=NULL;
+							}
+						}while(_biginteger!=NULL&&mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO);
+					}else{
+						FREE_BIGINTEGER(_biginteger,owner);
+						_biginteger=NULL;
+					}
+				}else{
+					do{
+						int integer2=INT_MAX;
+						if(mp_cmp(MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_intmaxbiginteger))!=MP_GT){
+							integer2=mp_get_i64(MP_INT_POINTER(_biginteger2));
+							mp_zero(MP_INT_POINTER(_biginteger2));
+						}else
+						if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
+							outputError("Failed to subtract shift right maximum");
+							FREE_BIGINTEGER(_biginteger,owner);
+							_biginteger=NULL;
+						}
+						if(_biginteger!=NULL&&mp_div_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
+							outputError("Failed to shift right");
+							FREE_BIGINTEGER(_biginteger,owner);
+							_biginteger=NULL;
+						}
+					}while(_biginteger!=NULL&&mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO);
+				}
+				if(_biginteger!=NULL){
+					// convert back to small integer if possible
+					if(mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+						result=_getIntegerValue(mp_get_i64(MP_INT_POINTER(_biginteger)));
+						FREE_BIGINTEGER(_biginteger,owner);
+					}else
+						result=_getValueOfBiginteger(disowned_biginteger(_biginteger,owner));
+				}
+				FREE_BIGINTEGER(_intmaxbiginteger,owner);
+			}
+		}	
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
+		return result;
+	}
+	// MDH@12OCT2023 END
+
 	long long shiftrightinteger=getValueInteger(_value2);if(shiftrightinteger==M_LL_INVALID)return NULL;
 	/////////////if(shiftrightinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
@@ -9103,7 +9268,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '&' :result=(strlen(operator)-1?logicaland(_value1,_value2):bitwiseand(_value1,_value2));break;
 			case '|' :result=(strlen(operator)-1?logicalor(_value1,_value2):bitwiseor(_value1,_value2));break;
 			// comparison operators
-			case '<' :result=(strlen(operator)-1?(operator[1]=='<'?shiftleft(_value1,_value2):Msmallerthanorequalto(_value1,_value2)):Msmallerthan(_value1,_value2));break;
+			case '<' :result=(strlen(operator)-1?(operator[1]=='<'?Mshiftleft(_value1,_value2):Msmallerthanorequalto(_value1,_value2)):Msmallerthan(_value1,_value2));break;
 			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):Mlargerthanorequalto(_value1,_value2)):Mlargerthan(_value1,_value2));break;
 			case '!' :result=Munequalto(_value1,_value2);break;
 			case '=' :result=Mequalto(_value1,_value2);break;

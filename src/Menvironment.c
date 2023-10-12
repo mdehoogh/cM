@@ -2207,6 +2207,19 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	*/
 	return _getTextValue(result);
 }
+// MDH@02OCT2023
+/**
+ * @brief returns all types in \p value
+ * 
+ * @param value 
+ * @return Mvalue* 
+ */
+Mvalue* Mtypes(Mvalue* value){
+	// any text is assumed to be a variable/property name of which all types should be returned
+	// NO, only a reference should do so returning {'':'r','r':{}}
+
+}
+// MDH@02OCT2023 END
 
 /**
  * @brief locks i.e. mutes the variables indicated by \p variableNameValue
