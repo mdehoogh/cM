@@ -1200,6 +1200,7 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 		return MP_OKAY;
 	}
 	// MDH16OCT2023 NOTE: copying the original a into t, which we only do this once, so a will be unaffected all in all
+	static char* digitchars="0123456789";
 	mp_err err;
 	mp_int t;
 	if((err=mp_init_copy(&t,a))==MP_OKAY){
@@ -1209,10 +1210,14 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 		// MDH: we can append the sign AFTER computing all the digits
 		bool negative=(t.sign==MP_NEG);
 		/* if it is negative output we have one less position for decimal digits */
-		if(negative){size--;t.sign=MP_ZPOS;}
-		digs=0;
+		if(negative){*size--;t.sign=MP_ZPOS;} // size is the number of digits we 
+		digs=*size; // the number of decimal digit positions available for the magnitude
 		mp_word w;
 		mp_digit digit;
+		// NOTE why divide the entire number a by 10 until it ends up equal to zero when we can
+		//      simply divide each term until it is zero before we divide the next term
+		//      that would actually save us a lot of iterations
+		//      does that mean that we can keep dividing until what's left is below 10 in each digit?
 		do{
 			// when there are a lot of decimal digits, we would be calling mp_div_d a lot, so it's best to put the division by 10 code here
 			// mp_div_d has arguments a=&t, b=10, c=&t and d=&d, and the result should be placed in err to test it next 
@@ -1222,14 +1227,18 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 			// how about using pointers in the following instead of array elements????
 			mp_digit* _mp_digits=t.dp;
 			mp_digit* _mp_digit=_mp_digits+t.used;
+			bool zeroed=true; // to prevent needing to clamp afterwards
 			do{
 				w=(w<<(mp_word)MP_DIGIT_BIT)|(mp_word)*(--_mp_digit);
 				if(w>=10){
 					digit=(mp_digit)(w/10);
 					w-=(mp_word)digit*(mp_word)10;
 					*_mp_digit=digit;
-				}else
+					zeroed=false;
+				}else{
 					*_mp_digit=0;
+					if(zeroed)t.used--;
+				}
 			}while(_mp_digit!=_mp_digits);
 			/* replacing:
 			int ix=t.used;
@@ -1244,24 +1253,27 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 			}
 			*/
 			// MDH the actual decimal digit result is 'w' (not d)
-			*_s++=(w+48);
-			++digs;
-			if(digs==size){err=MP_VAL;break;}
-			mp_clamp(&t);
-		}while(t.used>0); // replacing !MP_IS_ZERO(&t)
-		if(err==MP_OKAY){
+			*_s++=(w+48); // this is a little faster than using digitchars[w]
+			// one less position for decimal digits
+			--digs;
+			if(!t.used)break; // done when no digits are non-zero anymore
+			///////mp_clamp(&t);
+		}while(digs); // replacing !MP_IS_ZERO(&t)
+		if(!t.used){
 			if(negative){
 				*_s++='-';
-				++digs;
+				--digs;
 			}
 			*_s='\0'; /* append a NULL so the string is properly terminated */
-			*size=digs;
+			// digs is the number of decimal positions left, and we update *size by subtracting digs
+			*size-=digs;
 			/* reverse the digits of the string */
 			//////output("Reversing '%i' characters.",digs);
 			//char *x=str,*y=_s-1;char c;while(x<y){c=*x;*x++=*y;*y--=c;}
-			s_mp_reverse((unsigned char *)str,digs);
+			s_mp_reverse((unsigned char *)str,*size);
 			/////////output("Reversed: '%s'",str);
-		}
+		}else // only possible when digs is not zero2
+			err=MP_VAL;
 		mp_clear(&t);
 	}
 	return err;
@@ -1306,7 +1318,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 				if(arepsize<=INT_MAX){
 #endif
 					// output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
-					//////outputChar('D');
+					/////outputChar('D');
 					/////output("Decimal representation size: %i",arepsize);
 					// if(amVerbose()&&amDebugging())
 					// outputChar('E');
