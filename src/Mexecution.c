@@ -1170,6 +1170,103 @@ long long getInteger(Mvalue* _value){
 */
 
 // BigInteger stuff
+// MDH@16OCT2023: _getMpintText() below it too slow because it calls mp_radix_size and mp_to_radix which both iterate _mpint 
+//                and also divide continued by 10 putting the result in the same mp_int which can be optimized because now it keeps computing the dividend
+//                each time and copying the result back, instead of directly putting it back in the original mp_int
+//                the question is whether or not we may consume the used mpint???????? but ok, we might still make a single copy at the start which is reducable
+static int getMpintSize(mp_int const * const _mpint){
+	////////output("mp_int size: '%i'",_mpint->used);
+	// depends on the number of bits per 'digit' which is MP_DIGIT_BIT (could be as large as 60)
+	return(_mpint!=NULL?(_mpint->used*MP_DIGIT_BIT)/3+(_mpint->sign!=MP_ZPOS?1:0)+1:0);
+}
+/**
+ * @brief returns the decimal text representation of \p _mpint in \p str using the current length of \p str in \p size
+ * 
+ * @param a
+ * @param str where to place the decimal digits into
+ * @param _size the final length of str on return
+ * @return int MP_OKAY on sucess
+ */
+static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
+	if(size<2)return MP_VAL;
+	// now let's compute an approximation of how many decimal digits we're going to need to allocated
+	// how about allocating this amount
+	// start of mp_to_radix function adapted to speed it up
+	/* quick out if its zero */
+	if(a->used<=0){ // replacing: MP_IS_ZERO(a)
+		*str='0';
+		*(str+1)='\0';
+		*size=1;
+		return MP_OKAY;
+	}
+	// MDH16OCT2023 NOTE: copying the original a into t, which we only do this once, so a will be unaffected all in all
+	mp_err err;
+	mp_int t;
+	if((err=mp_init_copy(&t,a))==MP_OKAY){
+		char *_s=str;
+		int digs;
+		mp_digit d;
+		// MDH: we can append the sign AFTER computing all the digits
+		bool negative=(t.sign==MP_NEG);
+		/* if it is negative output we have one less position for decimal digits */
+		if(negative){size--;t.sign=MP_ZPOS;}
+		digs=0;
+		mp_word w;
+		mp_digit digit;
+		do{
+			// when there are a lot of decimal digits, we would be calling mp_div_d a lot, so it's best to put the division by 10 code here
+			// mp_div_d has arguments a=&t, b=10, c=&t and d=&d, and the result should be placed in err to test it next 
+			// in the original mp_div_d q is initialized to a, and at the end it copies q to c, we can simply continue with using t instead of q and NOT copy q back to t
+			// we can do that because t.dp[ix] is retrieved to set t.dp[ix] later on, and both do NOT interfere!!!!! except for the remaining 'digits' which I think we should zero
+			w=0;
+			// how about using pointers in the following instead of array elements????
+			mp_digit* _mp_digits=t.dp;
+			mp_digit* _mp_digit=_mp_digits+t.used;
+			do{
+				w=(w<<(mp_word)MP_DIGIT_BIT)|(mp_word)*(--_mp_digit);
+				if(w>=10){
+					digit=(mp_digit)(w/10);
+					w-=(mp_word)digit*(mp_word)10;
+					*_mp_digit=digit;
+				}else
+					*_mp_digit=0;
+			}while(_mp_digit!=_mp_digits);
+			/* replacing:
+			int ix=t.used;
+			while(--ix>=0){
+				w=(w<<(mp_word)MP_DIGIT_BIT)|(mp_word)t.dp[ix];
+				if(w>=10){
+					digit=(mp_digit)(w/10);
+					w-=(mp_word)digit*(mp_word)10;
+					t.dp[ix]=digit;
+				}else
+					t.dp[ix]=0;
+			}
+			*/
+			// MDH the actual decimal digit result is 'w' (not d)
+			*_s++=(w+48);
+			++digs;
+			if(digs==size){err=MP_VAL;break;}
+			mp_clamp(&t);
+		}while(t.used>0); // replacing !MP_IS_ZERO(&t)
+		if(err==MP_OKAY){
+			if(negative){
+				*_s++='-';
+				++digs;
+			}
+			*_s='\0'; /* append a NULL so the string is properly terminated */
+			*size=digs;
+			/* reverse the digits of the string */
+			//////output("Reversing '%i' characters.",digs);
+			//char *x=str,*y=_s-1;char c;while(x<y){c=*x;*x++=*y;*y--=c;}
+			s_mp_reverse((unsigned char *)str,digs);
+			/////////output("Reversed: '%s'",str);
+		}
+		mp_clear(&t);
+	}
+	return err;
+}
+
 // MDH@09APR2020: certain functions only know the mp_int* and not the big integer
 /**
  * @brief returns the pointer to a new M string containing the text representation of the multiple precision integer pointed to by \p _mpint
@@ -1180,10 +1277,10 @@ long long getInteger(Mvalue* _value){
 static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _mpintText=owned_string(__string(),owner);
 	////outputChar('A');
-	if(_mpintText){
+	if(_mpintText!=NULL){
 		/// output("Initial big integer text length: %zu.\n",_bigintegerText->length);
 		///outputChar('B');
-		if(_mpint){
+		if(_mpint!=NULL){
 			// determine the required size
 // MDH@13MAR2020: this is unfortunate because I would have wanted to solve everything with tommath.h
 #ifdef M_MP_DEVELOP
@@ -1191,13 +1288,16 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 #else
 			int arepsize=0;
 #endif
-			///outputChar('C');
-			clock_t then=0;
-			// if(amVerboseDebugging())then=clock(); // DEBUG
+			//////outputChar('C');
+			clock_t then=0; /////=clock();
+			// if(amVerboseDebugging())
+			///////then=clock(); // DEBUG
 			///////if(amVerbose())outputInfo("Determining a big integer text representation.");
 			// output("Big integer text length: %zu.\n",_bigintegerText->length);
 			// output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
-			if(mp_radix_size(_mpint,10,&arepsize)==MP_OKAY){
+			// MDH@16OCT2023: replacing the call to mp_radix_size with a call to getMpintSize() which approximates the number of decimal digit characters we're going to need!!!!
+			arepsize=getMpintSize(_mpint);
+			if(arepsize>0){ // replacing: mp_radix_size(_mpint,10,&arepsize)==MP_OKAY){
 #ifdef M_MP_DEVELOP
 				// if(arepsize>0)output("Length of big integer text representation: %zu.\n",arepsize-1);
 				if(arepsize<=SIZE_MAX){
@@ -1206,7 +1306,8 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 				if(arepsize<=INT_MAX){
 #endif
 					// output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
-					// outputChar('D');
+					//////outputChar('D');
+					/////output("Decimal representation size: %i",arepsize);
 					// if(amVerbose()&&amDebugging())
 					// outputChar('E');
 					// MDH@13MAR2020: arepsize actually includes the '\0' character at the end of any text representation which means that the text itself is one byte shorter
@@ -1214,8 +1315,15 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 					//                as mp_toradix would write
 					uint8_t failure=0;
 					if(string_setlength(_mpintText,arepsize)){
-						if(mp_toradix(_mpint,_mpintText->_chars->chars,10)==MP_OKAY){ // MDH@17APR2020: TODO we should NOT actually use the internal structure of Mstring here!!
-							if(string_synclength(_mpintText)){
+						//////outputChar('E');
+						// MDH@16OCT2023: replacing the call to mp_toradix with a call to my own speedup version
+						if(_getMpintDecimalText(_mpint,_mpintText->_chars->chars,&arepsize)==MP_OKAY){
+						// replacing: if(mp_toradix(_mpint,_mpintText->_chars->chars,10)==MP_OKAY){ // MDH@17APR2020: TODO we should NOT actually use the internal structure of Mstring here!!
+							///////output("BEFORE SYNCLENGTH: '%s'",string(_mpintText));
+							//////outputChar('F');
+							if(string_setlength(_mpintText,arepsize)){ //// replacing (since we know the exact length now!!!): string_synclength(_mpintText)){
+								////////output("'%s'",string(_mpintText));
+								//////outputChar('G');
 								size_t trailingZeroCount=string_trailing(_mpintText,'0');
 								if(trailingZeroCount>=3){
 									if(string_shorten(_mpintText,trailingZeroCount)){ // 'remove' the trailing zeroes

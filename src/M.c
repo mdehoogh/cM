@@ -2484,6 +2484,7 @@ extern char** Mtimezonenames;
  * @return size_t the number of characters written
  */
 size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+	// MDH@13OCT2023 (Petra's 59th birthday!): have to revision this speeding up displaying very large big integers for instance
 	size_t written=0;
 	if(_value!=NULL){
 		switch(_value->type){
