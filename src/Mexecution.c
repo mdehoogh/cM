@@ -1212,7 +1212,7 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 		/* if it is negative output we have one less position for decimal digits */
 		if(negative){*size--;t.sign=MP_ZPOS;} // size is the number of digits we 
 		digs=*size; // the number of decimal digit positions available for the magnitude
-		mp_word w;
+		mp_word remainder; // called w in the original code
 		mp_digit digit;
 		// NOTE why divide the entire number a by 10 until it ends up equal to zero when we can
 		//      simply divide each term until it is zero before we divide the next term
@@ -1223,23 +1223,21 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 			// mp_div_d has arguments a=&t, b=10, c=&t and d=&d, and the result should be placed in err to test it next 
 			// in the original mp_div_d q is initialized to a, and at the end it copies q to c, we can simply continue with using t instead of q and NOT copy q back to t
 			// we can do that because t.dp[ix] is retrieved to set t.dp[ix] later on, and both do NOT interfere!!!!! except for the remaining 'digits' which I think we should zero
-			w=0;
+			remainder=0;
 			// how about using pointers in the following instead of array elements????
-			mp_digit* _mp_digits=t.dp;
-			mp_digit* _mp_digit=_mp_digits+t.used;
-			bool zeroed=true; // to prevent needing to clamp afterwards
-			do{
-				w=(w<<(mp_word)MP_DIGIT_BIT)|(mp_word)*(--_mp_digit);
-				if(w>=10){
-					digit=(mp_digit)(w/10);
-					w-=(mp_word)digit*(mp_word)10;
-					*_mp_digit=digit;
-					zeroed=false;
-				}else{
-					*_mp_digit=0;
-					if(zeroed)t.used--;
-				}
-			}while(_mp_digit!=_mp_digits);
+			int ix=t.used;
+			mp_digit* _mp_digit=t.dp+ix;
+			////////bool zeroed=true; // to prevent needing to clamp afterwards
+			while(--ix>=0){
+				// the following is 3 to 4 as fast as what we had before, and twice when we use both % and /
+				digit=(remainder<<(mp_word)MP_DIGIT_BIT)|(mp_word)*(--_mp_digit); // this is the current 'digit' with the remainder prefixed
+				*_mp_digit=digit/10;
+				remainder=digit-(*_mp_digit)*10;
+				/////////if(!*_mp_digit)t.used--;
+				/* replacing:
+
+				*/
+			}
 			/* replacing:
 			int ix=t.used;
 			while(--ix>=0){
@@ -1253,12 +1251,14 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 			}
 			*/
 			// MDH the actual decimal digit result is 'w' (not d)
-			*_s++=(w+48); // this is a little faster than using digitchars[w]
+			*_s++=(remainder+48); // this is a little faster than using digitchars[w]
 			// one less position for decimal digits
-			--digs;
-			if(!t.used)break; // done when no digits are non-zero anymore
-			///////mp_clamp(&t);
-		}while(digs); // replacing !MP_IS_ZERO(&t)
+			if(!--digs)break;
+			// clamp but a bit faster than calling mp_clamp(&t)
+			int digitindex=t.used;while(--digitindex>=0&&t.dp[digitindex]==0u);t.used=digitindex+1;
+			// no need to change the sign of t (as mp_clamp() does)
+			// replacing: mp_clamp(&t);
+		}while(t.used); // replacing !MP_IS_ZERO(&t)
 		if(!t.used){
 			if(negative){
 				*_s++='-';
