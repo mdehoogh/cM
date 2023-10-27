@@ -1279,6 +1279,55 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 	return err;
 }
 
+// MDH@27OCT2023: we can do binary to bcd using double dabble, let's indeed call it double dabble
+//                let's return the result in a string????
+Mtext* doubledabble_ll(long long integer){Mallocationowner owner=getOwner(__LINE__);
+	bool zerointeger=(integer==0);
+	Mstring *_p=NULL,*_result=owned_string(__string(),owner);
+	if(_result!=NULL){
+		_p=_result;
+		if(integer!=0){
+			bool negative=(integer<0);
+			if(negative)integer=-integer;
+			char c;
+			// how many bytes are we going to need
+			int bits=8*sizeof(long long);
+			int bcd_bytes=(bits+4*((bits/3)+1))<<3; // (bits/3)+1 should equal ceil(bits/3)
+			_p=string_setlength(_p,bcd_bytes);
+			if(_p!=NULL){
+				char* bcd_chars=_p->_chars->chars; // easiest to directly manipulate the stored characters
+				char c;
+				int bit_in,bit_out,bcd_digit,bcd_digits=1; // the number of BDC digits we have constructed (every 4 shifts we get another 1)
+				// we can now perform bits shifts possibly prepended by a number of ADD-3 operations
+				while(--bits>0){
+					// check whether we need to perform ADD-3 on any of the BCD digits 
+					bcd_digit=bcd_digits;
+					while(--bcd_digit>=0){
+						c=bcd_chars[bcd_digit];
+						if(c>=5)bcd_chars[bcd_digit]+=3;
+					}
+					// ready to shift
+					bit_in=(integer>>bits);
+					// shift in 
+					while(++bcd_digit<bcd_digits){
+						c=bcd_chars[bcd_digit];
+						bit_out=(c>>3);
+						bcd_chars[bcd_digit]=bit_in+(c&7)<<1;
+						bit_in=bit_out;
+					}
+					// after 4 shifts we will get a new bcd_digit
+					if(bits%4==0)bcd_digits++;
+				}
+				if(negative)_p=string_prepend(_p,"-");
+			}
+		}else
+			_p=string_append_char(_result,'0');
+	}
+	Mtext* _text=(_p!=NULL?_getText(string(_p)):NULL);
+	if(_result!=NULL)FREE_STRING(_result,owner);
+	return(_text!=NULL?disowned_text(_result,owner):NULL);
+}
+
 // MDH@09APR2020: certain functions only know the mp_int* and not the big integer
 /**
  * @brief returns the pointer to a new M string containing the text representation of the multiple precision integer pointed to by \p _mpint
