@@ -43,6 +43,8 @@ Mstring* string_setlength(Mstring * const str, size_t length); // MDH@26FEB2018:
 
 Mstring* string_synclength(Mstring * const str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
 
+Mstring* string_declength(Mstring * const str); // MDH@13DEC2023: decrements the length of the string
+
 char string_char(Mstring const * const str,size_t pos);
 char string_last_char(Mstring const * const str);
 // MDH@13OCT2020: string_last_char_count() returns the number of times str ends with c
@@ -77,7 +79,7 @@ char string_replacedchar(Mstring * const str,char c,size_t pos); // returns the 
 
 size_t string_number_of_matching_chars(Mstring const * const str,char const * chars); // the number of matching character at the start
 
-bool string_equal(Mstring* str1,Mstring* str2); // MDH@24OCT2019: whether or not two strings are considered equal
+bool string_equal(Mstring const * const str1,Mstring const * const str2); // MDH@24OCT2019: whether or not two strings are considered equal
 
 // MDH@13MAR2020: helper function implementations now here (moved from Mexecution.h/c)
 Mstring* string_append_ull(Mstring* const ms,unsigned long long ll);

@@ -3815,6 +3815,116 @@ bool updateNumberOfLineCharacters(){
 	return true;
 }
 
+// MDH@13DEC2023: after an input character is accepted (and successfully appended to the current command)
+//                it is used to update the expended characters accordingly
+/**
+ * @brief updates the expected characters after appending \p inputChar successfully to the input command
+ * 
+ * @param inputChar the accepted input character
+ * @param currentToken the current input command token
+ * @return int8_t positive on success, zero on input failure, negative on failing to update expected characters
+ */
+int8_t expectedCharactersUpdated(char inputChar,Mtoken const * const currentToken){
+	if(NULL==_expectedCharacters)return 0;
+	// if the last expected character indicates we're in a string literal inputChar is considered part of that string literal
+	char lastExpectedCharacter=string_last_char(_expectedCharacters);
+	if(lastExpectedCharacter=='"'||lastExpectedCharacter=='\''){
+		// only when inputChar actually ends the current token
+		// (technically the end of string literal token could be escaped!!!)
+		if(inputChar==lastExpectedCharacter){
+			if(isTokenFinished(currentToken)){
+				if(NULL==string_declength(_expectedCharacters)){
+					inputError("Failed to register '%c' as expected character",inputChar);
+					return -3;
+				} // 'removes' the last expected token by decrementing the string length
+			}else{
+				inputInfo("Token is not finished!");
+				return 0;
+			}
+		}
+	}else
+	if(inputChar=='"'||inputChar=='\''){ 
+		// could start a string literal
+		if(string_length(currentToken->text)==1){ // actually started the string literal (is NOT escaped)
+			if(NULL==string_append_char(_expectedCharacters,inputChar)){
+				inputError("Failed to register '%c' as expected character",inputChar);
+				return -1;
+			}
+		}
+	}else
+	if(inputChar=='('){
+		// if this starts a function call argument list we're going to need to append comma's for each
+		// argument and a final closing parenthesis, but always the closing parenthesis is expected
+		if(string_append_char(_expectedCharacters,')')!=NULL){
+			Mtoken* prevToken=currentToken->prev;
+			if(prevToken!=NULL&&prevToken->type==TT_FUNCTION_CALL){
+				char* functionName=_getSignificantTokenCharacters(prevToken);
+				Mfunction* function=getFunction(NULL,functionName);
+				if(function!=NULL){
+					long long numberOfArguments=getNumberOfFunctionParameters(functionName);
+					while(--numberOfArguments>0)if(string_append_char(_expectedCharacters,',')==NULL){
+						inputError("Failed to register ',' as expected character");
+						return -2;
+					}
+				}else{
+					inputError("Unknown function call");
+					return -2;
+				}
+			}
+		}else{
+			inputError("Failed to register ')' as expected character");
+			return -2;
+		}
+	}else
+	if(inputChar=='['){
+		if(string_append_char(_expectedCharacters,']')==NULL){
+			inputError("Failed to register ']' as expected character");
+			return -2;
+		}
+	}else
+	if(inputChar=='{'){
+		if(NULL==string_append_char(_expectedCharacters,'}')){
+			inputError("Failed to register '}' as expected character");
+			return -2;
+		}
+	}else
+	if(inputChar==','){
+		if(string_last_char(_expectedCharacters)==','){
+			if(NULL==string_declength(_expectedCharacters)){
+				inputError("Failed to remove expected character ','");
+				return -3;
+			}
+		}
+	}else
+	if(inputChar==')'){
+		if(string_last_char(_expectedCharacters)==')'){
+			if(NULL==string_declength(_expectedCharacters)){
+				inputError("Failed to remove expected character ')'");
+				return -3;
+			}
+		}
+	}else
+	if(inputChar==']'){
+		if(string_last_char(_expectedCharacters)==']'){
+			if(NULL==string_declength(_expectedCharacters)){
+				inputError("Failed to remove expected character ']'");
+				return -3;
+			}
+		}
+	}else
+	if(inputChar=='}'){
+		if(string_last_char(_expectedCharacters)=='}'){
+			if(NULL==string_declength(_expectedCharacters)){
+				inputError("Failed to remove expected character '}'");
+				return -3;
+			}
+		}
+	}
+	//if(amVerbose())
+	inputInfo("'%c+%c': expected characters: '%s' (%zu).",lastExpectedCharacter,inputChar,string(_expectedCharacters),string_length(_expectedCharacters));
+	return 1;
+}
+
 // MDH@20SEP2019: whenever a token changes the associated feed forward text might change, so it makes sense to update the feed forward text accordingly
 //				assuming that the given type is correct (e.g. an identifier of which has been determined whether it is a function or variable name)
 // MDH@26SEP2019: due to the separation of the identifier continuation text and the other feed forward text we separate getting the identifier continution text from getting the other feed forward text
@@ -3847,6 +3957,7 @@ void setUserInputCommand(Mcommand* command){
 	// NOTE command is either an existing command (commandIndex>0) or a new command (commandIndex=0)
 	//	  so if it is a registered command we should NOT obtain ownership
 	_userInputCommand=command; // MDH@24MAY2020: take over ownership!!!!
+	/// string_setlength(_expectedCharacters,0); // MDH@13DEC2023 TODO: is there a better place to do this??????
 	// replacing: _userInputCommand->_lastToken=_userInputCommand->_firstToken=pCommand;
 	numberOfLineCommandCharacters=outputCommand(_userInputCommand); // MDH@24SEP2020: essential to 'sync' numberOfLineCommandCharacters to the number of command characters on the last command line
 	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=(_userInputCommand?inIdentifierToken(_userInputCommand->_lastToken):false); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
@@ -4505,6 +4616,10 @@ static void newCommandLine(bool newline){
 	outputTokenColor(_userInputCommand->_lastToken);
 }
 
+/* MDH@13DEC2023:
+		whenever inputChar gets accepted (and added to the current command we should update _expectedCharacters based
+		on inputChar and possible the current or previous token type
+*/
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
 //	   		  ASSERTION _userInputCommand->_firstToken and _userInputCommand->_lastToken are  NOT  NULL
 //				the endOfInput flag is used to indicate whether this is the end of the input
@@ -4578,7 +4693,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	// MDH@28OCT2019: all the code that deals with updating the tokens 
 	//				NOTE passing in the address of _userInputCommand->_lastToken, so it can be changed!!!!
 	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(_userInputCommand/*,owner_userInputCommand*/,inputChar,inputCharacterType,endOfInput);
-	if(NULL==newLastCommandToEvaluateToken)return -1;
+	if(NULL==newLastCommandToEvaluateToken)return -1; // MDH@13DEC2023: can't actually return -1 though!!!!
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
 		result|=NEW_TOKEN_CHARACTER;
 		//////outputLine("Owning the last command token!");
@@ -4718,6 +4833,16 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		///////}
 		///////else // MDH@22OCT2021: I think if we're consuming a suggested character there's no need to append the last token auto completion text (as it would already be there)
 		updateLastTokenAutoCompletionText(/*acceptedFirstSuggestedCharacterDeleted*/false); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
+		
+		// MDH@13DEC2023 TODO how to respond appropriately to some error???????
+		switch(expectedCharactersUpdated(inputChar,newLastCommandToEvaluateToken)){
+			case 0: break;
+			case -1: break; // input error
+			case -2: break; // appending inputChar failed
+			case -3: break; // removing inputChar failed
+		}
+		// MDH@13DEC2023 END
+		
 		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amVerboseDebugging())inputInfo("N");
 		// debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
@@ -5419,10 +5544,12 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	//                     will always be the comma, which is a nuisance because it would prevent showing the closing parentheses to the user, unless
 	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
 	_expectedCharacters=owned_string(__string(),owner_expectedCharacters);
-	if(NULL==_expectedCharacters)outputError("Failed to feed forward closing parentheses!");
+	if(NULL==_expectedCharacters)
+		outputError("Failed to feed forward closing parentheses!");
 
 	_suggestedText=owned_string(__string(),owner_suggestedText);
-	if(NULL==_suggestedText)outputError("Failed to allow suggested text");
+	if(NULL==_suggestedText)
+		outputError("Failed to allow suggested text");
 	/* do not initialize _manualFeedforwardText because there's now a difference between manual feed forward being NULL or empty (not blocking vs blocking identifier continuation)
 	_manualFeedforwardText=__string();if(!_manualFeedforwardText)outputError("Failed to allow manual feed forward");
 	*/
@@ -5576,7 +5703,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
-				string_setlength(_expectedCharacters,0); // MDH@13JUL2023: get rid of the current list of feed forward closers
+				//// MDH@13DEC2023 NOT HERE: string_setlength(_expectedCharacters,0); // MDH@13JUL2023: get rid of the current list of feed forward closers
 
 				////outputChar('A');
 				if(/*!_manualFeedforwardText||*/string_length(_manualFeedforwardText)==0)
@@ -6380,6 +6507,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			}
 			outputChar('\n');
 			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
+				string_setlength(_expectedCharacters,0); // MDH@13DEC2023: is there a better place to do this?????
 				// if _userInputCommand->_firstToken is set, we have a command to evaluate
 				/*
 				Mtoken* _userInputCommand->_firstTokenToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
