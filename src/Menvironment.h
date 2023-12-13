@@ -91,8 +91,8 @@ Mstring* _getFunctionNames(Menvironment const * const _environment,char const * 
 bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment);
 
 // helper function to return the function
-Mfunction* getFunction(Menvironment const * const _environment,char const * const functionName);
-Muserfunction* getUserfunction(Menvironment const * const _environment,char const * const userfunctionName);
+Mfunction* getFunction(Menvironment const * _environment,char const * const functionName);
+///////Muserfunction* getUserfunction(Menvironment const * _environment,char const * const userfunctionName);
 
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
 Mmap* _getFunctionArgumentMap(Mfunction const * const _function,Mlist const * const _argumentList,Mallocationowner owner_functionargumentmap);

@@ -1451,7 +1451,8 @@ Mstring* _getFunctionNames(Menvironment const * const _environment,const char* c
  * @param functionName 
  * @return Mfunction* the M function with name \p functionName in M environment \p _environment
  */
-Mfunction* getFunction(Menvironment const * const _environment,char const * const functionName){
+Mfunction* getFunction(Menvironment const * _environment,char const * const functionName){
+	if(_environment==NULL)_environment=getExecutionEnvironment();
 	if(_environment!=NULL&&functionName!=NULL&&strlen(functionName)){
 		Mfunctionmap* functionmap=_environment->_functionMap;
 		if(functionmap!=NULL){
@@ -1492,7 +1493,7 @@ Mfunction* getFunction(Menvironment const * const _environment,char const * cons
  */
 long long getNumberOfFunctionParameters(char const * const functionName){
 	// MDH@20DEC2022: we're going to need this to keep track of the expected number of function arguments
-	Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
+	Mfunction* function=getFunction(NULL,functionName);
 	return(function!=NULL&&function->_parameterMap!=NULL?function->_parameterMap->numberOfElements:-1);
 }
 

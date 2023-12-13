@@ -3857,41 +3857,47 @@ int8_t expectedCharactersUpdated(char inputChar,Mtoken const * const currentToke
 		// argument and a final closing parenthesis, but always the closing parenthesis is expected
 		if(string_append_char(_expectedCharacters,')')!=NULL){
 			Mtoken* prevToken=currentToken->prev;
-			if(prevToken!=NULL&&prevToken->type==TT_FUNCTION_CALL){
+			if(currentToken->type==TT_FUNCTION_CALL){
 				char* functionName=_getSignificantTokenCharacters(prevToken);
-				Mfunction* function=getFunction(NULL,functionName);
-				if(function!=NULL){
-					long long numberOfArguments=getNumberOfFunctionParameters(functionName);
-					while(--numberOfArguments>0)if(string_append_char(_expectedCharacters,',')==NULL){
-						inputError("Failed to register ',' as expected character");
+				long long numberOfFunctionParameters=getNumberOfFunctionParameters(functionName);
+				if(numberOfFunctionParameters>=0){
+					///////inputInfo("Number of arguments in function '%s': %lld",function,numberOfFunctionParameters);
+					while(--numberOfFunctionParameters>0)if(string_append_char(_expectedCharacters,',')==NULL){
+						inputError("Failed to register ',' as expected character.");
 						return -2;
 					}
 				}else{
-					inputError("Unknown function call");
+					inputError("Unknown function '%s'.",functionName);
 					return -2;
 				}
-			}
+			}/*else{
+				if(prevToken!=NULL)
+					inputInfo("Previous token of type %s.",TOKENTYPE_STRING[prevToken->type]);
+				else
+					inputInfo("Not a function call");
+				return 1;
+			}*/
 		}else{
-			inputError("Failed to register ')' as expected character");
+			inputError("Failed to register ')' as expected character.");
 			return -2;
 		}
 	}else
 	if(inputChar=='['){
 		if(string_append_char(_expectedCharacters,']')==NULL){
-			inputError("Failed to register ']' as expected character");
+			inputError("Failed to register ']' as expected character.");
 			return -2;
 		}
 	}else
 	if(inputChar=='{'){
 		if(NULL==string_append_char(_expectedCharacters,'}')){
-			inputError("Failed to register '}' as expected character");
+			inputError("Failed to register '}' as expected character.");
 			return -2;
 		}
 	}else
 	if(inputChar==','){
 		if(string_last_char(_expectedCharacters)==','){
 			if(NULL==string_declength(_expectedCharacters)){
-				inputError("Failed to remove expected character ','");
+				inputError("Failed to remove expected character ','.");
 				return -3;
 			}
 		}
@@ -3899,7 +3905,7 @@ int8_t expectedCharactersUpdated(char inputChar,Mtoken const * const currentToke
 	if(inputChar==')'){
 		if(string_last_char(_expectedCharacters)==')'){
 			if(NULL==string_declength(_expectedCharacters)){
-				inputError("Failed to remove expected character ')'");
+				inputError("Failed to remove expected character ')'.");
 				return -3;
 			}
 		}
@@ -3907,7 +3913,7 @@ int8_t expectedCharactersUpdated(char inputChar,Mtoken const * const currentToke
 	if(inputChar==']'){
 		if(string_last_char(_expectedCharacters)==']'){
 			if(NULL==string_declength(_expectedCharacters)){
-				inputError("Failed to remove expected character ']'");
+				inputError("Failed to remove expected character ']'.");
 				return -3;
 			}
 		}
@@ -3915,7 +3921,7 @@ int8_t expectedCharactersUpdated(char inputChar,Mtoken const * const currentToke
 	if(inputChar=='}'){
 		if(string_last_char(_expectedCharacters)=='}'){
 			if(NULL==string_declength(_expectedCharacters)){
-				inputError("Failed to remove expected character '}'");
+				inputError("Failed to remove expected character '}'.");
 				return -3;
 			}
 		}
