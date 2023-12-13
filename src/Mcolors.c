@@ -63,6 +63,7 @@ const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the
 const char* FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN};
 const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,DARK_YELLOW}; //{LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019
 const char* MANUAL_FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY}; // MDH@07OCT2019
+const char* FEEDFORWARD_CLOSER_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE}; // MDH@04DEC2023
 const char* AUTO_COMPLETION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,DARK_RED}; // MDH@27OCT2021
 // operator token colors (all the same)
 const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
@@ -113,6 +114,14 @@ const char* getManualFeedforwardTextColor(){return MANUAL_FEED_FORWARD_TEXT_COLO
  * @return const char* the current color scheme identifier continuation text color
  */
 const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for generated feed forward text
+
+/**
+ * @brief Get the FeedforwardCloser Text Color object
+ * 
+ * @return const char* the current color scheme feedforward closer text color
+ */
+const char* getFeedforwardCloserTextColor(){return FEEDFORWARD_CLOSER_TEXT_COLORS[colorscheme];} // MDH@27OCT2021: special color for generated auto completion text
+
 /**
  * @brief returns the current color scheme auto completion text color
  * 

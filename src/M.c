@@ -826,13 +826,13 @@ Mtokenautocompletiontext *_firstTokenautocompletiontext=NULL,*_lastConsumedAutoC
  */
 Mstring* _getAutoCompletionText(char sep){Mallocationowner owner=getOwner(__LINE__);
 	// constructs the total feed forward text
-	Mstring* _autoCompletionText=owned_string(__string(),owner);
-	if(_autoCompletionText!=NULL){
+	Mstring* autoCompletionText=owned_string(__string(),owner);
+	if(autoCompletionText!=NULL){
 		Mtokenautocompletiontext* tokenautocompletiontext=_firstTokenautocompletiontext;
 		while(tokenautocompletiontext!=NULL){
-			if(tokenautocompletiontext->_text&&!string_append(_autoCompletionText,tokenautocompletiontext->_text->chars))break;
+			if(tokenautocompletiontext->_text&&!string_append(autoCompletionText,tokenautocompletiontext->_text->chars))break;
 			///////if(autocompletiontext->token)if(!string_append_char(_suggestedText,'#'))break;
-			if(sep)if(NULL==string_append_char(_autoCompletionText,sep))break;
+			if(sep)if(NULL==string_append_char(autoCompletionText,sep))break;
 			tokenautocompletiontext=tokenautocompletiontext->_next;
 		}
 		/* MDH@04OCT2019: moved over to updateAutoCompletionText()
@@ -857,7 +857,7 @@ Mstring* _getAutoCompletionText(char sep){Mallocationowner owner=getOwner(__LINE
 		}
 		*/
 	}
-	return disowned_string(_autoCompletionText,owner);
+	return disowned_string(autoCompletionText,owner);
 }
 /**
  * @brief the number of characters written behind the prompt
@@ -915,6 +915,24 @@ void updateAutoCompletionText(){
 	}
 }
 
+// MDH@04DEC2023: 
+/* see _expectedCharacters MDH@04DEC2023: we're going to collect the enders in a single Mstring
+Mstring* _enders=NULL;
+Mallocationowner owner_enders=(Mallocationowner){MI_MAIN,__LINE__,1};
+*/
+static char getTokenTypeFeedforwardCloser(TokenType tokenType){
+	switch(tokenType){
+		case TT_DQSTRING:return '"'; 
+		// MDH@20DEC2022: take out the function and function call token feed forward out here, which is now being taken care of in determining the immediate feed forward text!!!
+		case TT_FUNCTION_CALL:return ')';
+		case TT_LIST:return ']';
+		case TT_MAP:return '}';
+		case TT_SQSTRING:return '\'';
+		default:break;
+	}
+	return '\0';
+}
+
 // MDH@25MAY2023: we can use it again
 // MDH@20DEC2022: apparently not getting called anywhere anymore
 static char getTokenTypeFeedforwardCharacter(TokenType tokenType){
@@ -968,7 +986,9 @@ static char* _getLastTokenAutoCompletionText(){// Mallocationowner owner=getOwne
 		case TT_BINARY_aeru:break;
 		case TT_COMMENT:break;
 		// MDH@03OCT2019: case TT_DQSTRING:tokenFeedforwardText="\"";break; // TODO using " for the double quoted string might change in the future and we'd be in trouble then
-		case TT_END_OF_DQSTRING:case TT_END_OF_FUNCTION_CALL:case TT_END_OF_LIST:case TT_END_OF_MAP:case TT_END_OF_SQSTRING:break;
+		case TT_END_OF_DQSTRING:break; /////tokenAutoCompletionText="\"";break; // MDH@04DEC2023: moved here
+		case TT_END_OF_SQSTRING:break; /////tokenAutoCompletionText="'";break; // MDH@04DEC2023: moved here
+		case TT_END_OF_FUNCTION_CALL:case TT_END_OF_LIST:case TT_END_OF_MAP:break;
 		case TT_ERROR:break;
 		case TT_EXPRESSION:if(string_last_char(_userInputCommand->_lastToken->text)=='(')tokenAutoCompletionText=")";break; // TODO use other type e.g. TT_FUNCTION_CALL instead of TT_EXPRESSION on (
 		// MDH@03OCT2019: case TT_FUNCTION:tokenFeedforwardText="(";break;
@@ -1317,8 +1337,9 @@ Mtokenautocompletiontext*  getAutoCompletionTextOfCharacterPrepended(char c,bool
 */
 
 // MDH@13JUL2023: keeping track of the closers
-Mstring* _feedforwardClosers=NULL;Mallocationowner owner_feedforwardClosers=(Mallocationowner){MI_MAIN,__LINE__,1};
-void deleteFeedforwardClosers(){FREE_STRING(_feedforwardClosers,owner_feedforwardClosers);_feedforwardClosers=NULL;}
+// MDH@13DEC2023: now renamed to _expectedCharacters indicating that these are the expected closing characters
+Mstring* _expectedCharacters=NULL;Mallocationowner owner_expectedCharacters=(Mallocationowner){MI_MAIN,__LINE__,1};
+///////void deleteFeedforwardClosers(){FREE_STRING(_expectedCharacters,owner_expectedCharacters);_expectedCharacters=NULL;}
 
 // MDH@03OCT2019: it's essential to differentiate between current token dependent feed forward and other feed forward
 //				deleteLastTokenImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken stops being the current token or when the type of the current token changes
@@ -3279,6 +3300,20 @@ void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
 	*/
 }
+
+/**
+ * @brief 
+ * 
+ * @param _cursormovement 
+ */
+void outputFeedforwardCloser(Mcursormovement* _cursormovement){
+	if(NULL==_cursormovement)return;
+	char c[2]="\0"; // a little trick
+	c[0]=string_last_char(_expectedCharacters);
+	if(c[0]&&string_append_char(_suggestedText,c[0]))
+		outputCommandLineText(&c,_cursormovement,getFeedforwardCloserTextColor(),-1);
+}
+
 /**
  * @brief outputs the auto completion characters
  * 
@@ -3505,6 +3540,8 @@ void showSuggestedText(){
 
 	outputImmediateFeedforwardCharacters(&cursormovement);
 
+	// MDH@04DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
+	////////if(string_length(_suggestedText)==0)outputFeedforwardCloser(&cursormovement);
 	outputAutoCompletionCharacters(&cursormovement);
 
 	// MDH@15OCT2020: returning to the position where command characters should be input depends on cursor position changes as remembered in cursormovement
@@ -5381,8 +5418,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	//                     and consume them one by one, whereas in arrays or maps the amount of elements is unlimited, and the element separator that we expect
 	//                     will always be the comma, which is a nuisance because it would prevent showing the closing parentheses to the user, unless
 	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
-	_feedforwardClosers=owned_string(__string(),owner_feedforwardClosers);
-	if(NULL==_feedforwardClosers)outputError("Failed to feed forward closing parentheses!");
+	_expectedCharacters=owned_string(__string(),owner_expectedCharacters);
+	if(NULL==_expectedCharacters)outputError("Failed to feed forward closing parentheses!");
 
 	_suggestedText=owned_string(__string(),owner_suggestedText);
 	if(NULL==_suggestedText)outputError("Failed to allow suggested text");
@@ -5539,7 +5576,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
-				string_setlength(_feedforwardClosers,0); // MDH@13JUL2023: get rid of the current list of feed forward closers
+				string_setlength(_expectedCharacters,0); // MDH@13JUL2023: get rid of the current list of feed forward closers
 
 				////outputChar('A');
 				if(/*!_manualFeedforwardText||*/string_length(_manualFeedforwardText)==0)
@@ -5550,6 +5587,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				//				DONE solved this by taking care of immediate feed forward texts whenever the current token (type) changes
 				///////////updateFeedforwardTexts();
 				updateAutoCompletionText(); // to force it being reconstructed!!! TODO if we decide to always do that we do not need to do this here!!!
+				////////updateFeedforwardClosers(); // MDH@03DEC2023: replacing the auto completion text
+
 				////outputChar('C');
 				showSuggestedText();
 				////outputChar('D');
