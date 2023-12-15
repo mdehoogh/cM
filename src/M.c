@@ -3935,6 +3935,37 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * const token){
 	if(!removedChar)return 0;
 	if(NULL==token)return 0;
+	// let's take care of the quote characters first
+	if(removedChar=='"'){
+		// 3 possibilities: removing the starting quote, the end quote and an escaped quote
+		if(token->type==TT_DQSTRING&&string_length(token->text)>0){ // end or escape double quote removed
+			// if not behind the \ escape character, we're removed the finishing double quote, and are moving
+			// back into the string literal which means we have to expect the double quote again
+			if(string_last_char(token->text)!='\\'&&NULL==string_append_char(_expectedCharacterStack,'"')){
+				inputError("Failed to register '\"' as expected character.");
+				return -1;
+			}
+		}else // starting quote removed, which means there must be a corresponding expected end quote to remove!!
+		if(string_last_char(_expectedCharacterStack)!='"'||NULL==string_declength(_expectedCharacterStack)){
+			inputError("Failed to remove the expected double quote.");
+			return -1;
+		}
+	}else
+	if(removedChar=='\''){
+		// 3 possibilities: removing the starting quote, the end quote and an escaped quote
+		if(token->type==TT_SQSTRING&&string_length(token->text)>0){ // end or escape single quote removed
+			// if not behind the \ escape character, we're removed the finishing single quote, and are moving
+			// back into the string literal which means we have to expect the single quote again
+			if(string_last_char(token->text)!='\\'&&NULL==string_append_char(_expectedCharacterStack,'\'')){
+				inputError("Failed to register '\'' as expected character.");
+				return -1;
+			}
+		}else // starting quote removed, which means there must be a corresponding expected end quote to remove!!
+		if(string_last_char(_expectedCharacterStack)!='\''||NULL==string_declength(_expectedCharacterStack)){
+			inputError("Failed to remove the expected single quote.");
+			return -1;
+		}
+	}else
 	// a removed character could move it back onto the expected character stack
 	// but let's deal with being in a string literal first, because if we are in a string literal
 	// no character we delete actually should be placed on the expected character stack
@@ -3967,7 +3998,7 @@ int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * co
 				return -1;
 			}
 		}
-	}else{ // the token is a string literal
+	}/*else{ // the token is a string literal
 		// if the string literal is currently finished we haven't removed the final quote
 		if(isTokenUnfinished(token)){
 			if(string_length(token->text)){ // there are still characters in the string literal
@@ -3987,7 +4018,7 @@ int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * co
 				}
 			}
 		}
-	}
+	}*/
 	inputInfo("Expected character stack after removing '%c': '%s' (%zu).",removedChar,string(_expectedCharacterStack),string_length(_expectedCharacterStack));
 	return 1;
 }
@@ -6299,9 +6330,18 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 											//				to the input loop part to deal with identifier continuations that match the start of the feed forward text(s)
 											// MDH@07OCT2019: I've introduced a new feed forward element (manualFeedforwardText) to contain the part of the text
 											//				that the user took out of the (tokenized) command to e.g. correct a command
-											if(!manualFeedforwardCharacterPrepended(c)) // replacing: if(!getAutoCompletionTextOfCharacterPrepended(c,true))
+											if(manualFeedforwardCharacterPrepended(c)){ // replacing: if(!getAutoCompletionTextOfCharacterPrepended(c,true))
+												// MDH@15DEC2023: we need to update the expected character stack as if c was acutally
+												//                removed as it is no longer part of the current user input command
+												//                (essentially we always need to keep _expectedCharacterStack correct)
+												switch(expectedCharacterStackUpdatedOnRemoval(c,_userInputCommand->_lastToken)){
+													case -1:break;
+													case 0 :break;
+													case 1 :break;
+												}
+											}else
 												inputCharType=switchToControlMode("Failed to accept the removed command character as suggested text.");
-											/*
+											/* this would be else when we succeeded!!!!!!
 											else
 											if(amVerbose())
 											inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
