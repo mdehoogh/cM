@@ -3302,16 +3302,19 @@ void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 }
 
 /**
- * @brief 
- * 
- * @param _cursormovement 
+ * @brief outputs expected characters stored in _expectedCharacterStack as part of the feedforward text
+ * @details appends the expected characters to _suggestedText
+ * @param _cursormovement the cursor movement updated to keep track of the current line and cursor position
  */
-void outputFeedforwardCloser(Mcursormovement* _cursormovement){
+void outputExpectedCharacters(Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_cursormovement)return;
-	char c[2]="\0"; // a little trick
-	c[0]=string_last_char(_expectedCharacterStack);
-	if(c[0]&&string_append_char(_suggestedText,c[0]))
-		outputCommandLineText(&c,_cursormovement,getFeedforwardCloserTextColor(),-1);
+	Mchars *_chars=owned_chars(_getReversedChars(string(_expectedCharacterStack)),owner);
+	if(NULL==_chars)return;
+	if(string_append(_suggestedText,_chars->chars)!=NULL)
+		outputCommandLineText(_chars->chars,_cursormovement,getExpectedCharacterStackTextColor(),-1);
+	else
+		_cursormovement->written=0;
+	FREE_CHARS(_chars,1,strlen(_chars->chars)+1,'\'',owner); // MDH27DEC2023 TODO: we should adapt FREE_CHARS if possible to use the defaults!!!
 }
 
 /**
@@ -3473,7 +3476,24 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			}
 		}
 	}else
-	if(/*_autoCompletionText&&*/string_length(_autoCompletionText)>0){
+	if(string_length(_expectedCharacterStack)>0){
+		char firstExpectedCharacter=string_last_char(_expectedCharacterStack);
+		if(inputChar!='\0'&&inputChar!=firstExpectedCharacter){
+			result=false;
+			logToOutputFile("First expected character '%c' does not match the consumed suggested character '%c'.",firstExpectedCharacter,inputChar);
+		}else{
+			string_declength(_expectedCharacterStack); // this way nothing can go wrong
+			/*replacing:
+			char expectedCharacterRemoved=firstExpectedCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
+			if(expectedCharacterRemoved=='\0'||(inputChar!='\0'&&expectedCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
+				result=false;
+				logToOutputFile("%sFailed to remove the first expected character '%c'.",firstExpectedCharacter);
+			}
+			*/
+		}
+	}
+	/* replacing:
+	if(string_length(_autoCompletionText)>0){
 		// BUG FIX: _autoCompletionText is like _suggestedText a composed text i.e. it is the concatenation of all token auto completion texts
 		//		  therefore you need to remove the first of the characters in the token auto completion texts instead
 		// NOTE this is actually the only place where deleteFirstAutoCompletionCharacter is called!!!!!
@@ -3488,7 +3508,8 @@ bool removeFirstSuggestedCharacter(char inputChar){
 				logToOutputFile("%sFailed to remove the first auto completion character '%c'.",firstAutoCompletionCharacter);
 			}
 		}
-	}else{
+	}*/
+	else{
 		result=false;
 		if(inputChar!='\0')
 			logToOutputFile("%sSuggested input character '%c' not consumed!",M_ERROR_PREFIX,inputChar);
@@ -3540,9 +3561,9 @@ void showSuggestedText(){
 
 	outputImmediateFeedforwardCharacters(&cursormovement);
 
-	// MDH@04DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
-	////////if(string_length(_suggestedText)==0)outputFeedforwardCloser(&cursormovement);
-	outputAutoCompletionCharacters(&cursormovement);
+	// MDH@27DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
+	if(string_length(_suggestedText)==0)outputExpectedCharacters(&cursormovement);
+	//// replacing: outputAutoCompletionCharacters(&cursormovement);
 
 	// MDH@15OCT2020: returning to the position where command characters should be input depends on cursor position changes as remembered in cursormovement
 	//				the commented code below did not work when dealing with explicit newlines, therefore we need to use cursormovement explicitly to determine what to do with the cursor

@@ -26,4 +26,6 @@ Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,lo
 Mchars* _getChars(char const * const chars);
 void freeChars(Mchars const * const _chars/*,Mallocationowner owner*/); // to free what was created with _getChars()
 
+Mchars* _getReversedChars(char const * const chars);
+
 #define FREECHARS(_chars,owner_chars) freeChars(disowned_chars(_chars,owner_chars))

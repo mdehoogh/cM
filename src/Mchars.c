@@ -96,11 +96,11 @@ void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,siz
  */
 Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LINE__);
 	Mchars* _chars=NULL;
-	if(chars){
+	if(chars!=NULL){
 		long long l=strlen(chars)+1;
 		// output("Allocating %zd characters for storing '%s'.\n",l,chars);
 		_chars=owned_chars(__chars(1,l,'\''),owner); // MDH@20MAY2020: obtain ownership of what _chars returns
-		if(_chars){
+		if(_chars!=NULL){
 			memcpy(_chars->chars,chars,l);
 			// if I'm the owner, I return a _chars disowned, otherwise I am returning as is because I never was the owner to start with
 			return disowned_chars(_chars,owner);
@@ -108,6 +108,26 @@ Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LI
 		outputError("Failed to store the characters");
 	}
 	return NULL;
+}
+
+Mchars* _getReversedChars(char const * const chars){Mallocationowner owner=getOwner(__LINE__);
+	Mchars* _chars=NULL;
+	if(chars!=NULL){
+		long long l=strlen(chars);
+		if(l>0){
+			// output("Allocating %zd characters for storing '%s'.\n",l,chars);
+			_chars=owned_chars(__chars(1,l+1,'\''),owner); // MDH@20MAY2020: obtain ownership of what _chars returns
+			if(_chars!=NULL){
+				_chars->chars[l]='\0';
+				long long i=0;
+				while(--l>=0)_chars->chars[i++]=chars[l];
+				// if I'm the owner, I return a _chars disowned, otherwise I am returning as is because I never was the owner to start with
+				return disowned_chars(_chars,owner);
+			}
+			outputError("Failed to store the characters");
+		}
+	}
+	return _chars;
 }
 
 // utility function to free an Mchars* created using _getChars
@@ -120,3 +140,4 @@ void freeChars(Mchars const * const _chars/*,Mallocationowner owner_chars*/){
 	// if oid is not positive, assuming I was the owner to start with and use that as owner id
 	if(_chars)free_chars(_chars/*,owner_chars*/,1,strlen(_chars->chars)+1,'\'');
 }
+

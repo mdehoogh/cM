@@ -120,7 +120,7 @@ const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_
  * 
  * @return const char* the current color scheme feedforward closer text color
  */
-const char* getFeedforwardCloserTextColor(){return FEEDFORWARD_CLOSER_TEXT_COLORS[colorscheme];} // MDH@27OCT2021: special color for generated auto completion text
+const char* getExpectedCharacterStackTextColor(){return FEEDFORWARD_CLOSER_TEXT_COLORS[colorscheme];} // MDH@27OCT2021: special color for generated auto completion text
 
 /**
  * @brief returns the current color scheme auto completion text color
