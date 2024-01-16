@@ -3226,6 +3226,10 @@ size_t getNumberOfTokenAutoCompletionTexts(){
 	return numberOfTokenAutoCompletionTexts;
 }
 
+// MDH@16JAN2024: keep track of the source of the first character in the suggested text
+//                this way there's no need to actually construct _suggestedText
+unsigned char suggestedTextSources[]={0,0,0,0,0}; // there are 4 possible text sources but the actually sources
+
 // MDH@23SEP2020: perhaps more convenient to keep track of any cursor displacement
 /**
  * @brief outputs the manual feed forward characters
@@ -3248,9 +3252,13 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 		outputCommandLineText(string(_manualFeedforwardText)+_cursormovement->written,_cursormovement,getManualFeedforwardTextColor(),-1); // MDH@23SEP2020 NOTE: remember numberOfManualFeedforwardCharactersWritten is a (position/characters written) ULL
 		// replacing:setColor(getManualFeedforwardTextColor());numberOfManualFeedforwardCharactersWritten+=output("%s",string(_manualFeedforwardText)+manualFeedforwardCharactersWrittenSoFar);
 		string_setlength(_manualFeedforwardText,_cursormovement->written); // in case not all characters were actually written
+		// MDH@16JAN2024: update the suggested text source to 1
+		suggestedTextSources[++suggestedTextSources[0]]=1;
+		/* replacing:
 		if(NULL==string_append(_suggestedText,string(_manualFeedforwardText)))
 			_cursormovement->written=0;
 		//else string_append_char(_suggestedText,'#');
+		*/
 	}
 }
 /**
@@ -3259,8 +3267,14 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
  * @param _cursormovement the updated cursor movement
  */
 void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement){
+	if(_cursormovement&&_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)){
+		outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
+		suggestedTextSources[++suggestedTextSources[0]]=2;
+	}
+	/* replacing:
 	if(_cursormovement&&_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)&&string_append(_suggestedText,_identifierContinuationCharacters))
 		outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
+	*/
 	/* replacing:
 	if(!_cursormovement)return;
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
@@ -3284,10 +3298,14 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
  * @param _cursormovement the updated cursor movement
  */
 void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
-	if(_cursormovement!=NULL&&
-			string_length(_immediateFeedforwardText)&&
-			string_append(_suggestedText,string(_immediateFeedforwardText))!=NULL)
+	if(_cursormovement!=NULL&&string_length(_immediateFeedforwardText)){
 		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+		suggestedTextSources[++suggestedTextSources[0]]=3;
+	}
+	/* replacing:
+	if(_cursormovement!=NULL&&string_length(_immediateFeedforwardText)&&string_append(_suggestedText,string(_immediateFeedforwardText))!=NULL)
+		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+	*/
 	/* replacing:
 	if(!_cursormovement)return;
 	unsigned long long numberOfImmediateFeedforwardCharactersWritten=(_immediateFeedforwardText?string_length(_immediateFeedforwardText):0);
@@ -3310,10 +3328,17 @@ void outputExpectedCharacters(Mcursormovement* _cursormovement){Mallocationowner
 	if(NULL==_cursormovement)return;
 	Mchars *_chars=owned_chars(_getReversedChars(string(_expectedCharacterStack)),owner);
 	if(NULL==_chars)return;
+	// MDH@16JAN2024: updating suggestedTextSources
+	suggestedTextSources[++suggestedTextSources[0]]=4;
+	// MDH@16JAN2024: keep track of the source of the first character in the suggested text
+	//                this way there's no need to actually construct _suggestedText
+	outputCommandLineText(_chars->chars,_cursormovement,getExpectedCharacterStackTextColor(),-1);
+	/* replacing:
 	if(string_append(_suggestedText,_chars->chars)!=NULL)
 		outputCommandLineText(_chars->chars,_cursormovement,getExpectedCharacterStackTextColor(),-1);
 	else
 		_cursormovement->written=0;
+	*/
 	FREE_CHARS(_chars,1,strlen(_chars->chars)+1,'\'',owner); // MDH27DEC2023 TODO: we should adapt FREE_CHARS if possible to use the defaults!!!
 }
 
@@ -3427,6 +3452,23 @@ void writeSuggestedText(bool updateUserInputCommandIdentifierContinuationText){
 // MDH@22OCT2021: central point where a consumed suggested character (from _suggestedText) is removed from one of the constituent parts
 //				NOTE that _suggestedText itself is not consumed and would therefore need to be updated afterwards to sync it again
 //				NOTE that consumption of suggested characters only happens one at a time with right arrow and by token with tab
+// MDH@16JAN2024: suggestedTextSources[0] contains the index of the source of the
+/**
+ * @brief returns the first suggested character
+ * @details suggestedTextSources[0] contains the positive index (if any) in suggestedTextSources where the source index of the
+ *          suggested text can be found
+ * @return char the first suggested character
+ */
+char getFirstSuggestedCharacter(){
+	char firstSuggestedCharacter='\0';
+	switch(suggestedTextSources[suggestedTextSources[0]]){
+		case 1:firstSuggestedCharacter=string_char(_manualFeedforwardText,0);break;
+		case 2:firstSuggestedCharacter=getFirstIdentifierContinuationCharacter();break;
+		case 3:firstSuggestedCharacter=string_char(_immediateFeedforwardText,0);break;
+		case 4:firstSuggestedCharacter=string_last_char(_expectedCharacterStack);break; // OOPS take the last character not the first!!!
+	}
+	return firstSuggestedCharacter;
+}
 /**
  * @brief removes the first (consumed) suggested character
  * 
@@ -3436,7 +3478,71 @@ void writeSuggestedText(bool updateUserInputCommandIdentifierContinuationText){
  */
 bool removeFirstSuggestedCharacter(char inputChar){
 	bool result=true;
-	if(/*_manualFeedforwardText&&*/string_length(_manualFeedforwardText)>0){
+	bool sourceRemoved=false;
+	// MDH@16JA2024: since we now know the source of the first suggested character, there's no need to guess it anymore
+	switch(suggestedTextSources[suggestedTextSources[0]]){
+		case 1:
+			{
+				char firstManualFeedForwardCharacter=string_char(_manualFeedforwardText,0);
+				if(inputChar!='\0'&&inputChar!=firstManualFeedForwardCharacter){
+					result=false;
+					logToOutputFile("%sFirst manual feed forward character '%c' does not match the consumed suggested character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter,inputChar);
+				}else{
+					char manualFeedForwardCharacterRemoved=string_removed_char(_manualFeedforwardText,0);
+					if(manualFeedForwardCharacterRemoved=='\0'||(manualFeedForwardCharacterRemoved!=inputChar&&inputChar!='\0')){
+						result=false;
+						logToOutputFile("%sFailed to remove the first manual feed forward character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter);
+					}else
+						sourceRemoved=!string_length(_manualFeedforwardText);
+				}
+			}
+			break;
+		case 2:
+			{
+				char firstIdentifierContinuationCharacter=_identifierContinuationCharacters[0];
+				if(inputChar!='\0'&&inputChar!=firstIdentifierContinuationCharacter){
+					result=false;
+					inputError("First identifier continuation character '%c' does not match the consumed suggested character '%c'.",firstIdentifierContinuationCharacter,inputChar);
+				}else{
+					// MDH@02NOV2021: here we replaced delete... by firstIdentifierContinuationCharacterRemoved() similar to what we do with the other feed forward constituent parts
+					char identifierContinuationCharacterRemoved=firstIdentifierContinuationCharacterRemoved();
+					if(identifierContinuationCharacterRemoved=='\0'||(firstIdentifierContinuationCharacter!=inputChar&&inputChar!='\0')){
+						result=false;
+						logToOutputFile("%sFailed to remove the first identifier continuation character '%c'!",firstIdentifierContinuationCharacter);
+					}else
+						sourceRemoved=!strlen(_identifierContinuationCharacters);
+				}
+			}
+			break;
+		case 3:
+			{
+				char firstImmediateFeedforwardCharacter=string_char(_immediateFeedforwardText,0);
+				if(inputChar!='\0'&&inputChar!=firstImmediateFeedforwardCharacter){
+					result=false;
+					logToOutputFile("%sFirst immediate feed forward character '%c' does not match the input character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter,inputChar);
+				}else{
+					char immediateFeedforwardCharacterRemoved=string_removed_char(_immediateFeedforwardText,0);
+					if(immediateFeedforwardCharacterRemoved=='\0'||(inputChar!='\0'&&immediateFeedforwardCharacterRemoved!=inputChar)){
+						result=false;
+						logToOutputFile("%sFailed to remove the first immediate feed forward character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter);
+					}else
+						sourceRemoved=!string_length(_immediateFeedforwardText);
+				}
+			}
+			break;
+		case 4:
+			// expectedCharacterStack is a different ball park since it is kept updated based on the current input command
+			// and does not need to be adapted by explicitly removing the consumed 
+			break;
+		default:
+			result=false;
+	}
+	// increment the suggested text source index, if the current suggested text source is depleted
+	// NOTE if the suggested text sources ends up becoming 5 it's out of range apparently
+	if(sourceRemoved)
+		while(++suggestedTextSources[0]<5&&!suggestedTextSources[suggestedTextSources[0]]);
+	/* replacing:
+	if(string_length(_manualFeedforwardText)>0){
 		char firstManualFeedForwardCharacter=string_char(_manualFeedforwardText,0);
 		if(inputChar!='\0'&&inputChar!=firstManualFeedForwardCharacter){
 			result=false;
@@ -3463,7 +3569,7 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			}
 		}
 	}else
-	if(/*_immediateFeedforwardText&&*/string_length(_immediateFeedforwardText)>0){
+	if(string_length(_immediateFeedforwardText)>0){
 		char firstImmediateFeedforwardCharacter=string_char(_immediateFeedforwardText,0);
 		if(inputChar!='\0'&&inputChar!=firstImmediateFeedforwardCharacter){
 			result=false;
@@ -3483,32 +3589,31 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			logToOutputFile("First expected character '%c' does not match the consumed suggested character '%c'.",firstExpectedCharacter,inputChar);
 		}else{
 			string_declength(_expectedCharacterStack); // this way nothing can go wrong
-			/*replacing:
-			char expectedCharacterRemoved=firstExpectedCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
-			if(expectedCharacterRemoved=='\0'||(inputChar!='\0'&&expectedCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
-				result=false;
-				logToOutputFile("%sFailed to remove the first expected character '%c'.",firstExpectedCharacter);
-			}
-			*/
+			///replacing:
+			///char expectedCharacterRemoved=firstExpectedCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
+			///if(expectedCharacterRemoved=='\0'||(inputChar!='\0'&&expectedCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
+			///	result=false;
+			///	logToOutputFile("%sFailed to remove the first expected character '%c'.",firstExpectedCharacter);
+			///}
 		}
 	}
-	/* replacing:
-	if(string_length(_autoCompletionText)>0){
-		// BUG FIX: _autoCompletionText is like _suggestedText a composed text i.e. it is the concatenation of all token auto completion texts
-		//		  therefore you need to remove the first of the characters in the token auto completion texts instead
-		// NOTE this is actually the only place where deleteFirstAutoCompletionCharacter is called!!!!!
-		char firstAutoCompletionCharacter=string_char(_autoCompletionText,0); // NOTE __not__ using getFirstAutoCompletionCharacter anymore!!!!
-		if(inputChar!='\0'&&inputChar!=firstAutoCompletionCharacter){
-			result=false;
-			logToOutputFile("First auto completion character '%c' does not match the consumed suggested character '%c'.",firstAutoCompletionCharacter,inputChar);
-		}else{
-			char autocompletionCharacterRemoved=firstAutoCompletionCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
-			if(autocompletionCharacterRemoved=='\0'||(inputChar!='\0'&&autocompletionCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
-				result=false;
-				logToOutputFile("%sFailed to remove the first auto completion character '%c'.",firstAutoCompletionCharacter);
-			}
-		}
-	}*/
+	///replacing:
+	///if(string_length(_autoCompletionText)>0){
+	///	// BUG FIX: _autoCompletionText is like _suggestedText a composed text i.e. it is the concatenation of all token auto completion texts
+	///	//		  therefore you need to remove the first of the characters in the token auto completion texts instead
+	///	// NOTE this is actually the only place where deleteFirstAutoCompletionCharacter is called!!!!!
+	///	char firstAutoCompletionCharacter=string_char(_autoCompletionText,0); // NOTE __not__ using getFirstAutoCompletionCharacter anymore!!!!
+	///	if(inputChar!='\0'&&inputChar!=firstAutoCompletionCharacter){
+	///		result=false;
+	///		logToOutputFile("First auto completion character '%c' does not match the consumed suggested character '%c'.",firstAutoCompletionCharacter,inputChar);
+	///	}else{
+	///		char autocompletionCharacterRemoved=firstAutoCompletionCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
+	///		if(autocompletionCharacterRemoved=='\0'||(inputChar!='\0'&&autocompletionCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
+	///			result=false;
+	///			logToOutputFile("%sFailed to remove the first auto completion character '%c'.",firstAutoCompletionCharacter);
+	///		}
+	///	}
+	///}
 	else{
 		result=false;
 		if(inputChar!='\0')
@@ -3516,6 +3621,7 @@ bool removeFirstSuggestedCharacter(char inputChar){
 		else
 			logToOutputFile("%sFailed to find (and consume) the first suggested character!",M_ERROR_PREFIX);
 	}
+	*/
 	return result;
 }
 /*
@@ -3532,6 +3638,7 @@ void consumeFirstSuggestedCharacter(char inputChar){
 	}
 }
 */
+
 // MDH@01OCT2019: it's better to show the suggested text JIT i.e. just before asking the user for input
 //				this is also better because at that moment we know the user should be seeing it
 /**
@@ -3545,12 +3652,15 @@ unsigned long long numberOfSuggestedCharactersWritten=0; // MDH@23SEP2020: basic
  * 
  */
 void showSuggestedText(){
+	// MDH@16JAN2024: initialize suggestedTextSources[0] to 0 indicating there is NO suggested text
+	suggestedTextSources[0]=0;
+	/* replacing:
 	// ASSERT _suggestedText should not be NULL
 	if(NULL==_suggestedText)return;
 	// MDH@26SEP2019: behind cursor text now consists of two parts now: identifier continuation text and feed forward text
 	// 0. preparation
-	string_setlength(_suggestedText,0/*,owner_suggestedText*/); // clear the suggested text!!!
-	
+	string_setlength(_suggestedText,0); // clear the suggested text!!!
+	*/
 	// 0. the current cursor position (in the command) is the number of line command characters
 	Mcursormovement cursormovement={numberOfLineCommandCharacters};
 
@@ -3562,7 +3672,8 @@ void showSuggestedText(){
 	outputImmediateFeedforwardCharacters(&cursormovement);
 
 	// MDH@27DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
-	if(string_length(_suggestedText)==0)outputExpectedCharacters(&cursormovement);
+	////if(string_length(_suggestedText)==0)
+	outputExpectedCharacters(&cursormovement);
 	//// replacing: outputAutoCompletionCharacters(&cursormovement);
 
 	// MDH@15OCT2020: returning to the position where command characters should be input depends on cursor position changes as remembered in cursormovement
@@ -6273,8 +6384,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								}else
 								if(inputChar==67){ // right arrow
 									// MDH@27SEP2019: don't forget the continuation text as well!!!
-									if(string_length(_suggestedText)){
-										char c=string_char(_suggestedText,0);
+									if(suggestedTextSources[0]){ // MDH@16JAN2024 replacing: string_length(_suggestedText)){
+										char c=getFirstSuggestedCharacter(); // MDH@16JAN2024 replacing: string_char(_suggestedText,0);
 										if(c){
 											// MDH@31OCT2019: this might well be a newline character!!!
 											char suggestedInputCharType=INPUTCHARACTERTYPES[c];
