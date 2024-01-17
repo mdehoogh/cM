@@ -3653,7 +3653,7 @@ unsigned long long numberOfSuggestedCharactersWritten=0; // MDH@23SEP2020: basic
  */
 void showSuggestedText(){
 	// MDH@16JAN2024: initialize suggestedTextSources[0] to 0 indicating there is NO suggested text
-	suggestedTextSources[0]=0;
+	memset(suggestedTextSources,0,sizeof suggestedTextSources); // reset the suggested text sources
 	/* replacing:
 	// ASSERT _suggestedText should not be NULL
 	if(NULL==_suggestedText)return;
@@ -3672,8 +3672,9 @@ void showSuggestedText(){
 	outputImmediateFeedforwardCharacters(&cursormovement);
 
 	// MDH@27DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
-	////if(string_length(_suggestedText)==0)
-	outputExpectedCharacters(&cursormovement);
+	// MDH@17JAN2024: for now we show all
+	if(cursormovement.written==0)
+		outputExpectedCharacters(&cursormovement);
 	//// replacing: outputAutoCompletionCharacters(&cursormovement);
 
 	// MDH@15OCT2020: returning to the position where command characters should be input depends on cursor position changes as remembered in cursormovement
@@ -6204,6 +6205,59 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					//				updateBehindCursorText() adjusted to return (if available) a pointer to the characters in the feed forward text (TODO change behind cursor into feed forward when appropriate)
 					// MDH@04OCT2019: are we going to consume in parts????? NOTE if there's no identifier continuation text, the immediate feed forward and auto completion texts to consume are present in _suggestedText (thank god)
 					// MDH@07OCT2019: manual feed forward text (as a whole) takes precedence
+					
+					// MDH@17JAN2024: _suggestedText is replaced by suggestedTextSources, and getting the first suggested character
+					//                is now replaced by getFirstSuggestedCharacter()
+					//                code adapted so that each character is removed immediately once accepted which is opposite
+					//                to the original code that deletes the umber of suggested characters consumed in one go
+					size_t numberOfSuggestedCharactersConsumed=0;
+					if(suggestedTextSources[0]){ // there still is a suggested character (although suggestedTextSources[0] could be 5)
+						char newInputChar='\0',newInputCharType='\0';
+						int8_t characterAccepted;
+						do{
+							newInputChar=getFirstSuggestedCharacter();
+							if(!newInputChar){
+								inputCharType=switchToControlMode("Suggested characters vanished somehow.");
+								break;
+							}
+							newInputCharType=INPUTCHARACTERTYPES[newInputChar];
+							// TODO=DONE I have to think about the following
+							// this is because as soon as the token ends we stop consuming suggested characters!!!
+							if(numberOfSuggestedCharactersConsumed>0&&
+									!characterContinuesToken(_userInputCommand->_lastToken,newInputChar,newInputCharType))
+								break;
+							characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):0);
+							if((characterAccepted&NO_USER_INPUT_ERROR)!=0){ // the character was not accepted
+								inputCharType=switchToControlMode("No user input.");
+								break;
+							}
+							if(characterAccepted==0&&numberOfSuggestedCharactersConsumed>0){
+								inputCharType=switchToControlMode("Not all suggested characters accepted.");
+								break;
+							}
+							// TODO the first time characterAccepted can also be '\0' shouldn't we get switch to control mode then as well??
+							if(!removeFirstSuggestedCharacter(newInputChar)){
+								inputCharType=switchToControlMode("Failed to remove the appended suggested character.");
+								break;
+							}
+							numberOfSuggestedCharactersConsumed++; // prepare to process the next character to consume (if any)
+							if(newInputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing (and improving upon): showContinuedPrompt(true,true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
+							// if suggestedTextSources[0] is now 5 there are no further suggested characters to consume!!!
+						}while(suggestedTextSources[0]<5);
+						if(inputMode==IM_COMMAND){ // all went well
+							// if identifier continuation characters were consumed nothing to do, otherwise either to clear the manual
+							// MDH@08OCT2019: have to be careful here because identifier continuation characters might come out of the manual feed forward text
+							if(numberOfSuggestedCharactersConsumed>0)
+								updateLastTokenAutoCompletionText(true); // TODO do we need the following????
+								// we might end up behind some character that produces auto completion stuff like [ or {
+							else
+								inputCharType=switchToControlMode("No suggested characters accepted.");
+						}
+					}else{ // no suggested text to consume
+						beep();
+						//inputCharType=switchToControlMode("No suggested characters to consume!");
+					}
+					/* replacing:
 					size_t numberOfCharactersToConsume=string_length(_suggestedText);
 					if(numberOfCharactersToConsume>0){
 						// TODO needs to be reviewed in that we should continue adding suggested characters as long as we are able to actually consume them
@@ -6244,11 +6298,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):0);
 							if((characterAccepted&NO_USER_INPUT_ERROR)!=0) // the character was not accepted
 								inputCharType=switchToControlMode("No user input.");
-							/* MDH@02NOV2021: no longer used
-							else
-							if((characterAccepted&REMOVE_SUGGESTED_CHARACTER_FAILURE)!=0) // the character was not accepted
-								inputCharType=switchToControlMode("Failed to accept a suggested character.");
-							*/
+							/// MDH@02NOV2021: no longer used
+							///else
+							///if((characterAccepted&REMOVE_SUGGESTED_CHARACTER_FAILURE)!=0) // the character was not accepted
+							///	inputCharType=switchToControlMode("Failed to accept a suggested character.");
+							
 							else
 							if(characterAccepted==0&&numberOfSuggestedCharactersConsumed>0)
 								inputCharType=switchToControlMode("Not all suggested characters accepted.");
@@ -6270,15 +6324,15 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										// remove numberOfSuggestedCharactersAccepted from the start of the manual feed forward text
 									if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersConsumed))
 										inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
-									/* replacing:
-									if(numberOfSuggestedCharactersConsumed>=string_length(_manualFeedforwardText)){ // all manual feed forward characters were consumed
-										FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
-									}else{ // not all manual feed forward characters were consumed 
-										// remove numberOfSuggestedCharactersAccepted from the start of the manual feed forward text
-										if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersConsumed))
-											inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
-									}
-									*/
+									/// replacing:
+									///if(numberOfSuggestedCharactersConsumed>=string_length(_manualFeedforwardText)){ // all manual feed forward characters were consumed
+									///	FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
+									///}else{ // not all manual feed forward characters were consumed 
+									///	// remove numberOfSuggestedCharactersAccepted from the start of the manual feed forward text
+									///	if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersConsumed))
+									///		inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
+									///}
+									///
 								}else
 									deleteTokenautocompletiontexts();
 								// MDH@21OCT2020: this is a very good point because apparently when the last consumed character is ( it's appending ) which is NOT always required
@@ -6294,6 +6348,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						beep();
 						//inputCharType=switchToControlMode("No suggested characters to consume!");
 					}
+					*/
 				}else
 				if(inputCharType=='m'){ // Esc character...
 					if(inputCharReadNonBlocking(&inputChar,NULL)){
