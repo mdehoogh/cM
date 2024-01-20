@@ -3678,7 +3678,7 @@ void showSuggestedText(){
 		// MDH@17JAN2024: for now we show all
 		if(cursormovement.written==0)
 			outputExpectedCharacters(&cursormovement);
-			
+
 	}else
 		outputManualFeedforwardCharacters(&cursormovement);
 	
@@ -6451,22 +6451,28 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								if(inputChar==51){
 									if(inputCharReadNonBlocking(&inputChar,NULL)){//inputChar=getInputChar();
 										if(inputChar==126){ // delete
+											// MDH@20JAN2024: deleting suggested text is allowed one character at a time
+											//                but deleting identifier continuation is probably best done entirely
+											if(suggestedTextSources[0]%5){
+												if(!removeFirstSuggestedCharacter(getFirstSuggestedCharacter()))
+													inputCharType=switchToControlMode("Failed to remove the first suggested character.");
+											}
+											/* replacing:
 											/////////inputInfo("Delete");
 											// we should have suggested (identifier continuation or feed forward (autocompletion)) text
 											// MDH@07OCT2019: manual feed forward text goes first
-											if(/*_suggestedText&&*/string_length(_suggestedText)){ // there is suggested text with parts to delete
+											if(string_length(_suggestedText)){ // there is suggested text with parts to delete
 												clearScreenFromCursor(); // MDH@17OCT2020 bug fix: ascertaining not to keep seeing the last suggested character
 												// any identifier continuation characters precede manual feed forward text
-												if(/*_manualFeedforwardText&&*/string_length(_manualFeedforwardText)){
+												if(string_length(_manualFeedforwardText)){
 													// MDH@05DEC2022: moving deleting manualFeedforwardText to getFirstMgetFirstManualFeedforwardCharacterRemoved
 													if(!getFirstManualFeedforwardCharacterRemoved())
 														inputCharType=switchToControlMode("Failed to delete the first suggested character.");
-													/* replacing:
-													if(getFirstManualFeedforwardCharacterRemoved()){
-														if(string_length(_manualFeedforwardText)==0)deleteManualFeedforwardText();
-													}else
-														inputCharType=switchToControlMode("Failed to delete the first suggested character.");
-														*/
+													/// replacing:
+													///if(getFirstManualFeedforwardCharacterRemoved()){
+													///	if(string_length(_manualFeedforwardText)==0)deleteManualFeedforwardText();
+													///}else
+													///	inputCharType=switchToControlMode("Failed to delete the first suggested character.");
 												}else
 												if(_identifierContinuationCharacters!=NULL&&strlen(_identifierContinuationCharacters)){
 													// if there's immediate feed forward token, there's no manual feed forward
@@ -6488,12 +6494,13 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 														if(firstAutoCompletionCharacterRemoved()=='\0') // MDH@20SEP2019 replacing: string_removed_char(feedforwardText,0))
 															inputCharType=switchToControlMode("Failed to delete the first character of the suggested text.");	
 													}else{ // remove the immediate feed forward text
-														string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
+														string_setlength(_immediateFeedforwardText,0);
 														/////////////immediateFeedforwardToBeUpdated=false; // do not update next time
 													}
 												}
 											}else
 												beep();
+											*/
 										}
 									}
 								}else
