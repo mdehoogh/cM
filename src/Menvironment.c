@@ -928,7 +928,7 @@ Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 									if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
 										if(completiontype==1){
 											if(completion!=NULL){
-												output("'%s'",completion);
+												/////// MDH@21JAN2024 don't want to see this: output("'%s'",completion);
 												numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(variablename+l,completion);
 												if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
 												if(completionlength==0){ // too bad

@@ -1473,17 +1473,40 @@ long long commandIndex=0; // the index of the current command from the end of th
 /// MDH@28OCT2019: replaced by _userInputCommand: Mtoken* _userInputCommand->_firstToken=NULL;
 
 /**
- * @brief returns the number of suggested text characters
+ * @brief returns the total number of suggested characters
  * 
- * @return * size_t 
+ * @return size_t the total number of suggested characters
  */
-size_t getNumberOfSuggestedCharacters(){return(_suggestedText!=NULL?string_length(_suggestedText):0);}
+size_t getTotalNumberOfSuggestedCharacters(){
+	// TODO should be computed using suggestedTextSources[] so showSuggestedText can be changed independent of this function
+	if(_manualFeedforwardText!=NULL)return string_length(_manualFeedforwardText);
+	size_t totalNumberOfSuggestedCharacters=(_identifierContinuationCharacters!=NULL?strlen(_identifierContinuationCharacters):0);
+	if(_immediateFeedforwardText!=NULL)totalNumberOfSuggestedCharacters+=string_length(_immediateFeedforwardText);
+	if(_expectedCharacterStack!=NULL)totalNumberOfSuggestedCharacters+=string_length(_expectedCharacterStack);
+	return totalNumberOfSuggestedCharacters;
+}
+
+/**
+ * @brief returns the number of suggested text characters in the suggested text source with index \p suggestedTextSourceIndex
+ * 
+ * @return * long long 
+ */
+long long getNumberOfSuggestedCharacters(size_t suggestedTextSourceIndex){
+	switch(suggestedTextSourceIndex){
+		case 1:return(_manualFeedforwardText!=NULL?string_length(_manualFeedforwardText):-1);
+		case 2:return(_identifierContinuationCharacters!=NULL?strlen(_identifierContinuationCharacters):-1);
+		case 3:return(_immediateFeedforwardText!=NULL?string_length(_immediateFeedforwardText):-1);
+		case 4:return(_expectedCharacterStack!=NULL?string_length(_expectedCharacterStack):-1);
+	}
+	return -2;
+	//return(_suggestedText!=NULL?string_length(_suggestedText):0);
+}
 /**
  * @brief returns the number of characters in the current user input command and the number of suggested characters
  * 
  * @return size_t the number of characters in the current user input command and the suggested text
  */
-size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
+size_t getCommandLength(){return getUserInputLength()+getTotalNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
 // request body of function moved over to Mshell.h/c
 /**
@@ -3668,7 +3691,7 @@ void showSuggestedText(){
 	Mcursormovement cursormovement={numberOfLineCommandCharacters};
 
 	// MDH@20JAN2024: if there's manual feed forward text it's best NOT to show any other feed forward
-	if(!string_length(_manualFeedforwardText)){
+	if(!string_length(_manualFeedforwardText)){ // user is not editing the command entered so far (manual feedforward text)
 		
 		outputIdentifierContinuationTextCharacters(&cursormovement);
 	
@@ -4565,7 +4588,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			// remove any opening parenthesis from the behind cursor text
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: invalidateAutoCompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019: I suppose when TT_VARIABLE changes to TT_NEW_VARIABLE later on, an equal sign might be added!!!
 			/* MDH@20SEP2019 replacing:
-			if(endOfInput)if(amMatchingparentheses())if(getNumberOfSuggestedCharacters())if(string_char(feedforwardText,0)=='(')string_removed_char(feedforwardText,0);
+			if(endOfInput)if(amMatchingparentheses())if(getTotalNumberOfSuggestedCharacters())if(string_char(feedforwardText,0)=='(')string_removed_char(feedforwardText,0);
 			*/
 		}
 	}
@@ -6043,8 +6066,12 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			////////outputChar('X');
 
 			////if(amVerbose())
-				inputInfo("%d %d %d %d %d",suggestedTextSources[0],suggestedTextSources[1],suggestedTextSources[2],
-										suggestedTextSources[3],suggestedTextSources[4]);
+				inputInfo("%d %d(%d) %d(%d) %d(%d) %d(%d)",
+										suggestedTextSources[0],
+										suggestedTextSources[1],getNumberOfSuggestedCharacters(suggestedTextSources[1]),
+										suggestedTextSources[2],getNumberOfSuggestedCharacters(suggestedTextSources[2]),
+										suggestedTextSources[3],getNumberOfSuggestedCharacters(suggestedTextSources[3]),
+										suggestedTextSources[4],getNumberOfSuggestedCharacters(suggestedTextSources[4]));
 
 			// ask the user for input
 			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
@@ -6736,6 +6763,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						beep();
 				}else
 				if(inputCharType=='d'){
+					/* MDH@21JAN2024: _suggestedText replaced by suggestedTextSources[]
 					if(string_length(_suggestedText)){ // something behind the cursor that we can remove
 						if(string_removed_char(_suggestedText,0))
 							///////writeSuggestedText(true)
@@ -6744,6 +6772,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							inputCharType=switchToControlMode("Failed to remove the first autocompletion character!");
 					}else // nothing to remove
 						beep();
+					*/
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-C)
 					if(_userInputCommand->_firstToken!=NULL){
@@ -6756,7 +6785,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				if(inputCharType=='t'){ // Tab character
 					// if there's a preview (well, code completion by way of a feedforwardText)
 					// here we have a serious problem in that we now have identifier continuation text, immediate feed forward text and permanent feed forward texts
-					uint16_t bc=getNumberOfSuggestedCharacters();
+					/* MDH@21JAN2024: _suggestedTextReplaced by suggestedTextSources[]
+					uint16_t bc=getTotalNumberOfSuggestedCharacters();
 					if(bc){
 						while(bc--){
 							char newInputChar=string_removed_char(_suggestedText,0);
@@ -6769,6 +6799,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						}
 					}else
 						beep();
+					*/
 				}else
 				if(inputCharType=='m'){ // Esc character...
 					if(inputCharReadNonBlocking(&inputChar,NULL)){////inputChar=getInputChar();
@@ -6777,13 +6808,15 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								if(inputChar==51){
 									if(inputCharReadNonBlocking(&inputChar,NULL)){///////inputChar=getInputChar();
 										if(inputChar==126){ // delete
+											/* MDH@21JAN2024: _suggestedText replaced by suggestedTextSources[]
 											// TODO FIX this does not seem to be right!!!!!
-											if(getNumberOfSuggestedCharacters()){
+											if(getTotalNumberOfSuggestedCharacters()){
 												// we could go one to the right and do a backspace!!
 												moveCursorRight(1);
 												// TODO what to do here??? removePreviousTokenCharacter();
 											}else // nothing under the cursor to delete
 												beep();
+											*/
 										}
 									}
 								}else
@@ -6794,7 +6827,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									beep();
 								}else
 								if(inputChar==67){ // right arrow
-									if(getNumberOfSuggestedCharacters()){
+									/* MDH@21JAN2024: _suggestedText replaced by suggestedTextSources[]
+									if(getTotalNumberOfSuggestedCharacters()){
 										char newInputChar=string_removed_char(_suggestedText,0);
 										if(!newInputChar){
 											////////writeSuggestedText(true);
@@ -6803,6 +6837,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 											string_insert_char(_shellCommand,getUserInputLength(),newInputChar);
 									}else
 										beep();
+									*/
 								}else
 								if(inputChar==68){ // left arrow
 									uint16_t cp=getUserInputLength();
@@ -6989,7 +7024,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				}else{
 					// MDH@14AUG2019: if a user presses Enter when there's no command but still feedforwardText it looses feedforwardText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)
 					//				NOTE that I might consider keeping feedforwardText, so it will be redisplayed when the user returns to the command mode
-					switchToControlMode(NULL); // replacing: if(getNumberOfSuggestedCharacters()==0)switchToControlMode(NULL);else outputError("Still suggested text");
+					switchToControlMode(NULL); // replacing: if(getTotalNumberOfSuggestedCharacters()==0)switchToControlMode(NULL);else outputError("Still suggested text");
 				}
 			}else
 			if(inputMode==IM_SHELL){
