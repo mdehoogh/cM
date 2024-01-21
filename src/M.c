@@ -3682,6 +3682,8 @@ void showSuggestedText(){
 	}else
 		outputManualFeedforwardCharacters(&cursormovement);
 	
+	// MDH@21JAN2024: suggestedTextSources[0] should point to the first suggested text to use
+	if(suggestedTextSources[0])suggestedTextSources[0]=1;
 	//// replacing: outputAutoCompletionCharacters(&cursormovement);
 
 	// MDH@15OCT2020: returning to the position where command characters should be input depends on cursor position changes as remembered in cursormovement
@@ -6039,6 +6041,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 			}
 			////////outputChar('X');
+
+			////if(amVerbose())
+				inputInfo("%d %d %d %d %d",suggestedTextSources[0],suggestedTextSources[1],suggestedTextSources[2],
+										suggestedTextSources[3],suggestedTextSources[4]);
 
 			// ask the user for input
 			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
