@@ -6066,12 +6066,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			////////outputChar('X');
 
 			////if(amVerbose())
-				inputInfo("%d %d(%d) %d(%d) %d(%d) %d(%d)",
+				inputInfo("%d %d(%d) %d(%d) %d(%d) %d(%d) M='%s' C='%s' I='%s' E='%s'",
 										suggestedTextSources[0],
 										suggestedTextSources[1],getNumberOfSuggestedCharacters(suggestedTextSources[1]),
 										suggestedTextSources[2],getNumberOfSuggestedCharacters(suggestedTextSources[2]),
 										suggestedTextSources[3],getNumberOfSuggestedCharacters(suggestedTextSources[3]),
-										suggestedTextSources[4],getNumberOfSuggestedCharacters(suggestedTextSources[4]));
+										suggestedTextSources[4],getNumberOfSuggestedCharacters(suggestedTextSources[4]),
+										string(_manualFeedforwardText),
+										(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters:""),
+										string(_immediateFeedforwardText),
+										string(_expectedCharacterStack));
 
 			// ask the user for input
 			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
