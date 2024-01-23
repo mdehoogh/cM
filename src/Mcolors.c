@@ -61,7 +61,7 @@ const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the
 
 // MDH@26SEP2019: distinguishing between identifier continuation text and feed forward text (behind the cursor)
 const char* FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN};
-const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,DARK_YELLOW}; //{LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019
+const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_CYAN,DARK_CYAN}; // MDH@23JAN2024 changed from YELLOW!!! //{LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019
 const char* MANUAL_FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY}; // MDH@07OCT2019
 const char* FEEDFORWARD_CLOSER_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE}; // MDH@04DEC2023
 const char* AUTO_COMPLETION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,DARK_RED}; // MDH@27OCT2021
@@ -113,7 +113,7 @@ const char* getManualFeedforwardTextColor(){return MANUAL_FEED_FORWARD_TEXT_COLO
  * 
  * @return const char* the current color scheme identifier continuation text color
  */
-const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for generated feed forward text
+const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for identifier continuation text
 
 /**
  * @brief Get the FeedforwardCloser Text Color object

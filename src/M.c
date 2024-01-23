@@ -749,6 +749,7 @@ char getFirstIdentifierContinuationCharacter(){
 	inputInfo("%s","Determining the first identifier continuation character!");
 	return(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters[0]:'\0');
 }
+
 /**
  * @brief removes the first identifier continuation character
  * 
@@ -3492,6 +3493,23 @@ char getFirstSuggestedCharacter(){
 	}
 	return firstSuggestedCharacter;
 }
+
+/**
+ * @brief 'removes' the identifier continuation text
+ * @details only places the null character at the first position of _identifierContinuationCharacters
+ * @return true 
+ * @return false 
+ */
+bool removeIdentifierContinuationCharacters(){
+	if(_identifierContinuationCharacters!=NULL){
+		userInputCommandIdentifierContinuationNeedsUpdating=false; // will this work?????
+		_identifierContinuationCharacters[0]='\0';
+		while(++suggestedTextSources[0]<5&&!suggestedTextSources[suggestedTextSources[0]]); // increment suggestedTextSources[0] does not equal 5 (it should be 2) to find the first new suggested text source
+		return true;
+	}
+	return false;
+}
+
 /**
  * @brief removes the first (consumed) suggested character
  * 
@@ -5988,7 +6006,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// MDH@07OCT2019: the newly created feed forward category (manual) takes precedence over the identifier continuation and immediate feed forward text
 				//				although it is shown in the same color
 				// MDH@07OCT2019: now decided to ALWAYS update the identifier continuation BUT it will be merged with the manual feed forward text
-				updateUserInputCommandIdentifierContinuation();
+				// MDH@23JAN2024: do NOT update the identifier continuation when it was deleted!!!! which is true when it's length equals 0
+				//                this means that now we need to delete _identifierContinuationCharacters every time we want it to get updated!!!!!
+				/////////if(NULL==_identifierContinuationCharacters)
+					updateUserInputCommandIdentifierContinuation();
 				// if we have manual feed forward starting with the given identifier continuation, the identifier continuation will remain
 				// and the identifier continuation will be removed from the manual feed forward
 				if(_manualFeedforwardText!=NULL){ // existing manual feed forward text that may block identifier continuation characters
@@ -6232,12 +6253,20 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						beep();
 				}else
 				if(inputCharType=='d'){ // MDH@18APR2019: delete now always deletes the first character in the behind cursor text
+					// MDH@23JAN204: is this code actually ever called now, if so it should be replaced!!!
+					char firstSuggestedCharacter=getFirstSuggestedCharacter();
+					if(firstSuggestedCharacter){
+						if(!removeFirstSuggestedCharacter(firstSuggestedCharacter))
+							inputCharType=switchToControlMode("Failed to remove the first suggested character!");
+					}else
+						beep();
+					/* replacing:
 					clearScreenFromCursor(); // MDH@16OCT2020: this might help
 					/////debugWrite("DELETE");
 					// MDH@20SEP2019: equivalent to removing ANY first character in the first feed forward text (if any)
 					// MDH@27SEP2019: removing the identifier continuation text takes precedence!!!
 					// MDH@07OCT2019: manual feed forward now comes first (in showing)
-					if(/*_manualFeedforwardText&&*/string_length(_manualFeedforwardText)){
+					if(string_length(_manualFeedforwardText)){
 						// remove one character at a time (TODO might be confusing with the removal of the entire identifier continuation on Delete)
 						if(!getFirstManualFeedforwardCharacterRemoved())
 							inputCharType=switchToControlMode("Failed to delete the first suggested character.");
@@ -6253,6 +6282,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							inputCharType=switchToControlMode("Failed to remove the first character in the suggested text.");
 					}else // no first feed forward text (and character)!
 						beep();
+						*/
 				}else
 				if(inputCharType=='b'){ // backspace
 					///////debugWrite("BACKSPACE");
@@ -6491,6 +6521,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 											// MDH@20JAN2024: deleting suggested text is allowed one character at a time
 											//                but deleting identifier continuation is probably best done entirely
 											if(suggestedTextSources[0]%5){
+												// MDH@23JAN2024: when dealing with deleting identifier continuation, we delete the entire identifier continuation
+												if(suggestedTextSources[suggestedTextSources[0]]==2){
+													if(!removeIdentifierContinuationCharacters())
+														inputCharType=switchToControlMode("Failed to delete the identifier continuation.");
+												}else
 												if(!removeFirstSuggestedCharacter(getFirstSuggestedCharacter()))
 													inputCharType=switchToControlMode("Failed to remove the first suggested character.");
 											}
@@ -6671,10 +6706,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				if(!inputChar) // MDH@0.1.7.14+28JUN2023: I've added this so that any command currently considered an error would simply report that we're in an error and ignore the input
 					beep(); // MDH@08JUL2023: TODO I wanted to do something here!!!!
 				else{ 
+					// MDH@23JAN2024: _suggestedText is not created anymore, is to be replaced by getFirstSuggestedCharacter()
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//				we always need a command (being edited)
 					// MDH@01OCT2019: if the input character matches the first non-anonymous i.e. autogenerated feed forward character same functionality as right arrow (except now we know the character entered)
-					char firstSuggestedCharacter=string_char(_suggestedText,0); // MDH@05DEC2022 replacing: getFirstSuggestedCharacter(/*true*/);
+					char firstSuggestedCharacter=getFirstSuggestedCharacter(); // replacing: string_char(_suggestedText,0); // MDH@05DEC2022 replacing: getFirstSuggestedCharacter();
 					if(inputChar==firstSuggestedCharacter){
 						//if(amVerboseDebugging())
 							logToOutputFile("\t\tInput character '%c' matches the first suggested character.\n",inputChar);
@@ -6692,15 +6728,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							inputError("%sFailed to consume the first suggested character '%c'.",M_BUG_PREFIX,inputChar);
 							switchToControlMode("See the log for details.");
 						}
-						/* MDH@02NOV2021: can't happen anymore	
-						if(result&REMOVE_SUGGESTED_CHARACTER_FAILURE){
-							inputError("Failed to remove the first accepted character!");
-						// replacing:
-						// char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed(inputChar,true);
-						//if(!firstSuggestedCharacterConsumed)
-							//inputCharType=switchToControlMode("Failed to accept the matching first suggested character.");
-						}
-						*/
+						/// MDH@02NOV2021: can't happen anymore	
+						///if(result&REMOVE_SUGGESTED_CHARACTER_FAILURE){
+						///	inputError("Failed to remove the first accepted character!");
+						///// replacing:
+						///// char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed(inputChar,true);
+						/////if(!firstSuggestedCharacterConsumed)
+						///	//inputCharType=switchToControlMode("Failed to accept the matching first suggested character.");
+						///}
 						// MDH@22OCT2021: no need to do the following anymore because commandCharacterAccepted() takes care of removing the consumed suggested character: 
 						// else deleteFirstSuggestedCharacter(firstSuggestedCharacterConsumed,false);
 					}else{
