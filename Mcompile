@@ -89,8 +89,8 @@ if [ -f M ]; then
     cp M ..
     cd ..
     if [ -f M ]; then
-        echo "Execute ./M to run M now."
-				M
+        echo "Executing ./M to run M now."
+		./M
     else
         echo "M vanished. You will have to copy it from the scr subdirectory yourself manually."
     fi

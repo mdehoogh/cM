@@ -157,3 +157,5 @@ Mvalue* Mget(Mvalue* _variableNameValue);
 Mvalue* Msetlocale(Mvalue* _localeValue);
 Mvalue* Mlocalesettings();
 
+// MDH@24JAN2024: why wasn't this here before?
+Mvalue* Mlock(Mvalue* variableNameValue);

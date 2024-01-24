@@ -1269,8 +1269,8 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 			*size-=digs;
 			/* reverse the digits of the string */
 			//////output("Reversing '%i' characters.",digs);
-			//char *x=str,*y=_s-1;char c;while(x<y){c=*x;*x++=*y;*y--=c;}
-			s_mp_reverse((unsigned char *)str,*size);
+			char *x=str,*y=_s-1;char c;while(x<y){c=*x;*x++=*y;*y--=c;}
+			// replacing: s_mp_reverse((unsigned char *)str,*size);
 			/////////output("Reversed: '%s'",str);
 		}else // only possible when digs is not zero2
 			err=MP_VAL;
