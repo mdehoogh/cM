@@ -49,7 +49,7 @@ echo "Copying M.tommath-1.1.0.h to the src folder."
 cp ../M.tommath-1.1.0.h ./M.tommath.h
 
 # MDH@25JAN2024: we should do the same with mpdecimal.h
-echo "Copying M.mpdecimal-2.4.2.h to the scr folder."
+echo "Copying M.mpdecimal-2.4.2.h to the src folder."
 cp ../mpdecimal-2.4.2.h ./mpdecimal.h
 
 echo ""
