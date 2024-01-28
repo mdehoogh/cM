@@ -9573,22 +9573,27 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			Mformulaelement* _lastAssignmentFormulaelement=NULL;
 			_formulaelement=formula;
 			while(_formulaelement!=NULL){
-				if(string_last_char(_formulaelement->_operator)!='=')break; // not ending with assignment operator character to start with
-				if(string_char(_formulaelement->_operator,0)=='<'||string_char(_formulaelement->_operator,0)=='>'||string_char(_formulaelement->_operator,0)=='!')break; // break on <=, >= and !=
-				if(string_length(_formulaelement->_operator)>1&&string_char(_formulaelement->_operator,0)=='=')break; // break on ==
-				if(_lastAssignmentFormulaelement)_formulaelement->_prev=_lastAssignmentFormulaelement; // MDH@21MAY2019: in order to be able to traverse back!!!
-				// MDH@11AUG2019: should we force existence?????? I don't think so because creation is done when the value reference is actually created, but I need to make certain that this is the case!!!!
-				/*
-				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
-					Mstring* _environmentName=_getExecutionEnvironmentName();
-					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
-					FREE_STRING(_environmentName);
-					break; // NO retrieves the undefined value subsequently!!
-				}
-				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
-				*/
-				_lastAssignmentFormulaelement=_formulaelement;
-				numberOfAssignments++;
+				/////if(_formulaelement->_operator!=NULL){ // MDH@28JAN2024: no need to check null
+					/////output("Checking formula operator '%s'.\n",string(_formulaelement->_operator));
+					if(string_last_char(_formulaelement->_operator)!='=')break; // not ending with assignment operator character to start with
+					// MDH@28JAN2024: oops <<= and >>= should be considered shortcut operators, so added the check for the length to equal 2
+					//                TODO there might be shortcut operators that are getting through this way
+					if(string_length(_formulaelement->_operator)==2&&(string_char(_formulaelement->_operator,0)=='<'||string_char(_formulaelement->_operator,0)=='>'||string_char(_formulaelement->_operator,0)=='!'))break; // break on <=, >= and !=
+					if(string_length(_formulaelement->_operator)>1&&string_char(_formulaelement->_operator,0)=='=')break; // break on ==
+					if(_lastAssignmentFormulaelement)_formulaelement->_prev=_lastAssignmentFormulaelement; // MDH@21MAY2019: in order to be able to traverse back!!!
+					// MDH@11AUG2019: should we force existence?????? I don't think so because creation is done when the value reference is actually created, but I need to make certain that this is the case!!!!
+					/*
+					if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
+						Mstring* _environmentName=_getExecutionEnvironmentName();
+						output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
+						FREE_STRING(_environmentName);
+						break; // NO retrieves the undefined value subsequently!!
+					}
+					if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
+					*/
+					_lastAssignmentFormulaelement=_formulaelement;
+					numberOfAssignments++;
+				///}
 				_formulaelement=_formulaelement->_next;
 			}
 			if(amVerboseDebugging())
@@ -9685,6 +9690,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
 					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
 						// we have to be a bit careful here if the value reference uses an index id
+						if(amVerboseDebugging())
+							output("Applying binary operator '%s'.\n",string(_formulaelement->_operator));
 						// does the _value field already contain the current value of the variable, if so we may immediately use that here instead of getValue()
 						_result=applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result);
 						// MDH@02NOV2019 replacing: assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result));
