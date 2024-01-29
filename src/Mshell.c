@@ -72,7 +72,13 @@ const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
 const long double M_LD_INF=1.0/0.0; // positive infinity
 const long double M_LD_NEGINF=-1.0/0.0; // negative infinity
 const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
+
+#ifdef PI
+const long double M_LD_PI=(long double)PI;
+#else
 const long double M_LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
+#endif
+
 const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
 long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
@@ -13615,6 +13621,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				////////return false;
 			}*/
 			// create and add PI and E constants!!!
+			if(M_LD_PI!=acosl(-1))
+				output("%s: PI=%.*f does not equal %.*f.\n",M_ERROR_PREFIX,LDBL_DIG-1,M_LD_PI,LDBL_DIG-1,acosl(-1));
+			else
+				output("PI (%.*f) equals acos(-1) (%.*f)!\n",LDBL_DIG-1,M_LD_PI,LDBL_DIG-1,acosl(-1));
+
 			Mvalue* PI_value=_getFloatValue(M_LD_PI);
 			if(NULL==PI_value){
 				outputError("Failed to create PI");

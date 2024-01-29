@@ -356,7 +356,10 @@ Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
 	if(NULL==_map)return NULL;
   //DEBUGGINGoutput("Disowning map!\n");
-	if(_map->_creator!=NULL){output("Creator: '%s'.\n",_map->_creator);disowned_chars(_map->_creator,owner_map);} // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
+	if(_map->_creator!=NULL){
+		////////output("Creator: '%s'.\n",_map->_creator);
+		disowned_chars(_map->_creator,owner_map);
+	} // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
 	if(_map->_first!=NULL)disowned_mapelement(_map->_first,owner_map);
 	//DEBUGGINGoutput("Map disowned!\n");
 	return DISOWNED(_map,owner_map);
@@ -373,7 +376,7 @@ Mmap* __map(char const * const source){Mallocationowner owner=getOwner(__LINE__)
 	Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
 	if(NULL==_map)return NULL;
 	if(source!=NULL){
-		output("Creating a map of source '%s'.\n",source);
+		///////output("Creating a map of source '%s'.\n",source);
 		_map->_creator=owned_chars(_getChars(source),Msubowner(owner,1)); 
 		if(NULL==_map->_creator)
 			output("%sFailed to register map creator '%s'.\n",M_ERROR_PREFIX,source);
@@ -4271,12 +4274,10 @@ Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_functio
 	if(NULL==_function)return NULL;
 	/////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
 	if(_function->_parameterMap!=NULL)disowned_map(_function->_parameterMap,owner_function);
-	//if(amVerboseDebugging())
-		output("\t\tFunction parameter map disowned.\n");
+	//if(amVerboseDebugging())output("\t\tFunction parameter map disowned.\n");
 	if(_function->type==FT_USER){
 		disowned_userfunction(_function->functionunion._userfunction,owner_function); // TODO ?????
-		//if(amVerboseDebugging())
-			output("\t\tUser function disowned!\n");
+		//if(amVerboseDebugging())output("\t\tUser function disowned!\n");
 	}
 	return DISOWNED(_function,owner_function);
 }
@@ -4318,12 +4319,12 @@ Mfunctionmapelement* owned_functionmapelement(Mfunctionmapelement* _functionmape
 Mfunctionmapelement* disowned_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocationowner owner_functionmapelement){
 	if(!_functionmapelement)return NULL;
 	disowned_functionmapelement(_functionmapelement->_next,owner_functionmapelement);
-	output("Disowning function map element '%s'.\n",string(_functionmapelement->_name));
-	output("\tDisowning the function.\n");
+	////////output("Disowning function map element '%s'.\n",string(_functionmapelement->_name));
+	////////output("\tDisowning the function.\n");
 	disowned_function(_functionmapelement->_function,owner_functionmapelement);
-	output("\tDisowning the function name.\n");
+	////////output("\tDisowning the function name.\n");
 	disowned_string(_functionmapelement->_name,owner_functionmapelement);
-	output("\tDisowning the function map element!\n");
+	////////output("\tDisowning the function map element!\n");
 	return DISOWNED(_functionmapelement,owner_functionmapelement);
 }
 #endif
