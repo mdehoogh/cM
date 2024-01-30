@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <time.h>
 #include <locale.h>
+// MDH@30JAN2024: for including math constants
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 #include "Mshell.h"
 
@@ -73,13 +76,22 @@ const long double M_LD_INF=1.0/0.0; // positive infinity
 const long double M_LD_NEGINF=-1.0/0.0; // negative infinity
 const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
 
-#ifdef PI
-const long double M_LD_PI=(long double)PI;
+// can't get the proper number of decimals using M_PI!!!
+#ifdef M_PI
+const long double M_LD_PI=(long double)M_PI;
+////printf("PI is predefined.\n");
 #else
-const long double M_LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
+const long double M_LD_PI=3.1415926535897932384626433832795028841971L; // 40 non-zero decimal digits of PI (before the first 0)
+                      ///?3,14159265358979323851280895940618620443
+                      ///?3,141592653589793238512808959406186
 #endif
 
+#ifdef M_E
+const long double M_LD_E=(long double)M_E;
+///////printf("E is predefined.\n");
+#else
 const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
+#endif
 
 long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
 
@@ -13621,12 +13633,20 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				////////return false;
 			}*/
 			// create and add PI and E constants!!!
-			if(M_LD_PI!=acosl(-1))
-				output("%s: PI=%.*f does not equal %.*f.\n",M_ERROR_PREFIX,LDBL_DIG-1,M_LD_PI,LDBL_DIG-1,acosl(-1));
-			else
-				output("PI (%.*f) equals acos(-1) (%.*f)!\n",LDBL_DIG-1,M_LD_PI,LDBL_DIG-1,acosl(-1));
-
-			Mvalue* PI_value=_getFloatValue(M_LD_PI);
+#ifdef M_PI
+			output("Long double PI is predefined in the math standard library!\n");
+#else
+			output("Long double PI is not predefined!\n");
+#endif
+			Mvalue* PI_value=NULL;
+			long double acosl_1=acosl(-1);
+			if(M_LD_PI!=acosl_1){
+				output("%sLong double constant PI (%.*Lf) replaced by acosl(-1) (%.*Lf).\n",M_WARNING_PREFIX,33,M_LD_PI,33,acosl_1);
+				PI_value=_getFloatValue(acosl_1);
+			}else{
+				output("Long double constant PI (%.*Lf) equals acosl(-1) (%.*Lf)!\n",33,M_LD_PI,33,acosl_1);
+				PI_value=_getFloatValue(M_LD_PI);
+			}
 			if(NULL==PI_value){
 				outputError("Failed to create PI");
 				return NULL;
@@ -13642,7 +13662,20 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
-			Mvalue* E_value=_getFloatValue(M_LD_E);
+#ifdef M_E
+			output("Long double E is predefined in the math standard library!\n");
+#else
+			output("Long double E is not predefined!\n");
+#endif
+			Mvalue* E_value=NULL;
+			long double expl1=expl(1);
+			if(M_LD_E!=expl1){
+				output("%sLong double constant E (%.*Lf) replaced by expl(1) (%.*Lf).\n",M_WARNING_PREFIX,33,M_LD_E,33,expl1);
+				E_value=_getFloatValue(expl1);
+			}else{
+				output("Long double constant E (%.*Lf) equals expl(1) (%.*Lf)!\n",33,M_LD_E,33,expl1);
+				E_value=_getFloatValue(M_LD_E);
+			}
 			if(NULL==E_value){
 				///////free_value(E_value);
 				outputError("Failed to create E");
