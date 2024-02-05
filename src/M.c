@@ -6703,9 +6703,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						}
 					}
 				}else
-				if(!inputChar) // MDH@0.1.7.14+28JUN2023: I've added this so that any command currently considered an error would simply report that we're in an error and ignore the input
-					beep(); // MDH@08JUL2023: TODO I wanted to do something here!!!!
-				else{ 
+				if(inputChar){ 
 					// MDH@23JAN2024: _suggestedText is not created anymore, is to be replaced by getFirstSuggestedCharacter()
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//				we always need a command (being edited)
@@ -6770,7 +6768,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					}else
 						switchToControlMode("Failed to create a new command!");
 					*/
-				}
+				}else	// MDH@0.1.7.14+28JUN2023: I've added this so that any command currently considered an error would simply report that we're in an error and ignore the input
+					beep(); // MDH@08JUL2023: TODO I wanted to do something here!!!!
 				///////////// MDH@06AUG2019 NOT AGAIN: outputStatus(inputChar,inputCharType);
 			}else
 			if(inputMode==IM_CONTROL){ // inputChar received in control mode

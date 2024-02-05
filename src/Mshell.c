@@ -1631,28 +1631,29 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 	/////if(amDebugging())(*inputInfoFunction)("C");
 	// TODO just like unary operators expressions, maps and list end immediately
 	// some combinations are (still) not allowed...
-	if(newTokenType<0||newTokenType==(*tokenType)){
+	// MDH@05FEB2024: the test newTokenType<0 was ||'ed in the following condition but nothing would be done when newTokenType<0
+	//                so I moved that boolean expression negated into the else part, to follow through with doing if the token types are not the same
+	if(newTokenType==(*tokenType)){
 		/* 
 			MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
 			MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
 		*/
-		if(newTokenType==(*tokenType)){
-			if(isTokenFinished(token)){
-				// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
-				// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
-				if((*tokenType)!=TT_LIST&&(*tokenType)!=TT_FUNCTION_CALL&&(*tokenType)!=TT_UNARY&&(*tokenType)!=TT_TERNARY_aeru&&(*tokenType)!=TT_LISTELEMENT&&(*tokenType)!=TT_END_OF_FUNCTION_CALL&&(*tokenType)!=TT_END_OF_MAP&&(*tokenType)!=TT_END_OF_LIST){
-					newTokenType=TT_ERROR;
-				}
-			}else{ // MDH@25MAR2020: a property cannot contain a 'dot' (period) other than at the first position
-				// 'finishing' a token forces creating a new one below
-				if(newTokenType==TT_PROPERTY&&inputChar==M_PROPERTY_SEPARATOR_CHARACTER)
-					if(isTokenUnfinished(token))
-						//finishToken(lastCommandToken)
-						;
+		if(isTokenFinished(token)){
+			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
+			// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
+			if((*tokenType)!=TT_LIST&&(*tokenType)!=TT_FUNCTION_CALL&&(*tokenType)!=TT_UNARY&&(*tokenType)!=TT_TERNARY_aeru&&(*tokenType)!=TT_LISTELEMENT&&(*tokenType)!=TT_END_OF_FUNCTION_CALL&&(*tokenType)!=TT_END_OF_MAP&&(*tokenType)!=TT_END_OF_LIST){
+				newTokenType=TT_ERROR;
 			}
+		}else{ // MDH@25MAR2020: a property cannot contain a 'dot' (period) other than at the first position
+			// 'finishing' a token forces creating a new one below
+			if(newTokenType==TT_PROPERTY&&inputChar==M_PROPERTY_SEPARATOR_CHARACTER)
+				if(isTokenUnfinished(token))
+					//finishToken(lastCommandToken)
+					;
 		}
-	}else{ // different token types
+	}else
+	if(newTokenType>=0){ // different token types
 		// a shortcut assignment can NOT be turned into a equality comparison
 		if(inputCharacterType=='='&&(*tokenType)==TT_ASSIGNMENT&&(token->prev->type==TT_BINARY_AeRu||token->prev->type==TT_BINARY_Aeru))
 			newTokenType=TT_ERROR;
@@ -1811,13 +1812,15 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 		/////if(amDebugging())(*inputInfoFunction)("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
-		if(newTokenType<0||newTokenType==lastCommandToken->type){
+		// MDH@05FEB2024: here we can make the same change as we did in characterContinuesToken()
+		//                i.e. move newTokenType<0 to the else part (and comment out the inner if test)
+		if(/*newTokenType<0||*/newTokenType==lastCommandToken->type){
 			/* 
 			   MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			   MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
 			   MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
 			*/
-			if(newTokenType==lastCommandToken->type){
+			///if(newTokenType==lastCommandToken->type){
 				if(isTokenFinished(lastCommandToken)){
 					// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
 					// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
@@ -1831,8 +1834,9 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 						if(isTokenUnfinished(lastCommandToken))
 							finishToken(lastCommandToken);
 				}
-			}
-		}else{ // different token types
+			///}
+		}else
+		if(newTokenType>=0){ // different (regular) token types
 			// a shortcut assignment can NOT be turned into a equality comparison
 			if(*inputCharacterType=='='&&lastCommandToken->type==TT_ASSIGNMENT&&(lastCommandToken->prev->type==TT_BINARY_AeRu||lastCommandToken->prev->type==TT_BINARY_Aeru)){
 				newTokenType=TT_ERROR;
