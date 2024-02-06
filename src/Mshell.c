@@ -1251,7 +1251,7 @@ static InputResponseFunction* inputErrorFunction=NULL;
  * @param inputCharacterType 
  * @return int8_t 
  */
-int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
+static int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
 		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
 		char* noTransition=NO_TRANSITIONS[inputTokenType];
@@ -1262,7 +1262,10 @@ int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 		///////////if(noTransition[0]!='`'&&!strchr(noTransition,inputCharacterType))return -inputTokenType;
 		if(strlen(noTransition)==0||(noTransition[0]=='!'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
 			int8_t tokenType=NUMBER_OF_TOKEN_TYPES; // MDH@10APR2019: BUG FIX uint8_t changed to int8_t otherwise would circle around
-			while(--tokenType>=0)if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)return tokenType;
+			// find the new token type
+			while(--tokenType>=0)
+				if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)
+					return tokenType;
 		}
 #ifdef __DEBUG__
 		else{
@@ -1591,6 +1594,50 @@ static void correctInputCharacterType(Mtoken const * const token,char inputChar,
 		if(token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
 	}
 }
+
+/**
+ * @brief returns false if \p token does not denote a binary operator, true otherwise
+ * 
+ * @param token 
+ * @return true \p token represents a binary operator
+ * @return false \p token does not represent a binary operator
+ */
+static bool isNotABinaryOperator(Mtoken const * const token){
+	Mstring* tokenText=token->text;
+	size_t tokenLength=string_length(tokenText);
+	if(tokenLength>0){
+		char firstTokenCharacter=string_char(tokenText,0);
+		if(tokenLength==2){
+			char secondTokenCharacter=string_char(tokenText,1);
+			// if the second token character is = the first character needs to be either ! or =
+			if(secondTokenCharacter=='='){
+				if(firstTokenCharacter=='='||firstTokenCharacter=='!')
+					return false;
+			}else{ // the second character is not an equal sign
+				// arithmetic 1-character binary operator + and - (but * and / do!) have no continuation
+				// & and | 1-character bitwise operator also have no valid continuation
+				// ! allows < and > but nothing else (but = see above)
+				switch(firstTokenCharacter){
+					case '*':if(secondTokenCharacter=='*')return false;break;
+					case '/':if(secondTokenCharacter=='/')return false;break;
+					case '!':
+					case '<':if(secondTokenCharacter=='<'||secondTokenCharacter=='>')return false;break;
+					case '>':if(secondTokenCharacter=='>')return false;break;
+				}
+			}
+		}else
+		if(tokenLength==1){
+			switch(firstTokenCharacter){
+				case '+':case '-':case '*':case '/':
+				case '<':case '>':case '&':case '|':
+				case '!':case '=':case '^':
+					return false;
+			}
+		}
+	}
+	return true;
+}
+
 /** TODO
  * @brief returns the new token type of token \p token on appending \p inputChar of type \p inputCharacterType
  * 
@@ -1634,6 +1681,20 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 	// MDH@05FEB2024: the test newTokenType<0 was ||'ed in the following condition but nothing would be done when newTokenType<0
 	//                so I moved that boolean expression negated into the else part, to follow through with doing if the token types are not the same
 	if(newTokenType==(*tokenType)){
+		// MDH@06FEB2024: we should exclude all invalid binary operators which weren't yet discovered
+		switch(newTokenType){
+			case TT_BINARY_AeRu:
+			case TT_BINARY_Aeru:
+			case TT_BINARY_aERu:
+			case TT_BINARY_aErU:
+			case TT_BINARY_aeru:
+				if(isNotABinaryOperator(token)){
+					newTokenType=TT_ERROR;
+					if(*inputErrorFunction!=NULL)
+						(*inputErrorFunction)("'%s' is not a binary operator!",string(token->text));
+				}
+				break;
+		}
 		/* 
 			MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
@@ -1855,10 +1916,12 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
 		//				this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
 		//				this way it will always be there!!
+		/* MDH@06FEB2024: now added negated to the if in the else part
 		if(newTokenType<0){
 
 		}else
-		if(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||isTokenFinished(lastCommandToken)){
+		*/
+		if(newTokenType>=0&&(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||isTokenFinished(lastCommandToken))){
 			///////////if(amVerbose())outputInfo("!");/////(*inputInfoFunction)("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//				if we're in a binary operator and move to another binary operator type it's an extension
@@ -1917,11 +1980,10 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 			setLastTokenType(newTokenType,endOfInput);
 			*/
 			/////if(amDebugging())(*inputInfoFunction)("F");
-/*
-#ifdef __DEBUG__
-			printf("@%p=%p?:%s",_userInputCommand->_firstToken,_userInputCommand->_lastToken,string(_userInputCommand->_firstToken->text));
-#endif
-*/
+			/*
+			if(amVerboseDebugging())
+				printf("@%p=%p?:%s",_userInputCommand->_firstToken,_userInputCommand->_lastToken,string(_userInputCommand->_firstToken->text));
+			*/
 			/* MDH@23JUL2019 TODO check what we still need of the following!!!!: replacing:
 			// ending a function call, list or map is only allowed with expr defined
 			if(_userInputCommand->_lastToken->type==TT_END_OF_FUNCTION_CALL||_userInputCommand->_lastToken->type==TT_LISTELEMENT||_userInputCommand->_lastToken->type==TT_END_OF_LIST||_userInputCommand->_lastToken->type==TT_END_OF_MAP){

@@ -6086,7 +6086,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			}
 			////////outputChar('X');
 
-			////if(amVerbose())
+			if(amVerboseDebugging())
 				inputInfo("%d %d(%d) %d(%d) %d(%d) %d(%d) M='%s' C='%s' I='%s' E='%s'",
 										suggestedTextSources[0],
 										suggestedTextSources[1],getNumberOfSuggestedCharacters(suggestedTextSources[1]),
