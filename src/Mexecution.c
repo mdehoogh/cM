@@ -103,9 +103,11 @@ bool initExecution(){
  * @return Mbiginteger* the disowned big integer pointer
  */
 Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
-	if(!_biginteger)return NULL;
-	if(_biginteger->_bi)DISOWNED(_biginteger->_bi,owner_biginteger);
-	return DISOWNED(_biginteger,owner_biginteger);
+	if(NULL==_biginteger)return NULL;
+	if(_biginteger->_bi!=NULL)DISOWNED(_biginteger->_bi,Msubowner(owner_biginteger,1));
+	DISOWNED(_biginteger,owner_biginteger);
+	if(NULL==Mdisowned(_biginteger,owner_biginteger))outputError("Failed to disown big integer");
+	return _biginteger;
 }
 /**
  * @brief sets the ownership of the big integer pointed to by \p _biginteger to \p owner_biginteger
@@ -115,8 +117,8 @@ Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner
  * @return Mbiginteger* the owned big integer pointer
  */
 Mbiginteger* owned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
-	if(!_biginteger)return NULL;
-	if(_biginteger->_bi)OWNED(_biginteger->_bi,Msubowner(owner_biginteger,1));
+	if(NULL==_biginteger)return NULL;
+	if(_biginteger->_bi!=NULL)OWNED(_biginteger->_bi,Msubowner(owner_biginteger,1));
 	return OWNED(_biginteger,owner_biginteger);
 }
 /**
@@ -126,16 +128,22 @@ Mbiginteger* owned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_bi
  */
 Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
 	Mbiginteger* _biginteger=(Mbiginteger*)CALLOC_1(sizeof(Mbiginteger),'B',owner);
-	if(_biginteger){
+	if(_biginteger!=NULL){
 #ifndef __PRODUCTION__
 		_biginteger->_bi=(mp_int*)SUBOWNED(CALLOC_1(sizeof(mp_int),'b',owner),1);
-		if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE_DISOWNED_1(_biginteger->_bi,'b',owner);_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
-		if(!_biginteger->_bi){FREE_DISOWNED_1(_biginteger,'B',owner);_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
+		if(_biginteger->_bi!=NULL&&mp_init(_biginteger->_bi)!=MP_OKAY){
+			FREE_DISOWNED_1(_biginteger->_bi,'b',owner);
+			_biginteger->_bi=NULL;
+		} // initialize the mp_int, when failing free the mp_int*
+		if(NULL==_biginteger->_bi){
+			FREE_DISOWNED_1(_biginteger,'B',owner);
+			_biginteger=NULL;
+		} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
 #else
 		if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
 #endif
 	}
-	return disowned_biginteger(_biginteger,owner);
+	return(_biginteger!=NULL?disowned_biginteger(_biginteger,owner):NULL);
 }/* VALIDATED */
 
 // end of block that uses __PRODUCTION__ flag
@@ -167,7 +175,7 @@ Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__
 	// if(ll==M_LL_INVALID)return NULL; // MDH@16DEC2020: essentially a long long could be larger so technically do not call _getBiginteger() with an invalid long long!!!!!
 	Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
 	// MDH@09APR2020: in the non-production version we're keeping track of the allocations and get_mpint on Mbiginteger will return what is required
-	if(_biginteger)mp_set_i64(MP_INT_POINTER(_biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
+	if(_biginteger!=NULL)mp_set_i64(MP_INT_POINTER(_biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
 	return disowned_biginteger(_biginteger,owner);
 }/* VALIDATED */
 

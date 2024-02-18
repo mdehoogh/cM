@@ -3041,25 +3041,25 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
 			{
 				// this is a bit of a nuisance when the double is out of the VT_INTEGER range
 				_resultBiginteger=owned_biginteger(__biginteger(),owner);
-				if(_resultBiginteger&&mp_set_longdouble(_resultBiginteger,_value->value._float->ld)!=MP_OKAY)
+				if(_resultBiginteger!=NULL&&mp_set_longdouble(_resultBiginteger,_value->value._float->ld)!=MP_OKAY)
 				{FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
-				if(!_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+				if(NULL==_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
 			}
 			break;
 		case VT_TEXT:
 			{
-				_resultBiginteger=__biginteger();
-				if(_resultBiginteger&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),_value->value._text->_c,10)!=MP_OKAY)
+				_resultBiginteger=owned_biginteger(__biginteger(),owner);
+				if(_resultBiginteger!=NULL&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),_value->value._text->_c,10)!=MP_OKAY)
 				{FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
-				if(!_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+				if(NULL==_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
 			}
 			break;
 		case VT_TOKEN:
 			{
 				_resultBiginteger=owned_biginteger(__biginteger(),owner);
-				if(_resultBiginteger&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),string(_value->value._token->text),10)!=MP_OKAY)
+				if(_resultBiginteger!=NULL&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),string(_value->value._token->text),10)!=MP_OKAY)
 				{FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
-				if(!_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+				if(NULL==_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
 			}
 		case VT_REFERENCE: // TODO this may be hard
 			break;

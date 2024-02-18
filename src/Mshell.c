@@ -1605,7 +1605,7 @@ static void correctInputCharacterType(Mtoken const * const token,char inputChar,
 static bool isNotABinaryOperator(Mtoken const * const token){
 	Mstring* tokenText=token->text;
 	size_t tokenLength=string_length(tokenText);
-	if(tokenLength>0){
+	if(tokenLength){
 		char firstTokenCharacter=string_char(tokenText,0);
 		if(tokenLength==2){
 			char secondTokenCharacter=string_char(tokenText,1);
@@ -7855,14 +7855,22 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
-			_integerquotientBiginteger=__biginteger();
+			_integerquotientBiginteger=owned_biginteger(__biginteger(),owner); // OOPS have to own it!!!
 			if(_integerquotientBiginteger!=NULL&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_integerquotientBiginteger),NULL)!=MP_OKAY)
 			{FREE_BIGINTEGER(_integerquotientBiginteger,owner);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
-		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
+		if(smallinteger1){
+			/////outputBiginteger("Freeing '",_biginteger1,"'.\n");
+			FREE_BIGINTEGER(_biginteger1,owner);
+			_biginteger1=NULL;
+		}
+		if(smallinteger2){
+			//////outputBiginteger("Freeing '",_biginteger2,"'.\n");
+			FREE_BIGINTEGER(_biginteger2,owner);
+			_biginteger2=NULL;
+		}
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//				but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
