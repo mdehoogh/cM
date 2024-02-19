@@ -152,7 +152,7 @@ unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized i
  * @brief for each possible input character the associated type
  * 
  */
-const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[e]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[e]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~b";
 
 // MDH@24MAR2020 BUG FIX: needed to insert an additional "" for TT_PROPERTY which I forgot previously
@@ -219,6 +219,13 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 // MDH@04NOV2019: the reference token type added, so we can pass references to functions wrapped inside a value
 // MDH@08JUL2023: if we allow comments everywhere we have to remove C from the last element in each TRANSITIONS element, but changing it into c is also possible, to make it acceptable
 // MDH@18JUL2023: a comma behind an opening parenthesis should now also be allowed, therefore , was removed from the last element of EXPRESSION and added to the L_EL string
+/* MDH@18FEB2024: replacing binary operators by 3 types:
+   ONE_CHARACTER_BINARY: + - & | ^ E
+	 ONE_AND_TWO_CHARACTER_BINARY: / * < > extendible to // ** << <> and >>
+	 TWO_CHARACTER_BINARY: != !< !> == but also !! instead of == so that a user can always not use = in binary operators
+	 we need to prevent binary operators to be over two characters programmatically!!!
+	 we now have = for == / ! for != !< and !> / < / and * for << // and ** / < for << and <> / and all the one character bin operators
+*/
 /*
  "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","REF" ,"VAR"  ,"NEWVAR","PROP" ,"L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 /**
@@ -226,35 +233,36 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
  * 
  */
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*    >?:	] }="}, /* EXPRESSION */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,"" ,"`R; CDS% )&*  , >?:	]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
-{"(","!-+~","" ,"=" ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*  , >?:	] }" }, /* ASSIGNMENT = */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ","C","`R; c  % )&*  , >?:	] }="}, /* Baeru finished bin.op. */ \
-{""	,""    ,"" ,"=" ,""  ,""   ,"" ,""    ,"" ,""    ,""	  ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"C","`R;!cDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,"R"   ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; cDS% )&*  , >?:	]"   }, /* BAeRu assignable repeatable */ \
-{"(","!-+~","" ,"=" ,""  ,""   ,"" ,"R"   ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  ,  ?:	]"   }, /* BaERu comp. (<>) bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,""    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  , >?:	]"   }, /* BAeru assignable bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,""    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  , >?:	]{}" }, /* Taeru ternary op. (? only now) */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""    ,"" ,"LEN" ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"}","","" ,")","C","`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
-{""	,""    ,"=",""  ,"!" ,"&*" ,">","-+%" ,"?",""    ,"RLEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","` ;  DS (			   {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""	,""    ,"=",""  ,""  ,""   ,"" ,""    ,"" ,""    ,""    ,"LEN","."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,"" ,"C","`R;! DS%()&*+-  >?:	 {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{""	,""	   ,"=",""  ,"!" ,"&*" ,">","-+%" ,"?",""    ,""    ,""	  ,"RLEN.",",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","` ;  DS (			   {"  }, /* PROPERTY (identifier starting with the property separator) */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*	>?:	  }="}, /* LIST ELEMENT (similar to expression) */ \
-{";",""    ,"" ,"?:","!=","&*" ,">","-+%E","?",""    ,""    ,""	  ,""     ,",","N"  ,"."   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`R   DS (		  L  [ {"  }, /* INTEGER: (signless) list of digits */ \
-{";",""    ,"" ,"?:","!=","&*" ,">","-+%E","?",""    ,""    ,""	  ,""     ,",",""   ,"N"   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`R   DS (	  .   L  [ {"  }, /* REAL: part behind a decimal period */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""    ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"D","" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"" ,""						   }, /* DQSTRING: double quoted string */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""    ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"S","" ,"" ,"" ,"" ,"" ,"","" ,"" ,"" ,""						   }, /* SQSTRING: single quoted string */ \
-{";",""    ,"" ,"+" ,"!=","&"  ,">",""    ,"?",""    ,""    ,""	  ,""     ,",",""   ,""    ,"D","S","" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{";",""    ,"" ,"+" ,"!=","&"  ,">",""    ,"?",""    ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,""    ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,")","C","` ; c  %& )*   .>?:	  }="}, /* LIST: [ starts a list */ \
-{";",""    ,"=","?" ,"!" ,"&*" ,">","-+%" ,"?",""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","`R   DS  (		 LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,""    ,"D","S","" ,"" ,"[","" ,"" ,"" ,"}","","" ,")","C","` ; c  %& )*  ,.>?:	]{ ="}, /* MAP: { starts a map */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","C","` ; c  %& )*  , >?:	] }="}, /* MAP_VALUE: : starts a map value */ \
-{";",""    ,"" ,"?" ,"!=","&*" ,">","+"   ,"?",""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,")","C","`R   DS% (   -	:LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""    ,"" ,""    ,""    ,""	  ,"."    ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","(","" ,"C","`R;!cDS%& )*+-, >?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
-{"(","!-+~","" ,""  ,""  ,"" 	 ,"" ,""    ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","C","` ; c  %&  *	>?:	] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{";",""    ,"" ,"?:","!=","&*" ,">","-+%E","?",""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","`R   DS  (		 L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"(","!-+~","" ,"" ,"" ,""   ,""  ,""      ,"" ,"@"  ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*    <>?:	  ] }="}, /* EXPRESSION */ \
+{"(","!-+~","" ,"" ,"" ,""   ,""  ,""      ,"" ,""   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,"" ,"`@; CDS% )&*  , <>?:	  ]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
+{"(","!-+~","" ,"=","" ,""   ,""  ,""      ,"" ,"@"  ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*  , <>?:	  ] }" }, /* ASSIGNMENT = */ \
+{"(","!-+~","" ,"" ,"" ,""   ,""  ,""      ,"" ,""   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ","C","`@; c  % )&*  , <>?:	  ] }="}, /* Baeru finished bin.op. */ \
+{""	,""    ,"" ,"=","" ,""   ,""  ,""      ,"" ,""   ,""	  ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"C","`@;!cDS%()&*+-,.<>?:LEN[]{}"}, /* BaErU unfinished bin.op. */ \
+{"(","!-+~","=","" ,"" ,""   ,""  ,"@"     ,"" ,""   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`@; cDS% )&*  , <>?:	  ]"   }, /* BAeRu assignable repeatable */ \
+{"(","!-+~","" ,"=","" ,""   ,""  ,"@"     ,"" ,""   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`@; c  % )&*  ,   ?:	  ]"   }, /* BaERu comp. (<>) bin.op. */ \
+{"(","!-+~","=","" ,"" ,""   ,""  ,""      ,"" ,""   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`@; c  % )&*  , <>?:	  ]"   }, /* BAeru assignable bin.op. */ \
+{"(","!-+~","=","" ,"" ,""   ,""  ,""      ,"" ,""   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`@; c  % )&*  , <>?:	  ]{}" }, /* Taeru ternary op. (? only now) */ \
+{""	,""    ,"" ,"" ,"" ,""   ,""  ,""      ,"" ,"LEN",""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"}","","" ,")","C","`@;! DS%( &*+-  <>?:   [ { ="}, /* REFERENCE to an existing variable */ \
+{""	,""    ,"=","" ,"!","*/>","<","-+&:%^" ,"?",""   ,"@LEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","` ;  DS (			           {  "}, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""	,""    ,"=","" ,"" ,""   ,""  ,""      ,"" ,""   ,""    ,"LEN","."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,"" ,"C","`@;! DS%()&*+-  <>?:	   {  "}, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""	,""	   ,"=","" ,"!","*/>","<","-+&:%^" ,"?",""   ,""    ,""	  ,"@LEN.",",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","` ;  DS (			           {  "}, /* PROPERTY (identifier starting with the property separator) */ \
+{"(","!-+~","" ,"" ,"" ,""   ,""  ,""      ,"" ,"@"  ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*	  <>?:	    }="}, /* LIST ELEMENT (similar to expression) */ \
+{";",""    ,"" ,"=","!","*/>","<","-+&:%^E","?",""   ,""    ,""	  ,""     ,",","N"  ,"."   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`@   DS (		        L  [ {  "}, /* INTEGER: (signless) list of digits */ \
+{";",""    ,"" ,"=","!","*/>","<","-+&:%^E","?",""   ,""    ,""	  ,""     ,",",""   ,"N"   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`@   DS (	     .    L  [ {  "}, /* REAL: part behind a decimal period */ \
+{""	,""    ,"" ,"" ,"" ,""   ,""  ,""      ,"" ,""   ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"D","" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"" ,""						   }, /* DQSTRING: double quoted string */ \
+{""	,""    ,"" ,"" ,"" ,""   ,""  ,""      ,"" ,""   ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"S","" ,"" ,"" ,"" ,"" ,"","" ,"" ,"" ,""						   }, /* SQSTRING: single quoted string */ \
+{";",""    ,"" ,"=","!","*/" ,"<","+&"     ,"?",""   ,""    ,""	  ,""     ,",",""   ,""    ,"D","S","" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`@   DS%&( * - .    LEN[ {  "}, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";",""    ,"" ,"=","!","*/" ,"<","+&"     ,"?",""   ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","C","`@   DS%&( * - .    LEN[ {  "}, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"(","!-+~","" ,"" ,"" ,""   ,""  ,""      ,"" ,"@"  ,"LE"  ,""	  ,""     ,",","N"  ,""    ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,")","C","` ; c  %& )*   .<>?:	    }="}, /* LIST: [ starts a list */ \
+{";",""    ,"=","=","!","*>" ,"<","-+&:%^E","?",""   ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","`@   DS  (		      LEN  {  "}, /* END_OF_LIST: behind ] that ends a list */ \
+{"(","!-+~","" ,"" ,"" ,""   ,""  ,""      ,"" ,"@"  ,"LE"  ,""	  ,""     ,"" ,"N"  ,""    ,"D","S","" ,"" ,"[","" ,"" ,"" ,"}","","" ,")","C","` ; c  %& )*  ,.<>?:	  ]{ ="}, /* MAP: { starts a map */ \
+{"(","!-+~","" ,"" ,"" ,""   ,""  ,""      ,"" ,"@"  ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","C","` ; c  %& )*  , <>?:	  ] }="}, /* MAP_VALUE: : starts a map value */ \
+{";",""    ,"" ,"=","!","*>" ,"<","+"      ,"?",""   ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,")","C","`@   DS% (   -	   :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""	,""    ,"" ,"" ,"" ,""   ,""  ,""      ,"" ,""   ,""    ,""	  ,"."    ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","(","" ,"C","`@;!cDS%& )*+-, <>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"(","!-+~","" ,"" ,"" ,"" 	 ,""  ,""      ,"" ,"@"  ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","C","` ; c  %&  *	  <>?:	  ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{";",""    ,"" ,"=","!","*/>","<","-+&:%^E","?",""   ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","`@   DS  (		      L N  {  "}, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
+
 /**
  * @brief the token type ids
  * 
