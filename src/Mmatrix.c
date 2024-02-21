@@ -925,7 +925,8 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 						long long rowIndex=numberOfRows;while(--rowIndex>=0)permutation[rowIndex]=rowIndex;
 						bool neg=false;
 						// permutate permutation
-						long long temp,swapi,i=1,count=0;
+						// i should start at 0 not 1
+						long long temp,swapi,i=0,count=0;
 						while(1){ // replacing: i<numberOfRows
 							if(i>=numberOfRows||c[i]<i){
 								//if(amVerbose()){
@@ -960,7 +961,7 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 									assignValue(&determinantValue,subtract(determinantValue,cumproduct[numberOfRows-1]));
 								}
 								c[i]++;
-								i=1;
+								i=0;
 							}else
 								c[i++]=0;
 						}
