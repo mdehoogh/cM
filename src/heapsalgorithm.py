@@ -7,14 +7,14 @@ def generate(n,A):
     A[j]=temp
   result=[]
   c=[0]*n
-  i=0
+  i=0 # instead of 1 as it states on Wikipedia
   # count=1
   result=[A[:]] # print("1: ",A)
   while i<n:
     if c[i]<i:
-      if i%2==0:
+      if i%2==0: # even
        	swap(0,i)
-      else:
+      else: # odd
         swap(c[i],i)
       # count+=1
       result.append(A[:]) # print(count,": ",A)
@@ -25,7 +25,10 @@ def generate(n,A):
       i+=1
   return result
 
-gp4=generate(4,[1,2,3,4])
+gp4=generate(6,[1,2,3,4,5,6])
+for i in range(720):
+  print(i+1,':',gp4[i])
+
 gp5=generate(5,[1,2,3,4,5])
 
 # Python program to print all permutations using
