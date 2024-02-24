@@ -883,7 +883,9 @@ void free_mpd(mpd_t* _mpd){
  * @param owner_decimal 
  * @return Mdecimal* \p _decimal disowned from \p owner_decimal
  */
-Mdecimal* disowned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){return(Mdecimal*)DISOWNED(_decimal,owner_decimal);}
+Mdecimal* disowned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){
+	return(Mdecimal*)DISOWNED(_decimal,owner_decimal);
+}
 /**
  * @brief returns \p _decimal owned from \p owner_decimal
  * 
@@ -891,7 +893,9 @@ Mdecimal* disowned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){re
  * @param owner_decimal 
  * @return Mdecimal* \p _decimal owned from \p owner_decimal
  */
-Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){return(Mdecimal*)OWNED(_decimal,owner_decimal);}
+Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){
+	return(Mdecimal*)OWNED(_decimal,owner_decimal);
+}
 
 /**
  * @brief frees \p decimal, delegating to free_mpd() for freeing the contained mpdecimal instance
@@ -1131,7 +1135,7 @@ Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d
 			FREE_RATIONAL(_r1,owner);
 			FREE_RATIONAL(_r2,owner);
 		}else // pure decimals
-			_decimal=owned_decimal(_ddiv(d1,d2),owner); // just multiply
+			_decimal=owned_decimal(_ddiv(d1,d2),owner); // just divide
 	}
 	return disowned_decimal(_decimal,owner);
 }
@@ -1154,11 +1158,12 @@ Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 			// compute the quotient
 			_decimal=owned_decimal(__decimal(mpd_context,0,false),owner);
 			if(_decimal==NULL)return NULL;
-			uint32_t status=0;mpd_qmul(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			uint32_t status=0;
+			mpd_qmul(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
 			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_decimal,owner);
-				outputError("Failed to compute the quotient of two decimals");
+				outputError("Failed to compute the product of two decimals");
 				return NULL;
 			}
 		}
