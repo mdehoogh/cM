@@ -237,11 +237,11 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*    >?:	   ] }="}, /* EXPRESSION */ \
 {"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,"" ,"`R; CDS% )&*  , >?:	   ]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
 {"(","!-+~","" ,"=" ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","` ; c  % )&*  , >?:	   ] }" }, /* ASSIGNMENT = */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ","C","`R; c  % )&*  , >?:	   ] }="}, /* Baeru finished bin.op. */ \
-{""	,""    ,"" ,"=" ,""  ,""   ,"" ,""     ,"" ,""    ,""	  ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"C","`R;!cDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; cDS% )&*  , >?:	   ]"   }, /* BAeRu assignable repeatable */ \
-{"(","!-+~","" ,"=" ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  ,  ?:	   ]"   }, /* BaERu comp. (<>) bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  , >?:	   ]"   }, /* BAeru assignable bin.op. */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ","C","`R; c  % )&*  , >?:	   ] }=e"}, /* Baeru finished bin.op. */ \
+{""	,""    ,"" ,"=" ,""  ,""   ,"" ,""     ,"" ,""    ,""	   ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"C","`R;!cDS%()&*+-,.>?:LEN[]{} e"}, /* BaErU unfinished bin.op. */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; cDS% )&*  , >?:	   ]   e"}, /* BAeRu assignable repeatable */ \
+{"(","!-+~","" ,"=" ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  ,  ?:	   ]   e"}, /* BaERu comp. (<>) bin.op. */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  , >?:	   ]   e"}, /* BAeru assignable bin.op. */ \
 {"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"C","`R; c  % )&*  , >?:	   ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,"LEN" ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"}","","" ,")","C","`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
 {""	,""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"?",""    ,"RLEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","C","` ;  DS (			          {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
@@ -1292,6 +1292,7 @@ static InputResponseFunction* inputErrorFunction=NULL;
  * @return int8_t 
  */
 static int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
+	///logToOutputFile("Token type: %s + % c",TOKENTYPE_STRING[inputTokenType],inputCharacterType);
 	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
 		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
 		char* noTransition=NO_TRANSITIONS[inputTokenType];
@@ -1304,8 +1305,10 @@ static int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 			int8_t tokenType=NUMBER_OF_TOKEN_TYPES; // MDH@10APR2019: BUG FIX uint8_t changed to int8_t otherwise would circle around
 			// find the new token type
 			while(--tokenType>=0)
-				if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)
+				if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL){
+					///logToOutputFile(" -> %s.\n",TOKENTYPE_STRING[tokenType]);
 					return tokenType;
+				}
 		}
 #ifdef __DEBUG__
 		else{
@@ -1313,6 +1316,7 @@ static int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 		}
 #endif
 	}
+	///logToOutputFile(" -> NO TRANSITION.\n");
 	return inputTokenType; // if no match was found assume no change to the token type!!
 }
 // TODO we could call the following function from tokenCheckedForBeingAFunction
@@ -1619,7 +1623,11 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
  * @param inputCharacterType 
  */
 static void correctInputCharacterType(Mtoken const * const token,char inputChar,char* inputCharacterType){
+
+	///* MDH@29FEB2024 removed: repeating a character prevents transitioning to another token type
 	if((TOKENTYPE_IDS[token->type]&0x62)==0x62)if(inputChar==string_char(token->text,0))*inputCharacterType='r'; // MDH@04NOV2019: changed into lowercase r as we're now using R for token of type reference!!!
+	//*/
+
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 	// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
 	//				there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
@@ -1912,6 +1920,18 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 				break;
 		}
 
+		// MDH@29FEB2024: a binary operator token is never 3 characters
+		if(newTokenType>=TT_BINARY_aeru&&newTokenType<=TT_BINARY_Aeru&&newTokenType==lastCommandToken->type){
+			(*inputInfoFunction)("Binary operator continuation.");
+			if(lastCommandToken->significantCharacterCount>=2||string_length(lastCommandToken->text)>=2){
+				finishToken(lastCommandToken);
+				newTokenType=TT_ERROR;
+				/////if(*inputErrorFunction)
+				(*inputErrorFunction)("A binary operator may contain at most 2 characters.");
+				// TODO should be finish the binary operator token?????
+			}
+		}
+
 		/////if(amDebugging())(*inputInfoFunction)("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
@@ -1944,6 +1964,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 			if(*inputCharacterType=='='&&lastCommandToken->type==TT_ASSIGNMENT&&(lastCommandToken->prev->type==TT_BINARY_AeRu||lastCommandToken->prev->type==TT_BINARY_Aeru)){
 				newTokenType=TT_ERROR;
 				//if(amVerbose())
+				/////if(*inputErrorFunction)
 				(*inputErrorFunction)("A shortcut operator assignment cannot change into an equality.");
 			}else{
 				// MDH@26MAR2020: TODO check whether this should be done elsewhere???

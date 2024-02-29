@@ -747,6 +747,7 @@ static InputResponseFunction* inputErrorFunction=NULL;
 // MDH@05JUN2019: it's prudent to return the negative value of the input token type if the given input character type ends the token 
 //                i.e. when NO_TRANSITIONS is a match, so that the caller can set the significantCharacterCount
 int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
+	logToOutputFile("Token type: %d",inputTokenType);
 	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
 		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
 		char* noTransition=NO_TRANSITIONS[inputTokenType];
@@ -757,7 +758,10 @@ int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 		///////////if(noTransition[0]!='`'&&!strchr(noTransition,inputCharacterType))return -inputTokenType;
 		if(strlen(noTransition)==0||(noTransition[0]=='`'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
 			int8_t tokenType=NUMBER_OF_TOKEN_TYPES; // MDH@10APR2019: BUG FIX uint8_t changed to int8_t otherwise would circle around
-			while(--tokenType>=0)if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)return tokenType;
+			while(--tokenType>=0)if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL){
+				logToOutputFile("+ %c = %d",inputCharacterType,tokenType);
+				return tokenType;
+			}
 		}
 #ifdef __DEBUG__
 		else{

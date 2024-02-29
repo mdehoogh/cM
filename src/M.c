@@ -4109,8 +4109,8 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 			}
 		}
 	}
-	//if(amVerbose())
-	inputInfo("'%c+%c': expected characters: '%s' (%zu).",lastExpectedCharacter,inputChar,string(_expectedCharacterStack),string_length(_expectedCharacterStack));
+	if(amVerbose())
+		inputInfo("'%c+%c': expected characters: '%s' (%zu).",lastExpectedCharacter,inputChar,string(_expectedCharacterStack),string_length(_expectedCharacterStack));
 	return 1;
 }
 
@@ -4202,7 +4202,7 @@ int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * co
 			}
 		}
 	}*/
-	inputInfo("Expected character stack after removing '%c': '%s' (%zu).",removedChar,string(_expectedCharacterStack),string_length(_expectedCharacterStack));
+	/////inputInfo("Expected character stack after removing '%c': '%s' (%zu).",removedChar,string(_expectedCharacterStack),string_length(_expectedCharacterStack));
 	return 1;
 }
 
