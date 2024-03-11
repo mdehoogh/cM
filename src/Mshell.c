@@ -1240,6 +1240,116 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 	return _result;
 }
 
+// MDH@11MAR2024: we want to be able to use block ifs, whiles, and fors
+
+// MDH@11MAR2024: by delegating registering a map of locals into an environment we can reuse this code
+//                for all the block environments (in ifs, whiles and fors)
+//                TODO move over to Menvironment.h/c eventually
+/**
+ * @brief pushes \p _withEnvironment as execution environment after successfully initializing it with \p localMap
+ * @details any . value in \p localMap is used to name the environment
+ * @param _withEnvironment the environment to push
+ * @param owner the owner of the environment
+ * @param localMap the map to initialize the environment with
+ * @return long long M_TRUE on success, M_FALSE on failure
+ */
+static long long pushInitializedEnvironment(Menvironment * const _withEnvironment,Mallocationowner const owner,Mmap const * const localMap){
+	bool result=M_LL_INVALID;
+	if(_withEnvironment!=NULL){
+		result=M_FALSE;
+		Mmapelement* withNameMapelement=(localMap!=NULL?getMapelement(localMap,"."):NULL);
+		Mvariable* withNameVariable=(withNameMapelement!=NULL?withNameMapelement->_variable:NULL);
+		Mstring* _withNameText=(withNameVariable!=NULL?owned_string(_getValueText(withNameVariable->_value,true),owner):NULL);
+		// if a property "." is defined, it's text value will be the name of the with environment
+		if(_withNameText!=NULL){
+			if(_withEnvironment->_name!=NULL){freeChars(_withEnvironment->_name);_withEnvironment->_name=NULL;}
+			_withEnvironment->_name=owned_chars(_getChars(string(_withNameText)),Msubowner(owner,1));
+		}
+		// copy local map
+		// TODO what if we fail to copy the map????????
+		if(localMap!=NULL)_withEnvironment->_variableMap=owned_map(_getMapCopy(localMap),Msubowner(owner,1));
+		if(NULL==localMap||_withEnvironment->_variableMap!=NULL){
+			if(NULL==withNameMapelement||removedFromMap(_withEnvironment->_variableMap,owner,".")==M_TRUE){
+				// almost there
+				if(!pushExecutionEnvironment(disowned_environment(_withEnvironment,owner))){ // _withEnvironment not bound!!!
+					free_environment(_withEnvironment);//////////_withEnvironment=NULL;
+					output("%sFailed to initialize environment '%s'.\n",M_ERROR_PREFIX,_withEnvironment->_name->chars);
+				}else{
+					result=M_TRUE;
+					output("Environment '%s' initialized.",_withEnvironment->_name->chars);
+				}
+			}else
+			if(withNameMapelement!=NULL)
+				outputError("Failed to remove the environment name from the local variables map");	
+		}
+		if(result==M_FALSE&&_withEnvironment!=NULL){
+			/////////if(report)output("Freeing the with environment!");
+			FREE_ENVIRONMENT(_withEnvironment,owner);
+		}
+		/* replacing:
+		Mmapelement* withVariableMapelement=localMap->_first;
+		while(withVariableMapelement){
+			withNameVariable=withVariableMapelement->_variable;
+			if(withNameVariable){
+				Mchars* withlocalVariableName=withNameVariable->_name;
+				if(withlocalVariableName->chars){
+					if(!addVariable(_withEnvironment,owner,withlocalVariableName,));
+					withVariableMapelement=withVariableMapelement->_next;
+				}
+			}
+		}
+		if(!withVariableMapelement){ // with environment successfully initialized
+		}else{
+			output("%sFailed to initialize %senvironment",M_ERROR_PREFIX,(_withNameText?"":"the with "));
+			if(_withNameText)output(" '%s'",string(_withNameText));
+			output(".\n");
+		}
+		*/
+		if(_withNameText!=NULL)FREE_STRING(_withNameText,owner);
+	}
+	return result;
+}
+
+/**
+ * @brief initiates a block if, returns M_TRUE on success, M_FALSE on failure, of M_LL_INVALID on invalid input
+ * 
+ * @param testValue 
+ * @param localsValue 
+ * @return Mvalue* 
+ */
+Mvalue* Mif(Mvalue* testValue,Mvalue* localsValue){Mallocationowner owner=getOwner(__LINE__);
+	long long result=M_LL_INVALID;
+	if(testValue!=NULL){
+		result=M_FALSE;
+		// we'd be successful if we succesfully initialized the if environment
+		// (copied over and adapted from Mdofunction!!!)
+		Menvironment* ifEnvironment=owned_environment(__environment(),owner);
+		if(ifEnvironment!=NULL){
+			ifEnvironment->_name=owned_chars(_getChars("if"),Msubowner(owner,1));
+			// let's add variable $ as result variable and ! as exit flag variable
+			// MDH@10JAN2020: ! is replaced by making "$" immutable to indicate being done
+			bool ifEnvironmentInitialized=addVariable(ifEnvironment,owner,"$",VT_UNDEFINED,false)
+				/* removing
+												&&addVariable(_doEnvironment,owner,"!",VT_INTEGER,false)
+												&&setValue(_doEnvironment,"!",_getIntegerValue(0))*/
+												;
+			if(ifEnvironmentInitialized){
+				Mmap* localMap=(localsValue!=NULL&&localsValue->type==VT_MAP?localsValue->value._map:NULL);
+				// MDH@21DEC2020 BUG FIX: pushing an environment will wrap it inside a value
+				//						which should be able to take over membership
+				//						which means you have to disown the environment!!!!
+				if(pushInitializedEnvironment(ifEnvironment,owner,localMap)==M_TRUE)
+					result=M_TRUE;
+			}else{ // _doEnvironment bound to this function, so both disowned and free
+				FREE_ENVIRONMENT(ifEnvironment,owner); // MDH@17JUN2020: check if this should be here
+				outputError("Failed to create the if environment");
+			}
+		}
+	}
+	return _getIntegerValue(result);
+}
+// MDH@11MAR2024 END
+
 // the input info and error function default to shellInputInfo and shellInputError that write the text to the console  (and are replaced in M.c by functions that output above the user input lines and use colors)
 /**
  * @brief displays input info 
@@ -9947,6 +10057,8 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 		if(_withEnvironment!=NULL){
 			if(report)
 				output("With environment created.\n");
+			result=pushInitializedEnvironment(_withEnvironment,owner,localMap);
+			/* replacing: 
 			Mmapelement* withNameMapelement=(localMap?getMapelement(localMap,"."):NULL);
 			Mvariable* withNameVariable=(withNameMapelement!=NULL?withNameMapelement->_variable:NULL);
 			Mstring* _withNameText=(withNameVariable!=NULL?owned_string(_getValueText(withNameVariable->_value,true),owner):NULL);
@@ -9978,26 +10090,26 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 					output("Freeing the with environment!");
 				FREE_ENVIRONMENT(_withEnvironment,owner);
 			}
-			/* replacing:
-			Mmapelement* withVariableMapelement=localMap->_first;
-			while(withVariableMapelement){
-				withNameVariable=withVariableMapelement->_variable;
-				if(withNameVariable){
-					Mchars* withlocalVariableName=withNameVariable->_name;
-					if(withlocalVariableName->chars){
-						if(!addVariable(_withEnvironment,owner,withlocalVariableName,));
-						withVariableMapelement=withVariableMapelement->_next;
-					}
-				}
-			}
-			if(!withVariableMapelement){ // with environment successfully initialized
-			}else{
-				output("%sFailed to initialize %senvironment",M_ERROR_PREFIX,(_withNameText?"":"the with "));
-				if(_withNameText)output(" '%s'",string(_withNameText));
-				output(".\n");
-			}
-			*/
+			/// replacing:
+			///Mmapelement* withVariableMapelement=localMap->_first;
+			///while(withVariableMapelement){
+			///	withNameVariable=withVariableMapelement->_variable;
+			///	if(withNameVariable){
+			///		Mchars* withlocalVariableName=withNameVariable->_name;
+			///		if(withlocalVariableName->chars){
+			///			if(!addVariable(_withEnvironment,owner,withlocalVariableName,));
+			///			withVariableMapelement=withVariableMapelement->_next;
+			///		}
+			///	}
+			///}
+			///if(!withVariableMapelement){ // with environment successfully initialized
+			///}else{
+			///	output("%sFailed to initialize %senvironment",M_ERROR_PREFIX,(_withNameText?"":"the with "));
+			///	if(_withNameText)output(" '%s'",string(_withNameText));
+			///	output(".\n");
+			///}
 			if(_withNameText!=NULL)FREE_STRING(_withNameText,owner);
+			*/
 		}
 	}else
 		outputError("With argument not a (local variable) map!");
