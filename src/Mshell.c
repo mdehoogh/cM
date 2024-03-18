@@ -14248,3 +14248,87 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 }
 
+// MDH@18MAR2024: putting the generic methods to deal with block commands here, although it's probably better to put 
+//                them in a separate module at some point
+const int8_t NUMBER_OF_BLOCK_KEYWORDS=7;
+
+const enum BLOCK_KEYWORD_INDICES {M_KW_FOR,M_KW_WHILE,M_KW_IF,M_KW_ELIF,M_KW_ELSE,M_KW_END,M_KW_ENDALL};
+
+const char * const BLOCK_KEYWORDS[NUMBER_OF_BLOCK_KEYWORDS]={"for","while","if","elif","else","end","endall"};
+
+const int8_t * const BLOCK_FLAGS={1,1,1,3,3,2,4};
+
+/**
+ * @brief returns the block keyword id of \p keyword
+ * 
+ * @param keyword the text representation of a possible block keyword
+ * @return int8_t the block keyword id or \p keyword
+ */
+int8_t getBlockKeywordId(char const * const keyword){
+	int8_t keywordId=NUMBER_OF_BLOCK_KEYWORDS;
+	while(--keywordId>=0&&NULL==strstr(BLOCK_KEYWORDS[keywordId],keyword));
+	return keywordId;
+}
+
+/**
+ * @brief adds \p command to the list of block commands in the current environment
+ * 
+ * @param command 
+ * @return true on success
+ * @return false on failure
+ */
+bool addBlockCommand(Mcommand const * const command){
+	if(command!=NULL){
+		// TODO the problem with the environment itself is that we do not know who owns it 
+		//      unless we know every execution environment is essentially wrapped inside an Mvalue in which case we know who owns it!!
+		Menvironment* environment=getExecutionEnvironment();
+		if(environment!=NULL){
+			// ascertain to have a block command list
+			if(NULL==environment->blockCommandList)environment->blockCommandList=owned_list(__list("block command list"),getValueDataOwner());
+			if(appendedToList(environment->blockCommandList,getValueDataOwner(),_getValueOfToken(command->_firstToken),0))
+				return true;
+		}
+	}
+	return false;
+}
+
+bool startBlock(enum BLOCK_KEYWORD_INDICES blockKeywordId){Mallocationowner owner=getOwner(__LINE__);
+	// we have to add a new execution environment
+	Menvironment* _blockEnvironment=owned_environment(__environment(),owner);
+	if(_blockEnvironment!=NULL){
+		_blockEnvironment->_name=owned_chars(_getChars(BLOCK_KEYWORDS[blockKeywordId]),Msubowner(owner,1));
+		if(_blockEnvironment->_name!=NULL){
+			if(pushExecutionEnvironment(_blockEnvironment))
+				return true;
+		}
+		FREE_ENVIRONMENT(_blockEnvironment,owner);
+	}
+	return false;
+}
+
+bool endBlock(){
+	Menvironment* environment=getExecutionEnvironment();
+	if(environment!=NULL){
+		// we need to consume the block commands and append them to the parent
+		Mlist* blockCommandList=environment->blockCommandList;
+		if(blockCommandList!=NULL&&blockCommandList->_first!=NULL){
+			Menvironment* parent=(environment->_parent!=NULL?environment->_parent->value._environment:NULL);
+			if(parent!=NULL){
+				if(parent->blockCommandList==NULL)parent->blockCommandList=owned_list(__list("block command list"),getValueDataOwner());
+				if(parent->blockCommandList!=NULL){
+					// consuming blockCommandList means updating _first as soon as we manage to append it to the parent block command list
+					Mlistelement* nextBlockCommandListElement;
+					do{
+						nextBlockCommandListElement=blockCommandList->_first->_next;
+						if(appendedToList(parent->blockCommandList,getValueDataOwner(),blockCommandList->_first->_value,0)<0)return false;
+						blockCommandList->numberOfElements--;
+						blockCommandList->_first=nextBlockCommandListElement;
+					}while(blockCommandList->_first!=NULL);
+				}
+				if(popExecutionEnvironment()!=NULL)return true;
+				outputError("Failed to pop the block command environment!");
+			}
+		}
+	}
+	return false;
+}

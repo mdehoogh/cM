@@ -130,3 +130,8 @@ bool shellInitialized(
 				OutputCommandInfoFunction _outputCommandInfoFunction
 			);
 
+// MDH@18MAR2024: block stuff
+int8_t getBlockKeywordId(char const * const keyword);
+bool addBlockCommand(Mcommand const * const command);
+bool startBlock();
+bool endBlock();

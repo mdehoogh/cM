@@ -4431,7 +4431,10 @@ Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owne
 	if(amVerboseDebugging())output("Taking over ownership environment.\n");
 	owned_chars(_environment->_name,Msubowner(owner_environment,1));
 	owned_map(_environment->_variableMap,Msubowner(owner_environment,1));
-	owned_functionmap(_environment->_functionMap,Msubowner(owner_environment,1)); // all functions also need to change their ownership
+	if(_environment->_functionMap!=NULL)
+		owned_functionmap(_environment->_functionMap,Msubowner(owner_environment,1)); // all functions also need to change their ownership
+	if(_environment->blockCommandList!=NULL)
+		owned_list(_environment->blockCommandList,Msubowner(owner_environment,1)); // MDH@18MAR2024
 	return OWNED(_environment,owner_environment);
 }
 /**
@@ -4451,9 +4454,13 @@ Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner o
 	disowned_map(_environment->_variableMap,owner_environment);
 	//if(amVerboseDebugging())
 		output("\tEnvironment variable map ownership released.\n");
-	disowned_functionmap(_environment->_functionMap,owner_environment); // all functions also need to be disowned
-	if(amVerboseDebugging())
-		output("\tEnvironment function map ownership released!");
+	if(_environment->_functionMap!=NULL){
+		disowned_functionmap(_environment->_functionMap,owner_environment); // all functions also need to be disowned
+		if(amVerboseDebugging())
+			output("\tEnvironment function map ownership released!");
+	}
+	if(_environment->blockCommandList!=NULL)
+		disowned_list(_environment->blockCommandList,owner_environment); // MDH@18MAR2024: the block command list need to be disowned as well
 	///////if(amVerboseDebugging())output("Environment function map ownership released.\n");
 	// disowned_map(_environment->_functionMap);
 	return DISOWNED(_environment,owner_environment);
@@ -4479,6 +4486,9 @@ void free_environment(Menvironment* _environment/*,Mallocationowner owner_enviro
 											freeing the execution environment)
 		if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
 		*/
+		// MDH@18MAR2024: free any block command list TODO is such a list owned somehow????? if so we'd have to know who owns it calling FREE_LIST
+		if(_environment->blockCommandList!=NULL)
+			free_list(_environment->blockCommandList);
 		FREE_1(_environment,'E'/*,owner_environment*/);
 	}
 }/* VALIDATED */
