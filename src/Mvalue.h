@@ -523,6 +523,7 @@ typedef struct Menvironment{
     Mvalue* _parent; // MDH@03FEB2020 replacing: struct Menvironment* _parent; // typically the definition environment
     Mvalue* execution; // MDH@03FEB2020 replacing: struct Menvironment* _execution; // the environment that was executing before this one was popped!!
 		Mlist* blockCommandList; // MDH@18MAR2024: may keep a list of block commands, that can either be transferred or executed
+		Mtoken* insertToken; // MDH@25MAR2024: the token behind which to insert the block command list element tokens
 }Menvironment;
 
 Menvironment* __environment(); // creates a new (empty) environment

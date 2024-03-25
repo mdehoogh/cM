@@ -7024,11 +7024,20 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										outputError("Failed to end the block of commands");
 								}
 								if(BLOCK_FLAGS[blockKeywordId]&1){ // starts a block
-									if(startBlock()){
-										blockCommandLevel++;
-										output("Block of commands started.\n");
-									}else
-										outputError("Failed to start a new block of commands!");
+									// MDH@25MAR2024: we should determine the insert token to be initialized in the block environment
+									//                we should find the closing parenthesis of this function call
+									//                but we also need to ascertain that function call is incomplete!!!
+									Mtoken* insertToken=secondToken->next; // now on the opening parenthesis of the function call
+									while(insertToken!=NULL&&insertToken->next!=NULL&&insertToken->next->type!=TT_END_OF_FUNCTION_CALL){
+										insertToken=insertToken->next;
+									}
+									if(insertToken!=NULL){
+										if(startBlock(blockKeywordId,_userInputCommand,insertToken)){
+											blockCommandLevel++;
+											output("Block of commands started.\n");
+										}else
+											outputError("Failed to start a new block of commands!");
+									}
 								}else{ 
 									// as soon as we're done with all the blocks, we should execute all block commands
 									if(blockCommandLevel==0){
