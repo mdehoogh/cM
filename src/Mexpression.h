@@ -148,15 +148,15 @@ typedef struct Mtoken{
 	TokenType type; // actually the index into the TOKENTYPES array!!!
 	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
 	uint16_t offset; // number of characters in front of this token in the command
-    uint16_t position; // MDH@24JUN2020: keep track of the total number of lines and position on each line
+	uint16_t position; // MDH@24JUN2020: keep track of the total number of lines and position on each line
 	Mstring* text; // NOTE this is not an Mtext, Mstring is mutable whereas Mtext is not!!!!
 	struct Mtoken* expr; // the expression this token is part of
 	struct Mtoken* prev; // we need this during user input
 	struct Mtoken* next;
-    // MDH@07AUG2019: we will be pointing to the identifier in front of it, allowing us to determine whether a new identifier is an existing or new variable (no need to free this reference ever)
-    struct Mtoken* prevIdentifier;
-    long long argument; // the argument level (1 for local variables, all other values for non-local variables)
-    uint64_t envid; // keep track of the special function call environment id
+	// MDH@07AUG2019: we will be pointing to the identifier in front of it, allowing us to determine whether a new identifier is an existing or new variable (no need to free this reference ever)
+	struct Mtoken* prevIdentifier;
+	long long argument; // the argument level (1 for local variables, all other values for non-local variables)
+	uint64_t envid; // keep track of the special function call environment id
 }Mtoken;
 
 Mtoken* __token();

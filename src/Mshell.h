@@ -134,4 +134,4 @@ bool shellInitialized(
 int8_t getBlockKeywordId(char const * const keyword);
 bool addBlockCommand(Mcommand const * const command);
 bool startBlock();
-bool endBlock();
+Menvironment* endBlock();

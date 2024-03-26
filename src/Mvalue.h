@@ -522,8 +522,10 @@ typedef struct Menvironment{
     Mtoken* expressionToken; // MDH@17JUL2019: the current token of the expression being evaluated in this environment
     Mvalue* _parent; // MDH@03FEB2020 replacing: struct Menvironment* _parent; // typically the definition environment
     Mvalue* execution; // MDH@03FEB2020 replacing: struct Menvironment* _execution; // the environment that was executing before this one was popped!!
+		// temporary fields that we need when we're collecting block commands that we use to complete the incompleted command (now stored as first element in the block command list)
 		Mlist* blockCommandList; // MDH@18MAR2024: may keep a list of block commands, that can either be transferred or executed
 		Mtoken* insertToken; // MDH@25MAR2024: the token behind which to insert the block command list element tokens
+		int8_t blockKeywordId; // MDH@26MAR2024: this is going to be required so we will know whether or not insert the block commands as a list or as separate arguments
 }Menvironment;
 
 Menvironment* __environment(); // creates a new (empty) environment

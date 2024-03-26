@@ -7008,16 +7008,29 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					if(secondToken!=NULL&&secondToken->type==TT_FUNCTION_CALL){
 						char* secondTokenCharacters=_getSignificantTokenCharacters(secondToken);
 						if(secondTokenCharacters!=NULL&&strlen(secondTokenCharacters)>0){
+							output("Second token: '%s'.\n",secondTokenCharacters);
 							int8_t blockKeywordId=getBlockKeywordId(secondTokenCharacters);
+							Mtoken* completedBlockCommandToken=NULL; // the first token of the completed command
 							if(blockKeywordId>=0){ // a block keyword either starts and/or ends a block
+								Menvironment* blockEnvironment=NULL;
 								// a block is always ended before a new block is started
 								if(BLOCK_FLAGS[blockKeywordId]&4){ // end all blocks
 									// end all blocks (the M environment does not have a parent so it's endBlock will return false)
-									while(endBlock())
+									while(blockCommandLevel){
+										blockEnvironment=endBlock();
+										if(NULL==blockEnvironment)break;
+										completedBlockCommandToken=blockEnvironment->blockCommandList->_first->_value->value._token;
+										blockEnvironment->blockCommandList=NULL; 
+										FREE_ENVIRONMENT(blockEnvironment,getValueDataOwner());
 										blockCommandLevel--;
+									}
 								}else
 								if(BLOCK_FLAGS[blockKeywordId]&2){ // ends a block
-									if(endBlock()){
+									blockEnvironment=endBlock();
+									if(blockEnvironment!=NULL){
+										completedBlockCommandToken=blockEnvironment->blockCommandList->_first->_value->value._token;
+										blockEnvironment->blockCommandList=NULL; 
+										FREE_ENVIRONMENT(blockEnvironment,getValueDataOwner());
 										blockCommandLevel--;
 										output("Block of commands ended!\n");
 									}else
@@ -7041,11 +7054,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								}else{ 
 									// as soon as we're done with all the blocks, we should execute all block commands
 									if(blockCommandLevel==0){
+										// NOTE: _userInputCommand should NOW be completed, and ready to be executed, so no need to extract it now!!!!
+										//       unless we know that the completed block command field has actually been NULLed in the finished environment
+										_userInputCommand->_firstToken->next=completedBlockCommandToken;
+										/*
 										if(!executeBlockCommands()){
 											outputError("Failed to execute the block commands.");
 											blockCommandLevel=-2;
 										}else
 											blockCommandLevel=-1;
+										*/
 									}
 								}
 							}

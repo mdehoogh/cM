@@ -14258,6 +14258,7 @@ const char * const BLOCK_KEYWORDS[NUMBER_OF_BLOCK_KEYWORDS]={"for","while","if",
 
 const int8_t * const BLOCK_FLAGS={1,1,1,3,3,2,4};
 
+const bool * const BLOCK_KEYWORD_SINGLE_ARGUMENT={false,false,true,true,true}; // MDH@25MAR2024: single arguments are to be presented as a list and not appended as consecutive arguments
 /**
  * @brief returns the block keyword id of \p keyword
  * 
@@ -14265,8 +14266,10 @@ const int8_t * const BLOCK_FLAGS={1,1,1,3,3,2,4};
  * @return int8_t the block keyword id or \p keyword
  */
 int8_t getBlockKeywordId(char const * const keyword){
+	output("Id of keyword '%s'",keyword);
 	int8_t keywordId=NUMBER_OF_BLOCK_KEYWORDS;
 	while(--keywordId>=0&&strcmp(BLOCK_KEYWORDS[keywordId],keyword));
+	output(": %d.\n",keywordId);
 	return keywordId;
 }
 
@@ -14284,9 +14287,10 @@ bool addBlockCommand(Mcommand const * const command){
 		Menvironment* environment=getExecutionEnvironment();
 		if(environment!=NULL){
 			// ascertain to have a block command list
-			if(NULL==environment->blockCommandList)environment->blockCommandList=owned_list(__list("block command list"),getValueDataOwner());
-			if(appendedToList(environment->blockCommandList,getValueDataOwner(),_getValueOfToken(command->_firstToken),0))
+			//// MDH@26MAR2024 should always be true: if(NULL==environment->blockCommandList)environment->blockCommandList=owned_list(__list("block command list"),getValueDataOwner());
+			if(appendedToList(environment->blockCommandList,getValueDataOwner(),_getValueOfToken(command->_firstToken->next),0)>0)
 				return true;
+			outputError("Failed to register block command");
 		}
 	}
 	return false;
@@ -14300,39 +14304,42 @@ bool addBlockCommand(Mcommand const * const command){
  */
 bool startBlock(enum BLOCK_KEYWORD_INDICES blockKeywordId,Mcommand const * const command,Mtoken const * const insertToken){Mallocationowner owner=getOwner(__LINE__);
 	// we have to add a new execution environment
-	Menvironment* _blockEnvironment=owned_environment(__environment(),owner);
-	if(_blockEnvironment!=NULL){
-		_blockEnvironment->_name=owned_chars(_getChars(BLOCK_KEYWORDS[blockKeywordId]),Msubowner(owner,1));
-		if(_blockEnvironment->_name!=NULL){
-			Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
-			if(_blockCommandList!=NULL){
-				if(appendedToList(_blockCommandList,owner,_getValueOfToken(command->_firstToken),0)>0){
-					// do NOT initialize the environment's blockCommandList until we effectively pushed the block environment
-					// if I don't disown the block environment, pushExecutionEnvironment can't and won't take over the ownership
-					if(pushExecutionEnvironment(disowned_environment(_blockEnvironment,owner))){
-						_blockEnvironment->blockCommandList=owned_list(disowned_list(_blockCommandList,owner),getValueDataOwner());
-						_blockEnvironment->insertToken=owned_token(insertToken,getValueDataOwner());
-						return true;
+	if(command!=NULL&&insertToken!=NULL){
+		Menvironment* _blockEnvironment=owned_environment(__environment(),owner);
+		if(_blockEnvironment!=NULL){
+			_blockEnvironment->_name=owned_chars(_getChars(BLOCK_KEYWORDS[blockKeywordId]),Msubowner(owner,1));
+			_blockEnvironment->blockKeywordId=blockKeywordId; // MDH@26MAR2024: remembering the block keyword id (although could have simply stored the bool from BLOCK_KEYWORD_SINGLE_ARGUMENT)
+			if(_blockEnvironment->_name!=NULL){
+				Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
+				if(_blockCommandList!=NULL){
+					if(appendedToList(_blockCommandList,owner,_getValueOfToken(command->_firstToken),0)>0){
+						// do NOT initialize the environment's blockCommandList until we effectively pushed the block environment
+						// if I don't disown the block environment, pushExecutionEnvironment can't and won't take over the ownership
+						if(pushExecutionEnvironment(disowned_environment(_blockEnvironment,owner))){
+							_blockEnvironment->blockCommandList=owned_list(disowned_list(_blockCommandList,owner),getValueDataOwner());
+							_blockEnvironment->insertToken=owned_token(insertToken,getValueDataOwner());
+							return true;
+						}
+						outputError("Failed to activate the block environment");
 					}
-					outputError("Failed to activate the block environment");
+					// failed to append the block command to complete
+					FREE_LIST(_blockCommandList,owner);
+					// failed to initialize the pushed environment
 				}
-				// failed to append the block command to complete
-				FREE_LIST(_blockCommandList,owner);
-				// failed to initialize the pushed environment
 			}
+			// failed to activate the block environment, so we have to free it again
+			FREE_ENVIRONMENT(_blockEnvironment,owner);
 		}
-		// failed to activate the block environment, so we have to free it again
-		FREE_ENVIRONMENT(_blockEnvironment,owner);
 	}
 	return false;
 }
 /**
- * @brief ends a block of commands
+ * @brief returns the popped block execution environment after completing the first block command list element
  * @details completes the first command with the rest of the commands wrapped in a list iif need be
  * @return true on success
  * @return false on failure
  */
-bool endBlock(){
+Menvironment* endBlock(){
 	Menvironment* environment=getExecutionEnvironment();
 	if(environment!=NULL){
 		// we need to consume the block commands and append them to the parent
@@ -14350,9 +14357,64 @@ bool endBlock(){
 					*/
 					if(parent->blockCommandList!=NULL){
 						if(appendedToList(parent->blockCommandList,getValueDataOwner(),_getValueOfToken(completableTokens),0)>0){
+							bool insertBlockCommandsAsList=BLOCK_KEYWORD_SINGLE_ARGUMENT[environment->blockKeywordId];
+							// we should now consume the block command list (and get rid of it) at the insert token
+							// let's distinguish between a single element and a compound block
+							Mtoken* endOfArgumentListToken=insertToken->next;
+							// open the argument list if need be
+							if(insertBlockCommandsAsList){
+								// insert list element separator in front of list of commands or single command to insert
+								insertToken->next=NULL;
+								insertToken->next=_getNewCommandToken(insertToken,TT_LISTELEMENT);
+								insertToken=insertToken->next;
+								insertToken->text=_getString(",");
+								if(blockCommandList->numberOfElements>2){
+									insertToken->next=_getNewCommandToken(insertToken,TT_LIST);
+									insertToken=insertToken->next;
+									insertToken->text=_getString("[");
+								}
+							}
+							Mlistelement *blockCommandListelement=blockCommandList->_first,*nextblockCommandListelement=NULL;
+							Mtoken* lastInsertedToken;
+							do{
+								// ASSERT blockCommandListelement must not be NULL!!!!
+								nextblockCommandListelement=blockCommandListelement->_next;
+								blockCommandListelement->_next=NULL; // preventing FREE_LISTELEMENT to attempt to free the successor that we still need to process
+								// prefix comma as argument separator
+								if(!insertBlockCommandsAsList){
+									insertToken->next=NULL;
+									insertToken->next=_getNewCommandToken(insertToken,TT_LISTELEMENT);
+									insertToken=insertToken->next;
+									insertToken->text=_getString(",");
+								}
+								insertToken->next=blockCommandListelement->_value->value._token; // point to the first token in the command to insert
+								FREE_LISTELEMENT(blockCommandListelement,false,getValueDataOwner());
+								// find the last non-NULL insert token
+								lastInsertedToken=insertToken->next;
+								while(lastInsertedToken->next!=NULL)lastInsertedToken=lastInsertedToken->next;
+								insertToken=lastInsertedToken;
+								blockCommandListelement=nextblockCommandListelement;
+								if(blockCommandListelement==NULL)break; // if we've processed the last command to insert, no need to append a list element separator
+								// append list element separator when we're supposed to group all commands in a list
+								if(insertBlockCommandsAsList){
+									insertToken->next=_getNewCommandToken(insertToken,TT_LISTELEMENT);
+									insertToken=insertToken->next;
+									insertToken->text=_getString(",");
+								}
+							}while(1);
+							environment->blockCommandList->_first=NULL; // to prevent FREE_LIST by releasing the first list element again
+							// close the argument list if need be
+							if(insertBlockCommandsAsList){
+								if(blockCommandList->numberOfElements>2){
+									insertToken->next=_getNewCommandToken(insertToken,TT_END_OF_LIST);
+									insertToken=insertToken->next;
+									insertToken->text=_getString("]");
+								}
+							}
+							// connect the last inserted token to the end of argument list token
+							insertToken->next=endOfArgumentListToken;
 							FREE_LIST(environment->blockCommandList,getValueDataOwner());
 							environment->blockCommandList=NULL;
-							// we should now consume the block command list (and get rid of it) at the insert token
 						}
 						/* replacing
 						// consuming blockCommandList means updating _first as soon as we manage to append it to the parent block command list
@@ -14366,10 +14428,21 @@ bool endBlock(){
 						*/
 					}else
 						outputBug("Missing block environment parent block command list");
-					if(popExecutionEnvironment()!=NULL){
-						return true;
+					// how about extracting the completed block command before popping and destroying the block environment?????
+					return popExecutionEnvironment(); // NOTE that popExecutionEnvironment() does NOT free the popped execution environment!!!!
+					/*
+					Menvironment* poppedBlockCommandEnvironment=getExecutionEnvironment();
+					Mtoken* completedBlockCommandToken=poppedBlockCommandEnvironment->blockCommandList->_first->_value->value._token;
+					poppedBlockCommandEnvironment->blockCommandList=NULL; // this might not be required though!!!
+					
+					if(popExecutionEnvironment()){
+						// shouldn't we append the completed block command token to the blockCommandList of the parent environment????
+						if(appendedToList(getExecutionEnvironment()->blockCommandList,getValueDataOwner(),_getValueOfToken(completedBlockCommandToken),0)<=0)
+							outputError("Failed to append the completed block command to the block command list");
+						return completedBlockCommandToken;
 					}
 					outputError("Failed to pop the block command environment!");
+					*/
 				}else
 					outputBug("Block host environment vanished");
 			}
@@ -14377,5 +14450,5 @@ bool endBlock(){
 		}else
 			outputBug("Block environment command list vanished");
 	}
-	return false;
+	return NULL;
 }
