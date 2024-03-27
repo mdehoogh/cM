@@ -5746,7 +5746,6 @@ char getAcceptedSuggestedCharacter(char suggestedCharacter,char * const inputCha
  * @brief executes the block commands in the current execution environment (which would be the global M environment)
  * @result true on success
  * @result false on failure
- */
 bool executeBlockCommands(){
 	Mlist* blockCommandList=_Menvironment->blockCommandList;
 	if(blockCommandList!=NULL){
@@ -5768,6 +5767,7 @@ bool executeBlockCommands(){
 		outputError("No block commands to execute!");
 	return false;
 }
+*/
 
 /**
  * @brief main entry point of M
@@ -7004,7 +7004,39 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					//                however, if a block command represents the declaration of local variables it should be executed in the block design environment
 					//                NOTE that any user input command should be allowed to start/end a new environment whether or not already collectingBlockCommands
 					//                for a user input command to start/end a block it's first token should be a block keyword but with the right number of arguments???
+
+					// MDH@26MAR2024: we should find the successive placeholder tokens, if any, NOTE there could be multiple
+					// that there could be multiple placeholders might be problematic
+					Mtoken* token=getExecutionEnvironment()->continuationToken; // the continuation token is the token to search for the next placeholder token from
+					int8_t blockKeywordId=-1; // the keyword id of the last function call
+					if(token==NULL)token=_userInputCommand->_firstToken->next;
+					while(token!=NULL&&token->type!=TT_PLACEHOLDER){
+						if(token->type==TT_FUNCTION_CALL){
+							char* functionTokenCharacters=_getSignificantTokenCharacters(token->prev);
+							if(functionTokenCharacters!=NULL&&strlen(functionTokenCharacters)>0)blockKeywordId=getBlockKeywordId(functionTokenCharacters);
+						}else
+						if(token->type==TT_END_OF_FUNCTION_CALL)
+							blockKeywordId=-1;
+						token=token->next;
+					}
+					if(token!=NULL){ // we found a placeholder token!!!!
+						getExecutionEnvironment()->firstIncompleteCommandToken=_userInputCommand->_firstToken; // remember the start of the command we need to exeute
+						/*
+						getExecutionEnvironment()->placeholderToken=token;
+						getExecutionEnvironment()->continuationToken=token->next; // NOTE will NOT be NULL as a command cannot end with a placeholder token!!!!
+						getExecutionEnvironment()->insertToken=token->prev; // this is the token where to connect the block command to
+						*/
+						// can we find the block keyword id?????? don't think we actually need it, hmmm although we need to know if it's a function that will create an environment!!!!!
+						if(startBlock(blockKeywordId,_userInputCommand,token)){
+							// disconnect the tokens in _userInputCommand, so when it is freed it won't release all the tokens we will need later on
+							_userInputCommand->_firstToken=NULL;
+							_userInputCommand->_lastToken=NULL;
+							blockCommandLevel++;
+						}
+					}
+					/* replacing:
 					Mtoken* secondToken=_userInputCommand->_firstToken->next;
+					
 					if(secondToken!=NULL&&secondToken->type==TT_FUNCTION_CALL){
 						char* secondTokenCharacters=_getSignificantTokenCharacters(secondToken);
 						if(secondTokenCharacters!=NULL&&strlen(secondTokenCharacters)>0){
@@ -7057,18 +7089,17 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										// NOTE: _userInputCommand should NOW be completed, and ready to be executed, so no need to extract it now!!!!
 										//       unless we know that the completed block command field has actually been NULLed in the finished environment
 										_userInputCommand->_firstToken->next=completedBlockCommandToken;
-										/*
-										if(!executeBlockCommands()){
-											outputError("Failed to execute the block commands.");
-											blockCommandLevel=-2;
-										}else
-											blockCommandLevel=-1;
-										*/
+										///replacing:
+										///if(!executeBlockCommands()){
+									 	///		outputError("Failed to execute the block commands.");
+										///	blockCommandLevel=-2;
+										///}else
+										///	blockCommandLevel=-1;
 									}
 								}
 							}
 						}
-					}
+					}*/
 
 					if(blockCommandLevel>0){ // (still) inside a block
 

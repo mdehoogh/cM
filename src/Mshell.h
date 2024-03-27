@@ -133,5 +133,5 @@ bool shellInitialized(
 // MDH@18MAR2024: block stuff
 int8_t getBlockKeywordId(char const * const keyword);
 bool addBlockCommand(Mcommand const * const command);
-bool startBlock();
+bool startBlock(int8_t blockKeywordId,Mcommand const * const command,Mtoken const * const placeholderToken);
 Menvironment* endBlock();

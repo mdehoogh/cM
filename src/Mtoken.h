@@ -92,9 +92,10 @@
 // MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
 // MDH@31OCT2019: TT_WHITESPACE added which never should take part in any transition (so although it is a token type it is not counted in the number of (finishable) token types)
 // MDH@04NOV2019: TT_REFERENCE added to be used for all references to existing variables
-#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 28
+#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 29
 #define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
 // MDH@03MAY2019: TT_EXPRESSION is now the 'default' token type, so there's no need to set the token type on a new token
+// MDH@26MAR2024: adding TT_PLACEHOLDER which starts with ? to indicate where a list of comma-delimited commands is to be inserted
 #define FOREACH_TOKENTYPE(TOKENTYPE) \
 		TOKENTYPE(TT_EXPRESSION) \
 		TOKENTYPE(TT_UNARY) \
@@ -124,6 +125,7 @@
 		TOKENTYPE(TT_FUNCTION) \
 		TOKENTYPE(TT_FUNCTION_CALL) \
 		TOKENTYPE(TT_END_OF_FUNCTION_CALL) \
+		TOKENTYPE(TT_PLACEHOLDER) \
 		TOKENTYPE(TT_COMMENT) \
 		TOKENTYPE(TT_ERROR) \
 		TOKENTYPE(TT_WHITESPACE)
@@ -151,7 +153,7 @@ typedef struct Mtoken{
 	TokenType type; // actually the index into the TOKENTYPES array!!!
 	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
 	uint16_t offset; // number of characters in front of this token in the command
-    uint16_t position; // MDH@24JUN2020: keep track of the total number of lines and position on each line
+	uint16_t position; // MDH@24JUN2020: keep track of the total number of lines and position on each line
 	Mstring* text; // NOTE this is not an Mtext, Mstring is mutable whereas Mtext is not!!!!
 	struct Mtoken* expr; // the expression this token is part of
 	struct Mtoken* prev; // we need this during user input

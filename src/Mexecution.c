@@ -1320,7 +1320,7 @@ Mtext* doubledabble_ll(long long integer){Mallocationowner owner=getOwner(__LINE
 					while(++bcd_digit<bcd_digits){
 						c=bcd_chars[bcd_digit];
 						bit_out=(c>>3);
-						bcd_chars[bcd_digit]=bit_in+(c&7)<<1;
+						bcd_chars[bcd_digit]=bit_in+((c&7)<<1); // TODO + has higher priority then << so I've enclosed the shift in parentheses but not certain if that is correct
 						bit_in=bit_out;
 					}
 					// after 4 shifts we will get a new bcd_digit
