@@ -2830,7 +2830,7 @@ void sanitizeCommand(){
 }
 /**
  * @brief uncomments the current user input command and returns the last comment token if any
- * 
+ * @details removes all comment tokens from the forward token chain in current command
  * @return Mtoken* the comment token that ends the command
  */
 Mtoken* uncommentCommand(){
@@ -2847,19 +2847,26 @@ Mtoken* uncommentCommand(){
 				////////assert(token!=NULL&&token->type!=TT_COMMENT); // TODO remove once M is sufficiently debugged
 				if(token->next!=nextToken)token->next=nextToken;
 				token=nextToken;
-			}else
+			}else{
 				endCommentToken=nextToken;
+				// MDH@30MAR2024: because we can now have intermediate comments (because of embedded commands)
+				//                we should 'remove' these intermediate comments as well
+				//                removing means point the previous token over skip the comment token!!!!
+				endCommentToken->prev->next=endCommentToken->next;
+			}
 		}
+		/* MDH@30MAR2024: we do not need the following anymore if we remove all intermediate comments in the loop above!!
 		if(endCommentToken!=NULL)endCommentToken->prev->next=NULL;
-		if(amVerboseDebugging()){
+		*/
+		///if(amVerboseDebugging()){
 			size_t tokenCount=0;
 			while(firstToken!=NULL){
 				if(firstToken->type==TT_COMMENT)output("%sFailed to remove comment token #%zd.\n",M_ERROR_PREFIX,tokenCount);
 				firstToken=firstToken->next;
 				tokenCount++;
 			}
-			output("Number of non-comment tokens: %zd.\n",tokenCount);
-		}
+			///output("Number of non-comment tokens: %zd.\n",tokenCount);
+		///}
 	}
 	return endCommentToken;
 }
@@ -2868,18 +2875,33 @@ void recommentCommand(Mtoken* endCommentToken){
 	if(firstToken==NULL)return;
 	Mtoken *prevToken,*nextToken,*token=firstToken;
 	while(1){
+		// ASSERT token!=NULL which is guaranteed because it starts non-NULL and breaking out will prevent it to become NULL
 		nextToken=token->next;
 		if(nextToken==NULL)break;
-		if(nextToken->type==TT_COMMENT){outputBug("A comment encountered in the uncommented command");break;}
-		// if the predecessor of nextToken is not equal to token, we've skipped one or more comments
-		prevToken=nextToken->prev;
-		if(prevToken!=token){
-			while(prevToken!=NULL&&prevToken->prev!=token)prevToken=prevToken->prev;
-			token->next=prevToken;
-		}
+		if(nextToken->type!=TT_COMMENT){
+			// if the predecessor of nextToken is not equal to token, we've skipped one or more comments
+			prevToken=nextToken->prev;
+			// MDH@30MAR2024: you know prevToken must be a 'removed' comment token, however 
+			//                it's probably best to test this explicitly 
+			if(prevToken!=token){
+				// find the first token going back in the 'removed' comment token chain until we bump into token!! 
+				while(prevToken!=NULL&&prevToken->prev!=token)
+					prevToken=prevToken->prev;
+				// NOTE prevToken represents the last prevToken that points backwards to token (as it should)
+				if(prevToken!=NULL){
+					token->next=prevToken;
+					if(prevToken->type!=TT_COMMENT)
+						outputBug("A disconnected non-comment token encountered");
+				}else
+					outputBug("Removed tokens cannot be reinserted");
+			}
+		}else
+			outputBug("A comment encountered in the uncommented command");
 		token=nextToken;
 	}
-	if(endCommentToken!=NULL)token->next=endCommentToken;
+	// endcommenttoken ends the command but cannot be reinserted by the above loop
+	if(endCommentToken!=NULL)
+		endCommentToken->prev->next=endCommentToken;
 	if(amVerboseDebugging()){
 		// check!!!
 		size_t tokenCount=0;
