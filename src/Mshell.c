@@ -10141,6 +10141,18 @@ Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__)
 	popExecutionEnvironment();
 	return(_resultMap!=NULL?_getValueOfMap(disowned_map(_resultMap,owner)):_returnValue);
 }
+
+// MDH@02APR2024: Mend is called when entering a block of commands is to be ended
+/**
+ * @brief ends a block of commands by popping the current execution environment, similar to what Mendwith does
+ * 
+ * @param _returnValue 
+ * @return Mvalue* 
+ */
+Mvalue* Mend(Mvalue* _returnValue){
+	return Mendwith(_returnValue);
+}
+
 // the functions to create functions are moved here from Menvironment.h/c because they require parsing the command texts
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
 //				so these are actually anonymous functions
@@ -14016,7 +14028,12 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			// MDH@22DEC2020: register the with() and endwith() function
 			if(!/*completedMapFunction*/registerFunction(_Menvironment,owner,"with",Mwith,1,(char*[]){"local variables map"},(Mvalue*[]){NULL}))return false;
-			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,"end",Mendwith,1,(char*[]){"result value"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER)}))return false;
+			// MDH@02APR2024: "end" changed to "endwith" to distinguish it effectively from "end" being used to effectively end a block of commands used as arguments to while, for, if clauses
+			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,"endwith",Mendwith,1,(char*[]){"result value"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER)}))return false;
+
+			// MDH@02APR2024: for now decided to use a separate function with a different name than "endwith" that approximately does the same but is also recognized to end() a block of commands
+			//                it's argument should be recognized as the result to store in the $-variable of the while of for loop (not applicable to then and else clauses as they don't require end)
+			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,"end",Mend,1,(char*[]){"result value"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER)}))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 			// if(!completedValueFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
@@ -14258,7 +14275,7 @@ const enum BLOCK_KEYWORD_INDICES {M_KW_FOR,M_KW_WHILE,M_KW_IF,M_KW_ELIF,M_KW_ELS
 
 const char * const BLOCK_KEYWORDS[NUMBER_OF_BLOCK_KEYWORDS]={"for","while","if","elif","else","end","endall"};
 
-const int8_t BLOCK_FLAGS[NUMBER_OF_BLOCK_KEYWORDS]={1,1,1,3,3,2,4};
+const int8_t BLOCK_FLAGS[NUMBER_OF_BLOCK_KEYWORDS]={1,1,1,3,3,2,6};
 
 const bool BLOCK_KEYWORD_SINGLE_ARGUMENT[NUMBER_OF_BLOCK_KEYWORDS-2]={false,false,true,true,true}; // MDH@25MAR2024: single arguments are to be presented as a list and not appended as consecutive arguments
 /**

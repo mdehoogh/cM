@@ -6998,6 +6998,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore
 			}
 			outputChar('\n');
+
 			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
 				string_setlength(_expectedCharacterStack,0); // MDH@13DEC2023: is there a better place to do this?????
 				// if _userInputCommand->_firstToken is set, we have a command to evaluate
@@ -7017,7 +7018,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				*/
 
 				// if we succeeded in evaluating a command we should register it
-				if(_userInputCommand!=NULL&&_userInputCommand->_firstToken!=NULL){ // technically something to evaluate
+				if(_userInputCommand!=NULL&&_userInputCommand->_firstToken!=NULL){ // technically something to process (not necessarily evaluate!)
+					
 					if(amVerboseDebugging())
 						outputCommandInfo(_userInputCommand); // now defined in Mshell.c/h
 
@@ -7041,8 +7043,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							blockKeywordId=-1;
 						token=token->next;
 					}
-					if(token!=NULL){ // we found a placeholder token!!!!
-						getExecutionEnvironment()->firstIncompleteCommandToken=_userInputCommand->_firstToken; // remember the start of the command we need to exeute
+					if(token!=NULL){ // any placeholder starts a new environment in which commands are to be entered
 						/*
 						getExecutionEnvironment()->placeholderToken=token;
 						getExecutionEnvironment()->continuationToken=token->next; // NOTE will NOT be NULL as a command cannot end with a placeholder token!!!!
@@ -7050,11 +7051,17 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						*/
 						// can we find the block keyword id?????? don't think we actually need it, hmmm although we need to know if it's a function that will create an environment!!!!!
 						if(startBlock(blockKeywordId,_userInputCommand,token)){
+							output("Block command environment activated!"); ///DEBUGGING
+							// determine how many commands can be embedded: if the placeholder token is followed by a comma (,) only a single command is allowed (and no end() to end the block is required)
+							getExecutionEnvironment()->multipleCommandsAllowed=(token->next!=NULL&&token->next->type!=TT_LISTELEMENT);
+							// set the first incomplete command token of the parent of the current execution environment to the first token of the user input command
+							getExecutionEnvironment()->_parent->value._environment->firstIncompleteCommandToken=_userInputCommand->_firstToken; // remember the start of the command we need to exeute
 							// disconnect the tokens in _userInputCommand, so when it is freed it won't release all the tokens we will need later on
 							_userInputCommand->_firstToken=NULL;
 							_userInputCommand->_lastToken=NULL;
 							blockCommandLevel++;
-						}
+						}else // this is a serious problem so let's switch to control mode (TODO allow garbage collection in control mode or some memory allocation test to check wether out of memory)
+							switchToControlMode("Failed to initiate a request for embedded commands");
 					}
 					/* replacing:
 					Mtoken* secondToken=_userInputCommand->_firstToken->next;
@@ -7122,17 +7129,30 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							}
 						}
 					}*/
-
+					else // a user input command that does NOT contain a placeholder token
 					if(blockCommandLevel>0){ // (still) inside a block
-
-						// add the user input command to the list of environment block commands
-						if(addBlockCommand(_userInputCommand)){
-							output("Block command added!");
-						}else{ // that's a rather serious error
-							beep();
-							switchToControlMode("Failed to register block command!");
+						// TODO should we check whether this is an end() call??????
+						bool endOfBlock=(blockKeywordId>=0&&BLOCK_FLAGS[blockKeywordId]&2);
+						if(!endOfBlock){ // doesn't end a block
+							// add the user input command to the list of environment block commands
+							if(addBlockCommand(_userInputCommand)){
+								output("Block command added!");
+								// if the execution environment does not allow multiple commands we're done and the block should be closed
+								if(!getExecutionEnvironment()->multipleCommandsAllowed)endOfBlock=true;
+							}else{ // that's a rather serious error
+								beep();
+								switchToControlMode("Failed to register block command!");
+							}
 						}
-
+						if(endOfBlock){
+							Menvironment* endedBlockEnvironment=endBlock();
+							if(endedBlockEnvironment!=NULL){
+								blockCommandLevel--;
+							}else{
+								beep();
+								switchToControlMode("Failed to end a block!");
+							}
+						}
 					}else
 					if(blockCommandLevel==0){ // a directly executable user input command
 
