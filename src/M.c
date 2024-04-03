@@ -7156,6 +7156,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						if(endOfBlock){
 							Menvironment* endedBlockEnvironment=endBlock();
 							if(endedBlockEnvironment!=NULL){
+								output("Block environment ended!\n");
 								blockCommandLevel--;
 								// once a block ended successfully we're back in the environment containing the perhaps now
 								// completed command
@@ -7163,12 +7164,17 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								// if not, we should again prompt the user
 								// 1. find the next placeholder token (since we ended a block we're in the original parent
 								//    that contains the continuationToken
-								Mtoken* token=getExecutionEnvironment()->continuationToken;
+								Mtoken* token=getExecutionEnvironment()->firstIncompleteCommandToken; // instead of the continuation token
+								// MDH@03APR2024: multiple placeholders allowed in the same function call
+								//                therefore blockKeywordId should NOT be initialized unless
+								//                we decide to reiterate the entire command again from the start
+								//                which is probably a good idea because one placeholder is now resolved
 								int8_t blockKeywordId=-1; // the keyword id of the last function call
 								while(token!=NULL&&token->type!=TT_PLACEHOLDER){
 									if(token->type==TT_FUNCTION_CALL){
 										char* functionTokenCharacters=_getSignificantTokenCharacters(token->prev);
-										if(functionTokenCharacters!=NULL&&strlen(functionTokenCharacters)>0)blockKeywordId=getBlockKeywordId(functionTokenCharacters);
+										if(functionTokenCharacters!=NULL&&strlen(functionTokenCharacters)>0)
+											blockKeywordId=getBlockKeywordId(functionTokenCharacters);
 									}else
 									if(token->type==TT_END_OF_FUNCTION_CALL)
 										blockKeywordId=-1;
