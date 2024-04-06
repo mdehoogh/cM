@@ -21,9 +21,9 @@ Mtoken* disowned_token(Mtoken* _token,Mallocationowner owner_token){
 }
 void free_token(Mtoken* _token/*,Mallocationowner owner*/){
     // MDH@19MAY2020: we can free it only when we own it
-    if(!_token)return;
-    if(_token->next){free_token(_token->next/*,owner*/);_token->next=NULL;}
-    if(_token->text){
+    if(NULL==_token)return;
+    if(_token->next!=NULL){free_token(_token->next/*,owner*/);_token->next=NULL;}
+    if(_token->text!=NULL){
         if(amVerboseDebugging())output("Freeing token '%s'.\n",string(_token->text));
         free_string(_token->text/*,owner*/);_token->text=NULL;
     }

@@ -512,6 +512,12 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction,Mvaluetype
 //Mvalue* getFunction(Mfunctionlist functionlist,char* name);
 
 // environments
+// MDH@28OCT2019: because now often we need both the first and last token in a command it's probably best to combine them in a single command
+typedef struct{
+	unsigned long long sourceCommandIndex; // MDH@18JUN2020: storing what this command is a duplicate of
+	Mtoken *_firstToken,*_lastToken;
+	/////////////////bool identifierContinuationIsDirty; // convenient to keep it with the command itself
+}Mcommand;
 
 // an environment is a bag of variables and functions
 // MDH@03FEB2020: all environments should be wrapped in Mvalue instances, so they won't get released until they can
@@ -525,7 +531,7 @@ typedef struct Menvironment{
 		// temporary fields that we need when we're collecting block commands that we use to complete the incompleted command (now stored as first element in the block command list)
 		/////Mlist* blockCommandList; // MDH@18MAR2024: may keep a list of block commands, that can either be transferred or executed
 		// parent environment keeps a reference to the incomplete command
-		Mtoken* firstIncompleteCommandToken; // MDH@26MAR2024: the first token of the user input command that is being completed
+		Mcommand* incompleteCommand; // MDH@26MAR2024: the first token of the user input command that is being completed
 		// the child environment keeps track of whether or not this is the first added block command
 		bool blockCommandsInserted; // MDH@25MAR2024: the token that is to be replaced by the comma-delimited block commands
 		Mtoken* insertToken; // MDH@26MAR2024: where to insert each successive block command

@@ -5798,6 +5798,22 @@ bool executeBlockCommands(){
 */
 
 /**
+ * @brief returns the keyword id associated with argument token \p placeholderToken
+ * 
+ * @param placeholderToken 
+ * @return int8_t the keyword id associated with argument token \p placeholderToken
+ */
+int8_t getPlaceholderBlockKeywordId(Mtoken const * const placeholderToken){
+	int8_t blockKeywordId=-1;
+	Mtoken* expressionToken=placeholderToken->expr;
+	if(expressionToken!=NULL&&expressionToken->type==TT_FUNCTION_CALL){
+		char* _functionName=_getSignificantTokenCharacters(expressionToken->prev);
+		blockKeywordId=getBlockKeywordId(_functionName);
+		free(_functionName);
+	}
+	return blockKeywordId;
+}
+/**
  * @brief main entry point of M
  * 
  * @param argc 
@@ -7036,6 +7052,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					//                for a user input command to start/end a block it's first token should be a block keyword but with the right number of arguments???
 
 					// MDH@26MAR2024: we should find the successive placeholder tokens, if any, NOTE there could be multiple
+					// MDH@06APR2024: we'd better use expr to determine the blockKeywordId from the placeholder token
+					Mtoken* firstPlaceholderToken=_userInputCommand->_firstToken;
+					while(firstPlaceholderToken!=NULL&&firstPlaceholderToken->type!=TT_PLACEHOLDER)
+						firstPlaceholderToken=firstPlaceholderToken->next;
+					/* replacing:
 					// that there could be multiple placeholders might be problematic
 					Mtoken* token=getExecutionEnvironment()->continuationToken; // the continuation token is the token to search for the next placeholder token from
 					int8_t blockKeywordId=-1; // the keyword id of the last function call
@@ -7049,26 +7070,26 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							blockKeywordId=-1;
 						token=token->next;
 					}
-					if(token!=NULL){ // any placeholder starts a new environment in which commands are to be entered
+					*/
+					if(firstPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
+						int8_t firstBlockKeywordId=getPlaceholderBlockKeywordId(firstPlaceholderToken);
 						/*
 						getExecutionEnvironment()->placeholderToken=token;
 						getExecutionEnvironment()->continuationToken=token->next; // NOTE will NOT be NULL as a command cannot end with a placeholder token!!!!
 						getExecutionEnvironment()->insertToken=token->prev; // this is the token where to connect the block command to
 						*/
 						// can we find the block keyword id?????? don't think we actually need it, hmmm although we need to know if it's a function that will create an environment!!!!!
-						if(startBlock(blockKeywordId,_userInputCommand,token)){
+						if(startBlock(firstBlockKeywordId,_userInputCommand,firstPlaceholderToken)){
 							output("Block command environment activated!\n"); ///DEBUGGING
-							// get rid of the owner token
-							token->next=NULL;FREE_TOKEN(token,owner_userInputCommand);
+							// get rid of the placeholder token
+							firstPlaceholderToken->next=NULL;FREE_TOKEN(firstPlaceholderToken,owner_userInputCommand);
 							/*
 							// determine how many commands can be embedded: if the placeholder token is followed by a comma (,) only a single command is allowed (and no end() to end the block is required)
 							getExecutionEnvironment()->multipleCommandsAllowed=(token->next!=NULL&&token->next->type!=TT_LISTELEMENT);
 							// set the first incomplete command token of the parent of the current execution environment to the first token of the user input command
 							getExecutionEnvironment()->_parent->value._environment->firstIncompleteCommandToken=_userInputCommand->_firstToken; // remember the start of the command we need to exeute
 							*/
-							// disconnect the tokens in _userInputCommand, so when it is freed it won't release all the tokens we will need later on
-							_userInputCommand->_firstToken=NULL;
-							_userInputCommand->_lastToken=NULL;
+							_userInputCommand=NULL; // MDH@06APR2024: _userInputCommand was embedded in the parent environment as incompleteCommand
 							blockCommandLevel++;
 						}else // this is a serious problem so let's switch to control mode (TODO allow garbage collection in control mode or some memory allocation test to check wether out of memory)
 							switchToControlMode("Failed to initiate a request for embedded commands");
@@ -7141,17 +7162,29 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					}*/
 					else // a user input command that does NOT contain a placeholder token
 					if(blockCommandLevel>0){ // (still) inside a block
-						// TODO should we check whether this is an end() call??????
-						bool endOfBlock=(blockKeywordId>=0&&BLOCK_FLAGS[blockKeywordId]&2);
+						// is end() called?
+						bool endOfBlock=false;
+						Mtoken* endFunctionToken=_userInputCommand->_firstToken;
+						while(endFunctionToken!=NULL&&endFunctionToken->type==TT_FUNCTION){
+							char* _functionName=_getSignificantTokenCharacters(endFunctionToken);
+							if(!strcmp(_functionName,"end")||!strcmp(_functionName,"endall"))endOfBlock=true;
+							free(_functionName);
+							if(endOfBlock)break;
+							endFunctionToken=endFunctionToken->next;
+						}
+						////// replacing: bool endOfBlock=(getExecutionEnvironment()->blockKeywordId>=0&&BLOCK_FLAGS[getExecutionEnvironment()->blockKeywordId]&2);
 						if(!endOfBlock){ // doesn't end a block
 							// add the user input command to the list of environment block commands
 							if(addBlockCommand(_userInputCommand)){
 								//if(amVerboseDebugging())
 									output("Block command added!\n");
+								FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
 								// if the execution environment does not allow multiple commands we're done and the block should be closed
 								if(!getExecutionEnvironment()->multipleCommandsAllowed)endOfBlock=true;
 							}else // that's a rather serious error
 								switchToControlMode("Failed to register block command!");
+						}else{
+							FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
 						}
 						if(endOfBlock){
 							Menvironment* endedBlockEnvironment=endBlock();
@@ -7164,13 +7197,13 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								// if not, we should again prompt the user
 								// 1. find the next placeholder token (since we ended a block we're in the original parent
 								//    that contains the continuationToken
-								Mtoken* token=getExecutionEnvironment()->firstIncompleteCommandToken; // instead of the continuation token
+								Mtoken* nextPlaceholderToken=getExecutionEnvironment()->continuationToken;
 								// MDH@03APR2024: multiple placeholders allowed in the same function call
 								//                therefore blockKeywordId should NOT be initialized unless
 								//                we decide to reiterate the entire command again from the start
 								//                which is probably a good idea because one placeholder is now resolved
-								int8_t blockKeywordId=-1; // the keyword id of the last function call
-								while(token!=NULL&&token->type!=TT_PLACEHOLDER){
+								while(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_PLACEHOLDER){
+									/*
 									if(token->type==TT_FUNCTION_CALL){
 										char* functionTokenCharacters=_getSignificantTokenCharacters(token->prev);
 										if(functionTokenCharacters!=NULL&&strlen(functionTokenCharacters)>0)
@@ -7178,10 +7211,12 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									}else
 									if(token->type==TT_END_OF_FUNCTION_CALL)
 										blockKeywordId=-1;
-									token=token->next;
+									*/
+									nextPlaceholderToken=nextPlaceholderToken->next;
 								}
-								if(token!=NULL){ // any placeholder starts a new environment in which commands are to be entered
-									if(startBlock(blockKeywordId,getExecutionEnvironment()->firstIncompleteCommandToken,token)){
+								if(nextPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
+									int8_t nextBlockKeywordId=getPlaceholderBlockKeywordId(nextPlaceholderToken);
+									if(startBlock(nextBlockKeywordId,NULL,nextPlaceholderToken)){
 										output("Block command environment activated!\n"); ///DEBUGGING
 										/* startBlock already does that!!!!
 										// determine how many commands can be embedded: if the placeholder token is followed by a comma (,) only a single command is allowed (and no end() to end the block is required)
@@ -7190,15 +7225,20 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										getExecutionEnvironment()->_parent->value._environment->firstIncompleteCommandToken=_userInputCommand->_firstToken; // remember the start of the command we need to exeute
 										// disconnect the tokens in _userInputCommand, so when it is freed it won't release all the tokens we will need later on
 										*/
-										token->next=NULL;FREE_TOKEN(token,owner_userInputCommand);
-										_userInputCommand->_firstToken=NULL;
+										nextPlaceholderToken->next=NULL;FREE_TOKEN(nextPlaceholderToken,owner_userInputCommand);
+										////////////_userInputCommand=NULL;
+										/*
+										->_firstToken=NULL;
 										_userInputCommand->_lastToken=NULL;
+										*/
 										blockCommandLevel++;
 									}else
 										switchToControlMode("Failed to request embedded commands.");
 								}else
 								if(blockCommandLevel==0){ // the top-level incomplete command is now complete and therefore executable
 									// we have to set _userInputCommand to that completed command
+									_userInputCommand=getExecutionEnvironment()->incompleteCommand;
+									/*
 									FREE_COMMAND(_userInputCommand,owner_userInputCommand);
 									_userInputCommand=_getNewCommand(false);
 									if(_userInputCommand!=NULL){
@@ -7206,20 +7246,21 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										getExecutionEnvironment()->firstIncompleteCommandToken=NULL;
 									}else
 										switchToControlMode("Failed to execute the completed command");
+									*/
 								}else{
 									// the incomplete command is now finished and completed but not at the top-level
 									// and therefore is ready to be added 
-									if(addBlockCommand(getExecutionEnvironment()->firstIncompleteCommandToken)){
-										getExecutionEnvironment()->firstIncompleteCommandToken=NULL;
-									}else
+									if(addBlockCommand(getExecutionEnvironment()->incompleteCommand))
+										getExecutionEnvironment()->incompleteCommand=NULL;
+									else
 										switchToControlMode("Failed to add the completed command.");					
 								}
 							}else
 								switchToControlMode("Failed to end a block!");
 						}
 					}//else
-					
-					if(blockCommandLevel==0){ // a directly executable user input command
+					// TODO now checking for _userInputCommand being NULL but used to be blockCommandLevel==0
+					if(_userInputCommand!=NULL){ // a directly executable user input command
 						// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 						Mvalue* userInputCommandResultValue=NULL;
 						bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);

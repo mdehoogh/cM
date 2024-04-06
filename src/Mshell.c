@@ -2855,7 +2855,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
 		pNewToken->text=owned_string(__string(),Msubowner(owner,1));
 		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
-		if(!pNewToken->text){
+		if(NULL==pNewToken->text){
 			pNewToken->type=TT_ERROR; 
 			if(inputErrorFunction)(*inputErrorFunction)("Failed to initialize the new token.");
 		}else
@@ -2867,7 +2867,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		pNewToken->next=NULL;
 		*/
 	}
-	if(!pNewToken){
+	if(NULL==pNewToken){
 		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a new token.");
 		return NULL;
 	}
@@ -14369,15 +14369,16 @@ bool startBlock(int8_t blockKeywordId,Mcommand const * const command,Mtoken cons
 			////////if(blockKeywordId<0)return true;
 			if(pushExecutionEnvironment(disowned_environment(_blockEnvironment,owner))){
 				Menvironment* environment=_blockEnvironment->_parent->value._environment;
-				environment->firstIncompleteCommandToken=command->_firstToken->next;
+				environment->incompleteCommand=command;
 				environment->continuationToken=placeholderToken->next;
+				environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
 				// connect the insert token with the continuation token
-				_blockEnvironment->multipleCommandsAllowed=(placeholderToken->next!=NULL&&placeholderToken->next->type!=TT_LISTELEMENT);
+				_blockEnvironment->multipleCommandsAllowed=(environment->continuationToken!=NULL&&environment->continuationToken->type!=TT_LISTELEMENT);
 				_blockEnvironment->insertToken->next=environment->continuationToken;
 				environment->continuationToken->prev=_blockEnvironment->insertToken;
 				return true;
 			}
-			outputError("Failed to activate the block environment");
+			outputError("Failed to activate the block command environment");
 			/* replacing:
 			if(_blockEnvironment->_name!=NULL){
 				Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
