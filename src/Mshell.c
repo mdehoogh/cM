@@ -14299,7 +14299,7 @@ int8_t getBlockKeywordId(char const * const keyword){
  * @return true on success
  * @return false on failure
  */
-bool addBlockCommand(Mcommand const * const command){
+bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_command){
 	if(command!=NULL&&command->_firstToken!=NULL){
 		// TODO the problem with the environment itself is that we do not know who owns it 
 		//      unless we know every execution environment is essentially wrapped inside an Mvalue in which case we know who owns it!!
@@ -14308,25 +14308,21 @@ bool addBlockCommand(Mcommand const * const command){
 			Mtoken* nextInsertToken=environment->insertToken->next;
 			if(environment->blockCommandsInserted){ // the placeholder token has been replaced by a command
 				// insert a command separator
-				Mtoken* listelementToken=_getNewCommandToken(environment->insertToken,TT_LISTELEMENT);
-				if(listelementToken==NULL)return false;
-				listelementToken->text=owned_string(_getString(","),getValueDataOwner());
+				Mtoken* listelementToken=owned_token(_getNewCommandToken(environment->insertToken,TT_LISTELEMENT),Msubowner(owner_command,1));
+				if(listelementToken==NULL){outputError("Failed to insert the block command separator");return false;}
+				listelementToken->text=owned_string(_getString(","),Msubowner(owner_command,2));
 				listelementToken->significantCharacterCount=1;
 				environment->insertToken->next=listelementToken;
 				listelementToken->next=nextInsertToken;
 				listelementToken->prev=environment->insertToken;
 				environment->insertToken=listelementToken;
-			}else{ // adding the first block command, signal having inserted already a command by removing the placeholder token
-				/* placeholderToken is set BUT is no longer pointing anywhere!!!
-				environment->placeholderToken->next=NULL;
-				FREE_TOKEN(environment->placeholderToken,getValueDataOwner());
-				// connect insertToken forward with the continuationToken and vice versa
-				environment->insertToken->next=environment->continuationToken;
-				nextInsertToken->prev=environment->insertToken;
-				*/
 			}
+			// connect to start of command
 			environment->insertToken->next=command->_firstToken->next; // TODO insert first token as well????
+			command->_firstToken->prev=environment->insertToken;
+			// connect to end of command
 			command->_lastToken->next=nextInsertToken;
+			nextInsertToken->prev=command->_lastToken;
 			// the last inserted token becomes the new insert token
 			// NOTE that environment->continuationToken essentially remains the same!!!!
 			environment->insertToken=command->_lastToken;
@@ -14356,29 +14352,47 @@ bool addBlockCommand(Mcommand const * const command){
  * @return true 
  * @return false 
  */
-bool startBlock(int8_t blockKeywordId,Mcommand const * const command,Mtoken const * const placeholderToken){Mallocationowner owner=getOwner(__LINE__);
+bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken){Mallocationowner owner=getOwner(__LINE__);
+	// command is allowed to be NULL which means do not replace the incompleteCommand!!
 	// we have to add a new execution environment
-	if(command!=NULL&&placeholderToken!=NULL){
+	if(placeholderToken!=NULL){
 		Menvironment* _blockEnvironment=owned_environment(__environment(),owner);
 		if(_blockEnvironment!=NULL){
+			///////int8_t blockKeywordId=-1;
+			Mtoken* startExpressionToken=placeholderToken->expr;
+			Mtoken* functionNameToken=(startExpressionToken!=NULL&&startExpressionToken->type==TT_FUNCTION_CALL?startExpressionToken->prev:NULL);
+			if(functionNameToken!=NULL){
+				char* _functionName=_getSignificantTokenCharacters(functionNameToken);
+				if(_functionName!=NULL){
+					_blockEnvironment->_name=owned_chars(_getChars(_functionName),Msubowner(owner,1));
+					free(_functionName);
+				}
+			}
+			/* replacing: 
+			int8_t blockKeywordId=getBlockKeywordId(_functionName);
 			if(blockKeywordId>=0)_blockEnvironment->_name=owned_chars(_getChars(BLOCK_KEYWORDS[blockKeywordId]),Msubowner(owner,1));
 			_blockEnvironment->blockKeywordId=blockKeywordId; // MDH@26MAR2024: remembering the block keyword id (although could have simply stored the bool from BLOCK_KEYWORD_SINGLE_ARGUMENT)
+			*/
 			//// NOT HERE ANYMORE!!!! _blockEnvironment->placeholderToken=placeholderToken;
 			//// NOT HERE!!!! _blockEnvironment->continuationToken=placeholderToken->next;
-			_blockEnvironment->insertToken=placeholderToken->prev;
 			////////if(blockKeywordId<0)return true;
+			Mtoken *prevPlaceholderToken=placeholderToken->prev,*nextPlaceholderToken=placeholderToken->next;
+			// disconnect the placeholder token
+			if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
+			if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
 			if(pushExecutionEnvironment(disowned_environment(_blockEnvironment,owner))){
 				Menvironment* environment=_blockEnvironment->_parent->value._environment;
-				environment->incompleteCommand=command;
-				environment->continuationToken=placeholderToken->next;
-				environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
-				// connect the insert token with the continuation token
-				_blockEnvironment->multipleCommandsAllowed=(environment->continuationToken!=NULL&&environment->continuationToken->type!=TT_LISTELEMENT);
-				_blockEnvironment->insertToken->next=environment->continuationToken;
-				environment->continuationToken->prev=_blockEnvironment->insertToken;
-				return true;
-			}
-			outputError("Failed to activate the block command environment");
+				if(environment!=NULL){
+					if(command!=NULL)environment->incompleteCommand=command; // remember the command that has to be completed NOTE when receiving NULL environment->incompleteCommand has be be left alone!!!!!
+					environment->continuationToken=nextPlaceholderToken; // remember where to continue looking for placeholder tokens
+					_blockEnvironment->insertToken=prevPlaceholderToken;
+					_blockEnvironment->multipleCommandsAllowed=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT);
+					///////environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
+					return true;
+				}
+				outputBug("Block parent environment vanished");
+			}else
+				outputError("Failed to activate the block command environment");
 			/* replacing:
 			if(_blockEnvironment->_name!=NULL){
 				Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
