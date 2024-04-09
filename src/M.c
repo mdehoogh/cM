@@ -1543,15 +1543,19 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 					promptLength=string_length(_environmentName);
 					FREE_STRING(_environmentName,owner);
 				}
+				
 				/* replacing:
 				output("M");
 				promptLength=1;
 				*/
+				// MDH@09APR2024: we need the environment on multiple occasions
+				Menvironment* environment=getExecutionEnvironment();
+				char* environmentName=(environment!=NULL&&environment->_name!=NULL?environment->_name->chars:NULL);
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
-				if(getCurrentFunctionBodyInput()!=NULL)
-					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getExecutionEnvironment()->_name->chars));	// replacing: printf("%lu",(commandCount+1));
+				if(getCurrentFunctionBodyInput()!=NULL&&environmentName!=NULL)
+					sprintf(str,"%lld",1+getNumberOfFunctionCommands(environmentName));	// replacing: printf("%lu",(commandCount+1));
 				else
-					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
+					sprintf(str,"%lld",(environment->commandCount+1));	// replacing: printf("%lu",(commandCount+1));
 				promptLength+=output("[%s]",str);
 				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
 				promptLength+=output("%s"," = ");
@@ -2092,21 +2096,17 @@ Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MI_MAIN,__LIN
  */
 #define COMMAND_BLOCKSIZE 8
  // array for storing the pointers to the first token of all commands entered
-// MDH@18JUN2020: a registered command might be a command that is a duplicate of a previous command
-/**
- * @brief a record to store a registered command
- * 
- */
-typedef struct{
-	Mcommand* _command;
-	unsigned long long previousCommandIndex;
-}Mregisteredcommand;
+
 /**
  * @brief stores the registered commands
  * 
  */
-Mregisteredcommand* _registeredcommands=NULL;Mallocationowner owner_registeredcommands=(Mallocationowner){MI_MAIN,__LINE__,1};
+/* MDH@09APR2024: a list of registered commands is now kept by the current environment (much more convenient!!!)
+Mregisteredcommand* _registeredcommands=NULL;
+Mallocationowner owner_registeredcommands=(Mallocationowner){MI_MAIN,__LINE__,1};
 size_t commandBlocks=0;
+*/
+Mallocationowner owner_registeredcommands=(Mallocationowner){MI_MAIN,__LINE__,1}; // TODO replace by the owner of the associated environment
 // MDH@24MAY2020 NOTE: registerCommand is ONLY called once with _userInputCommand as argument but 
 // MDH@12JUN2020 TODO TODO TODO how to deal with the command being registered and whether or not the tokens are to be disowned when put in the value 
 /**
@@ -2119,24 +2119,26 @@ size_t commandBlocks=0;
  */
 bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==command)return false;Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==getCurrentFunctionBodyInput()){ // a top-level (non function body) command
-		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
+		Menvironment* environment=getExecutionEnvironment();
+		if(environment==NULL){outputBug("Environment vanished.");return false;}
+		if(environment->commandCount==environment->commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			Mregisteredcommand* newRegisteredCommands=
-				(commandBlocks==0
+				(environment->commandBlocks==0
 					?MALLOC(sizeof(Mregisteredcommand),COMMAND_BLOCKSIZE,-'C',owner_registeredcommands)
-					:REALLOC(_registeredcommands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mregisteredcommand),-'C')
+					:REALLOC(environment->registeredCommands,environment->commandBlocks*COMMAND_BLOCKSIZE,(environment->commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mregisteredcommand),-'C')
 				);
 			if(newRegisteredCommands==NULL)return false;
-			commandBlocks++;
-			_registeredcommands=newRegisteredCommands;
+			environment->commandBlocks++;
+			environment->registeredCommands=newRegisteredCommands;
 		}
 		// MDH@18JUN2020: NOTE commandIndex now stored in any command will equal 0 when it is a new command, so when it is being stored commandIndex will tell us whether it is a new command or not
 		//				as soon as we store the current command and it is a new command we store the index of the command i.e. where it is located in the list of registered commands
 		// if(commandIndex>0)command->sourceCommandIndex=(commandCount-commandIndex+1);
 		///////outputLine("Registering command!");
-		_registeredcommands[commandCount]=(Mregisteredcommand){owned_command(disowned_command(command,owner_command),owner_registeredcommands)};
-		if(commandIndex>0)_registeredcommands[commandCount].previousCommandIndex=commandCount-commandIndex+1; // will be positive for any positive commandIndex, because commandIndex is in [1,commandCount-1)
-		commandCount++;
+		environment->registeredCommands[commandCount]=(Mregisteredcommand){owned_command(disowned_command(command,owner_command),owner_registeredcommands)};
+		if(commandIndex>0)environment->registeredCommands[environment->commandCount].previousCommandIndex=environment->commandCount-commandIndex+1; // will be positive for any positive commandIndex, because commandIndex is in [1,commandCount-1)
+		environment->commandCount++;
 		if(amVerboseDebugging())outputLine("Command registered!");
 		return true;
 	}
@@ -3095,10 +3097,12 @@ uint32_t commandPages=0; // the total number of command pages
 void setCommandPage(uint32_t createUserInputCommandPage){
 	commandPage=createUserInputCommandPage;
 	int32_t commandToShowIndex=10,lastCommandToShowIndex=commandCount-(commandPage*10);
+	Menvironment* environment=getExecutionEnvironment();
+	if(NULL==environment){outputBug("Environment vanished.");return;}
 	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
 		resetOutputColor();
 		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
-		Mtoken* token=_registeredcommands[lastCommandToShowIndex+commandToShowIndex]._command->_firstToken;
+		Mtoken* token=environment->registeredCommands[lastCommandToShowIndex+commandToShowIndex]._command->_firstToken;
 		// MDH@24SEP2020: this is definitely an issue because outputToken() assumes the token is written on the command line which in this case is not the case, so we shouldn't use outputToken()
 		while(token!=NULL){
 			outputTokenText(token); // write the token text in the color of it's type
@@ -4316,16 +4320,18 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){Mallocationowner owne
 	// TODO do we need to do this: clear the behind cursor text (in any situation)
 	invalidateAutoCompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	if(commandIndex>0){
+		Menvironment* environment=getExecutionEnvironment();
+		if(NULL==environment){outputBug("Environment vanished.");return;}
 		// MDH@29OCT2019 should already have _userInputCommand equal to NULL: _userInputCommand->_lastToken=NULL; 
 		// replacing: _userInputCommand->_lastToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
-		Mcommand* command=_registeredcommands[commandCount-commandIndex]._command; // MDH@18JUN2020: 
+		Mcommand* command=environment->registeredCommands[environment->commandCount-commandIndex]._command; // MDH@18JUN2020: 
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		// TODO this construction (with a return in the middle is a bit unclear)
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
-			if(amVerboseDebugging())inputInfo("Showing registered command #%lld.",commandCount-commandIndex+1);
+			if(amVerboseDebugging())inputInfo("Showing registered command #%lld.",environment->commandCount-commandIndex+1);
 			setUserInputCommand(command);
 		}else{
-			if(amVerboseDebugging())inputInfo("Showing command #%lld as suggested text.",commandCount-commandIndex+1);
+			if(amVerboseDebugging())inputInfo("Showing command #%lld as suggested text.",environment->commandCount-commandIndex+1);
 			// the previous command will be used as behind cursor text, and not immediately as command
 			// MDH@20SEP2019
 			// this is a bit of a nuisance as there will be no associated tokens for the entire behind cursor text
@@ -4359,7 +4365,9 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){Mallocationowner owne
  */
 bool commandDown(){
 	if(commandCount==0)return false;
-	setCommandIndex(commandIndex<commandCount?commandIndex+1:0);
+	Menvironment* environment=getExecutionEnvironment();
+	if(NULL==environment){outputBug("Environment vanished.");return false;}
+	setCommandIndex(commandIndex<environment->commandCount?commandIndex+1:0);
 	return true;
 }
 /**
@@ -4371,7 +4379,9 @@ bool commandDown(){
 bool commandUp(){
 	// MDH@26FEB2019: instead of stopping at the start of the commands it's better to move back to the new command which is at commandCount
 	if(commandCount==0)return false;
-	setCommandIndex(commandIndex>0?commandIndex-1:commandCount);
+	Menvironment* environment=getExecutionEnvironment();
+	if(NULL==environment){outputBug("Environment vanished.");return false;}
+	setCommandIndex(commandIndex>0?commandIndex-1:environment->commandCount);
 	return true;
 }
 /*
@@ -4415,10 +4425,27 @@ bool createUserInputCommand(){
 	///////output("Creating user input command!\n");
 	_userInputCommand=owned_command(_getNewCommand(true),owner_userInputCommand);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
-	if(_userInputCommand!=NULL){
+	if(_userInputCommand!=NULL&&_userInputCommand->_firstToken!=NULL){
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
 		updateLastTokenAutoCompletionText(false); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
 		// if(amVerboseDebugging())inputInfo("New user input command created.");
+		// MDH@09APR2024: if the current environment has an insert token we have to copy most of the insert token fields
+		//                to the created first token in the new command, this is VERY essential because it there's an 
+		//                insert token, the entered command has to know what it will be continuing otherwise the fields
+		//                of the command will not be initialized correctly
+		Menvironment* environment=getExecutionEnvironment();
+		if(environment!=NULL){
+			Mtoken* environmentInsertToken=environment->insertToken;
+			if(environmentInsertToken!=NULL){
+				Mtoken* firstCommandToken=_userInputCommand->_firstToken;
+				////firstCommandToken->expr=environmentInsertToken->expr;
+				firstCommandToken->prevIdentifier=environmentInsertToken->prevIdentifier;
+				///firstCommandToken->argument=environmentInsertToken->argument;
+				///firstCommandToken->envid=environmentInsertToken->envid;
+				// NOT: type, significantCharacterCount,text,offset,position,prev and next
+			}
+		}else
+			outputBug("Environment vanished!");
 	}else
 		inputError("Failed to create a new user input command.");
 	return(_userInputCommand!=NULL);
@@ -5565,36 +5592,39 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
  */
 void reset(){Mallocationowner owner=getOwner(__LINE__);
 	newline();
-	if(_registeredcommands!=NULL){ // MDH@18JUN2020: testing commandBlocks is better than testing commandCount, and testing _registeredcommands is perhaps even better
+	Menvironment* environment=getExecutionEnvironment();
+	if(NULL==environment){outputBug("Environment vanished.");return;}
+	if(environment->registeredCommands!=NULL){ // MDH@18JUN2020: testing commandBlocks is better than testing commandCount, and testing _registeredcommands is perhaps even better
 		output("Delete all remembered commands? ");
 		char c;
 		while(!inputCharRead(&c))
 		;outputChar(c);newline();
 		if(c=='Y'||c=='y'){
-			if(commandCount>0){
-				output("Deleting %lld command%s.\n",commandCount,(commandCount>1?"s":""));
+			if(environment->commandCount>0){
+				output("Deleting %lld command%s.\n",environment->commandCount,(environment->commandCount>1?"s":""));
 				unsigned long long numberOfOriginalCommandsFreed=0;
 				// TODO we might get a problem if a command is replicated in _registeredcommands // DONE MDH@18JUN2020: commandIndex added to Mcommand so if it is the same as where it is located in _registeredcommands we free it otherwise we do not
-				while(1){
-					commandCount--;
-					if(_registeredcommands[commandCount].previousCommandIndex==0){
-						FREE_COMMAND(_registeredcommands[commandCount]._command,owner_registeredcommands); // freeing all new (i.e. not duplicated) commands
+				while(environment->commandCount){
+					environment->commandCount--;
+					if(environment->registeredCommands[environment->commandCount].previousCommandIndex==0){
+						FREE_COMMAND(environment->registeredCommands[environment->commandCount]._command,owner_registeredcommands); // freeing all new (i.e. not duplicated) commands
 						numberOfOriginalCommandsFreed++;
 					}
-					if(commandCount==0)break;
+					////////if(environment->commandCount==0)break;
 				}
 				if(numberOfOriginalCommandsFreed>0)output("Number of original commands freed: %llu.\n",numberOfOriginalCommandsFreed);else outputWarning("No original commands freed");
 			}
-			if(commandBlocks>0){
-				FREE_DISOWNED(_registeredcommands,commandBlocks*COMMAND_BLOCKSIZE,'C',owner_registeredcommands);
-				commandBlocks=0;
+			if(environment->commandBlocks>0){
+				FREE_DISOWNED(environment->registeredCommands,environment->commandBlocks*COMMAND_BLOCKSIZE,'C',owner_registeredcommands);
+				environment->commandBlocks=0;
 			} // free all (disowned!!!!!) allocated command blocks
-			_registeredcommands=NULL; // MDH@18JUN2020: makes sense to do this as well
-			outputInfo("All commands deleted!");
+			environment->registeredCommands=NULL; // MDH@18JUN2020: makes sense to do this as well
+			outputInfo("All registered commands deleted!");
 			// MDH@18JUN2020: also remove all the items in the command result 
 			if(M_value!=NULL){
 				Mvalue* clearValue=Mclear(M_value);
-				if(isValueZero(clearValue))output("Command result history cleared...\n");else if(isValueNegative(clearValue))outputWarning("Command result history not completely cleared...");
+				if(isValueZero(clearValue))output("Command result history cleared...\n");else 
+				if(isValueNegative(clearValue))outputWarning("Command result history not completely cleared...");
 			}
 		}else
 			outputInfo("Deleting commands canceled by user!");
@@ -7297,6 +7327,12 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						// debugging: Mstring* _commandText=owned_string(_getCommandText(true),owner_userInputCommand);output("Registering command '%s'.\n",string(_commandText));FREE_STRING(_commandText,owner_userInputCommand);
 						if(amVerboseDebugging())
 							outputInfo("Registering command!");
+						/*
+						Menvironment* environment=getExecutionEnvironment();
+						if(NULL==environment)
+							switchToControlMode("Environment vanished.");
+						else
+						*/
 						if(!registerCommand(_userInputCommand,(commandIndex>0?owner_registeredcommands:owner_userInputCommand))){
 							if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
 								// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed

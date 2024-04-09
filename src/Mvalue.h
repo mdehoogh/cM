@@ -513,11 +513,25 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction,Mvaluetype
 
 // environments
 // MDH@28OCT2019: because now often we need both the first and last token in a command it's probably best to combine them in a single command
+/**
+ * @brief a structure to store a command in
+ * 
+ */
 typedef struct{
 	unsigned long long sourceCommandIndex; // MDH@18JUN2020: storing what this command is a duplicate of
 	Mtoken *_firstToken,*_lastToken;
 	/////////////////bool identifierContinuationIsDirty; // convenient to keep it with the command itself
 }Mcommand;
+
+// MDH@18JUN2020: a registered command might be a command that is a duplicate of a previous command
+/**
+ * @brief a record to store a registered command
+ * 
+ */
+typedef struct{
+	Mcommand* _command;
+	unsigned long long previousCommandIndex;
+}Mregisteredcommand;
 
 // an environment is a bag of variables and functions
 // MDH@03FEB2020: all environments should be wrapped in Mvalue instances, so they won't get released until they can
@@ -528,6 +542,9 @@ typedef struct Menvironment{
     Mtoken* expressionToken; // MDH@17JUL2019: the current token of the expression being evaluated in this environment
     Mvalue* _parent; // MDH@03FEB2020 replacing: struct Menvironment* _parent; // typically the definition environment
     Mvalue* execution; // MDH@03FEB2020 replacing: struct Menvironment* _execution; // the environment that was executing before this one was popped!!
+		size_t commandCount; // MDH@09APR2024: keeping track of the registered commands in the environment from now on
+		size_t commandBlocks;
+		Mregisteredcommand* registeredCommands;
 		// temporary fields that we need when we're collecting block commands that we use to complete the incompleted command (now stored as first element in the block command list)
 		/////Mlist* blockCommandList; // MDH@18MAR2024: may keep a list of block commands, that can either be transferred or executed
 		// parent environment keeps a reference to the incomplete command
