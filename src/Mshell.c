@@ -2590,6 +2590,14 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* _token=owned_token(__token(),owner);
 	if(_token!=NULL){
+		_token->text=owned_string(__string(),Msubowner(owner,1));
+		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
+		if(NULL==_token->text){
+			FREE_TOKEN(_token,owner);_token=NULL; // MDH@10APR2024: probably best to return NULL so that we'd switch to control mode and report a serious (probably memory) error as we can't continue
+			/* replacing: _token->type=TT_ERROR;
+			if(inputErrorFunction)(*inputErrorFunction)("Failed to initialize the new token.");
+			*/
+		}else
 		/////if(amDebugging())inputInfo("E1");
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
 		if(prevToken!=NULL){
@@ -2699,7 +2707,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 						// we have to increment the addendum by 1 because we also need to increment the octet that should be incremented when a nested special function call is encountered!!
 						_token->envid=(prevToken->envid+addendum+1); // ander will take care of removing what's too the left
 					}else{ // can't increment
-						_token->type=TT_ERROR;
+						newTokenType=TT_ERROR; // MDH@10APR2024 bug fix at the end of this block token->type is still set to newTokenType and directly setting _token->type would have no effect: replacing: _token->type=TT_ERROR;
 						if(inputErrorFunction)(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
 					}
 				}
@@ -2853,6 +2861,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		}
 		/////if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): _token->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
+		/* moving the following to the beginning, and returning NULL when we fail to initialize text as we need it to be able to add text to it!!!!
 		_token->text=owned_string(__string(),Msubowner(owner,1));
 		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
 		if(NULL==_token->text){
@@ -2861,6 +2870,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		}else
 		if(amVerboseDebugging())
 			if(inputInfoFunction)(*inputInfoFunction)("New token text initialized."); // TODOhow about 
+		*/
 		/////if(amDebugging())inputInfo("E9");
 		/* not needed with calloc() allocation
 		_token->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
