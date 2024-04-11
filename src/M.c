@@ -7202,8 +7202,6 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						// MDH@08APR2024: if we always also add the end() command to the current block we can still use it by executing end() [and know it was a placeholder command!!!!!!]
 						if(addBlockCommand(_userInputCommand,owner_userInputCommand)){
 							// MDH@08APR2024: get rid of the current user input command (_userInputCommand can be set though when we returned to block command level 0)
-							_userInputCommand->_firstToken->next=NULL;
-							FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
 							// check if this command actually ends the current block!!!
 							bool endOfBlocks=false,endOfBlock=!getExecutionEnvironment()->multipleCommandsAllowed;
 							if(!endOfBlock){ // not an implicit end of block
@@ -7223,6 +7221,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									endFunctionToken=endFunctionToken->next;
 								}
 							}
+							_userInputCommand->_firstToken->next=NULL;
+							FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
+							output("Embedded command freed!\n");
 							// end any block we're supposed to end
 							while(endOfBlock){
 								if(!endOfBlocks)endOfBlock=false; // update endOfBlock
@@ -7262,6 +7263,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										if(addBlockCommand(completedBlockCommand,owner_userInputCommand)){
 											getExecutionEnvironment()->incompleteCommand=NULL;
 											completedBlockCommand->_firstToken->next=NULL;FREE_COMMAND(completedBlockCommand,owner_userInputCommand);
+											output("Embedded command released.\n");
 										}else
 											switchToControlMode("Failed to add the completed command");
 									}else{ // all blocks ended
@@ -7365,45 +7367,42 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							_userInputCommandText=NULL;
 						} // MDH@14NOV2019: freed
 
-					}/*else // a trick to skip executing the current user input command after executing the block commands
-						blockCommandLevel=0;*/
+						// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
+						_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
 
-					// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
-					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
+						// MDH@18MAR2024: only garbage collect when not inside a block collecting block commands
+						if(blockCommandLevel==0){
+							// garbage collection: remove any values not used anymore...
+							// if(amVerboseDebugging())
+							if(amVerboseDebugging())
+								outputInfo("Removing unreferenced values.");
+							size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
+							if(amVerbose())
+							{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
 
-					// MDH@18MAR2024: only garbage collect when not inside a block collecting block commands
-					if(blockCommandLevel==0){
-						// garbage collection: remove any values not used anymore...
-						// if(amVerboseDebugging())
-						if(amVerboseDebugging())
-							outputInfo("Removing unreferenced values.");
-						size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
-						if(amVerbose())
-						{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
+							// MDH@17JAN2023
+							size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose());
+							if(amVerbose())
+								output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
 
-						// MDH@17JAN2023
-						size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose());
-						if(amVerbose())
-							output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
+							if(amVerbose())
+								reportAllocations("Allocations.\n","\t");
 
-						if(amVerbose())
-							reportAllocations("Allocations.\n","\t");
+							// switch to function body input mode when this command contained at least one user function definition
+							// (even when dealing with currently inputting function body commands)
+							if(getFirstFunctionBodyRequest()!=NULL&&!startFunctionBodyInput())
+								outputError("Failed to start requesting the body of a new function");
 
-						// switch to function body input mode when this command contained at least one user function definition
-						// (even when dealing with currently inputting function body commands)
-						if(getFirstFunctionBodyRequest()!=NULL&&!startFunctionBodyInput())
-							outputError("Failed to start requesting the body of a new function");
-
-						// MDH@12MAY2020: output two incremental out
-						if(allocationMarksAdded>0){
-							outputTotalMemoryUsage();
-							if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)outputError("Not all command allocation marks output.");
-							while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
-						}
-					}else // a little trick to return to entering immediately executing commands
-					if(blockCommandLevel<0)
-						blockCommandLevel=0;
-
+							// MDH@12MAY2020: output two incremental out
+							if(allocationMarksAdded>0){
+								outputTotalMemoryUsage();
+								if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)outputError("Not all command allocation marks output.");
+								while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
+							}
+						}else // a little trick to return to entering immediately executing commands
+						if(blockCommandLevel<0)
+							blockCommandLevel=0;
+					}
 				}else{
 					// MDH@14AUG2019: if a user presses Enter when there's no command but still feedforwardText it looses feedforwardText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)
 					//				NOTE that I might consider keeping feedforwardText, so it will be redisplayed when the user returns to the command mode

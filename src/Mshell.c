@@ -14348,7 +14348,8 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 		//      unless we know every execution environment is essentially wrapped inside an Mvalue in which case we know who owns it!!
 		Menvironment* environment=getExecutionEnvironment();
 		if(environment!=NULL){
-			Mtoken* nextInsertToken=environment->insertToken->next;
+			Mtoken* offsetToken=environment->insertToken;
+			Mtoken* nextInsertToken=offsetToken->next;
 			if(environment->blockCommandsInserted){ // the placeholder token has been replaced by a command
 				// insert a command separator
 				Mtoken* listelementToken=owned_token(_getNewCommandToken(environment->insertToken,TT_LISTELEMENT),Msubowner(owner_command,1));
@@ -14367,6 +14368,17 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 			command->_lastToken->next=nextInsertToken;
 			nextInsertToken->prev=command->_lastToken;
 			// the last inserted token becomes the new insert token
+			// propagate the offset token properties until bumping in a placeholder token (if any)
+			Mtoken *token=offsetToken;
+			while(tokenPropertiesPropagated(token)){
+				output("Properties of '");outputToken(token);output("' propagated!\n");
+				token=token->next;
+				if(token==NULL){output("No further tokens to propagate properties from.\n");break;}
+				output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
+				if(token->type==TT_PLACEHOLDER){output("Bumped into a placeholder token.\n");break;} // done
+				if(token->type==TT_ERROR){outputBug("Some error occurred initializing the embedded command");break;}
+			}
+			output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
 			environment->insertToken=command->_lastToken;
 			environment->blockCommandsInserted=true;
