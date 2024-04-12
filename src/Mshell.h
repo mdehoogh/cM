@@ -25,7 +25,7 @@ void free_command(Mcommand* _command/*,Mallocationowner owner*/);
 
 void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/);
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
-Mcommand* _getNewCommand(bool withFirstToken);
+Mcommand* _getNewCommand(bool withFirstToken,Mtoken const * const offsetToken);  // MDH@12APR2024: offsetToken added to indicate the predecessor of the first token when the command is a subcommand
 
 // MDH@20FEB2020: the function definition so we can plug in our own inputInfo and inputError functions
 typedef void InputResponseFunction(char const * const fmt,...);

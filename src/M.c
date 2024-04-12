@@ -4423,7 +4423,8 @@ bool createUserInputCommand(){
 	// if(amVerboseDebugging())inputInfo("Creating the new user input command.");
 	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
 	///////output("Creating user input command!\n");
-	_userInputCommand=owned_command(_getNewCommand(true),owner_userInputCommand);
+	Mtoken* offsetToken=getExecutionEnvironment()->insertToken;
+	_userInputCommand=owned_command(_getNewCommand(true,offsetToken),owner_userInputCommand);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand!=NULL&&_userInputCommand->_firstToken!=NULL){
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
@@ -4476,7 +4477,7 @@ bool createUserInputCommand(){
 bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	//		it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
-	Mcommand* _newUserInputCommand=owned_command(_getNewCommand(false),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
+	Mcommand* _newUserInputCommand=owned_command(_getNewCommand(false,NULL),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
 	if(NULL==_newUserInputCommand)
 	{outputError("Failed to duplicate the current user input command");return false;}
 	

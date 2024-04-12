@@ -2403,7 +2403,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 	if(commandCharacter){ // commandText should not be NULL and the first character in it should not be '\0'
 		if(amVerboseDebugging())
 			output("%s","Parsing '");
-		_command=owned_command(_getNewCommand(true),owner);
+		_command=owned_command(_getNewCommand(true,NULL),owner);
 		if(_command!=NULL){
 			Mtoken* _commandToken=_command->_firstToken;
 			/* already set: 
@@ -2938,22 +2938,30 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
 	return disowned_token(_newCommandToken,owner);
 }
+
+// MDH@12APR2024: added offsetToken to represent the predecessor token of the first token to add
 /**
  * @brief returns a new M command with or without first token as determined by \p withFirstToken
  * 
  * @param withFirstToken 
+ * @param offsetToken precedes the first token to create (if any)
  * @return Mcommand* returns a new M command with or without first token as determined by \p withFirstToken
  */
-Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__LINE__);
+Mcommand* _getNewCommand(bool withFirstToken,Mtoken const * const offsetToken){Mallocationowner owner=getOwner(__LINE__);
 	Mcommand* _command=(Mcommand*)CALLOC_1(sizeof(Mcommand),'K',owner);
 	if(_command!=NULL){
 		// if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
-			_command->_firstToken=owned_token(_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/),Msubowner(owner,1)); // MDH@24MAY2020: obtain ownership immediately
-			if(_command->_firstToken!=NULL){ // we've got a first token allocated
+			Mtoken* firstToken=owned_token(_getNewCommandToken(offsetToken,TT_EXPRESSION/*,endInput*/),Msubowner(owner,1)); // MDH@24MAY2020: obtain ownership immediately
+			if(firstToken!=NULL){ // we've got a first token allocated
 				// if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
-				_command->_lastToken=_command->_firstToken;
-				_command->_firstToken->expr=NULL;
+				_command->_firstToken=firstToken;
+				_command->_lastToken=firstToken;
+				firstToken->expr=NULL;
+				if(offsetToken!=NULL){ // we'll have to reset some of the properties
+					firstToken->offset=0;
+					firstToken->argument=0; // TODO what other properties to reset???
+				}
 			}else{ // too bad, out of memory!
 				FREE_DISOWNED_1(_command,'K',owner);_command=NULL;
 				// if(amVerboseDebugging())
@@ -10304,7 +10312,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 											if(commandContinued)string_setlength(_bodyCommandText,string_length(_bodyCommandText)-1);
 											if(report)output("Characters of command text%s '%s' parsed: '",(_command?" continuation":""),string(_bodyCommandText));
 											// ascertain to have a command (we will have one if this command text is considered a continuation of the command so far)
-											if(NULL==_command)_command=owned_command(_getNewCommand(true),owner);
+											if(NULL==_command)_command=owned_command(_getNewCommand(true,NULL),owner);
 											// can't break here if the command is NULL because we haven't freed _bodyCommandText yet
 											if(_command!=NULL){ // a command to parse into in which inputChar will always be set
 												// ignore whitespace at the beginning of the command
