@@ -7211,9 +7211,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					}*/
 					else // the user input command is NOT incomplete
 					if(blockCommandLevel>0){ // (still) inside a block
+						output("Embedding the command.\n");
 						// does this user input command designate an end of block?????
 						// MDH@08APR2024: if we always also add the end() command to the current block we can still use it by executing end() [and know it was a placeholder command!!!!!!]
 						if(addBlockCommand(_userInputCommand,owner_userInputCommand)){
+							output("Command embedded.\n");
 							// MDH@08APR2024: get rid of the current user input command (_userInputCommand can be set though when we returned to block command level 0)
 							// check if this command actually ends the current block!!!
 							bool endOfBlocks=false,endOfBlock=!getExecutionEnvironment()->multipleCommandsAllowed;
@@ -7234,6 +7236,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									endFunctionToken=endFunctionToken->next;
 								}
 							}
+							// we can register this command in the current execution environment in which case it is bound!!!
+							if(!registerCommand(_userInputCommand,owner_userInputCommand))
+								outputError("Failed to register the embedded command");
 							_userInputCommand->_firstToken->next=NULL;
 							FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
 							output("Embedded command freed!\n");

@@ -2590,10 +2590,11 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 	TokenType newTokenType=TT_ERROR; // assume failure
 	if(prevToken!=NULL&&prevToken->next!=NULL){
+		///outputChar('A');
 		// initialize _token and newTokenType
 		Mtoken* _token=prevToken->next;
 		newTokenType=_token->type;
-		
+		//////outputChar('B');
 		// now we have the block of code copied from _getToken
 		/////if(amDebugging())inputInfo("E2");
 		// MDH@27MAY2019: let's by default copy prevToken-expr over
@@ -2615,7 +2616,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 			_token->expr=prevToken;
 		else
 			_token->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token
-		
+		//////outputChar('C');
 		// MDH@09AUG2019: before we actually kill the expr in the end of function call we update the envid
 		// if ending a special function call, we should zero the last set octet, but determining whether that is the case is not as easy as it seems
 		// I suppose the argument of the expr field of the new token will tell us if it is a special function call (because the argument field would then be positive)
@@ -2628,7 +2629,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 			_token->envid=(((prevToken->envid>>4)<<4)+incrementoctet-1)&((ander<<4)+15); // shifting ander by 4 additional bits and adding 15 to maintain the level value (increment octet)
 		}else
 			_token->envid=prevToken->envid; // MDH@09AUG2019: take over the environment id!!
-
+		//////outputChar('D');
 		// MDH@16OCT2019: if the previous token was an end of list/function call/map it was accepted and itself would be pointing to the start of the list/function call/map
 		//				therefore we do not need to set 
 		if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
@@ -2637,8 +2638,9 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 			if(_token->expr!=NULL)_token->expr=_token->expr->expr;else newTokenType=TT_ERROR;
 		}
 		// we still have to recognize an error
-		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)if(NULL==_token->expr)newTokenType=TT_ERROR;
-
+		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)if(NULL==_token->expr)
+			newTokenType=TT_ERROR;
+		//////outputChar('E');
 		/* replacing:
 		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP){
 			// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't _token->expr will most likely be NULL
@@ -2654,7 +2656,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 		///////if(amVerbose()){if(_token->expr)inputInfo("Pointing to %s of type %s.",string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]);else inputInfo("Nothing to point to.");}
 		//////// ending with NULL means all is Ok!! if(!_token->expr)_token->expr=_userInputCommand->_firstToken; // TODO will this help???
 		_token->offset=prevToken->offset+string_length(prevToken->text); // set the offset
-		
+		//////outputChar('F');
 		// MDH@07AUG2019: a token 'inherits' the prevIdentifier and argument of its previous token, to be adapted if necessary depending on what it is
 		//				of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
 		//				how about function identifiers? they are special in that they change the argument value
@@ -2669,7 +2671,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 			// MDH@20DEC2022: we can change this to encode the number of arguments left to enter somehow in _token->argument (for common non-special functions)
 			if(strcmp(_functionName,DOFUNCTION_NAME)&&strcmp(_functionName,FORWITHFUNCTION_NAME)){ // not a special function (like do and forw)
 				//  MDH@20DEC2022: used to assign -2 but now -3 minus the number of function arguments (so -2 would then be considered an unknown function)
-				long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);//outputChar('X');
+				long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);////////outputChar('X');
 				_token->argument=(numberOfExpectedArguments<0?-2:-numberOfExpectedArguments-3);
 				// informing the user
 				if(inputInfoFunction){
@@ -2687,7 +2689,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 			else 
 			if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))_token->argument=2;
 			*/
-
+			//////outputChar('G');
 			// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
 			if(_token->argument>0){ // a special function call // MDH@09MAR2020: added >0 TODO is that correct?
 				uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
@@ -2701,6 +2703,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 					if(inputErrorFunction)(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
 				}
 			}
+			//////outputChar('H');
 			// every , that ends a function call argument should decrement the argument value
 		}else{ // not a function identifier	
 			/////if(amDebugging())inputInfo("E4");		
@@ -2717,6 +2720,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 					_token->prevIdentifier=prevToken->prevIdentifier;
 				free(_identifierName);
 			}
+			//////outputChar('K');
 			/////if(amDebugging())inputInfo("E5");
 			// what to do with the argument if a function call ends???????
 			// the function name of the function call should contain the right argument value TODO check this!!!!!!!!
@@ -2725,6 +2729,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 				_token->argument=prevToken->expr->prev->argument;
 			else
 				_token->argument=prevToken->argument;
+			//////outputChar('L');
 			/////if(amDebugging())inputInfo("E6");
 			// should we change the argument??????
 			if(newTokenType==TT_LISTELEMENT){ // ha ha, can't use _token->type here as not assigned yet!!!
@@ -2736,6 +2741,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 				//				which has to be assigned to a variable in order to be remembered (and used)
 				//				both with `function` and `defun` the user can define the body inside the definition itself
 				if(_token->expr!=NULL){
+					//////outputChar('M');
 					if(_token->expr->type==TT_FUNCTION_CALL){ // a function call argument
 						// MDH@09MAR2020: with function calls that have a 'body' i.e. for, do, function and defun
 						//				I think we can use envid to determine whether this is the case
@@ -2747,30 +2753,32 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 							// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
 							//				what we would do on ) 
 							if(_token->argument==0){
-								// outputChar('A');
+								// //////outputChar('A');
 								// MDH@25FEB2021:  we can now evaluate the command from the first token in the first argument to this special function representing the local variable map of this special function
 								Mvalue* localVariablesMapValue=getSubcommandValue(_token->expr->next,prevToken,TT_FUNCTION_CALL,(TokenType[]){TT_EXPRESSION},1,NULL,"local variables");
-								// outputChar('B');
+								// //////outputChar('B');
 								if(!localVariablesMapValue||localVariablesMapValue->type==VT_MAP){
-									// outputChar('C');
+									// //////outputChar('C');
 									if(amVerboseDebugging())
 										if(inputInfoFunction)(*inputInfoFunction)("Local variables map identified!");
 										//outputValue("Local variables map:",localVariablesMapValue,"'.\n");
 									if(!pushLocalvariables(localVariablesMapValue,_token->envid)){
-										// outputChar('D');
+										// //////outputChar('D');
 										newTokenType=TT_ERROR; // TODO I suppose we could have a separate TT_BUG token type perhaps?????
 										if(inputErrorFunction)(*inputErrorFunction)("Failed to register local variables!");
 									}
-									// outputChar('E');
+									// //////outputChar('E');
 								}else{ // it's not a map which it should be
-									// outputChar('F');
+									// //////outputChar('F');
 									newTokenType=TT_ERROR; 
 									if(inputInfoFunction)(*inputInfoFunction)("%sLocal variables argument does not evaluate to a map!",M_WARNING_PREFIX);
 								}
-								// outputChar('G');
+								// //////outputChar('G');
 							}
+							//////outputChar('N');
 						}else
 						if(_token->expr->argument<-2){ // MDH@20DEC2022: a known number of expected arguments
+							//////outputChar('O');
 							if(_token->expr->argument==-3){ // already reached the total number of expected arguments
 								newTokenType=TT_ERROR;
 								if(inputErrorFunction)(*inputErrorFunction)("Another argument not allowed.");
@@ -2779,8 +2787,9 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 								//if(amVerboseDebugging())
 								if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments: %lld.",-_token->expr->argument-3);
 							}
+							//////outputChar('P');
 						}else{
-								if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
+							if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
 						}
 					}else
 					if(_token->expr->type!=TT_LIST&&_token->expr->type!=TT_MAP&&_token->expr->type!=TT_EXPRESSION){
@@ -2788,6 +2797,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 						newTokenType=TT_ERROR;
 						if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[_token->expr->type]);
 					}
+					//////outputChar('Q');
 				}else{ // a comma should always match either a map or list or expression start
 					newTokenType=TT_ERROR;
 					if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed outside map, list or function call!");
@@ -2795,42 +2805,43 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 			}
 			/////if(amDebugging())inputInfo("E7");
 		}
+		//////outputChar('R');
 		// MDH@11JAN2021: at every colon that defines the value of a local variable (to a do(), forw() or function() call, we remember the name of the property and register it when we encounter a comma)
 		if(newTokenType==TT_MAP_VALUE){
-			// outputChar('A');
+			// //////outputChar('A');
 			/* MDH@25FEB2021: no need to do the following anymore because we managed to evaluate this argument as a whole at the comma (TT_LIST_ELEMENT) following it
 			if(_token->argument==1){
-				outputChar('A');
+				//////outputChar('A');
 				if(inputInfoFunction)(*inputInfoFunction)("Property value token in first special function argument!\n");
 				// the property name can be a literal or the name of a variable, of which we know the current value (essentially not something that currently exists in the command, because then we could not evaluate its value!!)
 				if(prevToken->type==TT_END_OF_SQSTRING||prevToken->type==TT_END_OF_DQSTRING){
-					outputChar('C');
+					//////outputChar('C');
 					if(prevToken->prev){
-						outputChar('E');
+						//////outputChar('E');
 						// register the actual name (without the quote that prefixes the property name)
 						bool localvariablepushed=push_localvariable(string(prevToken->prev->text)+1,_token->envid);
 						if(localvariablepushed){
-							outputChar('G');
+							//////outputChar('G');
 							if(inputInfoFunction)(*inputInfoFunction)("Local variable '%s' registered.\n",_lastlocalvariable->_name);
 						}else
 						if(inputInfoFunction)(*inputInfoFunction)("%sFailed to register property name '%s'.\n",M_ERROR_PREFIX,string(prevToken->prev->text)+1);
 					}
 				}else
 				if(prevToken->type==TT_VARIABLE){
-					outputChar('B');
+					//////outputChar('B');
 					char* _variableName=_getSignificantTokenCharacters(prevToken);
 					if(_variableName){
-						outputChar('D');
+						//////outputChar('D');
 						// if we're able to resolve this variable to a text we can push it as a text
 						Mvariable* variable=getVariable(getExecutionEnvironment(),_variableName,false);
 						if(variable){
-							outputChar('F');
+							//////outputChar('F');
 							Mstring* _valueText=owned_string(_getValueText(variable->_value,true),owner);
 							if(_valueText){
-								outputChar('H');
+								//////outputChar('H');
 								bool localvariablepushed=pushLocalvariable(string(_valueText),_token->envid);
 								if(localvariablepushed){
-									outputChar('J');
+									//////outputChar('J');
 									if(inputInfoFunction)(*inputInfoFunction)("Local variable '%s' registered.\n",_lastlocalvariable->_name);
 								}else
 								if(inputInfoFunction)(*inputInfoFunction)("%sFailed to register property name '%s'.\n",M_ERROR_PREFIX,string(_valueText));
@@ -2847,9 +2858,10 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 			if(inputInfoFunction)(*inputInfoFunction)("Property value token!\n");
 			*/
 		}
-
+		//////outputChar('S');
 
 	}
+	//////outputChar('T');
 	// only when newTokenType does not equal TT_ERROR there's success
 	return(newTokenType!=TT_ERROR);
 }
@@ -2888,7 +2900,7 @@ static Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationow
 
 			// MDH@10APR2024: we can put the following code in a separate function possibly adapting newTokenType
 			_token->type=newTokenType; // we need to do this because tokenPropertiesPropagated initializes its local newTokenType to the type of the successor of prevToken 
-			if(tokenPropertiesPropagated(prevToken))newTokenType=TT_ERROR;
+			if(!tokenPropertiesPropagated(prevToken))newTokenType=TT_ERROR;
 		}
 		/////if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): _token->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
@@ -6816,7 +6828,11 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				// if(amDebugging())
-				if(amVerboseDebugging()){output("End of augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
+				if(amVerboseDebugging()){
+					output("End of augmented item id(s) token: ");
+					if(outputTokenFunction)(*outputTokenFunction)(expressionToken);
+					outputChar('\n');
+				}
 			}
 			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
 			if(itemIdsList!=NULL){
@@ -7528,7 +7544,9 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										output(".\n");
 										if(decimalprecisionreached)break; // decimal precision reached
 										if(inputCharReadFunction!=NULL){
-											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");(*inputCharReadFunction)(&c);outputChar('\n'); // wait for any key
+											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");
+											if(inputCharReadFunction)(*inputCharReadFunction)(&c);
+											outputChar('\n'); // wait for any key
 											if(c==3)break;
 										}
 										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pk))!=MP_OKAY)
@@ -10201,7 +10219,8 @@ Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__)
  * @return Mvalue* 
  */
 Mvalue* Mend(Mvalue* _returnValue){
-	return Mendwith(_returnValue);
+	if(_returnValue!=NULL)setVariable(NULL,"$",_returnValue);
+	return _returnValue; // TODO should set the result of the loop to _returnValue
 }
 
 // the functions to create functions are moved here from Menvironment.h/c because they require parsing the command texts
@@ -12693,7 +12712,9 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 												// if the stack is not full yet, we can prepend the new minimum
 												if(stackmaximumindex!=stacksize-1){ // the stack is not full yet (which is only possible with stackmultiplier<0)
 													stackelementindex=(++stackmaximumindex);
-													do{stack[stackelementindex]=stack[stackelementindex-1];}while(--stackelementindex!=stackminimumindex);
+													do{
+														stack[stackelementindex]=stack[stackelementindex-1];
+													}while(--stackelementindex!=stackminimumindex);
 													// outputChar('\n');
 												}
 												*(stack+stackminimumindex)=runsmallest; // as long as stackminimumindex equals zero, this would be the same as *stack=runsmallest
@@ -14347,37 +14368,56 @@ int8_t getBlockKeywordId(char const * const keyword){
  * @brief adds \p command to the list of block commands in the current environment
  * 
  * @param command 
+ * @param owner_commmand the owner of \p comman
  * @return true on success
  * @return false on failure
  */
 bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_command){
 	if(command!=NULL&&command->_firstToken!=NULL){
+		output("Embedding a block command!\n");
 		// TODO the problem with the environment itself is that we do not know who owns it 
 		//      unless we know every execution environment is essentially wrapped inside an Mvalue in which case we know who owns it!!
-		Menvironment* environment=getExecutionEnvironment();
-		if(environment!=NULL){
+		Menvironment* blockEnvironment=getExecutionEnvironment();
+		if(blockEnvironment!=NULL){
+			// MDH@12APR2024: since environment->insertToken now points to command->_firstToken as it must be
+			//                we do not need offsetToken anymore and can use the continuationToken in the parent env.
+			Menvironment* environment=blockEnvironment->_parent->value._environment;
+			if(NULL==environment){outputBug("No embedding command environment");return false;}
+			output("Embedding environment available.\n");
+			Mtoken* nextInsertToken=environment->continuationToken;
+			if(NULL==nextInsertToken){outputBug("No continuation token");return false;}
+			output("Continuation token of embedded command available.\n");
+			/*
 			Mtoken* offsetToken=environment->insertToken;
 			Mtoken* nextInsertToken=offsetToken->next;
-			if(environment->blockCommandsInserted){ // the placeholder token has been replaced by a command
+			*/
+			if(blockEnvironment->blockCommandsInserted){ // the placeholder token has been replaced by a command
 				// insert a command separator
-				Mtoken* listelementToken=owned_token(_getNewCommandToken(environment->insertToken,TT_LISTELEMENT),Msubowner(owner_command,1));
-				if(listelementToken==NULL){outputError("Failed to insert the block command separator");return false;}
+				output("Embedding a command separator.\n");
+				Mtoken* listelementToken=owned_token(_getNewCommandToken(blockEnvironment->insertToken,TT_LISTELEMENT),Msubowner(owner_command,1));
+				if(listelementToken==NULL){outputError("Failed to embed a command separator");return false;}
 				listelementToken->text=owned_string(_getString(","),Msubowner(owner_command,2));
 				listelementToken->significantCharacterCount=1;
-				environment->insertToken->next=listelementToken;
-				listelementToken->next=nextInsertToken;
-				listelementToken->prev=environment->insertToken;
-				environment->insertToken=listelementToken;
+				blockEnvironment->insertToken->next=listelementToken;
+				listelementToken->next=command->_firstToken;
+				listelementToken->prev=blockEnvironment->insertToken;
+				blockEnvironment->insertToken=listelementToken;
 			}
-			// connect to start of command
-			environment->insertToken->next=command->_firstToken->next; // TODO insert first token as well????
-			command->_firstToken->prev=environment->insertToken;
-			// connect to end of command
+			// MDH@12APR2024: insertToken is now connected to command->_firstToken (and back)
+			// skip over _firstToken to the first significant command token
+			Mtoken* firstSignificantCommandToken=command->_firstToken->next;
+			if(firstSignificantCommandToken!=NULL){
+				blockEnvironment->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
+				firstSignificantCommandToken->prev=blockEnvironment->insertToken;
+			}else
+				outputWarning("No significant first embedded command token");
+			// connect end of command to where the super command continues
 			command->_lastToken->next=nextInsertToken;
 			nextInsertToken->prev=command->_lastToken;
+			output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
 			// propagate the offset token properties until bumping in a placeholder token (if any)
-			Mtoken *token=offsetToken;
+			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
 			while(tokenPropertiesPropagated(token)){
 				output("Properties of '");outputToken(token);output("' propagated!\n");
 				token=token->next;
@@ -14388,8 +14428,8 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 			}
 			output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
-			environment->insertToken=command->_lastToken;
-			environment->blockCommandsInserted=true;
+			blockEnvironment->insertToken=command->_lastToken;
+			blockEnvironment->blockCommandsInserted=true;
 			return true;
 			// not ending the block yet but if we do we'd know where to continue searching for the next placeholder!!
 			//////environment->continuationToken=nextInsertToken; // where to continue searching for the next plave holder token
@@ -14401,8 +14441,9 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 				return true;
 				*/
 		}
-		outputError("Failed to register block command");
-	}
+		outputError("Embedded command environment vanished");
+	}else
+		outputError("No command to embed");
 	return false;
 }
 
@@ -14453,9 +14494,9 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 					///////environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
 					return true;
 				}
-				outputBug("Block parent environment vanished");
+				outputBug("Embedding command environment vanished");
 			}else
-				outputError("Failed to activate the block command environment");
+				outputError("Failed to activate the embedded command environment");
 			/* replacing:
 			if(_blockEnvironment->_name!=NULL){
 				Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
