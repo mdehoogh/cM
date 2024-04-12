@@ -4843,8 +4843,12 @@ char removedTokenCharacter(bool endOfInput){
 	if(_userInputCommand!=NULL){ // should ALWAYS be the case
 		size_t tokenCharacterPosition=0;
 		// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
-		while(_userInputCommand->_lastToken!=NULL){
-			tokenCharacterPosition=string_length(_userInputCommand->_lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): getUserInputLength()-_userInputCommand->_lastToken->offset;
+		Mtoken* lastToken=_userInputCommand->_lastToken;
+		if(lastToken==NULL)
+			outputBug("Last command token vanished!");
+		else
+		while(1){
+			tokenCharacterPosition=string_length(lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): getUserInputLength()-_userInputCommand->_lastToken->offset;
 #ifdef __DEBUG__
 			printf("%d",tokenCharacterPosition);
 #endif
@@ -4852,25 +4856,31 @@ char removedTokenCharacter(bool endOfInput){
 #ifdef __DEBUG__
 			outputChar('.');
 #endif		
-			_userInputCommand->_lastToken=_userInputCommand->_lastToken->prev;
+			// ASSERT token lastToken is empty, so to be skipped!!!
+			// MDH@12APR2024: since we should NOT allow removing the first token (with offset 0) which NOW can have a predecessor we have to demand that lastToken->offset is positive
+			//                TODO alternatively we could check against _userInputCommand->_firstToken
+			if(lastToken==_userInputCommand->_firstToken)break; // if lastToken is already _userInputCommand->_firstToken (because it's offset is zero) we should not allow lastToken to become 'less'
+			lastToken=lastToken->prev;
+			if(NULL==lastToken)break; // never allow _userInputCommand->_lastToken to become NULL!!!!
+			_userInputCommand->_lastToken=lastToken;
 		}
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: should be called whenever _userInputCommand->_lastToken changes...
 		// MDH@28JUN2023: testing tokenCharacterPosition for being positive is probably easier
-		if(tokenCharacterPosition>0) // replacing: _userInputCommand->_lastToken!=NULL)
+		if(tokenCharacterPosition>0){ // replacing: _userInputCommand->_lastToken!=NULL)
 			tokenCharacterRemoved=string_removed_char(_userInputCommand->_lastToken->text,tokenCharacterPosition-1);
-#ifdef __DEBUG__
-			outputChar(tokenCharacterRemoved);
-#endif
+			/////////output("'%c'",tokenCharacterRemoved?tokenCharacterRemoved:'`');
+		}
 		if(tokenCharacterRemoved){
 			if(endOfInput){
 				// MDH@30OCT2019: with multiline user input it sometimes is a little harder than calling moveCursorLeft(1)
 				//				if the offset of the current user input line is beyond the total command length apparently we've 'removed' the last command character on the previous line
 				// MDH@24SEP2020: now it's probably better to test numberOfLineCommandCharacters because it it is zero we're obviously at the first position on a command line
 				if(numberOfLineCommandCharacters==0){
+					//////outputChar('>');
 					// MDH@16OCT2020: think man, there's an explicit or implicit end of line in front of it
-				/* replacing:
-				size_t userInputLength=getUserInputLength();
-				if(_userinputline&&_userinputline->offset>userInputLength){
+					/* replacing:
+					size_t userInputLength=getUserInputLength();
+					if(_userinputline&&_userinputline->offset>userInputLength){
 					*/
 					toStartOfLine();clearScreenFromCursor(); // yes, we need this in particular when at the start of a new line and doing a left arrow in which case the prompt on the line needs to be removed
 					// MDH@16OCT2020: ok, the following is crucial to set the number of line command characters to where we end up that is one line up
@@ -4880,13 +4890,15 @@ char removedTokenCharacter(bool endOfInput){
 					if(numberOfLineCommandCharacters>0)numberOfLineCommandCharacters--;
 					toUserInputCursorPosition(-1); // one line up and to the proper position (not sure what will happen to the suggested text though)
 				}else{ // still command characters on the current command line
+					//////outputChar('<');
 					moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
 					numberOfLineCommandCharacters--; // MDH@07JUL2020: essential to keep track of the number of line command characters
 				}
 			}
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//				HOWEVER we're assuming that we're dealing with an end of input situation
-			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)?removeLastUserInputCommandToken():false);
+			// MDH@12APR2024: do NOT allow removing _userInputCommand->_firstToken
+			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)&&_userInputCommand->_lastToken!=_userInputCommand->_firstToken?removeLastUserInputCommandToken():false);
 			unfinishCommandToken(_userInputCommand->_lastToken); // we need to do this to allow appending characters to the token again
 			if(endOfInput){
 				if(!tokenRemoved)

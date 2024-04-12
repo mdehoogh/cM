@@ -2958,7 +2958,7 @@ Mcommand* _getNewCommand(bool withFirstToken,Mtoken const * const offsetToken){M
 				_command->_firstToken=firstToken;
 				_command->_lastToken=firstToken;
 				firstToken->expr=NULL;
-				if(offsetToken!=NULL){ // we'll have to reset some of the properties
+				if(offsetToken!=NULL){ // we'll have to reset some of the properties since _firstToken now has a prev TODO should it have one????
 					firstToken->offset=0;
 					firstToken->argument=0; // TODO what other properties to reset???
 				}

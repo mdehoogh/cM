@@ -355,7 +355,7 @@ char string_removed_char(Mstring* const str,size_t pos){
 	char rc='\0';
 	if(str!=NULL&&str->_chars!=NULL){
 		size_t l=str->length;
-		if(pos<l){
+		if(l>0&&pos<l){
 			--(str->length); // one less long
 			Mchars* strchars=str->_chars; // str replaced by strchars
 			rc=strchars->chars[pos]; // remember the character that is being removed!!
