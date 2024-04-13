@@ -2150,7 +2150,7 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==
 	//			   NOTE that _getValueOfToken will free the token (and all connected tokens) when failing to create the value
 	//			   we need to determine what to do with the command itself
 	Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(disowned_token(command->_firstToken,owner_command)); // MDH@12JUN2020: TODO as we do NOT want to loose _firstToken we do NOT disown it before asking for the value of the token
-	if(_commandToEvaluateTokenValue){ // the first command token is now bound (or otherwise released)
+	if(_commandToEvaluateTokenValue!=NULL){ // the first command token is now bound (or otherwise released)
 		// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
 		if(NULL==getCurrentFunctionBodyInput()->_function->_bodyCommandList)
 			getCurrentFunctionBodyInput()->_function->_bodyCommandList=
@@ -7218,36 +7218,52 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							output("Command embedded.\n");
 							// MDH@08APR2024: get rid of the current user input command (_userInputCommand can be set though when we returned to block command level 0)
 							// check if this command actually ends the current block!!!
-							bool endOfBlocks=false,endOfBlock=!getExecutionEnvironment()->multipleCommandsAllowed;
-							if(!endOfBlock){ // not an implicit end of block
+							Menvironment* blockEnvironment=getExecutionEnvironment();
+							int numberOfBlocksToEnd=(blockEnvironment->multipleCommandsAllowed?0:1);
+							if(numberOfBlocksToEnd==0){ // not an implicit end of block
 								Mtoken* endFunctionToken=_userInputCommand->_firstToken;
 								while(endFunctionToken!=NULL){
 									// TODO any function call could be an embedded function call which we would not want so we might want to check whether any end() or endall() call would actually be executed as it could be conditional
 									if(endFunctionToken->type==TT_FUNCTION){
 										char* _functionName=_getSignificantTokenCharacters(endFunctionToken);
 										if(!strcmp(_functionName,"endall")){
-											endOfBlock=true;endOfBlocks=true;
+											numberOfBlocksToEnd=blockCommandLevel;
 										}else
 										if(!strcmp(_functionName,"end"))
-											endOfBlock=true;
+											numberOfBlocksToEnd=1;
 										free(_functionName);
-										if(endOfBlock)break;
+										if(numberOfBlocksToEnd)break;
 									}
 									endFunctionToken=endFunctionToken->next;
 								}
 							}
 							// we can register this command in the current execution environment in which case it is bound!!!
-							if(!registerCommand(_userInputCommand,owner_userInputCommand))
+							if(!registerCommand(_userInputCommand,owner_userInputCommand)){
 								outputError("Failed to register the embedded command");
-							_userInputCommand->_firstToken->next=NULL;
-							FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
-							output("Embedded command freed!\n");
+								// can't do this because _userInputCommand as a whole is embedded NO not the first token
+								_userInputCommand->_firstToken->next=NULL;
+								FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
+								output("Embedded command freed!\n");
+							}
 							// end any block we're supposed to end
-							while(endOfBlock){
-								if(!endOfBlocks)endOfBlock=false; // update endOfBlock
+							if(numberOfBlocksToEnd==0){ // no block to end, so we should
+								// block not ended yet, so we're going to have another command to embed
+								// so we need to insert a command separator
+								// environment->insertToken points to the last inserted token
+								output("Embedding a command separator.\n");
+								Mtoken* listelementToken=owned_token(_getNewCommandToken(blockEnvironment->insertToken,TT_LISTELEMENT),Msubowner(owner_userInputCommand,1));
+								if(listelementToken!=NULL){
+									string_append_char(listelementToken->text,',');
+									listelementToken->significantCharacterCount=1;
+									blockEnvironment->insertToken=listelementToken;
+								}else
+									switchToControlMode("Failed to embed a command separator.");
+							}else
+							do{
 								Menvironment* endedBlockEnvironment=endBlock();
 								if(endedBlockEnvironment!=NULL){
 									output("Block environment ended!\n");
+									numberOfBlocksToEnd--; // one less block to end
 									blockCommandLevel--;
 									// once a block ended successfully we're back in the environment containing the perhaps now
 									// completed command
@@ -7264,7 +7280,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									while(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_PLACEHOLDER)
 										nextPlaceholderToken=nextPlaceholderToken->next;
 									if(nextPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
-										endOfBlock=false; // TODO if we find another placeholder we cannot end all blocks, so to stay safe we only end one block!!
+										numberOfBlocksToEnd=0; // TODO if we find another placeholder we cannot end all blocks, so to stay safe we only end one block!!
 										//////int8_t nextBlockKeywordId=getPlaceholderBlockKeywordId(nextPlaceholderToken);
 										if(startBlock(NULL,nextPlaceholderToken)){
 											output("Block command environment activated!\n"); ///DEBUGGING
@@ -7280,7 +7296,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										Mcommand* completedBlockCommand=getExecutionEnvironment()->incompleteCommand;
 										if(addBlockCommand(completedBlockCommand,owner_userInputCommand)){
 											getExecutionEnvironment()->incompleteCommand=NULL;
-											completedBlockCommand->_firstToken->next=NULL;FREE_COMMAND(completedBlockCommand,owner_userInputCommand);
+											completedBlockCommand->_firstToken->next=NULL;
+											FREE_COMMAND(completedBlockCommand,owner_userInputCommand);
 											output("Embedded command released.\n");
 										}else
 											switchToControlMode("Failed to add the completed command");
@@ -7290,8 +7307,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									}
 								}else
 									switchToControlMode("Failed to end a block!");
-								if(inputMode!=IM_COMMAND)break;
-							}
+							}while(numberOfBlocksToEnd>0&&inputMode==IM_COMMAND);
 						}
 						/* replacing:
 						// two ways to end a block: explicit by end() or implicit()

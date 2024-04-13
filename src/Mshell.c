@@ -14391,6 +14391,7 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 			Mtoken* offsetToken=environment->insertToken;
 			Mtoken* nextInsertToken=offsetToken->next;
 			*/
+			/* moved over to M.c where addBlockCommand is called!
 			if(blockEnvironment->blockCommandsInserted){ // the placeholder token has been replaced by a command
 				// insert a command separator
 				output("Embedding a command separator.\n");
@@ -14403,6 +14404,7 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 				listelementToken->prev=blockEnvironment->insertToken;
 				blockEnvironment->insertToken=listelementToken;
 			}
+			*/
 			// MDH@12APR2024: insertToken is now connected to command->_firstToken (and back)
 			// skip over _firstToken to the first significant command token
 			Mtoken* firstSignificantCommandToken=command->_firstToken->next;
