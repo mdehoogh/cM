@@ -31,8 +31,8 @@ const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
-const char* const FORWITHFUNCTION_NAME="forw";
-const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
+const char* const FORWITHFUNCTION_NAME="forwith";
+const char* const DOFUNCTION_NAME="dowith"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="defun"; // MDH@04MAR2020: the 'classic' approach is by defining a function with a fixed name which cannot be passed along
 const char* const DEFINEANONYMOUSFUNCTION_NAME="function"; // MDH@04MAR2020: an anonymous function that is to be assigned to a variable/argument
@@ -235,35 +235,35 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
  * 
  */
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"?","C","` ; c  % )&*    > :	   ] }=  "}, /* EXPRESSION */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,"" ,"" ,"`R; CDS% )&*  , >?:	   ]{}=  "}, /* ONE CHARACTER UNARY !-+~ */ \
-{"(","!-+~","" ,"=" ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"" ,"C","` ; c  % )&*  , >?:	   ] }   "}, /* ASSIGNMENT = */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ","" ,"C","`R; c  % )&*  , >?:	   ] }=e "}, /* Baeru finished bin.op. */ \
-{""	,""    ,"" ,"=" ,""  ,""   ,"" ,""     ,"" ,""    ,""	   ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"" ,"C","`R;!cDS%()&*+-,.>?:LEN[]{} e~"}, /* BaErU unfinished bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"" ,"C","`R; cDS% )&*  , >?:	   ]   e "}, /* BAeRu assignable repeatable */ \
-{"(","!-+~","" ,"=" ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"" ,"C","`R; c  % )&*  ,  ?:	   ]   e "}, /* BaERu comp. (<>) bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"" ,"C","`R; c  % )&*  , >?:	   ]   e "}, /* BAeru assignable bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"" ,"C","`R; c  % )&*  , >?:	   ]{} e "}, /* Taeru ternary op. (? only now) */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,"LEN" ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"}","","" ,")","" ,"C","`R;! DS%( &*+-  >?:   [ { =e~"}, /* REFERENCE to an existing variable */ \
-{""	,""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,"RLEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","" ,"C","` ;  DS (			   ?      {   ~"}, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""	,""    ,"=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,"LEN","."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,""  ,"}","","" ,"" ,"" ,"C","`R;! DS%()&*+-  >?:	    {  e~"}, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{""	,""	   ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,""    ,""	  ,"RLEN.",",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","" ,"C","` ;  DS (		  	 ?      {   ~"}, /* PROPERTY (identifier starting with the property separator) */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,"" ,"?","C","` ; c  % )&*	  > :	     }=e "}, /* LIST ELEMENT (similar to expression) */ \
-{";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",","N"  ,"."   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","" ,"C","`R   DS (		     ? L  [ {   ~"}, /* INTEGER: (signless) list of digits */ \
-{";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",",""   ,"N"   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","" ,"C","`R   DS (	     . ? L  [ {   ~"}, /* REAL: part behind a decimal period */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"D","" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,"" ,"" ,""						   }, /* DQSTRING: double quoted string */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"S","" ,"" ,"" ,"" ,"" ,"","" ,"" ,"" ,"" ,""						   }, /* SQSTRING: single quoted string */ \
-{";",""    ,"" ,"+" ,"!=","&"  ,">",""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"D","S","" ,"" ,"" ,"]","" ,":","}","","" ,")","" ,"C","`R   DS%&( * - . ? LEN[ {  e~"}, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{";",""    ,"" ,"+" ,"!=","&"  ,">",""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")","" ,"C","`R   DS%&( * - . ? LEN[ {  e~"}, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,""    ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,")","?","C","` ; c  %& )*   .> :   	 }=e "}, /* LIST: [ starts a list */ \
-{";",""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","" ,"C","`R   DS  (		   ? LEN  {   ~"}, /* END_OF_LIST: behind ] that ends a list */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,""    ,"D","S","" ,"" ,"[","" ,"" ,"" ,"}","","" ,")","" ,"C","` ; c  %& )*  ,.>?:    ]{ =e "}, /* MAP: { starts a map */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","" ,"C","` ; c  %& )*  , >?:	   ] }=e "}, /* MAP_VALUE: : starts a map value */ \
-{";",""    ,"" ,""  ,"!=","&*" ,">","+"    ,"" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,")","" ,"C","`R   DS% (   -	 ?:LEN  {  e~"}, /* END_OF_MAP: behind } that ends a map */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,"."    ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","(","" ,"" ,"C","`R;!cDS%& )*+-, >?:   []{}=e~"}, /* FUNCTION: some identifier recognized as function name */ \
-{"(","!-+~","" ,""  ,""  ,"" 	 ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","?","C","` ; c  %&  *	  > :	   ] }=e "}, /* FUNCTION_CALL ( following the name of a function */ \
-{";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")","" ,"C","`R   DS  (		   ? L N  {   ~"}, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
-{"" ,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"" ,"","" ,")","" ,"C","`R;!cDS%( &*+- .>?:LEN[ {}=e~"}, /* TT_PLACEHOLDER ? */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"?"  ,"C","` ; c  % )&*    > :	   ] }=  "}, /* EXPRESSION */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,"`R; CDS% )&*  , >?:	   ]{}=  "}, /* ONE CHARACTER UNARY !-+~ */ \
+{"(","!-+~","" ,"=" ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","` ; c  % )&*  , >?:	   ] }   "}, /* ASSIGNMENT = */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ",""   ,"C","`R; c  % )&*  , >?:	   ] }=e "}, /* Baeru finished bin.op. */ \
+{""	,""    ,"" ,"=" ,""  ,""   ,"" ,""     ,"" ,""    ,""	   ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"C","`R;!cDS%()&*+-,.>?:LEN[]{} e~"}, /* BaErU unfinished bin.op. */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; cDS% )&*  , >?:	   ]   e "}, /* BAeRu assignable repeatable */ \
+{"(","!-+~","" ,"=" ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  ,  ?:	   ]   e "}, /* BaERu comp. (<>) bin.op. */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  , >?:	   ]   e "}, /* BAeru assignable bin.op. */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  , >?:	   ]{} e "}, /* Taeru ternary op. (? only now) */ \
+{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,"LEN" ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"}","","" ,")",""   ,"C","`R;! DS%( &*+-  >?:   [ { =e~"}, /* REFERENCE to an existing variable */ \
+{""	,""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,"RLEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","` ;  DS (			   ?      {   ~"}, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""	,""    ,"=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,"LEN","."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,""  ,"}","","" ,"" ,""   ,"C","`R;! DS%()&*+-  >?:	    {  e~"}, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""	,""	   ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,""    ,""	  ,"RLEN.",",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","` ;  DS (		  	 ?      {   ~"}, /* PROPERTY (identifier starting with the property separator) */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,"" ,"?"  ,"C","` ; c  % )&*	  > :	     }=e "}, /* LIST ELEMENT (similar to expression) */ \
+{";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",","N"  ,"."   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS (		     ? L  [ {   ~"}, /* INTEGER: (signless) list of digits */ \
+{";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",",""   ,"N"   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS (	     . ? L  [ {   ~"}, /* REAL: part behind a decimal period */ \
+{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"D","" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,""						   }, /* DQSTRING: double quoted string */ \
+{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"S","" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,""						   }, /* SQSTRING: single quoted string */ \
+{";",""    ,"" ,"+" ,"!=","&"  ,">",""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"D","S","" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS%&( * - . ? LEN[ {  e~"}, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";",""    ,"" ,"+" ,"!=","&"  ,">",""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS%&( * - . ? LEN[ {  e~"}, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,""    ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,")","?"  ,"C","` ; c  %& )*   .> :   	 }=e "}, /* LIST: [ starts a list */ \
+{";",""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","`R   DS  (		   ? LEN  {   ~"}, /* END_OF_LIST: behind ] that ends a list */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,""    ,"D","S","" ,"" ,"[","" ,"" ,"" ,"}","","" ,")",""   ,"C","` ; c  %& )*  ,.>?:    ]{ =e "}, /* MAP: { starts a map */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")",""   ,"C","` ; c  %& )*  , >?:	   ] }=e "}, /* MAP_VALUE: : starts a map value */ \
+{";",""    ,"" ,""  ,"!=","&*" ,">","+"    ,"" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,")",""   ,"C","`R   DS% (   -	 ?:LEN  {  e~"}, /* END_OF_MAP: behind } that ends a map */ \
+{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,"."    ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","(","" ,""   ,"C","`R;!cDS%& )*+-, >?:   []{}=e~"}, /* FUNCTION: some identifier recognized as function name */ \
+{"(","!-+~","" ,""  ,""  ,"" 	 ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","?"  ,"C","` ; c  %&  *	  > :	   ] }=e "}, /* FUNCTION_CALL ( following the name of a function */ \
+{";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","`R   DS  (		   ? L N  {   ~"}, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"" ,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"" ,"","" ,")","LEN","C","`R;!cDS%( &*+- .>?:   [ {}=e~"}, /* TT_PLACEHOLDER ? */ \
 };
 // MDH@23FEB2024: the following is an experimental transitions that was supposed to make all binary operators assignable
 ///const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
@@ -14484,21 +14484,58 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			////////if(blockKeywordId<0)return true;
 			Mtoken *prevPlaceholderToken=placeholderToken->prev,*nextPlaceholderToken=placeholderToken->next;
 			// disconnect the placeholder token
-			if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
-			if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
 			if(pushExecutionEnvironment(disowned_environment(_blockEnvironment,owner))){
 				Menvironment* environment=_blockEnvironment->_parent->value._environment;
 				if(environment!=NULL){
 					if(command!=NULL)environment->incompleteCommand=command; // remember the command that has to be completed NOTE when receiving NULL environment->incompleteCommand has be be left alone!!!!!
+					// MDH@15APR2024: the default (with no characters behind ?) is to let the next token decide whether multiple commands are allowed
+					if(string_length(placeholderToken->text)>1){
+						_blockEnvironment->subcommandBlockType=string_char(placeholderToken->text,1);
+						// TODO should we force embed either '[' when L or '(' when A? 
+						switch(_blockEnvironment->subcommandBlockType){
+							case 'a':case 'A':
+								prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_FUNCTION_CALL);
+								if(prevPlaceholderToken!=NULL){
+									string_append_char(prevPlaceholderToken->text,'(');
+									prevPlaceholderToken->significantCharacterCount=1;
+								}else
+									outputError("Failed to embed (");
+								/* leave the closer to the end of the block
+								nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL);
+								string_append_char(nextPlaceholderToken->text,')');
+								nextPlaceholderToken->significantCharacterCount=1;
+								nextPlaceholderToken->next=placeholderToken->next;
+								*/
+								break;
+							case 'l':case 'L':
+								prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_LIST);
+								if(prevPlaceholderToken!=NULL){
+									string_append_char(prevPlaceholderToken->text,'[');
+									prevPlaceholderToken->significantCharacterCount=1;
+								}else
+									outputError("Failed to embed [");
+								/* leave the closer to the end of the block
+								nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_LIST);
+								string_append_char(nextPlaceholderToken->text,']');
+								nextPlaceholderToken->significantCharacterCount=1;
+								nextPlaceholderToken->next=placeholderToken->next;
+								*/
+								break;
+						}
+					}else // the default is determined by the type of the token following
+						_blockEnvironment->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'0':'1');
+					if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
+					if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
+					// register the continuation token and the insert token
 					environment->continuationToken=nextPlaceholderToken; // remember where to continue looking for placeholder tokens
 					_blockEnvironment->insertToken=prevPlaceholderToken;
-					_blockEnvironment->multipleCommandsAllowed=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT);
+					// replacing:	_blockEnvironment->multipleCommandsAllowed=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT);
 					///////environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
 					return true;
 				}
-				outputBug("Embedding command environment vanished");
+				outputBug("Subcommand environment vanished");
 			}else
-				outputError("Failed to activate the embedded command environment");
+				outputError("Failed to activate the subcommand environment");
 			/* replacing:
 			if(_blockEnvironment->_name!=NULL){
 				Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
@@ -14532,11 +14569,35 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
  * @return false on failure
  */
 Menvironment* endBlock(){
-	Menvironment* environment=getExecutionEnvironment();
-	if(environment!=NULL){
-		if(environment->blockKeywordId<0)return environment;
+	Menvironment* blockEnvironment=getExecutionEnvironment();
+	if(blockEnvironment!=NULL){
+		////////if(environment->blockKeywordId<0)return environment;
 		Mvalue* environmentValue=popExecutionEnvironment();
-		if(environmentValue!=NULL)return environmentValue->value._environment;
+		if(environmentValue!=NULL){
+			/*
+			switch(blockEnvironment->subcommandBlockType){
+				case 'a':case 'A':
+					prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_FUNCTION_CALL);
+					string_append_char(prevPlaceholderToken->text,'(');
+					prevPlaceholderToken->significantCharacterCount=1;
+					nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL);
+					string_append_char(nextPlaceholderToken->text,')');
+					nextPlaceholderToken->significantCharacterCount=1;
+					nextPlaceholderToken->next=placeholderToken->next;
+					break;
+				case 'l':case 'L':
+					prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_LIST);
+					string_append_char(prevPlaceholderToken->text,'[');
+					prevPlaceholderToken->significantCharacterCount=1;
+					nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_LIST);
+					string_append_char(nextPlaceholderToken->text,']');
+					nextPlaceholderToken->significantCharacterCount=1;
+					nextPlaceholderToken->next=placeholderToken->next;
+					break;
+			}
+			*/
+			return environmentValue->value._environment;
+		}
 		/*
 		// we need to consume the block commands and append them to the parent
 		Mlist* blockCommandList=environment->blockCommandList;

@@ -554,7 +554,7 @@ typedef struct Menvironment{
 		Mtoken* insertToken; // MDH@26MAR2024: where to insert each successive block command
 		Mtoken* continuationToken; // MDH@26MAR2024: the token following the placeholder token
 		int8_t blockKeywordId; // MDH@26MAR2024: this is going to be required so we will know whether or not insert the block commands as a list or as separate arguments
-		bool multipleCommandsAllowed; // MDH@02APR2024: whether or not commands to be embedded can or cannot be multiple commands (to be ended with calling the end function)
+		char subcommandBlockType; // MDH@02APR2024: whether or not commands to be embedded can or cannot be multiple commands (to be ended with calling the end function)
 }Menvironment;
 
 Menvironment* __environment(); // creates a new (empty) environment
