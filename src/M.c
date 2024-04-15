@@ -2387,7 +2387,7 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 									// let's do something like a backspace but without moving the cursor on the screen
 									// replacing the last character with a blank is another option????
 									if(string_setlength(lastTokenText,lastTokenLength-1/*,owner_lastTokenText*/)){ // managed to 'cut off' c (although it's still there, because when you set the length only ->length is adjusted nothing yet to the text itself)
-										Mtoken* _errorToken=_getNewCommandToken(_userInputCommand->_lastToken,TT_ERROR); // by passing in NULL all the complicated stuff is not happening!!!
+										Mtoken* _errorToken=_getNewCommandToken(_userInputCommand->_lastToken,TT_ERROR,true); // by passing in NULL all the complicated stuff is not happening!!!
 										if(_errorToken!=NULL){
 											// MDH@23OCT2020 OOPS take over ownership!!!
 											_userInputCommand->_lastToken=owned_token(_errorToken,Msubowner(owner_userInputCommand,1)); // update the last token assuming we will succeed in doing what needs doing
@@ -4491,7 +4491,7 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE theoretically _userInputCommand->_lastToken could be NULL due to _getToken() failing to create a new token
 	while(_tokenToCopy){
 		// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to _userInputCommand->_lastToken!!!
-		_newUserInputCommand->_lastToken=owned_token(_getNewCommandToken(_newUserInputCommand->_lastToken,_tokenToCopy->type),Msubowner(owner,1));
+		_newUserInputCommand->_lastToken=owned_token(_getNewCommandToken(_newUserInputCommand->_lastToken,_tokenToCopy->type,false),Msubowner(owner,1));
 		if(NULL==_newUserInputCommand->_lastToken)break;
 		// replacing: if(!setLastUserInputCommandToken(_getNewCommandToken(_userInputCommand->_lastToken,_tokenToCopy->type)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
 		/* MDH@23SEP2019 replacing:
@@ -5702,6 +5702,115 @@ bool preparedForUserInput(){
  * 
  */
 size_t blockCommandLevel=0;
+
+bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
+	assert(_userInputCommand!=NULL);
+	Mvalue* userInputCommandResultValue=NULL;
+	bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
+	// MDH@25OCT2020: immediately bind the result to the '' variable of the environment
+	if(!setVariable(getExecutionEnvironment(),"",(commandEvaluated?userInputCommandResultValue:NULL)))
+		outputError("Failed to store the result of the command execution");
+	newline();
+	// let's mark the allocation directly behind evaluating the command
+	if(allocationMarksAdded>0){
+		if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
+	}
+	// TODO the next part should be improved, as it is getting a bit messy
+	Mstring* _userInputCommandText=owned_string(_getCommandText(false),owner); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
+	if(!commandEvaluated){
+		if(string_length(_userInputCommandText)==0){
+			clearCommand();
+			outputInfo("Nothing to evaluate!");
+		}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
+			outputInfo("Please complete, correct or cancel the command.");
+		FREE_STRING(_userInputCommandText,owner); // freed!
+		_userInputCommandText=NULL;
+		return false;
+	}
+	resetOutputColor();
+	if(amVerboseDebugging())
+		outputInfo("Command evaluated!");
+	deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
+	// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
+	// MDH@18JUN2020: if the current command is not an original command 
+	// debugging: Mstring* _commandText=owned_string(_getCommandText(true),owner_userInputCommand);output("Registering command '%s'.\n",string(_commandText));FREE_STRING(_commandText,owner_userInputCommand);
+	if(amVerboseDebugging())
+		outputInfo("Registering command!");
+	/*
+	Menvironment* environment=getExecutionEnvironment();
+	if(NULL==environment)
+		switchToControlMode("Environment vanished.");
+	else
+	*/
+	if(!registerCommand(_userInputCommand,(commandIndex>0?owner_registeredcommands:owner_userInputCommand))){
+		if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
+			// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
+			if(commandIndex==0){ // a new command being registered!!!
+				if(amVerboseDebugging())
+					outputInfo("Freeing command!");
+				FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
+				outputError("Failed to register the command! Probable cause: out of memory");
+			}else
+				outputError("Failed to register the command again! Probable cause: out of memory");
+		}
+	}else{
+		if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
+			if(amVerboseDebugging())
+				outputInfo("Command registered!");
+			if(M_value!=NULL){
+				// perhaps we should store the command text not the command itself?????
+				// NOTE prepend a single quote is essential to get the text enquoted!!!
+				if(NULL==string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
+					outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
+				else
+				if(amVerboseDebugging())
+					output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
+			}
+		}
+	}
+	// MDH@16NOV2020 NOTE: think we already freed the user input command text (see above)
+	if(_userInputCommandText!=NULL){
+		FREE_STRING(_userInputCommandText,owner);
+		_userInputCommandText=NULL;
+	} // MDH@14NOV2019: freed
+
+	// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
+	_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
+
+	// MDH@18MAR2024: only garbage collect when not inside a block collecting block commands
+	if(blockCommandLevel==0){
+		// garbage collection: remove any values not used anymore...
+		// if(amVerboseDebugging())
+		if(amVerboseDebugging())
+			outputInfo("Removing unreferenced values.");
+		size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
+		if(amVerbose())
+		{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
+
+		// MDH@17JAN2023
+		size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose());
+		if(amVerbose())
+			output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
+
+		if(amVerbose())
+			reportAllocations("Allocations.\n","\t");
+
+		// switch to function body input mode when this command contained at least one user function definition
+		// (even when dealing with currently inputting function body commands)
+		if(getFirstFunctionBodyRequest()!=NULL&&!startFunctionBodyInput())
+			outputError("Failed to start requesting the body of a new function");
+
+		// MDH@12MAY2020: output two incremental out
+		if(allocationMarksAdded>0){
+			outputTotalMemoryUsage();
+			if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)outputError("Not all command allocation marks output.");
+			while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
+		}
+	}/*else // a little trick to return to entering immediately executing commands
+	if(blockCommandLevel<0)
+		blockCommandLevel=0;*/
+	return true;
+}
 /**
  * @brief ends the current subcommand block
  * 
@@ -5709,7 +5818,7 @@ size_t blockCommandLevel=0;
  * @return true 
  * @return false 
  */
-bool endSubcommandBlock(){
+bool endSubcommandBlock(bool removeSubcommandSeparator){
 	bool result=true;
 	Menvironment* endedBlockEnvironment=endBlock();
 	if(endedBlockEnvironment!=NULL){
@@ -5722,6 +5831,19 @@ bool endSubcommandBlock(){
 		// 1. find the next placeholder token (since we ended a block we're in the original parent
 		//    that contains the continuationToken
 		Mtoken* nextPlaceholderToken=getExecutionEnvironment()->continuationToken;
+		// MDH@15APR2024: remove a subcommand separator
+		if(removeSubcommandSeparator){
+			Mtoken* separatorToken=endedBlockEnvironment->insertToken;
+			if(separatorToken->type==TT_LISTELEMENT){
+				nextPlaceholderToken->prev=separatorToken->prev;
+				separatorToken->prev->next=nextPlaceholderToken;
+				separatorToken->next=NULL;FREE_TOKEN(separatorToken,owner_userInputCommand); // release the separator token
+				/* replacing:
+				separatorToken->prev->next=separatorToken->next;
+				separatorToken->next->prev=separatorToken->prev;
+				*/
+			}
+		}
 		getExecutionEnvironment()->continuationToken=NULL; // in case we actually processed the last one
 		// MDH@03APR2024: multiple placeholders allowed in the same function call
 		//                therefore blockKeywordId should NOT be initialized unless
@@ -5731,7 +5853,7 @@ bool endSubcommandBlock(){
 			nextPlaceholderToken=nextPlaceholderToken->next;
 		if(nextPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
 			//////int8_t nextBlockKeywordId=getPlaceholderBlockKeywordId(nextPlaceholderToken);
-			if(startBlock(NULL,nextPlaceholderToken)){
+			if(startBlock(NULL,nextPlaceholderToken,Msubowner(owner_userInputCommand,1))){
 				output("Next subcommand block environment activated!\n"); ///DEBUGGING
 				nextPlaceholderToken->next=NULL;FREE_TOKEN(nextPlaceholderToken,owner_userInputCommand);
 				////////////_userInputCommand=NULL;
@@ -5745,7 +5867,7 @@ bool endSubcommandBlock(){
 			// the incomplete command is now finished and completed but not at the top-level
 			// and therefore is ready to be added as block command
 			Mcommand* completedBlockCommand=getExecutionEnvironment()->incompleteCommand;
-			if(addBlockCommand(completedBlockCommand,owner_userInputCommand)){
+			if(addBlockCommand(completedBlockCommand)){
 				getExecutionEnvironment()->incompleteCommand=NULL;
 				completedBlockCommand->_firstToken->next=NULL;
 				FREE_COMMAND(completedBlockCommand,owner_userInputCommand);
@@ -5757,7 +5879,12 @@ bool endSubcommandBlock(){
 		}else{
 			// we have to set _userInputCommand to that completed command
 			_userInputCommand=getExecutionEnvironment()->incompleteCommand;
-			output("Completed command to execute: '");outputCommand(_userInputCommand);output("'.\n");
+			if(_userInputCommand!=NULL){
+				getExecutionEnvironment()->incompleteCommand=NULL;
+				/////output("Completed command to execute: '");outputCommand(_userInputCommand);output("'.\n");resetOutputColor();
+				if(!userInputCommandEvaluated())
+					outputError("Failed to evaluate the completed user input command");
+			}
 		}
 	}else
 		result=false;
@@ -5798,7 +5925,7 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 				outputChar(c);newline();
 				if(c=='Y'||c=='y')result='x';
 			}else{
-				if(!endSubcommandBlock())
+				if(!endSubcommandBlock(true))
 					outputError("Failed to end the subcommand block");
 				result='n';
 			}
@@ -5883,7 +6010,7 @@ char getAcceptedSuggestedCharacter(char suggestedCharacter,char * const inputCha
 						inputCharType=switchToControlMode("Failed to remove the accepted first auto completion character.");
 				}
 			}
-			*/												
+			*/
 		}else
 			*inputCharType=switchToControlMode("Suggested character not accepted.");
 	}
@@ -5953,17 +6080,17 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 #ifdef __DEBUG__
 	printf("\n%s","Operator token types:");
-	printf("\nUnary operator							: %d.",TT_UNARY);
-	printf("\nAssignment operator					   : %d.",TT_ASSIGNMENT);
-	printf("\nBinary operator						   : %d.",TT_BINARY_aeru);
-	printf("\nAssignable repeatable binary operator	 : %d.",TT_BINARY_AeRu);
-	printf("\nEqualizable repeatable binary operator	: %d.",TT_BINARY_aERu);
+	printf("\nUnary operator                            : %d.",TT_UNARY);
+	printf("\nAssignment operator                       : %d.",TT_ASSIGNMENT);
+	printf("\nBinary operator                           : %d.",TT_BINARY_aeru);
+	printf("\nAssignable repeatable binary operator     : %d.",TT_BINARY_AeRu);
+	printf("\nEqualizable repeatable binary operator    : %d.",TT_BINARY_aERu);
 	printf("\nTEqualizable unfinished binary operator   : %d.",TT_BINARY_aErU);
-	printf("\nAssignable binary operator				: %d.",TT_BINARY_Aeru);
-	printf("\nTernary operator						  : %d.",TT_TERNARY_aeru);
+	printf("\nAssignable binary operator                : %d.",TT_BINARY_Aeru);
+	printf("\nTernary operator                          : %d.",TT_TERNARY_aeru);
 	printf("\n%s","Unfinishable token types:");
 	printf("\nComment (allowed when command is complete): %d.",TT_COMMENT);
-	printf("\nError									 : %d.",TT_ERROR);
+	printf("\nError                                     : %d.",TT_ERROR);
 
 #endif
 
@@ -7128,7 +7255,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				switchToCommandMode(); // NOTE as apparently we're in control mode!!
 			}else
 			if(blockCommandLevel>0){ // user decides to end a block
-				if(!endSubcommandBlock())
+				if(!endSubcommandBlock(true))
 					outputError("Failed to end a subcommand block");
 				switchToCommandMode();
 			}else
@@ -7209,7 +7336,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						getExecutionEnvironment()->insertToken=token->prev; // this is the token where to connect the block command to
 						*/
 						// can we find the block keyword id?????? don't think we actually need it, hmmm although we need to know if it's a function that will create an environment!!!!!
-						if(startBlock(_userInputCommand,firstPlaceholderToken)){
+						if(startBlock(_userInputCommand,firstPlaceholderToken,Msubowner(owner_userInputCommand,1))){
 							output("Subcommand environment activated!\n"); ///DEBUGGING
 							// get rid of the placeholder token
 							firstPlaceholderToken->next=NULL;FREE_TOKEN(firstPlaceholderToken,owner_userInputCommand);
@@ -7267,7 +7394,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										insertToken=insertToken->next;
 									}
 									if(insertToken!=NULL){
-										if(startBlock(blockKeywordId,_userInputCommand,insertToken)){
+										if(startBlock(blockKeywordId,_userInputCommand,insertToken,Msubowner(owner_userInputCommand,1))){
 											blockCommandLevel++;
 											output("Block of commands started.\n");
 										}else
@@ -7295,7 +7422,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						output("Embedding the subcommand.\n");
 						// does this user input command designate an end of block?????
 						// MDH@08APR2024: if we always also add the end() command to the current block we can still use it by executing end() [and know it was a placeholder command!!!!!!]
-						if(addBlockCommand(_userInputCommand,owner_userInputCommand)){
+						if(addBlockCommand(_userInputCommand)){
 							output("Subcommand embedded.\n");
 							// MDH@08APR2024: get rid of the current user input command (_userInputCommand can be set though when we returned to block command level 0)
 							// check if this command actually ends the current block!!!
@@ -7339,15 +7466,20 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								// so we need to insert a command separator
 								// environment->insertToken points to the last inserted token
 								output("Embedding a command separator.\n");
-								Mtoken* listelementToken=owned_token(_getNewCommandToken(blockEnvironment->insertToken,TT_LISTELEMENT),Msubowner(owner_userInputCommand,1));
+								Mtoken* nextInsertToken=blockEnvironment->insertToken->next;
+								Mtoken* listelementToken=owned_token(_getNewCommandToken(blockEnvironment->insertToken,TT_LISTELEMENT,false),Msubowner(owner_userInputCommand,1));
 								if(listelementToken!=NULL){
 									string_append_char(listelementToken->text,',');
 									listelementToken->significantCharacterCount=1;
 									blockEnvironment->insertToken=listelementToken;
+									// and link to the next insert token
+									listelementToken->next=nextInsertToken;
+									nextInsertToken->prev=listelementToken;
+									// should I link it forward just in case the user decides to end the list of subcommands??????
 								}else
 									switchToControlMode("Failed to embed a command separator.");
 							}else{
-								if(!endSubcommandBlock(true))
+								if(!endSubcommandBlock(false))
 									switchToControlMode("Failed to end a subcommand block!");
 							}
 						}
@@ -7372,118 +7504,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 					// TODO now checking for _userInputCommand being NULL but used to be blockCommandLevel==0
 					if(inputMode==IM_COMMAND&&_userInputCommand!=NULL){ // a directly executable user input command
+						// MDH@15APR2024: code to evaluate _userInputCommand moved over to evaluateUserInputCommand()
 						////DEBUGGING output("Command to evaluate: ");outputToken(_userInputCommand->_firstToken,NULL);outputLine(".");
 						// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
-						Mvalue* userInputCommandResultValue=NULL;
-						bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
-						// MDH@25OCT2020: immediately bind the result to the '' variable of the environment
-						if(!setVariable(getExecutionEnvironment(),"",(commandEvaluated?userInputCommandResultValue:NULL)))
-							outputError("Failed to store the result of the command execution");
-						newline();
-						// let's mark the allocation directly behind evaluating the command
-						if(allocationMarksAdded>0){
-							if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
-						}
-						// TODO the next part should be improved, as it is getting a bit messy
-						Mstring* _userInputCommandText=owned_string(_getCommandText(false),owner); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
-						if(!commandEvaluated){
-							if(string_length(_userInputCommandText)==0){
-								clearCommand();
-								outputInfo("Nothing to evaluate!");
-							}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
-								outputInfo("Please complete, correct or cancel the command.");
-							FREE_STRING(_userInputCommandText,owner); // freed!
-							_userInputCommandText=NULL;
-							continue;
-						}
-						resetOutputColor();
-						if(amVerboseDebugging())
-							outputInfo("Command evaluated!");
-						deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
-						// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
-						// MDH@18JUN2020: if the current command is not an original command 
-						// debugging: Mstring* _commandText=owned_string(_getCommandText(true),owner_userInputCommand);output("Registering command '%s'.\n",string(_commandText));FREE_STRING(_commandText,owner_userInputCommand);
-						if(amVerboseDebugging())
-							outputInfo("Registering command!");
-						/*
-						Menvironment* environment=getExecutionEnvironment();
-						if(NULL==environment)
-							switchToControlMode("Environment vanished.");
-						else
-						*/
-						if(!registerCommand(_userInputCommand,(commandIndex>0?owner_registeredcommands:owner_userInputCommand))){
-							if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
-								// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
-								if(commandIndex==0){ // a new command being registered!!!
-									if(amVerboseDebugging())
-										outputInfo("Freeing command!");
-									FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
-									outputError("Failed to register the command! Probable cause: out of memory");
-								}else
-									outputError("Failed to register the command again! Probable cause: out of memory");
-							}
-						}else{
-							if(NULL==getCurrentFunctionBodyInput()){ // not inside a function body
-								if(amVerboseDebugging())
-									outputInfo("Command registered!");
-								if(M_value!=NULL){
-									// perhaps we should store the command text not the command itself?????
-									// NOTE prepend a single quote is essential to get the text enquoted!!!
-									if(NULL==string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
-										outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
-									else
-									if(amVerboseDebugging())
-										output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
-								}
-							}
-						}
-						// MDH@16NOV2020 NOTE: think we already freed the user input command text (see above)
-						if(_userInputCommandText!=NULL){
-							FREE_STRING(_userInputCommandText,owner);
-							_userInputCommandText=NULL;
-						} // MDH@14NOV2019: freed
-
-						// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
-						_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
-
-						// MDH@18MAR2024: only garbage collect when not inside a block collecting block commands
-						if(blockCommandLevel==0){
-							// garbage collection: remove any values not used anymore...
-							// if(amVerboseDebugging())
-							if(amVerboseDebugging())
-								outputInfo("Removing unreferenced values.");
-							size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
-							if(amVerbose())
-							{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
-
-							// MDH@17JAN2023
-							size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose());
-							if(amVerbose())
-								output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
-
-							if(amVerbose())
-								reportAllocations("Allocations.\n","\t");
-
-							// switch to function body input mode when this command contained at least one user function definition
-							// (even when dealing with currently inputting function body commands)
-							if(getFirstFunctionBodyRequest()!=NULL&&!startFunctionBodyInput())
-								outputError("Failed to start requesting the body of a new function");
-
-							// MDH@12MAY2020: output two incremental out
-							if(allocationMarksAdded>0){
-								outputTotalMemoryUsage();
-								if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)outputError("Not all command allocation marks output.");
-								while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
-							}
-						}else // a little trick to return to entering immediately executing commands
-						if(blockCommandLevel<0)
-							blockCommandLevel=0;
+						if(!userInputCommandEvaluated())
+							outputError("Failed to evaluate the user input command");
 					}
-				}else{
+				}else
 					// MDH@14AUG2019: if a user presses Enter when there's no command but still feedforwardText it looses feedforwardText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)
 					//				NOTE that I might consider keeping feedforwardText, so it will be redisplayed when the user returns to the command mode
 					switchToControlMode(NULL); // replacing: if(getTotalNumberOfSuggestedCharacters()==0)switchToControlMode(NULL);else outputError("Still suggested text");
-				}
 			}else
 			if(inputMode==IM_SHELL){
 				if(string_length(_shellCommand))
@@ -7495,7 +7525,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		}
 		showSeparatorLine();
 		if(!allocationMarkAdded())
-			outputError("Failed to add a new memory allocation mark.");
+			outputError("Failed to add a new memory allocation mark");
 	}
 	// 'normal' exit
 	exit(0);

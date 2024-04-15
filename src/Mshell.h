@@ -24,7 +24,7 @@ void free_command(Mcommand* _command/*,Mallocationowner owner*/);
 #define FREE_COMMAND(_command,owner_command) free_command(disowned_command(_command,owner_command))
 
 void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/);
-Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool onInput); // prototype
 Mcommand* _getNewCommand(bool withFirstToken,Mtoken const * const offsetToken);  // MDH@12APR2024: offsetToken added to indicate the predecessor of the first token when the command is a subcommand
 
 // MDH@20FEB2020: the function definition so we can plug in our own inputInfo and inputError functions
@@ -126,6 +126,6 @@ bool shellInitialized(
 
 // MDH@18MAR2024: block stuff
 ///////int8_t getBlockKeywordId(char const * const keyword);
-bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_command);
-bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken);
+bool addBlockCommand(Mcommand const * const command);
+bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken,Mallocationowner ownerToken);
 Menvironment* endBlock();

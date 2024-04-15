@@ -2142,7 +2142,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 			//                TODO come up with a better idea to do this because theoretically lastCommandToken should be reowned at the moment it is assigned
 			//                     the problem here is that when we skipped comments, we would be returning a lastCommandToken which is NOT the registered last token
 			//                     and that's what's causing the problems!!!!
-			tokenToReturn=disowned_token(owned_token(_getNewCommandToken(command->_lastToken/* replacing: lastCommandToken */,newTokenType/*,endOfInput*/),owner),owner);
+			tokenToReturn=disowned_token(owned_token(_getNewCommandToken(command->_lastToken/* replacing: lastCommandToken */,newTokenType,true),owner),owner);
 			lastCommandToken=tokenToReturn; // MDH@18JUL2023: continue with tokenToReturn
 
 			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(false); // MDH@28FEB2020: a bit of a nuisance...
@@ -2587,7 +2587,7 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
  * @return true 
  * @return false 
  */
-static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
+static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInput){
 	TokenType newTokenType=TT_ERROR; // assume failure
 	if(prevToken!=NULL&&prevToken->next!=NULL){
 		///outputChar('A');
@@ -2674,11 +2674,17 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 				long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);////////outputChar('X');
 				_token->argument=(numberOfExpectedArguments<0?-2:-numberOfExpectedArguments-3);
 				// informing the user
-				if(inputInfoFunction){
-					if(numberOfExpectedArguments>=0)
-						(*inputInfoFunction)("Number of expected arguments: %lld.",numberOfExpectedArguments);
-					else
-						(*inputInfoFunction)("Number of expected arguments unknown!");
+				if(!onInput||inputInfoFunction){
+					if(numberOfExpectedArguments>=0){
+						if(onInput)
+							(*inputInfoFunction)("Number of expected arguments: %lld.",numberOfExpectedArguments);
+						else
+							output("%sNumber of expected arguments: %lld.\n",M_ERROR_PREFIX,numberOfExpectedArguments);
+					}else
+						if(onInput)
+							(*inputInfoFunction)("Number of expected arguments unknown!");
+						else
+							output("Number of expected arguments unknown!\n");
 				}
 			}else
 				_token->argument=1;
@@ -2700,7 +2706,11 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 					_token->envid=(prevToken->envid+addendum+1); // ander will take care of removing what's too the left
 				}else{ // can't increment
 					newTokenType=TT_ERROR; // MDH@10APR2024 bug fix at the end of this block token->type is still set to newTokenType and directly setting _token->type would have no effect: replacing: _token->type=TT_ERROR;
-					if(inputErrorFunction)(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
+					if(!onInput||inputErrorFunction)
+						if(onInput)
+							(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
+						else
+							outputWarning("Cannot exceed the maximum number of 15 (nested) special function calls");
 				}
 			}
 			//////outputChar('H');
@@ -2749,7 +2759,8 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 						if(_token->expr->argument>0){
 							_token->argument=_token->argument-1;
 							if(amVerboseDebugging())
-								if(inputInfoFunction)(*inputInfoFunction)("Local variables argument!");
+							if(!onInput||inputInfoFunction)
+								if(onInput)(*inputInfoFunction)("Local variables argument!");else output("Local variables argument!\n");
 							// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
 							//				what we would do on ) 
 							if(_token->argument==0){
@@ -2765,13 +2776,18 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 									if(!pushLocalvariables(localVariablesMapValue,_token->envid)){
 										// //////outputChar('D');
 										newTokenType=TT_ERROR; // TODO I suppose we could have a separate TT_BUG token type perhaps?????
-										if(inputErrorFunction)(*inputErrorFunction)("Failed to register local variables!");
+										if(!onInput||inputErrorFunction)
+											if(onInput)(*inputErrorFunction)("Failed to register local variables!");else outputError("Failed to register local variables!");
 									}
 									// //////outputChar('E');
 								}else{ // it's not a map which it should be
 									// //////outputChar('F');
-									newTokenType=TT_ERROR; 
-									if(inputInfoFunction)(*inputInfoFunction)("%sLocal variables argument does not evaluate to a map!",M_WARNING_PREFIX);
+									newTokenType=TT_ERROR;
+									if(!onInput||inputInfoFunction)
+									if(onInput)
+										(*inputInfoFunction)("%sLocal variables argument does not evaluate to a map!",M_WARNING_PREFIX);
+									else 
+										outputWarning("Local variables argument does not evaluate to a map!");
 								}
 								// //////outputChar('G');
 							}
@@ -2781,15 +2797,19 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 							//////outputChar('O');
 							if(_token->expr->argument==-3){ // already reached the total number of expected arguments
 								newTokenType=TT_ERROR;
-								if(inputErrorFunction)(*inputErrorFunction)("Another argument not allowed.");
+								if(!onInput||inputErrorFunction)
+								if(onInput)(*inputErrorFunction)("Another argument not allowed.");else outputError("Another argument not allowed");
 							}else{
 								_token->expr->argument=_token->expr->argument+1;
 								//if(amVerboseDebugging())
-								if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments: %lld.",-_token->expr->argument-3);
+								if(!onInput||inputInfoFunction)
+								if(onInput)(*inputInfoFunction)("Number of expected arguments: %lld.",-_token->expr->argument-3);
+								else output("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
 							}
 							//////outputChar('P');
 						}else{
-							if(inputInfoFunction)(*inputInfoFunction)("Number of expected arguments unknown!");
+							if(!onInput||inputInfoFunction)
+							if(onInput)(*inputInfoFunction)("Number of expected arguments unknown!");else output("Number of expected arguments unknown!\n");
 						}
 					}else
 					if(_token->expr->type!=TT_LIST&&_token->expr->type!=TT_MAP&&_token->expr->type!=TT_EXPRESSION){
@@ -2800,7 +2820,9 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
 					//////outputChar('Q');
 				}else{ // a comma should always match either a map or list or expression start
 					newTokenType=TT_ERROR;
-					if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed outside map, list or function call!");
+					if(!onInput||inputErrorFunction)
+					if(onInput)(*inputErrorFunction)("Comma not allowed outside map, list, array or function call!");
+					else outputError("Comma not allowed outside map, list, array or function call");
 				}
 			}
 			/////if(amDebugging())inputInfo("E7");
@@ -2875,7 +2897,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken){
  * @param newTokenType 
  * @return Mtoken* a new token following \p prevToken of type \p newTokenType
  */
-static Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner owner=getOwner(__LINE__);
+static Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType,bool onInput){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* _token=owned_token(__token(),owner);
 	if(_token!=NULL){
 		_token->text=owned_string(__string(),Msubowner(owner,1));
@@ -2900,7 +2922,7 @@ static Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationow
 
 			// MDH@10APR2024: we can put the following code in a separate function possibly adapting newTokenType
 			_token->type=newTokenType; // we need to do this because tokenPropertiesPropagated initializes its local newTokenType to the type of the successor of prevToken 
-			if(!tokenPropertiesPropagated(prevToken))newTokenType=TT_ERROR;
+			if(!tokenPropertiesPropagated(prevToken,onInput))newTokenType=TT_ERROR;
 		}
 		/////if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): _token->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
@@ -2921,7 +2943,10 @@ static Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationow
 		*/
 	}
 	if(NULL==_token){
-		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a new token.");
+		if(onInput)
+			if(inputErrorFunction)(*inputErrorFunction)("Failed to create a new token.");else;
+		else
+			outputError("Failed to create a new token");
 		return NULL;
 	}
 	_token->type=newTokenType;
@@ -2936,18 +2961,26 @@ static Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationow
  * @param tokenType
  * @return a new command token following \p lastCommandToken of type \p tokenType
  */
-Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/){Mallocationowner owner=getOwner(__LINE__);
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool onInput){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//				but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=owned_token(_getToken(lastCommandToken,tokenType),owner);
+	Mtoken* _newCommandToken=owned_token(_getToken(lastCommandToken,tokenType,onInput),owner);
 	// MDH@10APR2024 TODO: the following is weird because _getToken could change the type of _newCommandToken to TT_ERROR which would be overwritten again by the following 
 	if(_newCommandToken!=NULL){
-		if(inputErrorFunction)if(tokenType!=TT_ERROR&&_newCommandToken->type==TT_ERROR)(*inputErrorFunction)("Assumed new error token type corrected!"); // MDH@10APR2024
+		if(tokenType!=TT_ERROR&&_newCommandToken->type==TT_ERROR){
+			if(onInput)
+				if(inputErrorFunction)(*inputErrorFunction)("Assumed new error token type corrected!\n");else;
+			else
+				outputError("Assumed new error token type corrected");
+		}
 		setTokenType(_newCommandToken,tokenType);
 	}else
 	if(amVerboseDebugging())
-		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
+		if(onInput)
+			if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token.\n");else;
+		else
+			outputError("Failed to create a command token");
 	return disowned_token(_newCommandToken,owner);
 }
 
@@ -2964,7 +2997,7 @@ Mcommand* _getNewCommand(bool withFirstToken,Mtoken const * const offsetToken){M
 	if(_command!=NULL){
 		// if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
-			Mtoken* firstToken=owned_token(_getNewCommandToken(offsetToken,TT_EXPRESSION/*,endInput*/),Msubowner(owner,1)); // MDH@24MAY2020: obtain ownership immediately
+			Mtoken* firstToken=owned_token(_getNewCommandToken(offsetToken,TT_EXPRESSION,false),Msubowner(owner,1)); // MDH@24MAY2020: obtain ownership immediately
 			if(firstToken!=NULL){ // we've got a first token allocated
 				// if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
 				_command->_firstToken=firstToken;
@@ -14372,7 +14405,7 @@ int8_t getBlockKeywordId(char const * const keyword){
  * @return true on success
  * @return false on failure
  */
-bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_command){
+bool addBlockCommand(Mcommand const * const command){
 	if(command!=NULL&&command->_firstToken!=NULL){
 		output("Embedding a block command!\n");
 		// TODO the problem with the environment itself is that we do not know who owns it 
@@ -14381,10 +14414,10 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 		if(blockEnvironment!=NULL){
 			// MDH@12APR2024: since environment->insertToken now points to command->_firstToken as it must be
 			//                we do not need offsetToken anymore and can use the continuationToken in the parent env.
-			Menvironment* environment=blockEnvironment->_parent->value._environment;
-			if(NULL==environment){outputBug("No embedding command environment");return false;}
+			Menvironment* hostEnvironment=blockEnvironment->_parent->value._environment;
+			if(NULL==hostEnvironment){outputBug("No host command environment");return false;}
 			output("Embedding environment available.\n");
-			Mtoken* nextInsertToken=environment->continuationToken;
+			Mtoken* nextInsertToken=hostEnvironment->continuationToken;
 			if(NULL==nextInsertToken){outputBug("No continuation token");return false;}
 			output("Continuation token of embedded command available.\n");
 			/*
@@ -14412,15 +14445,15 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 				blockEnvironment->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
 				firstSignificantCommandToken->prev=blockEnvironment->insertToken;
 			}else
-				outputWarning("No significant first embedded command token");
+				outputWarning("No significant first subcommand token");
 			// connect end of command to where the super command continues
-			command->_lastToken->next=nextInsertToken;
-			nextInsertToken->prev=command->_lastToken;
+			command->_lastToken->next=nextInsertToken; // links the command's last token to the continuation token
+			nextInsertToken->prev=command->_lastToken; // and back
 			output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
 			// propagate the offset token properties until bumping in a placeholder token (if any)
 			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
-			while(tokenPropertiesPropagated(token)){
+			while(tokenPropertiesPropagated(token,false)){
 				output("Properties of '");outputToken(token);output("' propagated!\n");
 				token=token->next;
 				if(token==NULL){output("No further tokens to propagate properties from.\n");break;}
@@ -14430,7 +14463,7 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
 			}
 			output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
-			blockEnvironment->insertToken=command->_lastToken;
+			blockEnvironment->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
 			blockEnvironment->blockCommandsInserted=true;
 			return true;
 			// not ending the block yet but if we do we'd know where to continue searching for the next placeholder!!
@@ -14458,7 +14491,7 @@ bool addBlockCommand(Mcommand const * const command,Mallocationowner owner_comma
  * @return true 
  * @return false 
  */
-bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken){Mallocationowner owner=getOwner(__LINE__);
+bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken,Mallocationowner ownerToken){Mallocationowner owner=getOwner(__LINE__);
 	// command is allowed to be NULL which means do not replace the incompleteCommand!!
 	// we have to add a new execution environment
 	if(placeholderToken!=NULL){
@@ -14494,32 +14527,36 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 						// TODO should we force embed either '[' when L or '(' when A? 
 						switch(_blockEnvironment->subcommandBlockType){
 							case 'a':case 'A':
-								prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_FUNCTION_CALL);
+								prevPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_EXPRESSION,false),ownerToken);
 								if(prevPlaceholderToken!=NULL){
 									string_append_char(prevPlaceholderToken->text,'(');
 									prevPlaceholderToken->significantCharacterCount=1;
+									nextPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL,false),ownerToken);
+									if(nextPlaceholderToken!=NULL){
+										string_append_char(nextPlaceholderToken->text,')');
+										nextPlaceholderToken->significantCharacterCount=1;
+										nextPlaceholderToken->next=placeholderToken->next;
+									}else
+										outputError("Failed to embed )");
 								}else
 									outputError("Failed to embed (");
 								/* leave the closer to the end of the block
-								nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL);
-								string_append_char(nextPlaceholderToken->text,')');
-								nextPlaceholderToken->significantCharacterCount=1;
-								nextPlaceholderToken->next=placeholderToken->next;
 								*/
 								break;
 							case 'l':case 'L':
-								prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_LIST);
+								prevPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_LIST,false),ownerToken);
 								if(prevPlaceholderToken!=NULL){
 									string_append_char(prevPlaceholderToken->text,'[');
 									prevPlaceholderToken->significantCharacterCount=1;
+									nextPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_END_OF_LIST,false),ownerToken);
+									if(nextPlaceholderToken!=NULL){
+										string_append_char(nextPlaceholderToken->text,']');
+										nextPlaceholderToken->significantCharacterCount=1;
+										nextPlaceholderToken->next=placeholderToken->next;
+									}else
+										outputError("Failed to embed ]");
 								}else
 									outputError("Failed to embed [");
-								/* leave the closer to the end of the block
-								nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_LIST);
-								string_append_char(nextPlaceholderToken->text,']');
-								nextPlaceholderToken->significantCharacterCount=1;
-								nextPlaceholderToken->next=placeholderToken->next;
-								*/
 								break;
 						}
 					}else // the default is determined by the type of the token following
