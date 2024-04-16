@@ -2126,7 +2126,7 @@ Mallocationowner owner_registeredcommands=(Mallocationowner){MI_MAIN,__LINE__,1}
 bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==command)return false;Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		Menvironment* environment=getExecutionEnvironment();
-		if(environment==NULL){outputBug("Environment vanished.");return false;}
+		if(environment==NULL){outputBug("Environment vanished");return false;}
 		if(environment->commandCount==environment->commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			Mregisteredcommand* newRegisteredCommands=

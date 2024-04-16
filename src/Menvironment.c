@@ -105,14 +105,23 @@ bool pushExecutionEnvironment(Menvironment * const _environment){Mallocationowne
 		outputExecutionEnvironmentName("New execution environment '","'.\n");
 	// MDH@16APR2024: how about storing the parent environment variable map as variable ` in the child environment?
 	//                unless getting a variable we distinguish ` from anything that starts with ` like `x to indicate the local variable x
+	/*
 	if(_environment->execution!=NULL&&_environment->_variableMap!=NULL&&_environment->_variableMap->numberOfElements==0){
 		output("Registering the variable map of the parent environment.\n");
-		if(!addVariable(_environment,getValueDataOwner(),"`",VT_MAP,true))
+		if(addVariable(_environment,getValueDataOwner(),"`",VT_MAP,false)){
+			output("Parent environment variable map reference added.\n");
+			if(setVariable(_environment,"`",_getValueOfMap(_environment->execution->value._environment->_variableMap))){
+				output("Parent environment variable map reference initialized.\n");
+				if(setImmutable(_environment->_variableMap->_first->_variable,true)!=M_LL_INVALID)
+					output("Changing the referenced parent environment variable map blocked!\n");
+				else
+					outputError("Failed to make the parent environment variable map reference immutable");
+			}else
+				outputError("Failed to initialize the parent environment variable map");
+		}else
 			outputError("Failed to register the parent environment variable map");
-		else
-		if(!setVariable(_environment,"`",_getValueOfMap(_environment->execution->value._environment->_variableMap)))
-			outputError("Failed to initialize the parent environment variable map");
 	}
+	*/
 	return true;
 }/* NOT VALIDATED */
 // MDH@25OCT2021: the brilliant idea I had two days ago will return the value that wraps the popped environment
@@ -1076,7 +1085,7 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 					if(amVerboseDebugging())output("Variable '%s' to be created.\n",name);
 					// we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
 					// MDH@08JUN2020: _getVariable() adjusted to accept an Mchars* properly owned to start with (and freed automatically on failure)
-					_variable=owned_variable(_getVariable(_getChars(name),(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
+					_variable=owned_variable(_getVariable(_getChars(name),(propertySeparator?VT_UNDEFINED:valuetype),immutable?1:0),owner); // creates the variable, free when not bound BUT that will NOT happen
 					if(_variable!=NULL){
 						if(amVerboseDebugging())output("Variable '%s' created.\n",name);
 						// store the references
@@ -1272,7 +1281,8 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 		}else
 		if(variable->_value!=NULL){
 			output("%sCannot change the value of variable '%s'",M_ERROR_PREFIX,name);
-			outputValue(" from '",variable->_value,"'");outputValue(" to '",_value,"': it is not mutable!\n");
+			outputValue(" from \n",variable->_value,"\n");outputValue("to \n",_value,"\n");
+			output(": it is not mutable!\n");
 		}else
 			output("%sCannot initialize the value of variable '%s': it is not mutable!\n",M_ERROR_PREFIX,name);
 	}else
