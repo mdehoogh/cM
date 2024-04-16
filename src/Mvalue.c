@@ -4482,6 +4482,10 @@ void free_environment(Menvironment* _environment/*,Mallocationowner owner_enviro
 		// output("Releasing the execution.\n"); // DEBUG
 		assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
 		// output("Freeing the variable map.\n"); // DEBUG
+
+		/* MDH@16APR2024: we do NOT want to delete the reference to the parent variable map which would be the first variable in the environment's variable map
+		if(strcmp("`",_environment->_variableMap->_first->_variable->_name))
+		*/
 		free_map(_environment->_variableMap/*,owner_environment*/);
 		// free_map(_environment->_functionMap); // MDH@04MAR2020: TODO do we need this??????
 		/* MDH@10JUL2019: only Menvironment has a function map!!   

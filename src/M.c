@@ -1537,13 +1537,14 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 			{
 				outputTimestamp();
 				echoToOutputFile();
+				/* MDH@16APR2024: removed, because we're now using the environment to get at the name, see below
 				Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner); // free asap
 				if(_environmentName!=NULL){
 					output(string(_environmentName));
 					promptLength=string_length(_environmentName);
 					FREE_STRING(_environmentName,owner);
 				}
-				
+				*/
 				/* replacing:
 				output("M");
 				promptLength=1;
@@ -1551,12 +1552,17 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				// MDH@09APR2024: we need the environment on multiple occasions
 				Menvironment* environment=getExecutionEnvironment();
 				char* environmentName=(environment!=NULL&&environment->_name!=NULL?environment->_name->chars:NULL);
+				if(environmentName!=NULL)
+					promptLength=output(environmentName);
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
 				if(getCurrentFunctionBodyInput()!=NULL&&environmentName!=NULL)
 					sprintf(str,"%lld",1+getNumberOfFunctionCommands(environmentName));	// replacing: printf("%lu",(commandCount+1));
 				else
+				if(environment!=NULL&&environment->subcommandBlockType!='1') // MDH@16APR2024: if only a single command expected no need to display the command index!!
 					sprintf(str,"%lld",(environment->commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-				promptLength+=output("[%s]",str);
+				else
+					str[0]=0;
+				if(str[0])promptLength+=output("[%s]",str);
 				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
 				promptLength+=output("%s"," = ");
 				clearScreenFromCursor();
@@ -6440,7 +6446,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				logToOutputFile("\nCommand: '%s'\n",string(_commandText));
 				FREE_STRING(_commandText,owner);
 				*/
-				logToOutputFile("\tInput character: '%c'\n",inputChar);
+				logToOutputFile("\tInput character: '%c'(%d)\n",inputChar,inputChar);
 			}
 
 			////////inputChar=getInputChar();
@@ -7079,7 +7085,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								///////////outputTokenColor(_userInputCommand->_lastToken); // and show the right color
 							}
 						}else
-						if(inputCharType!='`') // not a new line request character
+						if(inputCharType!='`') // not a new line request character MDH@16APR2024: ` is now the same as an L although that makes it usable anywhere in a variable name
 							inputCharType=switchToControlMode(_userInputCommand->_firstToken?"Failed to accept the character.":"Failed to create a new command.");
 						else
 							inputError("New line request character not allowed here!");

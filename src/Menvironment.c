@@ -90,7 +90,7 @@ size_t outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowne
  * @return true on success
  * @return false on failure
  */
-bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
+bool pushExecutionEnvironment(Menvironment * const _environment){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@28MAY2020: check if we actually obtain ownership of _environment at all
 	// MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
 	Mvalue* _environmentValue=(_environment!=NULL?_getValueOfEnvironment(_environment):NULL); // TODO check whether _environment passed in needs to be disowned or not (I think better not!!!)
@@ -101,8 +101,18 @@ bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner
 	assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
 	// replace the current execution environment with the new one
 	assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
-	if(amVerboseDebugging())
+	////if(amVerboseDebugging())
 		outputExecutionEnvironmentName("New execution environment '","'.\n");
+	// MDH@16APR2024: how about storing the parent environment variable map as variable ` in the child environment?
+	//                unless getting a variable we distinguish ` from anything that starts with ` like `x to indicate the local variable x
+	if(_environment->execution!=NULL&&_environment->_variableMap!=NULL&&_environment->_variableMap->numberOfElements==0){
+		output("Registering the variable map of the parent environment.\n");
+		if(!addVariable(_environment,getValueDataOwner(),"`",VT_MAP,true))
+			outputError("Failed to register the parent environment variable map");
+		else
+		if(!setVariable(_environment,"`",_getValueOfMap(_environment->execution->value._environment->_variableMap)))
+			outputError("Failed to initialize the parent environment variable map");
+	}
 	return true;
 }/* NOT VALIDATED */
 // MDH@25OCT2021: the brilliant idea I had two days ago will return the value that wraps the popped environment
@@ -583,6 +593,8 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 	if(NULL==name){if(report)outputError("No variable name specified requesting the variable");return NULL;}
 	// MDH@10MAR2020: taking care of variable names that end with @ which acts as dereference operator
 	size_t l=strlen(name);
+	// MDH@16APR2024: it's better to actually explicitly retrieve the variable map from the parent environment!! except that that map is NOT a variable itself
+	///////////if(l==1&&!strcmp(name,"`")&&_environment->_parent!=NULL)return _environment->_parent->value._environment->_variableMap; 
 	// MDH@25OCT2020 removing: if(l==0){if(report)outputError("Undefined variable name");return NULL;}
 	// MDH@12MAR2020: if `name` refers to a property in a map variable we have to determine if that property exists or not and return it if it does
 	//				in combination with containsVariable() we decided to 

@@ -103,7 +103,8 @@ const char M_ESCAPE_CHARACTER='\\'; // MDH@13OCT2020: the character to use to en
 const char M_NEWLINE_CHARACTER='\r'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@19OCT2020: I suppose using a character that will not be displayed is probably best!!!!
 const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator between map and property
-const char M_COMMAND_CONTINUATION_CHARACTER='`'; // MDH@28OCT2020: the only character unused left to continue a command because I couldn't use \ because that's the escape character in text
+// MDH@16APR2024: for now we forsake of a explicit command continuation (on next line) character because we need ` for something else now
+const char M_COMMAND_CONTINUATION_CHARACTER='\0'; // MDH@28OCT2020: the only character unused left to continue a command because I couldn't use \ because that's the escape character in text
 
 const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
 
@@ -148,11 +149,12 @@ unsigned long long M_MODULE_DEBUGGING=0; // MDH@05DEC2020: will be initialized i
 //								-------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
 // MDH@26OCT2020: all the i input characters can be associated with a macro, e.g. Ctrl-G (7) will insert get() into the command
 // MDH@28OCT2020: type of \ changed from W to e (i.e. the escape character), see what I can do with that elsewhere
+// MDH@16APR2024: ` character type changed from R (newline?) to L so we can simply use it in variable names, but with a special meaning! ` refers to the parent environment variable map
 /**
  * @brief for each possible input character the associated type
  * 
  */
-const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[e]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?LLLLLLLLLLLLLLLLLLLLLLLLLLL[e]%LLLLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 //const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[e]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~b";
 
@@ -235,33 +237,33 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
  * 
  */
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"?"  ,"C","` ; c  % )&*    > :	   ] }=  "}, /* EXPRESSION */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,"`R; CDS% )&*  , >?:	   ]{}=  "}, /* ONE CHARACTER UNARY !-+~ */ \
-{"(","!-+~","" ,"=" ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","` ; c  % )&*  , >?:	   ] }   "}, /* ASSIGNMENT = */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ",""   ,"C","`R; c  % )&*  , >?:	   ] }=e "}, /* Baeru finished bin.op. */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,"?"  ,"C","` ; c  % )&*    > :    ] }=  "}, /* EXPRESSION */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,"`R; CDS% )&*  , >?:    ]{}=  "}, /* ONE CHARACTER UNARY !-+~ */ \
+{"(","!-+~","" ,"=" ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","` ; c  % )&*  , >?:    ] }   "}, /* ASSIGNMENT = */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ," ",""   ,"C","`R; c  % )&*  , >?:    ] }=e "}, /* Baeru finished bin.op. */ \
 {""	,""    ,"" ,"=" ,""  ,""   ,"" ,""     ,"" ,""    ,""	   ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"C","`R;!cDS%()&*+-,.>?:LEN[]{} e~"}, /* BaErU unfinished bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; cDS% )&*  , >?:	   ]   e "}, /* BAeRu assignable repeatable */ \
-{"(","!-+~","" ,"=" ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  ,  ?:	   ]   e "}, /* BaERu comp. (<>) bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  , >?:	   ]   e "}, /* BAeru assignable bin.op. */ \
-{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  , >?:	   ]{} e "}, /* Taeru ternary op. (? only now) */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"" ,"" ,"" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; cDS% )&*  , >?:    ]   e "}, /* BAeRu assignable repeatable */ \
+{"(","!-+~","" ,"=" ,""  ,""   ,"" ,"R"    ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  ,  ?:    ]   e "}, /* BaERu comp. (<>) bin.op. */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  , >?:    ]   e "}, /* BAeru assignable bin.op. */ \
+{"(","!-+~","=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,"" ,""   ,"C","`R; c  % )&*  , >?:    ]{} e "}, /* Taeru ternary op. (? only now) */ \
 {""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,"LEN" ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"}","","" ,")",""   ,"C","`R;! DS%( &*+-  >?:   [ { =e~"}, /* REFERENCE to an existing variable */ \
-{""	,""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,"RLEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","` ;  DS (			   ?      {   ~"}, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""	,""    ,"=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,"LEN","."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,""  ,"}","","" ,"" ,""   ,"C","`R;! DS%()&*+-  >?:	    {  e~"}, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""	,""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,"RLEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","` ;  DS (        ?      {   ~"}, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""	,""    ,"=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,"LEN" ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,"" ,""   ,"C","`R;! DS%()&*+-  >?:     {  e~"}, /* NEW_VARIABLE (variable that does not exist yet) */ \
 {""	,""	   ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,""    ,""	  ,"RLEN.",",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","` ;  DS (		  	 ?      {   ~"}, /* PROPERTY (identifier starting with the property separator) */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,"" ,"?"  ,"C","` ; c  % )&*	  > :	     }=e "}, /* LIST ELEMENT (similar to expression) */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,"" ,"?"  ,"C","` ; c  % )&*	  > :      }=e "}, /* LIST ELEMENT (similar to expression) */ \
 {";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",","N"  ,"."   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS (		     ? L  [ {   ~"}, /* INTEGER: (signless) list of digits */ \
 {";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",",""   ,"N"   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS (	     . ? L  [ {   ~"}, /* REAL: part behind a decimal period */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"D","" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,""						   }, /* DQSTRING: double quoted string */ \
-{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"S","" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,""						   }, /* SQSTRING: single quoted string */ \
+{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"D","" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,""}, /* DQSTRING: double quoted string */ \
+{""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"" ,"S","" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,""}, /* SQSTRING: single quoted string */ \
 {";",""    ,"" ,"+" ,"!=","&"  ,">",""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"D","S","" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS%&( * - . ? LEN[ {  e~"}, /* END_DQSTRING: double quoted string at end of double quoted string */ \
 {";",""    ,"" ,"+" ,"!=","&"  ,">",""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS%&( * - . ? LEN[ {  e~"}, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,""    ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,")","?"  ,"C","` ; c  %& )*   .> :   	 }=e "}, /* LIST: [ starts a list */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,""    ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,")","?"  ,"C","` ; c  %& )*   .> :      }=e "}, /* LIST: [ starts a list */ \
 {";",""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","`R   DS  (		   ? LEN  {   ~"}, /* END_OF_LIST: behind ] that ends a list */ \
 {"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,""    ,"D","S","" ,"" ,"[","" ,"" ,"" ,"}","","" ,")",""   ,"C","` ; c  %& )*  ,.>?:    ]{ =e "}, /* MAP: { starts a map */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")",""   ,"C","` ; c  %& )*  , >?:	   ] }=e "}, /* MAP_VALUE: : starts a map value */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,"" ,"N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")",""   ,"C","` ; c  %& )*  , >?:    ] }=e "}, /* MAP_VALUE: : starts a map value */ \
 {";",""    ,"" ,""  ,"!=","&*" ,">","+"    ,"" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,")",""   ,"C","`R   DS% (   -	 ?:LEN  {  e~"}, /* END_OF_MAP: behind } that ends a map */ \
 {""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,"."    ,"" ,""   ,""    ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"" ,"","(","" ,""   ,"C","`R;!cDS%& )*+-, >?:   []{}=e~"}, /* FUNCTION: some identifier recognized as function name */ \
-{"(","!-+~","" ,""  ,""  ,"" 	 ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","?"  ,"C","` ; c  %&  *	  > :	   ] }=e "}, /* FUNCTION_CALL ( following the name of a function */ \
+{"(","!-+~","" ,""  ,""  ,"" 	 ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","" ,"{","" ,"" ,"","" ,")","?"  ,"C","` ; c  %&  *	  > :    ] }=e "}, /* FUNCTION_CALL ( following the name of a function */ \
 {";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","`R   DS  (		   ? L N  {   ~"}, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 {"" ,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,",",""   ,""    ,"" ,"" ,"" ,"" ,"" ,"]","" ,"" ,"" ,"","" ,")","LEN","C","`R;!cDS%( &*+- .>?:   [ {}=e~"}, /* TT_PLACEHOLDER ? */ \
 };
@@ -1261,12 +1263,55 @@ static long long pushInitializedEnvironment(Menvironment * const _withEnvironmen
 		result=M_FALSE;
 		Mmapelement* withNameMapelement=(localMap!=NULL?getMapelement(localMap,"."):NULL);
 		Mvariable* withNameVariable=(withNameMapelement!=NULL?withNameMapelement->_variable:NULL);
-		Mstring* _withNameText=(withNameVariable!=NULL?owned_string(_getValueText(withNameVariable->_value,true),owner):NULL);
+		Mstring* _withNameText=(withNameVariable!=NULL?owned_string(_getValueText(withNameVariable->_value,true),owner):owned_string(_getString("with"),owner));
 		// if a property "." is defined, it's text value will be the name of the with environment
 		if(_withNameText!=NULL){
 			if(_withEnvironment->_name!=NULL){freeChars(_withEnvironment->_name);_withEnvironment->_name=NULL;}
 			_withEnvironment->_name=owned_chars(_getChars(string(_withNameText)),Msubowner(owner,1));
 		}
+		// MDH@16APR2024: since pushing the environment will add as first variable the "`" variable pointing to the parent's variable map
+		//                we should append the localMap to the _variableMap afterwards, although come to think of it, let's not define "`" as first argument
+		_withEnvironment->_variableMap=owned_map(__map("with"),Msubowner(owner,1));
+		if(_withEnvironment->_variableMap!=NULL){ // we've got a variable map to fill
+			if(pushExecutionEnvironment(disowned_environment(_withEnvironment,owner))){ // _withEnvironment not bound!!!
+				// now append the variables in localMap to the with environment variable map
+				if(localMap!=NULL){
+					Mmap* withMap=_withEnvironment->_variableMap;
+					Mmapelement* localMapelement=localMap->_first;
+					while(localMapelement!=NULL){
+						Mvariable* localMapelementVariable=localMapelement->_variable;
+						if(localMapelementVariable!=NULL){
+							if(strcmp(localMapelementVariable->_name->chars,".")){
+								Mmapelement* _withMapelement=CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1)); // new map element to hold a copy
+								if(_withMapelement!=NULL){
+									// create a variable with the same name and value as the variable in mapelement
+									// MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
+									_withMapelement->_variable=_getVariableWithName(localMapelementVariable->_name->chars,localMapelementVariable->valuetype,localMapelementVariable->unlockCode/*true*/,Msubowner(owner,2));
+									if(_withMapelement->_variable!=NULL){
+										assignValue(&_withMapelement->_variable->_value,localMapelementVariable->_value); // 'copy' the value over
+										if(withMap->_last!=NULL)withMap->_last->_next=_withMapelement; // make the current last point to the new last
+										withMap->_last=_withMapelement; // replace current last by the new last
+										if(NULL==withMap->_first)withMap->_first=withMap->_last; // initialize first if necessary
+										withMap->numberOfElements++; // count one more
+									}
+								}else
+									output("%sFailed to copy the map attribute name '%s'.\n",M_ERROR_PREFIX,localMapelementVariable->_name->chars);
+							}
+						}else
+							output("%sFailed to copy map attribute '%s'.\n",M_ERROR_PREFIX,localMapelementVariable->_name->chars);
+						localMapelement=localMapelement->_next;
+					}
+					if(localMapelement!=NULL)
+						outputError("Not all with local variables registered");
+				}
+				result=M_TRUE;
+				output("Environment '%s' initialized.\n",_withEnvironment->_name->chars);
+			}else{
+				output("%sFailed to initialize environment '%s'.\n",M_ERROR_PREFIX,_withEnvironment->_name->chars);
+				free_environment(_withEnvironment);//////////_withEnvironment=NULL;
+			}
+		}
+		/* replacing:
 		// copy local map
 		// TODO what if we fail to copy the map????????
 		if(localMap!=NULL)_withEnvironment->_variableMap=owned_map(_getMapCopy(localMap),Msubowner(owner,1));
@@ -1278,12 +1323,13 @@ static long long pushInitializedEnvironment(Menvironment * const _withEnvironmen
 					output("%sFailed to initialize environment '%s'.\n",M_ERROR_PREFIX,_withEnvironment->_name->chars);
 				}else{
 					result=M_TRUE;
-					output("Environment '%s' initialized.",_withEnvironment->_name->chars);
+					output("Environment '%s' initialized.\n",_withEnvironment->_name->chars);
 				}
 			}else
 			if(withNameMapelement!=NULL)
 				outputError("Failed to remove the environment name from the local variables map");	
 		}
+		*/
 		if(result==M_FALSE&&_withEnvironment!=NULL){
 			/////////if(report)output("Freeing the with environment!");
 			FREE_ENVIRONMENT(_withEnvironment,owner);
