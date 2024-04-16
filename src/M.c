@@ -4639,9 +4639,10 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			lastCommandToken->type!=TT_FUNCTION)
 		return false;
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
-	char* _identifierName=_stringstart(lastCommandToken->text,getTokenSignificantCharacterCount(lastCommandToken)); // free asap
+	char* _identifierName=_getSignificantTokenCharacters(lastCommandToken); // replacing: (lastCommandToken->text,getTokenSignificantCharacterCount(lastCommandToken)); // free asap
+	logToOutputFile("Checking '%s'.\n",_identifierName);
 	if(lastCommandToken->type!=TT_FUNCTION){ // is it a function (now)?
-		if(getFunction(getExecutionEnvironment(),_identifierName)){ // yes, it is
+		if(getFunction(getExecutionEnvironment(),_identifierName)!=NULL){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
 			// MDH@20SEP2019: I suppose we need to ascertain that an opening parenthesis is associated with the token now, and no longer anything else
 			/* MDH@20SEP2019: removing:
@@ -4676,6 +4677,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			*/
 		}
 	}
+	logToOutputFile("Continuing to determine if '%s' is an existing variable!\n",_identifierName);
 	// check whether the variable exists or not
 	// MDH@07AUG2019: this variable could exist in this command, which we should check
 	if(lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
@@ -4689,6 +4691,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 				// MDH@12MAR2020: if containsVariable() returns -2 this only happens with a property reference that is invalid in which case the token should be considered an error
 				//				I suppose we should then change the token type to TT_ERROR in which case the type won't change from NEW_VARIABLE to VARIABLE or vice versa
 				variableExistsIndicator=containsVariable(NULL,_identifierName,-1);
+				logToOutputFile("Contains variable indicator: %d.\n",variableExistsIndicator);
 				switch(variableExistsIndicator){
 					case -5: // value of type MAP but no map defined (TODO is that a bug?????)
 					case -3: // value does not exist
@@ -4737,9 +4740,11 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			}
 		}else
 		if(lastCommandToken->type==TT_NEW_VARIABLE){ // a new variable
+			logToOutputFile("'%s' is still a new variable!\n",_identifierName);
 			if(variableExistsIndicator>0){ // now an existing variable
 				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);
 				if(endOfInput)updateLastTokenAutoCompletionText(false);
+				logToOutputFile("Re-outputting token!\n");
 				reoutputToken(lastCommandToken);
 				// DEBUG outputChar('X');
 				///// MDH@23SEP2019 removed: invalidateAutoCompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
@@ -7037,7 +7042,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						}
 					}
 				}else
-				if(inputChar){ 
+				if(inputChar){
+					logToOutputFile("Processing normal input character '%c'(%d).\n",inputChar,inputChar);
 					// MDH@23JAN2024: _suggestedText is not created anymore, is to be replaced by getFirstSuggestedCharacter()
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//				we always need a command (being edited)

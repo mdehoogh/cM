@@ -1244,6 +1244,68 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 	return _result;
 }
 
+/**
+ * @brief creates the variables in \p newVariablesValue in the current environment
+ * 
+ * @param newVariablesValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE on failure, or M_LL_INVALID if no environment available
+ */
+Mvalue* Mcreate(Mvalue* newVariablesValue){Mallocationowner owner=getOwner(__LINE__);
+	long long result=M_LL_INVALID;
+	Menvironment* environment=getExecutionEnvironment();
+	if(environment!=NULL){
+		result=0;
+		if(newVariablesValue!=NULL){
+			switch(newVariablesValue->type){
+				case VT_MAP:
+					if(registerVariables(environment,getValueDataOwner(),newVariablesValue->value._map,NULL))
+						result=newVariablesValue->value._map->numberOfElements;
+					break;
+				case VT_LIST:
+					{
+						Mlist* list=newVariablesValue->value._list;
+						Mlistelement* listelement=(list!=NULL?list->_first:NULL);
+						Mstring* valueText=NULL;
+						while(listelement!=NULL){
+							valueText=owned_string(_getValueText(listelement->_value,true),owner);
+							if(valueText!=NULL){
+								if(addVariable(environment,getValueDataOwner(),string(valueText),VT_UNDEFINED,false))
+									result+=1;
+								FREE_STRING(valueText,owner);valueText=NULL;
+							}
+							listelement=listelement->_next;
+						}
+					}
+					break;
+				case VT_ARRAY:
+					{
+						Marray* array=newVariablesValue->value._array;
+						if(array!=NULL){
+							Mstring* valueText=NULL;
+							long long numberOfElements=array->numberOfElements;
+							while(--numberOfElements>=0){
+								valueText=owned_string(_getValueText(array->values[numberOfElements],true),owner);
+								if(valueText!=NULL){
+									if(addVariable(environment,getValueDataOwner(),string(valueText),VT_UNDEFINED,false))
+										result+=1;
+									FREE_STRING(valueText,owner);valueText=NULL;
+								}
+							}
+						}
+					}
+					break;
+				case VT_TEXT:
+					// TODO can we pass the text directly here without duplicating?????
+					if(addVariable(environment,getValueDataOwner(),newVariablesValue->value._text->_c,VT_UNDEFINED,false))
+						result=1;
+					break;
+			}
+		}else
+			outputBug("Current environment vanished");
+	}
+	return _getIntegerValue(result);
+}
+
 // MDH@11MAR2024: we want to be able to use block ifs, whiles, and fors
 
 // MDH@11MAR2024: by delegating registering a map of locals into an environment we can reuse this code
@@ -1492,11 +1554,12 @@ static int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId){ // replacing: const Mtoken* const specialFunctionCallToken){
 	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
 	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
+	logToOutputFile("Does '%s' exist in command?\n",identifierName);
 	bool found=false;
 	size_t l=strlen(identifierName);
-	Mtoken* commandIdentifier=command->_lastToken->prevIdentifier;
+	Mtoken* commandIdentifier=(command->_lastToken!=NULL?command->_lastToken->prevIdentifier:NULL);
 	uint64_t commandIdentifierEnvironmentId,commandIdentifierEnvironmentLevels,ander=(1<<M_BITS_PER_ENV_LEVEL)-1;
-	while(!found&&commandIdentifier){
+	while(found==false&&commandIdentifier!=NULL){
 		// if a function call or end of function call identifier, no need to check!!
 		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){ // a (new) variable
 			// MDH@11JAN2021: the commandIdentifier can now also be a map property, but only in calls to do() and forw() and I guess function()
@@ -1544,6 +1607,7 @@ bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierE
 		commandIdentifier=commandIdentifier->prevIdentifier;
 	}
 	//////////if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
+	if(found)logToOutputFile("Found!\n");else logToOutputFile("Not found!\n");
 	return found;
 }
 /**
@@ -1592,6 +1656,8 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 	//				and we can return -2 as well to indicate invalid input in which case a TT_ERROR token should be started
 	size_t l=strlen(name);
 	if(l==0)return 0;
+	int8_t result=0;
+	logToOutputFile("Looking for '%s'.\n",name);
 	Mvariable* variable=NULL;
 	// MDH@12MAR2020: with dot notation it starts with also determining whether or not the dot notation is valid 
 	//				ok the essential thing here is that the thing holding the last property must be a variable that has a map value
@@ -1601,36 +1667,48 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 		if(report>0)
 			output("Looking for map variable '%s'.\n",name);
 		else 
-		if(report<0)
+		if(report<0&&inputInfoFunction!=NULL)
 			(*inputInfoFunction)("Looking for map variable '%s'.\n",name);
 		variable=getVariable(_environment,name,report>0); // getVariable() uses output() and we can only use that when report>0
 		name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER; // put the last property separator back
-		if(NULL==variable)return -2; // if this happens the part in front of the period does not denote an existing variable (and it should)
-		if(NULL==variable->_value)return -3; // the part in front of it does not contain a value
-		if(variable->_value->type!=VT_MAP)return -4; // the part in front of it is not a map
-		// if the map contains property '' it's an existing property otherwise it's a non-existing property
-		Mmap* map=variable->_value->value._map;
-		if(NULL==map)return -5;
-		Mmapelement* mapelement=map->_first;
-		while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,lastPropertySeparator+1)))
-			mapelement=mapelement->_next;
-		// point variable to the _variable in the map element
-		variable=(mapelement!=NULL?mapelement->_variable:NULL);
+		if(NULL==variable)result=-2;else // if this happens the part in front of the period does not denote an existing variable (and it should)
+		if(NULL==variable->_value)result=-3;else // the part in front of it does not contain a value
+		if(variable->_value->type!=VT_MAP)result=-4;
+		else{ // the part in front of it is not a map
+			// if the map contains property '' it's an existing property otherwise it's a non-existing property
+			Mmap* map=variable->_value->value._map;
+			if(map!=NULL){
+				Mmapelement* mapelement=map->_first;
+				while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,lastPropertySeparator+1)))
+					mapelement=mapelement->_next;
+				// point variable to the _variable in the map element
+				variable=(mapelement!=NULL?mapelement->_variable:NULL);
+			}else
+				result=-5;
+		}
 	}else // ASSERT not a property reference!!!!!
-		variable=getVariable(_environment,name,false);
+		variable=getVariable(_environment,name,true/*false*/);
 	// if variable is undefined, return -1
-	if(NULL==variable){
-		if(report>0)output("'%s' does not exist.",name);else if(report<0)(*inputInfoFunction)("'%s' does not exist.",name);
-		return -1;
+	if(result==0){
+		if(NULL==variable){
+			if(report>0)output("'%s' does not exist.",name);else if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' does not exist.",name);
+			result=-1;
+		}
 	}
-	// ASSERT variable!=NULL
-	// if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
-	if(representsAFunction(variable)){
-		if(report>0)output("'%s' holds a function, not a value.\n",name);else if(report>0)(*inputInfoFunction)("'%s' holds a function, not a value.\n",name);
-		return 1;
+	if(result==0){
+		// ASSERT variable!=NULL
+		// if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
+		logToOutputFile("Looking for function '%s'.\n",name);
+		if(representsAFunction(variable)){
+			if(report>0)output("'%s' holds a function, not a value.\n",name);else if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' holds a function, not a value.\n",name);
+			result=1;
+		}else{
+			result=2;
+			if(report>0)output("'%s' exists.\n",name);else if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' exists.\n",name);
+		}
 	}
-	if(report>0)output("'%s' exists.\n",name);else if(report<0)(*inputInfoFunction)("'%s' exists.\n",name);
-	return 2;
+	logToOutputFile("Result: %d.\n",result);
+	return result;
 }/* VALIDATED */
 
 // MDH@11JAN2021: if we want to recognize local variables in do, for with, and function commands, we will need to be able to remember the map properties of the first argument to these function calls
@@ -1712,11 +1790,11 @@ static size_t popLocalvariables(uint64_t envid){
  * @return true 
  * @return false 
  */
-bool existsAsLocalVariable(char* identifierName,uint64_t envid){
+bool existsAsLocalVariable(char const * const identifierName,uint64_t envid){
 	// if(inputInfoFunction)(*inputInfoFunction)("Checking the existence of '%s' in environment '%llu'.\n",identifierName,envid);
-	if(!_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
+	if(NULL==_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
 	Mlocalvariables* localvariables=_lastLocalvariables;
-	while(localvariables&&!isMapProperty(localvariables->mapValue->value._map,identifierName))localvariables=localvariables->_prev;
+	while(localvariables!=NULL&&!isMapProperty(localvariables->mapValue->value._map,identifierName))localvariables=localvariables->_prev;
 	return(localvariables!=NULL);
 }
 
@@ -5867,6 +5945,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 			// MDH@26MAR2020: BUT in order to be able to put a value into the variable we need the address of the value pointer, i.e. the value holder so to speak
 			//				i.e. we need a pointer to where the value pointer is stored, could we be using & on the value pointer being returned to get at the holder?????????
 			// MDH@28MAR2020: if we allow item index elements to be lists we need an array of value holders
+			output("Looking for value holder '%s'.\n",_valuereference->_name->chars);
 			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name->chars);
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 			if(valueholder!=NULL&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
@@ -5874,6 +5953,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				if(NULL==itemidList->_first)
 					if(appendedToList(itemidList,owner_valuereference,(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY?_getIntegerValue(M_LL_INVALID):_getTextValue("'"),M_LL_INVALID)<0)
 						return false;
+				outputList("Looking for elements '",itemidList,"'.\n");
 				result=true;
 				if(report)
 					outputInfo("************ Element(s) to set.");
@@ -14185,6 +14265,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@02APR2024: for now decided to use a separate function with a different name than "endwith" that approximately does the same but is also recognized to end() a block of commands
 			//                it's argument should be recognized as the result to store in the $-variable of the while of for loop (not applicable to then and else clauses as they don't require end)
 			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,"end",Mend,1,(char*[]){"result value"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER)}))return false;
+
+			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,"create",Mcreate,1,(char*[]){"variables map"},(Mvalue*[]){NULL}))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 			// if(!completedValueFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!

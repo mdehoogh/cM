@@ -105,7 +105,7 @@ bool pushExecutionEnvironment(Menvironment * const _environment){Mallocationowne
 		outputExecutionEnvironmentName("New execution environment '","'.\n");
 	// MDH@16APR2024: how about storing the parent environment variable map as variable ` in the child environment?
 	//                unless getting a variable we distinguish ` from anything that starts with ` like `x to indicate the local variable x
-	/*
+	/* decided to not do it this way but make getVariable() deal with it by looking at the top level property value
 	if(_environment->execution!=NULL&&_environment->_variableMap!=NULL&&_environment->_variableMap->numberOfElements==0){
 		output("Registering the variable map of the parent environment.\n");
 		if(addVariable(_environment,getValueDataOwner(),"`",VT_MAP,false)){
@@ -598,8 +598,8 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwn
  * @param report
  * @return the M variable with name \p name in M environment \p environment
  */
-Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * const name, bool report){ // MDH@10MAR2020: because we might want to cut off the last character name characters can not be const any more (between char and *)
-	if(NULL==name){if(report)outputError("No variable name specified requesting the variable");return NULL;}
+Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * /*const*/ name, bool report){ // MDH@10MAR2020: because we might want to cut off the last character name characters can not be const any more (between char and *)
+	if(NULL==name){if(report)logToOutputFile("%sNo variable name specified requesting the variable.\n",M_ERROR_PREFIX);return NULL;}
 	// MDH@10MAR2020: taking care of variable names that end with @ which acts as dereference operator
 	size_t l=strlen(name);
 	// MDH@16APR2024: it's better to actually explicitly retrieve the variable map from the parent environment!! except that that map is NOT a variable itself
@@ -613,10 +613,19 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 		char* propertySeparator=name;
 		// the 'root' name must be a variable in the current (environment) variable map
 		*nextPropertySeparator='\0'; // MDH@26SEP2023: much easier then: propertySeparator[nextPropertySeparator-propertySeparator]='\0'; // pointer arithmetic
-		Mvariable* variable=getVariable(_environment,propertySeparator,report);
+		
+		// MDH@16APR2024: when propertySeparator starts with '`' we should skip looking for the variable in the current environment but look for the remainder in the parent environment
+		Mvariable* variable=NULL;
+		if(strlen(propertySeparator)==0||_environment->_parent==NULL||propertySeparator[0]!='`'){ // not a reference to a parent environment variable
+			if(report)logToOutputFile("Looking for variable '%s' in the current environment.\n",propertySeparator);
+			variable=getVariable(_environment,propertySeparator,report);
+		}else{
+			if(report)logToOutputFile("Looking for variable '%s' in the parent environment.\n",(propertySeparator+1));
+			variable=getVariable(getValueEnvironment(_environment->_parent),propertySeparator+1,report);
+		}
 		//////// *nextPropertySeparator=M_PROPERTY_SEPARATOR_CHARACTER; // replacing: propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER;
-		if(NULL==variable){outputError("Variable not found!");return NULL;}
-		if(NULL==variable->_value){outputError("Variable not set!");return NULL;}
+		if(NULL==variable){if(report)logToOutputFile("%sVariable not found!\n",M_ERROR_PREFIX);return NULL;}
+		if(NULL==variable->_value){if(report)logToOutputFile("Variable not set!\n",M_ERROR_PREFIX);return NULL;}
 		Mvalue* value=variable->_value; // should be a map, list or array
 		while(value!=NULL&&nextPropertySeparator!=NULL){
 			//////outputValue("'",value,"'");
@@ -627,7 +636,7 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 			if(value->type==VT_MAP){
 				Mmap* map=value->value._map;
 				value=NULL;
-				if(report)output("Looking for property '%s' in '%s'.\n",propertySeparator,name);
+				if(report)logToOutputFile("Looking for property '%s' in '%s'.\n",propertySeparator,name);
 				Mmapelement* mapelement=(map!=NULL?map->_first:NULL);
 				while(mapelement!=NULL&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,propertySeparator)))
 					mapelement=mapelement->_next;
@@ -640,7 +649,7 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 				value=NULL;
 				if(array!=NULL){
 					long long index=atoll(propertySeparator);
-					if(report)output("Looking for element '%s' in '%s'.\n",propertySeparator,name);
+					if(report)logToOutputFile("Looking for element '%s' in '%s'.\n",propertySeparator,name);
 					if(index>0&&index<=array->numberOfElements)value=array->values[index-1];
 				}
 			}else
@@ -657,14 +666,14 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 			// ASSERT because there is a next property the property must have a map associated with it, so let's update map
 		}
 		// if we get here we definitely did not find the final property
-		if(report)output("Property '%s' not found.\n",name);
+		if(report)logToOutputFile("Property '%s' not found.\n",name);
 		return NULL;
 	}
 	// testing with: outputChar(M_DEREFERENCE_CHARACTER);
-	if(name[l-1]==M_DEREFERENCE_CHARACTER){
+	if(l>0&&name[l-1]==M_DEREFERENCE_CHARACTER){
 		// I need to cut off the last character, get the associated variable of that part
 		name[l-1]='\0';
-		if(report)output("Looking for the variable referenced by '%s'.\n",name);
+		if(report)logToOutputFile("Looking for the variable referenced by '%s'.\n",name);
 		Mvariable* variable=getVariable(_environment,name,report);
 		name[l-1]=M_DEREFERENCE_CHARACTER;
 		if(NULL==variable)return NULL;
@@ -677,30 +686,41 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 		// replacing (see explanation above): if(variable->valuetype!=VT_REFERENCE)return NULL;
 		variable=variable->_value->value._reference->variable;
 		if(NULL==variable)return NULL;
-		if(report)output("Referenced variable '%s'.\n",variable->_name);
+		if(report)logToOutputFile("Referenced variable '%s'.\n",variable->_name);
 		return variable;
 	}
 	// MDH@10MAR2020 END
 	// input valid
+	if(report)logToOutputFile("Looking for variable '%s'.\n",name);
 	Menvironment* environment=(_environment!=NULL?_environment:getExecutionEnvironment());
-	Mmap* variableMap=(environment!=NULL?environment->_variableMap:NULL);
+	if(environment==NULL){logToOutputFile("%sEnvironment missing!",M_BUG_PREFIX);return NULL;}
+	// if name starts with a backtick we should be looking for it in the parent environment when available!!!
+	if(l>1&&name[0]=='`'&&environment->_parent!=NULL){
+		char* _variableName=strdup(name+1);
+		if(report)logToOutputFile("Looking for variable '%s' in the parent environment!\n",_variableName);
+		Mvariable* variable=getVariable(getValueEnvironment(environment->_parent),_variableName,report);
+		free(_variableName);
+		return variable;
+	}
+	Mmap* variableMap=environment->_variableMap;
 	if(NULL==variableMap){
-		if(report)output("%sNo variables in environment to find '%s' in.\n",M_ERROR_PREFIX,name);
+		if(report)logToOutputFile("%sNo variables in environment to find '%s' in.\n",M_ERROR_PREFIX,name);
 		return NULL;
 	}
-	if(report)output("Looking for variable '%s' in '%s'.\n",name,environment->_name->chars);
+	if(environment->_name!=NULL)if(report)logToOutputFile("Looking for variable '%s' in '%s'.\n",name,environment->_name->chars);
 	///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
+	if(report)logToOutputFile("Iterating the variable map!\n");
 	Mmapelement* variableMapelement=variableMap->_first;
 	// as long as variable is defined, and the variable's name is not equal to the given name, continue
 	while(variableMapelement!=NULL&&
-			(NULL==variableMapelement->_variable||strcmp(variableMapelement->_variable->_name->chars,name)))
+			(NULL==variableMapelement->_variable||NULL==variableMapelement->_variable->_name||strcmp(variableMapelement->_variable->_name->chars,name)))
 		variableMapelement=variableMapelement->_next;
 	// MDH@20JUL2019: if found return
 	if(variableMapelement!=NULL){
-		if(report)output("Variable '%s' found in environment '%s'.\n",name,environment->_name->chars);
+		if(report)logToOutputFile("Variable '%s' found in environment '%s'.\n",name,environment->_name->chars);
 		return variableMapelement->_variable;
 	}
-	if(report)output("Variable '%s' NOT found in environment '%s'.\n",name,environment->_name->chars);
+	if(report)logToOutputFile("Variable '%s' NOT found in environment '%s'.\n",name,environment->_name->chars);
 	// if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
 	return (environment!=NULL&&environment->_parent!=NULL?getVariable(getValueEnvironment(environment->_parent),name,report):NULL);
 }/* VALIDATED */
@@ -1489,6 +1509,7 @@ Mfunction* getFunction(Menvironment const * _environment,char const * const func
 				functionmapelement=functionmapelement->_next;
 			}
 		}
+		logToOutputFile("'%s' is not a registered function!",functionName);
 		// MDH@04MAR2020: could now also be an anonymous function stored as variable value
 		Mmap* variableMap=_environment->_variableMap;
 		if(variableMap!=NULL){
@@ -1501,6 +1522,7 @@ Mfunction* getFunction(Menvironment const * _environment,char const * const func
 				variablemapelement=variablemapelement->_next;
 			}
 		}
+		logToOutputFile("'%s' is not an anonymous function!",functionName);
 		// might exist in the parent environment
 		if(_environment->_parent!=NULL)return getFunction(getValueEnvironment(_environment->_parent),functionName);
 	}
