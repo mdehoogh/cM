@@ -14526,6 +14526,107 @@ int8_t getBlockKeywordId(char const * const keyword){
 }
 
 /**
+ * @brief disowns \p _block owned by \p owner_block
+ * 
+ * @param _block 
+ * @param owner_block 
+ * @return Mblock* \p _block disowned
+ */
+static Mblock* disowned_block(Mblock const * const _block,Mallocationowner owner_block){
+	return (Mblock*)Mdisowned(_block,owner_block);
+}
+/**
+ * @brief sets the owner of \p _block to \p owner_block 
+ * 
+ * @param _block 
+ * @param owner_block 
+ * @return Mblock* \p _block owned
+ */
+static Mblock* owned_block(Mblock const * const _block,Mallocationowner owner_block){
+	return (Mblock*)Mowned(_block,owner_block);
+}
+// somehow can't call this thing __block() as that term is already defined somewhere else
+/**
+ * @brief returns a newly allocated block
+ * 
+ * @return Mblock* the newly allocated block
+ */
+static Mblock* _getNewBlock(){Mallocationowner owner=getOwner(__LINE__);
+	Mblock* _block=CALLOC_1(sizeof(Mblock),'B',owner);
+	return(_block!=NULL?disowned_block(_block,owner):NULL);
+}
+/**
+ * @brief frees \p block owned by \p owner_block
+ * 
+ * @param block the block to free
+ * @param owner_block the owner of \p block
+ */
+static void free_block(Mblock * const block){
+	if(block!=NULL){
+		if(block->_name!=NULL){freeChars(block->_name);block->_name=NULL;}
+		if(block->next!=NULL){free_block(block->next);block->next=NULL;}
+		FREE_1(block,'B');
+	}
+}
+
+#define FREE_BLOCK(block,owner_block) free_block(disowned_block(block,owner_block))
+
+/**
+ * @brief the first and last allocated block in a list of blocks
+ * 
+ */
+static Mblock *_firstBlock=NULL,*_lastBlock=NULL;static Mallocationowner owner_blocks=(Mallocationowner){MI_SHELL,__LINE__,1};
+
+/**
+ * @brief returns the current block
+ * 
+ * @return Mblock* the current block
+ */
+Mblock* getCurrentBlock(){return _lastBlock;} // exposes the last block TODO perhaps find another way to get and set current block properties
+
+/**
+ * @brief pushes \p block on the block stack
+ * 
+ * @param block 
+ * @return true on success
+ * @return false on failure
+ */
+static bool pushBlock(Mblock * const block){
+	if(block==NULL||_lastBlock==NULL)return false;
+	Mowned(block,owner_blocks); // take over block ownership
+	_lastBlock->next=block;
+	block->prev=_lastBlock;
+	_lastBlock=block; // makes block the current ('active') block
+	return true;
+}
+/**
+ * @brief pops the last block from the block stack
+ * 
+ * @return Mblock* the popped block
+ */
+static Mblock* popBlock(){
+	Mblock* blockToPop=_lastBlock;
+	if(blockToPop==NULL||blockToPop->next!=NULL)return NULL; // can only pop the last block
+	Mblock* prevBlockToPop=blockToPop->prev;
+	if(prevBlockToPop==NULL)return NULL; // we need a previous block, otherwise we would be popping the root block
+	FREE_BLOCK(blockToPop,owner_blocks);
+	_lastBlock=prevBlockToPop;
+	_lastBlock->next=NULL;
+	return blockToPop;
+}
+
+/**
+ * @brief initializes the subcommand block system
+ * 
+ * @return true on success
+ * @return false on failure
+ */
+bool blocksInitialized(){
+	_firstBlock=owned_block(_getNewBlock(),owner_blocks);
+	if(_firstBlock!=NULL)_lastBlock=_firstBlock;
+	return(_firstBlock!=NULL);
+}
+/**
  * @brief adds \p command to the list of block commands in the current environment
  * 
  * @param command 
@@ -14538,14 +14639,14 @@ bool addBlockCommand(Mcommand const * const command){
 		output("Embedding a block command!\n");
 		// TODO the problem with the environment itself is that we do not know who owns it 
 		//      unless we know every execution environment is essentially wrapped inside an Mvalue in which case we know who owns it!!
-		Menvironment* blockEnvironment=getExecutionEnvironment();
-		if(blockEnvironment!=NULL){
+		Mblock* block=_lastBlock;
+		if(block!=NULL){
 			// MDH@12APR2024: since environment->insertToken now points to command->_firstToken as it must be
 			//                we do not need offsetToken anymore and can use the continuationToken in the parent env.
-			Menvironment* hostEnvironment=blockEnvironment->_parent->value._environment;
-			if(NULL==hostEnvironment){outputBug("No host command environment");return false;}
+			Mblock* hostBlock=block->prev;
+			if(NULL==hostBlock){outputBug("No host command environment");return false;}
 			output("Embedding environment available.\n");
-			Mtoken* nextInsertToken=hostEnvironment->continuationToken;
+			Mtoken* nextInsertToken=hostBlock->continuationToken;
 			if(NULL==nextInsertToken){outputBug("No continuation token");return false;}
 			output("Continuation token of embedded command available.\n");
 			/*
@@ -14570,8 +14671,8 @@ bool addBlockCommand(Mcommand const * const command){
 			// skip over _firstToken to the first significant command token
 			Mtoken* firstSignificantCommandToken=command->_firstToken->next;
 			if(firstSignificantCommandToken!=NULL){
-				blockEnvironment->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
-				firstSignificantCommandToken->prev=blockEnvironment->insertToken;
+				block->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
+				firstSignificantCommandToken->prev=block->insertToken;
 			}else
 				outputWarning("No significant first subcommand token");
 			// connect end of command to where the super command continues
@@ -14591,8 +14692,8 @@ bool addBlockCommand(Mcommand const * const command){
 			}
 			output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
-			blockEnvironment->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
-			blockEnvironment->blockCommandsInserted=true;
+			block->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
+			block->blockCommandsInserted=true;
 			return true;
 			// not ending the block yet but if we do we'd know where to continue searching for the next placeholder!!
 			//////environment->continuationToken=nextInsertToken; // where to continue searching for the next plave holder token
@@ -14622,16 +14723,16 @@ bool addBlockCommand(Mcommand const * const command){
 bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken,Mallocationowner ownerToken){Mallocationowner owner=getOwner(__LINE__);
 	// command is allowed to be NULL which means do not replace the incompleteCommand!!
 	// we have to add a new execution environment
-	if(placeholderToken!=NULL){
-		Menvironment* _blockEnvironment=owned_environment(__environment(),owner);
-		if(_blockEnvironment!=NULL){
+	if(_lastBlock!=NULL&&placeholderToken!=NULL){
+		Mblock* _block=owned_block(_getNewBlock(),owner);
+		if(_block!=NULL){
 			///////int8_t blockKeywordId=-1;
 			Mtoken* startExpressionToken=placeholderToken->expr;
 			Mtoken* functionNameToken=(startExpressionToken!=NULL&&startExpressionToken->type==TT_FUNCTION_CALL?startExpressionToken->prev:NULL);
 			if(functionNameToken!=NULL){
 				char* _functionName=_getSignificantTokenCharacters(functionNameToken);
 				if(_functionName!=NULL){
-					_blockEnvironment->_name=owned_chars(_getChars(_functionName),Msubowner(owner,1));
+					_block->_name=owned_chars(_getChars(_functionName),Msubowner(owner,1));
 					free(_functionName);
 				}
 			}
@@ -14645,15 +14746,15 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			////////if(blockKeywordId<0)return true;
 			Mtoken *prevPlaceholderToken=placeholderToken->prev,*nextPlaceholderToken=placeholderToken->next;
 			// disconnect the placeholder token
-			if(pushExecutionEnvironment(disowned_environment(_blockEnvironment,owner))){
-				Menvironment* environment=_blockEnvironment->_parent->value._environment;
-				if(environment!=NULL){
-					if(command!=NULL)environment->incompleteCommand=command; // remember the command that has to be completed NOTE when receiving NULL environment->incompleteCommand has be be left alone!!!!!
+			if(pushBlock(disowned_block(_block,owner))){
+				Mblock* hostBlock=_block->prev;
+				if(hostBlock!=NULL){
+					if(command!=NULL)hostBlock->incompleteCommand=command; // remember the command that has to be completed NOTE when receiving NULL environment->incompleteCommand has be be left alone!!!!!
 					// MDH@15APR2024: the default (with no characters behind ?) is to let the next token decide whether multiple commands are allowed
 					if(string_length(placeholderToken->text)>1){
-						_blockEnvironment->subcommandBlockType=string_char(placeholderToken->text,1);
+						_block->subcommandBlockType=string_char(placeholderToken->text,1);
 						// TODO should we force embed either '[' when L or '(' when A? 
-						switch(_blockEnvironment->subcommandBlockType){
+						switch(_block->subcommandBlockType){
 							case 'a':case 'A':
 								prevPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_EXPRESSION,false),ownerToken);
 								if(prevPlaceholderToken!=NULL){
@@ -14688,19 +14789,19 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 								break;
 						}
 					}else // the default is determined by the type of the token following
-						_blockEnvironment->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'0':'1');
+						_block->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'0':'1');
 					if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
 					if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
 					// register the continuation token and the insert token
-					environment->continuationToken=nextPlaceholderToken; // remember where to continue looking for placeholder tokens
-					_blockEnvironment->insertToken=prevPlaceholderToken;
+					hostBlock->continuationToken=nextPlaceholderToken; // remember where to continue looking for placeholder tokens
+					_firstBlock->insertToken=prevPlaceholderToken;
 					// replacing:	_blockEnvironment->multipleCommandsAllowed=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT);
 					///////environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
 					return true;
 				}
-				outputBug("Subcommand environment vanished");
+				outputBug("Subcommand block vanished");
 			}else
-				outputError("Failed to activate the subcommand environment");
+				outputError("Failed to activate the subcommand block");
 			/* replacing:
 			if(_blockEnvironment->_name!=NULL){
 				Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
@@ -14722,7 +14823,7 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			}
 			*/
 			// failed to activate the block environment, so we have to free it again
-			FREE_ENVIRONMENT(_blockEnvironment,owner);
+			FREE_BLOCK(_block,owner);
 		}
 	}
 	return false;
@@ -14733,34 +14834,33 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
  * @return true on success
  * @return false on failure
  */
-Menvironment* endBlock(){
-	Menvironment* blockEnvironment=getExecutionEnvironment();
-	if(blockEnvironment!=NULL){
+Mblock* endBlock(){
+	return popBlock();
+	/* replacing:
+	if(environment!=NULL){
 		////////if(environment->blockKeywordId<0)return environment;
-		Mvalue* environmentValue=popExecutionEnvironment();
+		Mvalue* environmentValue=environment->_parent; // this line is not correct
 		if(environmentValue!=NULL){
-			/*
-			switch(blockEnvironment->subcommandBlockType){
-				case 'a':case 'A':
-					prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_FUNCTION_CALL);
-					string_append_char(prevPlaceholderToken->text,'(');
-					prevPlaceholderToken->significantCharacterCount=1;
-					nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL);
-					string_append_char(nextPlaceholderToken->text,')');
-					nextPlaceholderToken->significantCharacterCount=1;
-					nextPlaceholderToken->next=placeholderToken->next;
-					break;
-				case 'l':case 'L':
-					prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_LIST);
-					string_append_char(prevPlaceholderToken->text,'[');
-					prevPlaceholderToken->significantCharacterCount=1;
-					nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_LIST);
-					string_append_char(nextPlaceholderToken->text,']');
-					nextPlaceholderToken->significantCharacterCount=1;
-					nextPlaceholderToken->next=placeholderToken->next;
-					break;
-			}
-			*/
+			///switch(blockEnvironment->subcommandBlockType){
+			///	case 'a':case 'A':
+			///		prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_FUNCTION_CALL);
+			///		string_append_char(prevPlaceholderToken->text,'(');
+			///		prevPlaceholderToken->significantCharacterCount=1;
+			///		nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL);
+			///		string_append_char(nextPlaceholderToken->text,')');
+			///		nextPlaceholderToken->significantCharacterCount=1;
+			///		nextPlaceholderToken->next=placeholderToken->next;
+			///		break;
+			///	case 'l':case 'L':
+			///		prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_LIST);
+			///		string_append_char(prevPlaceholderToken->text,'[');
+			///		prevPlaceholderToken->significantCharacterCount=1;
+			///		nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_LIST);
+			///		string_append_char(nextPlaceholderToken->text,']');
+			///		nextPlaceholderToken->significantCharacterCount=1;
+			///		nextPlaceholderToken->next=placeholderToken->next;
+			///		break;
+			///}
 			return environmentValue->value._environment;
 		}
 		/*
@@ -14869,7 +14969,7 @@ Menvironment* endBlock(){
 			outputBug("Incomplete block command and/or insert token vanished");
 		}else
 			outputBug("Block environment command list vanished");
-	*/
 	}
 	return NULL;
+	*/
 }

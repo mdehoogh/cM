@@ -17,6 +17,16 @@ Mvalue* setdp(Mvalue* value);
 // end Decimal stuff
 
 // Mcommand stuff
+// MDH@28OCT2019: because now often we need both the first and last token in a command it's probably best to combine them in a single command
+/**
+ * @brief a structure to store a command in
+ * 
+ */
+typedef struct{
+	unsigned long long sourceCommandIndex; // MDH@18JUN2020: storing what this command is a duplicate of
+	Mtoken *_firstToken,*_lastToken;
+	/////////////////bool identifierContinuationIsDirty; // convenient to keep it with the command itself
+}Mcommand;
 
 Mcommand* owned_command(Mcommand* _command,Mallocationowner owner_command);
 Mcommand* disowned_command(Mcommand* _command,Mallocationowner owner_command);
@@ -126,6 +136,23 @@ bool shellInitialized(
 
 // MDH@18MAR2024: block stuff
 ///////int8_t getBlockKeywordId(char const * const keyword);
+typedef struct Mblock{
+	Mchars* _name;
+	// temporary fields that we need when we're collecting block commands that we use to complete the incompleted command (now stored as first element in the block command list)
+	/////Mlist* blockCommandList; // MDH@18MAR2024: may keep a list of block commands, that can either be transferred or executed
+	// parent environment keeps a reference to the incomplete command
+	Mcommand* incompleteCommand; // MDH@26MAR2024: the first token of the user input command that is being completed
+	// the child environment keeps track of whether or not this is the first added block command
+	bool blockCommandsInserted; // MDH@25MAR2024: the token that is to be replaced by the comma-delimited block commands
+	Mtoken* insertToken; // MDH@26MAR2024: where to insert each successive block command
+	Mtoken* continuationToken; // MDH@26MAR2024: the token following the placeholder token
+	int8_t blockKeywordId; // MDH@26MAR2024: this is going to be required so we will know whether or not insert the block commands as a list or as separate arguments
+	char subcommandBlockType; // MDH@02APR2024: whether or not commands to be embedded can or cannot be multiple commands (to be ended with calling the end function)
+	struct Mblock* prev;
+	struct Mblock* next;
+}Mblock;
+bool blocksInitialized(); // for initializing the subcommand block system
+Mblock* getCurrentBlock(); // returns the current block
 bool addBlockCommand(Mcommand const * const command);
 bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken,Mallocationowner ownerToken);
-Menvironment* endBlock();
+Mblock* endBlock();
