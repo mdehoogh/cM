@@ -555,9 +555,9 @@ Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner o
 #define __ENVIRONMENT(owner_environment) __environment()
 #endif
 
-Mstring* _getEnvironmentName(Menvironment* _environment); // for use in prompting
-Menvironment* getEnvironmentParent(Menvironment* _environment);
-Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
+Mstring* _getEnvironmentName(Menvironment const * _environment); // for use in prompting
+Menvironment* getEnvironmentParent(Menvironment const * const _environment);
+Menvironment* getValueEnvironment(Mvalue const * const _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 
 Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
 

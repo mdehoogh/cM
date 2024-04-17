@@ -1559,9 +1559,12 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				*/
 				// MDH@09APR2024: we need the environment on multiple occasions
 				Menvironment* environment=getExecutionEnvironment();
+				Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
+				/* replacing:
 				char* environmentName=(environment!=NULL&&environment->_name!=NULL?environment->_name->chars:NULL);
-				if(environmentName!=NULL)
-					promptLength=output(environmentName);
+				*/
+				if(_environmentName!=NULL)
+					promptLength=output(string(_environmentName));
 				// when inside a block of commands show the block name
 				if(blockCommandLevel>0){
 					Mstring* _blockName=owned_string(_getBlockName(),owner);
@@ -1570,15 +1573,16 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 						FREE_STRING(_blockName,owner);
 					}
 					if(getCurrentBlock()->subcommandBlockType!='1') // MDH@16APR2024: if only a single command expected no need to display the command index!!
-						sprintf(str,"%llu",(getCurrentBlock()->insertedBlockCommands+1));	// replacing: printf("%lu",(commandCount+1));
+						sprintf(str,"%lu",(getCurrentBlock()->insertedBlockCommands+1));	// replacing: printf("%lu",(commandCount+1));
 					else
 						str[0]=0;
 				}else
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
-				if(getCurrentFunctionBodyInput()!=NULL&&environmentName!=NULL)
-					sprintf(str,"%llu",1+getNumberOfFunctionCommands(environmentName));	// replacing: printf("%lu",(commandCount+1));
+				if(getCurrentFunctionBodyInput()!=NULL&&_environmentName!=NULL)
+					sprintf(str,"%lu",1+getNumberOfFunctionCommands(string(_environmentName)));	// replacing: printf("%lu",(commandCount+1));
 				else
-					sprintf(str,"%llu",environment->commandCount+1);
+					sprintf(str,"%lu",environment->commandCount+1);
+				if(_environmentName!=NULL)FREE_STRING(_environmentName,owner);
 				if(str[0])promptLength+=output("[%s]",str);
 				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
 				promptLength+=output("%s"," = ");
@@ -2171,7 +2175,7 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==
 		_registeredcommands[commandCount]=(Mregisteredcommand){owned_command(disowned_command(command,owner_command),owner_registeredcommands)};
 		if(commandIndex>0)_registeredcommands[commandCount].previousCommandIndex=commandCount-commandIndex+1; // will be positive for any positive commandIndex, because commandIndex is in [1,commandCount-1)
 		commandCount++;
-		environment->commandCount++;
+		// should be done before executing a command!!!! environment->commandCount++;
 		if(amVerboseDebugging())outputLine("Command registered!");
 		return true;
 	}
@@ -5740,6 +5744,7 @@ bool preparedForUserInput(){
 
 bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 	assert(_userInputCommand!=NULL);
+	getExecutionEnvironment()->commandCount++; // increment command count BEFORE evaluating as evaluating might create a new environment!!!!!
 	Mvalue* userInputCommandResultValue=NULL;
 	bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
 	// MDH@25OCT2020: immediately bind the result to the '' variable of the environment

@@ -3415,7 +3415,7 @@ Mdecimal* getValueDecimal(Mvalue* value,mpd_context_t const * mpd_context){
  * @param value 
  * @return Menvironment* the M environment stored in M value \p value
  */
-Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_ENVIRONMENT?value->value._environment:NULL);}
+Menvironment* getValueEnvironment(Mvalue const * const value){return(value!=NULL&&value->type==VT_ENVIRONMENT?value->value._environment:NULL);}
 
 /**
  * @brief returns a new M list of type \p valuetype
@@ -4535,7 +4535,7 @@ Menvironment* _getEnvironment(Mmap* _variableMap){Mallocationowner owner=getOwne
  * @param _environment 
  * @return Menvironment* the immediate parent of M environment \p _environment
  */
-Menvironment* getEnvironmentParent(Menvironment* _environment){
+Menvironment* getEnvironmentParent(Menvironment const * const _environment){
 	return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
 }/* VALIDATED */
 /**
@@ -4544,19 +4544,23 @@ Menvironment* getEnvironmentParent(Menvironment* _environment){
  * @param _environment 
  * @return Mstring* the new M string containing the full name of M environment \p _environment
  */
-Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getEnvironmentName(Menvironment const * _environment){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _environmentName=owned_string(__string(),owner);
 	if(_environmentName!=NULL){
 		Mstring* p=_environmentName;
 		while(p!=NULL&&_environment!=NULL){
-			if(_environment->_name!=NULL)p=string_prepend(p,_environment->_name->chars);
+			if(string_length(p))p=string_insert_char(p,0,'.');
+			if(_environment->_name!=NULL){
+				///////output("Prepending '%s'.\n",_environment->_name->chars);
+				p=string_prepend(p,_environment->_name->chars);
+			}
 			/////// printf("Prepending '%s'.\n",_environment->_name);
 			_environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
-			if(_environment!=NULL)p=string_insert_char(p,0,'.');
 		}
-		if(NULL==p){FREE_STRING(_environmentName,owner);_environmentName=NULL;}
+		if(p!=NULL)return disowned_string(_environmentName,owner);
+		FREE_STRING(_environmentName,owner);
 	}
-	return disowned_string(_environmentName,owner);
+	return NULL;
 }
 
 // additional function for wrapping environments and functions
