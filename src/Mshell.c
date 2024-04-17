@@ -14533,7 +14533,9 @@ int8_t getBlockKeywordId(char const * const keyword){
  * @return Mblock* \p _block disowned
  */
 static Mblock* disowned_block(Mblock const * const _block,Mallocationowner owner_block){
-	return (Mblock*)Mdisowned(_block,owner_block);
+	if(NULL==_block)return NULL;
+	if(_block->_name!=NULL)DISOWNED(_block->_name,owner_block);
+	return(Mblock*)DISOWNED(_block,owner_block);
 }
 /**
  * @brief sets the owner of \p _block to \p owner_block 
@@ -14543,7 +14545,9 @@ static Mblock* disowned_block(Mblock const * const _block,Mallocationowner owner
  * @return Mblock* \p _block owned
  */
 static Mblock* owned_block(Mblock const * const _block,Mallocationowner owner_block){
-	return (Mblock*)Mowned(_block,owner_block);
+	if(NULL==_block)return NULL;
+	if(_block->_name!=NULL)OWNED(_block->_name,Msubowner(owner_block,1));
+	return(Mblock*)OWNED(_block,owner_block);
 }
 // somehow can't call this thing __block() as that term is already defined somewhere else
 /**
@@ -14613,9 +14617,10 @@ Mstring* _getBlockName(){Mallocationowner owner=getOwner(__LINE__);
  */
 static bool pushBlock(Mblock * const block){
 	if(block==NULL||_lastBlock==NULL)return false;
+	if(Misowned(block))outputError("Block is still owned!");
 	_lastBlock->next=owned_block(block,owner_blocks);
 	block->prev=_lastBlock;
-	_lastBlock=block; // makes block the current ('active') block
+	_lastBlock=_lastBlock->next;
 	return true;
 }
 /**
@@ -14625,13 +14630,16 @@ static bool pushBlock(Mblock * const block){
  */
 static Mblock* popBlock(){
 	Mblock* blockToPop=_lastBlock;
-	if(blockToPop==NULL||blockToPop->next!=NULL)return NULL; // can only pop the last block
-	Mblock* prevBlockToPop=blockToPop->prev;
-	if(prevBlockToPop==NULL)return NULL; // we need a previous block, otherwise we would be popping the root block
-	FREE_BLOCK(blockToPop,owner_blocks);
-	_lastBlock=prevBlockToPop;
-	_lastBlock->next=NULL;
-	return blockToPop;
+	if(blockToPop!=NULL){
+		Mblock* prevBlockToPop=blockToPop->prev;
+		if(prevBlockToPop!=NULL){
+			_lastBlock=prevBlockToPop;
+			_lastBlock->next=NULL;
+			FREE_BLOCK(blockToPop,owner_blocks);
+			return blockToPop;
+		}
+	}
+	return NULL;
 }
 
 /**
@@ -14641,8 +14649,10 @@ static Mblock* popBlock(){
  * @return false on failure
  */
 bool blocksInitialized(){
-	_firstBlock=owned_block(_getNewBlock(),owner_blocks);
-	if(_firstBlock==NULL)return false;
+	Mblock* _newBlock=_getNewBlock();
+	if(NULL==_newBlock)return false;
+	if(Misowned(_newBlock))outputError("New block is still owned!");
+	_firstBlock=owned_block(_newBlock,owner_blocks);
 	_lastBlock=_firstBlock;
 	return true;
 }
