@@ -143,7 +143,7 @@ typedef struct Mblock{
 	// parent environment keeps a reference to the incomplete command
 	Mcommand* incompleteCommand; // MDH@26MAR2024: the first token of the user input command that is being completed
 	// the child environment keeps track of whether or not this is the first added block command
-	bool blockCommandsInserted; // MDH@25MAR2024: the token that is to be replaced by the comma-delimited block commands
+	size_t insertedBlockCommands; // MDH@25MAR2024: the token that is to be replaced by the comma-delimited block commands
 	Mtoken* insertToken; // MDH@26MAR2024: where to insert each successive block command
 	Mtoken* continuationToken; // MDH@26MAR2024: the token following the placeholder token
 	int8_t blockKeywordId; // MDH@26MAR2024: this is going to be required so we will know whether or not insert the block commands as a list or as separate arguments
@@ -153,6 +153,7 @@ typedef struct Mblock{
 }Mblock;
 bool blocksInitialized(); // for initializing the subcommand block system
 Mblock* getCurrentBlock(); // returns the current block
+Mstring* _getBlockName();
 bool addBlockCommand(Mcommand const * const command);
 bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken,Mallocationowner ownerToken);
 Mblock* endBlock();

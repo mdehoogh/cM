@@ -14583,6 +14583,26 @@ static Mblock *_firstBlock=NULL,*_lastBlock=NULL;static Mallocationowner owner_b
  * @return Mblock* the current block
  */
 Mblock* getCurrentBlock(){return _lastBlock;} // exposes the last block TODO perhaps find another way to get and set current block properties
+/**
+ * @brief returns the full name of the active subcommand blocks
+ * 
+ * @return Mstring* 
+ */
+Mstring* _getBlockName(){Mallocationowner owner=getOwner(__LINE__);
+	Mblock* block=_firstBlock->next;
+	if(block!=NULL){
+		Mstring* _blockName=owned_string(__string(),owner);
+		if(_blockName!=NULL){
+			do{
+				if(NULL==string_append_char(_blockName,'.'))break;
+				if(NULL==string_append_chars(_blockName,block->_name->chars,strlen(block->_name->chars)))break;
+				block=block->next;
+			}while(block!=NULL);
+			return disowned_string(_blockName,owner);
+		}
+	}
+	return NULL;
+}
 
 /**
  * @brief pushes \p block on the block stack
@@ -14593,8 +14613,7 @@ Mblock* getCurrentBlock(){return _lastBlock;} // exposes the last block TODO per
  */
 static bool pushBlock(Mblock * const block){
 	if(block==NULL||_lastBlock==NULL)return false;
-	Mowned(block,owner_blocks); // take over block ownership
-	_lastBlock->next=block;
+	_lastBlock->next=owned_block(block,owner_blocks);
 	block->prev=_lastBlock;
 	_lastBlock=block; // makes block the current ('active') block
 	return true;
@@ -14623,8 +14642,9 @@ static Mblock* popBlock(){
  */
 bool blocksInitialized(){
 	_firstBlock=owned_block(_getNewBlock(),owner_blocks);
-	if(_firstBlock!=NULL)_lastBlock=_firstBlock;
-	return(_firstBlock!=NULL);
+	if(_firstBlock==NULL)return false;
+	_lastBlock=_firstBlock;
+	return true;
 }
 /**
  * @brief adds \p command to the list of block commands in the current environment
@@ -14671,8 +14691,11 @@ bool addBlockCommand(Mcommand const * const command){
 			// skip over _firstToken to the first significant command token
 			Mtoken* firstSignificantCommandToken=command->_firstToken->next;
 			if(firstSignificantCommandToken!=NULL){
-				block->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
-				firstSignificantCommandToken->prev=block->insertToken;
+				if(block->insertToken!=NULL){
+					block->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
+					firstSignificantCommandToken->prev=block->insertToken;
+				}else
+					outputError("Insert token vanished");
 			}else
 				outputWarning("No significant first subcommand token");
 			// connect end of command to where the super command continues
@@ -14681,6 +14704,7 @@ bool addBlockCommand(Mcommand const * const command){
 			output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
 			// propagate the offset token properties until bumping in a placeholder token (if any)
+			output("Propagating token properties.\n");
 			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
 			while(tokenPropertiesPropagated(token,false)){
 				output("Properties of '");outputToken(token);output("' propagated!\n");
@@ -14693,7 +14717,7 @@ bool addBlockCommand(Mcommand const * const command){
 			output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
 			block->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
-			block->blockCommandsInserted=true;
+			block->insertedBlockCommands++;
 			return true;
 			// not ending the block yet but if we do we'd know where to continue searching for the next placeholder!!
 			//////environment->continuationToken=nextInsertToken; // where to continue searching for the next plave holder token
@@ -14794,7 +14818,7 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 					if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
 					// register the continuation token and the insert token
 					hostBlock->continuationToken=nextPlaceholderToken; // remember where to continue looking for placeholder tokens
-					_firstBlock->insertToken=prevPlaceholderToken;
+					_block->insertToken=prevPlaceholderToken;
 					// replacing:	_blockEnvironment->multipleCommandsAllowed=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT);
 					///////environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
 					return true;
@@ -14824,8 +14848,13 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			*/
 			// failed to activate the block environment, so we have to free it again
 			FREE_BLOCK(_block,owner);
-		}
-	}
+		}else
+			outputError("Failed to create a subcommand block");
+	}else
+	if(NULL==_lastBlock)
+		outputError("No initial subcommand block!");
+	else
+		outputError("Invalid input to start a subcommand block");
 	return false;
 }
 /**

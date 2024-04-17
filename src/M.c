@@ -1522,6 +1522,13 @@ void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
 	//outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
 	FREE_STRING(_promptTimestamp,owner);
 }
+
+/**
+ * @brief the subcommand block level
+ * 
+ */
+size_t blockCommandLevel=0;
+
 /**
  * @brief shows the prompt and sets the global prompt length \p promptLength accordingly
  * 
@@ -1555,14 +1562,23 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				char* environmentName=(environment!=NULL&&environment->_name!=NULL?environment->_name->chars:NULL);
 				if(environmentName!=NULL)
 					promptLength=output(environmentName);
+				// when inside a block of commands show the block name
+				if(blockCommandLevel>0){
+					Mstring* _blockName=owned_string(_getBlockName(),owner);
+					if(_blockName!=NULL){
+						promptLength+=output(string(_blockName));
+						FREE_STRING(_blockName,owner);
+					}
+					if(getCurrentBlock()->subcommandBlockType!='1') // MDH@16APR2024: if only a single command expected no need to display the command index!!
+						sprintf(str,"%llu",(getCurrentBlock()->insertedBlockCommands+1));	// replacing: printf("%lu",(commandCount+1));
+					else
+						str[0]=0;
+				}else
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
 				if(getCurrentFunctionBodyInput()!=NULL&&environmentName!=NULL)
-					sprintf(str,"%lld",1+getNumberOfFunctionCommands(environmentName));	// replacing: printf("%lu",(commandCount+1));
+					sprintf(str,"%llu",1+getNumberOfFunctionCommands(environmentName));	// replacing: printf("%lu",(commandCount+1));
 				else
-				if(getCurrentBlock()==NULL||getCurrentBlock()->subcommandBlockType!='1') // MDH@16APR2024: if only a single command expected no need to display the command index!!
-					sprintf(str,"%lld",(environment->commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-				else
-					str[0]=0;
+					sprintf(str,"%llu",environment->commandCount+1);
 				if(str[0])promptLength+=output("[%s]",str);
 				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
 				promptLength+=output("%s"," = ");
@@ -2136,7 +2152,7 @@ size_t commandBlocks=0;
 bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==command)return false;Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		Menvironment* environment=getExecutionEnvironment();
-		if(environment==NULL){outputBug("Environment vanished");return false;}
+		if(environment==NULL){outputBug("Environment vanished registering a command");return false;}
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			Mregisteredcommand* newRegisteredCommands=
@@ -3115,7 +3131,7 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 	commandPage=createUserInputCommandPage;
 	int32_t commandToShowIndex=10,lastCommandToShowIndex=commandCount-(commandPage*10);
 	Menvironment* environment=getExecutionEnvironment();
-	if(NULL==environment){outputBug("Environment vanished.");return;}
+	if(NULL==environment){outputBug("Environment vanished setting the command page");return;}
 	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
 		resetOutputColor();
 		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
@@ -4338,7 +4354,7 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){Mallocationowner owne
 	invalidateAutoCompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	if(commandIndex>0){
 		Menvironment* environment=getExecutionEnvironment();
-		if(NULL==environment){outputBug("Environment vanished.");return;}
+		if(NULL==environment){outputBug("Environment vanished setting the command index");return;}
 		// MDH@29OCT2019 should already have _userInputCommand equal to NULL: _userInputCommand->_lastToken=NULL; 
 		// replacing: _userInputCommand->_lastToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
 		Mcommand* command=_registeredcommands[commandCount-commandIndex]._command; // MDH@18JUN2020: 
@@ -4435,35 +4451,32 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
  * @return false on failure
  */
 bool createUserInputCommand(){
+	logToOutputFile("Creating the user input command.\n");
 	// MDH@24APR2019 obsolete: getCommandLength()=string_length(feedforwardText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
 	// if(amVerboseDebugging())inputInfo("Creating the new user input command.");
 	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
 	///////output("Creating user input command!\n");
-	Mtoken* offsetToken=getCurrentBlock()->insertToken;
+	Mblock* currentBlock=getCurrentBlock();
+	Mtoken* offsetToken=(currentBlock!=NULL?currentBlock->insertToken:NULL);
 	_userInputCommand=owned_command(_getNewCommand(true,offsetToken),owner_userInputCommand);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
-	if(_userInputCommand!=NULL&&_userInputCommand->_firstToken!=NULL){
+	if(_userInputCommand!=NULL){
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
 		updateLastTokenAutoCompletionText(false); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
-		// if(amVerboseDebugging())inputInfo("New user input command created.");
+		Mtoken* firstCommandToken=_userInputCommand->_firstToken;
 		// MDH@09APR2024: if the current environment has an insert token we have to copy most of the insert token fields
 		//                to the created first token in the new command, this is VERY essential because it there's an 
 		//                insert token, the entered command has to know what it will be continuing otherwise the fields
 		//                of the command will not be initialized correctly
-		Mblock* block=getCurrentBlock();
-		if(block!=NULL){
-			Mtoken* blockInsertToken=block->insertToken;
-			if(block!=NULL){
-				Mtoken* firstCommandToken=_userInputCommand->_firstToken;
-				////firstCommandToken->expr=environmentInsertToken->expr;
-				firstCommandToken->prevIdentifier=blockInsertToken->prevIdentifier;
-				///firstCommandToken->argument=environmentInsertToken->argument;
-				///firstCommandToken->envid=environmentInsertToken->envid;
-				// NOT: type, significantCharacterCount,text,offset,position,prev and next
-			}
-		}else
-			outputBug("Environment vanished!");
+		if(firstCommandToken!=NULL&&offsetToken!=NULL){
+			// if(amVerboseDebugging())inputInfo("New user input command created.");
+			////firstCommandToken->expr=environmentInsertToken->expr;
+			firstCommandToken->prevIdentifier=offsetToken->prevIdentifier;
+			///firstCommandToken->argument=environmentInsertToken->argument;
+			///firstCommandToken->envid=environmentInsertToken->envid;
+			// NOT: type, significantCharacterCount,text,offset,position,prev and next
+		}
 	}else
 		inputError("Failed to create a new user input command.");
 	return(_userInputCommand!=NULL);
@@ -5042,6 +5055,7 @@ const uint8_t NO_USER_INPUT_ERROR=128;
  * @return uint8_t 
  */
 uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
+	logToOutputFile("Accepting input character '%c'.",inputChar);
 	// MDH@11JUL2023: now I have to ascertain that M_NEWLINE_CHARACTER on a comment is accepted instead of rejected
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
@@ -5093,6 +5107,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 
 	// MDH@28OCT2019: all the code that deals with updating the tokens 
 	//				NOTE passing in the address of _userInputCommand->_lastToken, so it can be changed!!!!
+	logToOutputFile("Appending input character '%c'.\n",inputChar);
 	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(_userInputCommand/*,owner_userInputCommand*/,inputChar,inputCharacterType,endOfInput);
 	if(NULL==newLastCommandToEvaluateToken)return -1; // MDH@13DEC2023: can't actually return -1 though!!!!
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
@@ -5696,7 +5711,9 @@ bool interactiveSessionInitialized(){
 		;
 		outputChar(answer);newline();
 		if(answer!='Y'&&answer!='y')return false;
+		/*
 		if(!blocksInitialized()){outputError("Failed to initialize the subcommand block feature");return false;}
+		outputInfo("Subcommand block feature initialized.");*/
 	}
 	outputInfo("Ready for an interactive session.");
 	return true;
@@ -5720,12 +5737,6 @@ bool preparedForUserInput(){
 	setbuf(stdout,NULL);
 	return true;
 }
-
-/**
- * @brief the subcommand block level
- * 
- */
-size_t blockCommandLevel=0;
 
 bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 	assert(_userInputCommand!=NULL);
@@ -6202,9 +6213,15 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// prepare an interactive session
 	if(!interactiveSessionInitialized()){
-		outputError("Failed to initialize the interactive session.");
+		outputError("Failed to initialize the interactive session");
 		resetOutputColor();
 		exit(2);
+	}
+
+	if(!blocksInitialized()){
+		outputError("Failed to activate the subcommand block feature");
+		resetOutputColor();
+		exit(3);
 	}
 
 	resetOutputColor(); // just in case
@@ -7363,7 +7380,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						*/
 						// can we find the block keyword id?????? don't think we actually need it, hmmm although we need to know if it's a function that will create an environment!!!!!
 						if(startBlock(_userInputCommand,firstPlaceholderToken,Msubowner(owner_userInputCommand,1))){
-							output("Subcommand environment activated!\n"); ///DEBUGGING
+							output("Subcommand block activated!\n"); ///DEBUGGING
 							// get rid of the placeholder token
 							firstPlaceholderToken->next=NULL;FREE_TOKEN(firstPlaceholderToken,owner_userInputCommand);
 							/*
