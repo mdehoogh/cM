@@ -14760,15 +14760,39 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 	if(_lastBlock!=NULL&&placeholderToken!=NULL){
 		Mblock* _block=owned_block(_getNewBlock(),owner);
 		if(_block!=NULL){
+			////output("Subcommand block created!\n");
 			///////int8_t blockKeywordId=-1;
-			Mtoken* startExpressionToken=placeholderToken->expr;
-			Mtoken* functionNameToken=(startExpressionToken!=NULL&&startExpressionToken->type==TT_FUNCTION_CALL?startExpressionToken->prev:NULL);
-			if(functionNameToken!=NULL){
-				char* _functionName=_getSignificantTokenCharacters(functionNameToken);
-				if(_functionName!=NULL){
-					_block->_name=owned_chars(_getChars(_functionName),Msubowner(owner,1));
-					free(_functionName);
+			Mstring* _blockName=owned_string(__string(),owner);
+			if(_blockName!=NULL){
+				Mtoken* startExpressionToken=placeholderToken->expr;
+				Mtoken* functionNameToken=(startExpressionToken!=NULL&&startExpressionToken->type==TT_FUNCTION_CALL?startExpressionToken->prev:NULL);
+				if(functionNameToken!=NULL){
+					char* _functionName=_getSignificantTokenCharacters(functionNameToken);
+					if(_functionName!=NULL){
+						string_append_chars(_blockName,_functionName,strlen(_functionName));
+						///output("Function name appended!\n");
+						free(_functionName);
+					}
 				}
+				///output("Getting the placeholder text.\n");
+				char* _placeholderText=_getSignificantTokenCharacters(placeholderToken);
+				if(_placeholderText!=NULL){
+					///output("Appending the placeholder text.\n");
+					if(strlen(_placeholderText)>1){
+						///output("Placeholder text: '%s'.\n",_placeholderText);
+						string_append_chars(_blockName,_placeholderText,strlen(_placeholderText));
+					}
+					///output("Placeholder text appended.\n");
+					free(_placeholderText);
+				}else
+					outputError("No placeholder text!");
+				///output("Setting the name of the block.\n");
+				_block->_name=owned_chars(_getChars(string(_blockName)),Msubowner(owner,1));
+				///output("Name of block set!\n");
+				FREE_STRING(_blockName,owner);
+			}else{
+				outputError("Failed to create the block name");
+				_block->_name=owned_chars(_getChars("?"),Msubowner(owner,1));
 			}
 			/* replacing: 
 			int8_t blockKeywordId=getBlockKeywordId(_functionName);
@@ -14778,12 +14802,14 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			//// NOT HERE ANYMORE!!!! _blockEnvironment->placeholderToken=placeholderToken;
 			//// NOT HERE!!!! _blockEnvironment->continuationToken=placeholderToken->next;
 			////////if(blockKeywordId<0)return true;
+			///output("Pushing the subcommand block on the block stack.\n");
 			Mtoken *prevPlaceholderToken=placeholderToken->prev,*nextPlaceholderToken=placeholderToken->next;
 			// disconnect the placeholder token
 			if(pushBlock(disowned_block(_block,owner))){
 				Mblock* hostBlock=_block->prev;
 				if(hostBlock!=NULL){
 					if(command!=NULL)hostBlock->incompleteCommand=command; // remember the command that has to be completed NOTE when receiving NULL environment->incompleteCommand has be be left alone!!!!!
+					/* MDH@18APR2024: it's easier to let the user determine what to enclose the placeholder inside instead of using indicators in the placeholder text itself
 					// MDH@15APR2024: the default (with no characters behind ?) is to let the next token decide whether multiple commands are allowed
 					if(string_length(placeholderToken->text)>1){
 						_block->subcommandBlockType=string_char(placeholderToken->text,1);
@@ -14803,8 +14829,6 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 										outputError("Failed to embed )");
 								}else
 									outputError("Failed to embed (");
-								/* leave the closer to the end of the block
-								*/
 								break;
 							case 'l':case 'L':
 								prevPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_LIST,false),ownerToken);
@@ -14822,8 +14846,9 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 									outputError("Failed to embed [");
 								break;
 						}
-					}else // the default is determined by the type of the token following
-						_block->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'0':'1');
+					}else*/ 
+					// the default is determined by the type of the token following
+					_block->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'\0':'1');
 					if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
 					if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
 					// register the continuation token and the insert token

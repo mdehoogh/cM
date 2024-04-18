@@ -1528,6 +1528,35 @@ void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
  * 
  */
 size_t blockCommandLevel=0;
+/**
+ * @brief increments the command count as being shown in the prompt
+ * 
+ */
+void incrementPromptCommandCount(){
+	// if inside a function declaration no need to increment anything
+	if(blockCommandLevel>0)
+		getCurrentBlock()->insertedBlockCommands++;
+	else
+	if(getCurrentFunctionBodyInput()==NULL)
+		getExecutionEnvironment()->commandCount++;
+}
+
+size_t getNewPromptCommandIndex(char* environmentName,size_t defaultPromptCommandCount){Mallocationowner owner=getOwner(__LINE__);
+	// when inside a block of commands show the block name
+	if(blockCommandLevel>0){
+		Mstring* _blockName=owned_string(_getBlockName(),owner);
+		if(_blockName!=NULL){
+			promptLength+=output(string(_blockName));
+			FREE_STRING(_blockName,owner);
+		}
+		if(getCurrentBlock()->subcommandBlockType=='1')return 0; // MDH@16APR2024: if only a single command expected no need to display the command index!!
+		return(getCurrentBlock()->insertedBlockCommands+1);
+	}
+	// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
+	if(getCurrentFunctionBodyInput()!=NULL&&environmentName!=NULL)
+		return getNumberOfFunctionCommands(environmentName)+1;	// replacing: printf("%lu",(commandCount+1));
+	return defaultPromptCommandCount+1;
+}
 
 /**
  * @brief shows the prompt and sets the global prompt length \p promptLength accordingly
@@ -1565,6 +1594,11 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				*/
 				if(_environmentName!=NULL)
 					promptLength=output(string(_environmentName));
+				// MDH@18APR2024: now asking getNewPromptCommandIndex for the command index to use in the prompt
+				size_t newPromptCommandIndex=getNewPromptCommandIndex(string(_environmentName),environment->commandCount);
+				if(newPromptCommandIndex)
+					promptLength+=output("[%lu]",newPromptCommandIndex);
+				/* replacing (so we won't need str anymore)
 				// when inside a block of commands show the block name
 				if(blockCommandLevel>0){
 					Mstring* _blockName=owned_string(_getBlockName(),owner);
@@ -1582,8 +1616,9 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 					sprintf(str,"%lu",1+getNumberOfFunctionCommands(string(_environmentName)));	// replacing: printf("%lu",(commandCount+1));
 				else
 					sprintf(str,"%lu",environment->commandCount+1);
-				if(_environmentName!=NULL)FREE_STRING(_environmentName,owner);
 				if(str[0])promptLength+=output("[%s]",str);
+				*/
+				if(_environmentName!=NULL)FREE_STRING(_environmentName,owner);
 				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
 				promptLength+=output("%s"," = ");
 				clearScreenFromCursor();
@@ -5744,7 +5779,7 @@ bool preparedForUserInput(){
 
 bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 	assert(_userInputCommand!=NULL);
-	getExecutionEnvironment()->commandCount++; // increment command count BEFORE evaluating as evaluating might create a new environment!!!!!
+	incrementPromptCommandCount(); // replacing: getExecutionEnvironment()->commandCount++; // increment command count BEFORE evaluating as evaluating might create a new environment!!!!!
 	Mvalue* userInputCommandResultValue=NULL;
 	bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
 	// MDH@25OCT2020: immediately bind the result to the '' variable of the environment
