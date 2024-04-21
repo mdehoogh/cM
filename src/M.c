@@ -2384,7 +2384,7 @@ bool removeLastUserInputCommandToken(){
 	// MDH@20DEC2022: if removing the comma in a function call arguments list, we need to increment the number of expected arguments again
 	if(tokenToRemove->type==TT_LISTELEMENT&&tokenToRemove->expr&&tokenToRemove->expr->type==TT_FUNCTION_CALL){
 		tokenToRemove->expr->argument-=1;
-		inputInfo("Number of expected arguments: %lld.",-tokenToRemove->expr->argument-3);
+		////inputInfo("Number of expected arguments: %lld.",-tokenToRemove->expr->argument-3);
 	}
 	/////////////////////outputInfo("Removing last command token!");
 	removedLastCommandToken(_userInputCommand,owner_userInputCommand); // NOT using the result (which would be the new last command token)

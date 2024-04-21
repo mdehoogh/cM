@@ -299,21 +299,24 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
 			// MDH@20MAY2020 _decimalChars here eludes the dynamic allocation registration so essential to validate this function
 			char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT->mpd_context);
 			// output("Decimal rep: '%s'.\n",_decimalChars);
-			if(_decimalChars){
+			if(_decimalChars!=NULL){
 				_p=string_append(_p,_decimalChars);
 				// output("Decimal characters appended!");
-				if(_p){
+				if(_p!=NULL){
 					if(_decimal->repeating){
 						_p=string_insert_char(_p,string_length(_p)-_decimal->repeating,'[');
-						if(_p&&!fixedpoint)_p=string_append_char(_p,']');
+						if(_p!=NULL&&!fixedpoint)_p=string_append_char(_p,']');
 					}else{
 						// if there's a period in _p, and no 'e' we can insert a blank every 50 decimals
 						char* _period=strchr(_decimalChars,'.');
-						if(_period){
+						if(_period!=NULL){
 							if(!strchr(_decimalChars,'e')){
 								// output("**** Inserting blanks! ****\n");
 								size_t periodpos=(_period-_decimalChars); // index position of the period
-								while(periodpos+51<string_length(_p)){string_insert_char(_p,periodpos+51,' ');periodpos+=51;}
+								while(periodpos+51<string_length(_p)){
+									string_insert_char(_p,periodpos+51,' ');
+									periodpos+=51;
+								}
 								// output("**** Blanks inserted! ****\n");
 							}
 						}
@@ -322,10 +325,11 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
 				free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
 			}else
 				_p=NULL;
-			if(!_p){FREE_STRING(_decimalText,owner);_decimalText=NULL;}
+			if(NULL==_p){FREE_STRING(_decimalText,owner);_decimalText=NULL;}
 		}else
 			string_append_char(_decimalText,'?');
-	}else outputChar('?');
+	}/*else
+		outputChar('?');*/
 	return disowned_string(_decimalText,owner);
 }/* VALIDATED */
 
@@ -372,7 +376,7 @@ Mstring* _getDecimalJSON(Mdecimal const * const _decimal){Mallocationowner owner
 
 			p=string_append(p,JSON_OBJECT_END);
 			// if succeeding in creating the JSON decimal representation, return 
-			if(p)return disowned_string(_decimalJSON,owner);
+			if(p!=NULL)return disowned_string(_decimalJSON,owner);
 			FREE_STRING(_decimalJSON,owner); // not returned disowned, so free here
 		}
 	}
@@ -979,8 +983,10 @@ Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// the decimal with the highest decimal context determines the context to use
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
-		Mdecimalcontext* decimalcontext=(precision>=6?owned_decimalcontext(getDecimalcontext(precision),owner):M_DECIMALCONTEXT); // MDH@23JAN2023: take over decimal context ownership
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		// MDH@21APR2024: you can't take over the ownership of a decimal context because it's owned by a decimalcontext list element
+		Mdecimalcontext* decimalcontext=(precision>=6?getDecimalcontext(precision):M_DECIMALCONTEXT); // MDH@23JAN2023: take over decimal context ownership
+		// replacing:	Mdecimalcontext* decimalcontext=(precision>=6?owned_decimalcontext(getDecimalcontext(precision),owner):M_DECIMALCONTEXT); // MDH@23JAN2023: take over decimal context ownership
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:NULL);
 		if(mpd_context!=NULL){
 			// compute the sum
 			_decimal=owned_decimal(__decimal(mpd_context,0,false),owner);
@@ -1039,7 +1045,7 @@ Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
 		Mdecimalcontext* decimalcontext=(precision>=6?getDecimalcontext(precision):M_DECIMALCONTEXT);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:NULL);
 		if(mpd_context!=NULL){
 			// compute the sum
 			_decimal=owned_decimal(__decimal(mpd_context,0,false),owner);
@@ -1097,7 +1103,7 @@ Mdecimal* _ddiv(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
 		Mdecimalcontext* decimalcontext=(precision>=6?getDecimalcontext(precision):M_DECIMALCONTEXT);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:NULL);
 		if(mpd_context!=NULL){
 			// compute the quotient
 			_decimal=owned_decimal(__decimal(mpd_context,0,false),owner);
@@ -1154,7 +1160,7 @@ Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		// TODO should this double the precision???????
 		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
 		Mdecimalcontext* decimalcontext=(precision>=6?getDecimalcontext(precision):M_DECIMALCONTEXT);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:NULL);
 		if(mpd_context!=NULL){
 			// compute the quotient
 			_decimal=owned_decimal(__decimal(mpd_context,0,false),owner);
@@ -2605,8 +2611,8 @@ static mpd_t* _getCORDICsinorcos(Mdecimalcontext const * const decimalcontext,mp
 Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x!=NULL){
 		// use the same decimal context as used by x
-		if(decimalcontext==NULL)decimalcontext=getDecimalcontext(x->prec);
-		if(decimalcontext==NULL)decimalcontext=M_DECIMALCONTEXT;
+		if(NULL==decimalcontext)decimalcontext=getDecimalcontext(x->prec);
+		if(NULL==decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext!=NULL){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
 			if(decimalcontext->pi==NULL||decimalcontext->predefinedsinedeltaangle==NULL)
@@ -2723,8 +2729,8 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x!=NULL){
 		// use the same decimal context as used by x
-		if(decimalcontext==NULL)decimalcontext=getDecimalcontext(x->prec);
-		if(decimalcontext==NULL)decimalcontext=M_DECIMALCONTEXT;
+		if(NULL==decimalcontext)decimalcontext=getDecimalcontext(x->prec);
+		if(NULL==decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext!=NULL){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
 			if(decimalcontext->pi==NULL||decimalcontext->predefinedsinedeltaangle==NULL)
@@ -2917,8 +2923,8 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x!=NULL){
 		// use the same decimal context as used by x
-		if(decimalcontext==NULL)decimalcontext=getDecimalcontext(x->prec);
-		if(decimalcontext==NULL)decimalcontext=M_DECIMALCONTEXT;
+		if(NULL==decimalcontext)decimalcontext=getDecimalcontext(x->prec);
+		if(NULL==decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext!=NULL){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
 			// MDH@08NOV2022 NOTE: calling pi_decimal() will force the computation of the predefined sines!!!!
@@ -3182,8 +3188,8 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x!=NULL){
 		// use the same decimal context as used by x
-		if(decimalcontext==NULL)decimalcontext=getDecimalcontext(x->prec);
-		if(decimalcontext==NULL)decimalcontext=M_DECIMALCONTEXT;
+		if(NULL==decimalcontext)decimalcontext=getDecimalcontext(x->prec);
+		if(NULL==decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext!=NULL){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
 			// MDH@08NOV2022 NOTE: calling pi_decimal() will force the computation of the predefined sines!!!!
@@ -3340,7 +3346,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){Mallocationowner owner=getOwner(__LINE__);
 	if(x!=NULL){
 		// use the same decimal context as used by x
-		if(decimalcontext==NULL)decimalcontext=getDecimalcontext(x->prec);
+		if(NULL==decimalcontext)decimalcontext=getDecimalcontext(x->prec);
 		if(NULL==decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext!=NULL){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)

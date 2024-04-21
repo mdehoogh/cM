@@ -2801,7 +2801,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 				//  MDH@20DEC2022: used to assign -2 but now -3 minus the number of function arguments (so -2 would then be considered an unknown function)
 				long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);////////outputChar('X');
 				_token->argument=(numberOfExpectedArguments<0?-2:-numberOfExpectedArguments-3);
-				// informing the user
+				/* informing the user
 				if(!onInput||inputInfoFunction){
 					if(numberOfExpectedArguments>=0){
 						if(onInput)
@@ -2813,7 +2813,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 							(*inputInfoFunction)("Number of expected arguments unknown!");
 						else
 							output("Number of expected arguments unknown!\n");
-				}
+				}*/
 			}else
 				_token->argument=1;
 			free(_functionName); // MDH@10APR2024: moved from after the next block here!!
@@ -2888,7 +2888,8 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 							_token->argument=_token->argument-1;
 							if(amVerboseDebugging())
 							if(!onInput||inputInfoFunction)
-								if(onInput)(*inputInfoFunction)("Local variables argument!");else output("Local variables argument!\n");
+								if(onInput)(*inputInfoFunction)("Local variables argument!");
+								else output("Local variables argument!\n");
 							// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
 							//				what we would do on ) 
 							if(_token->argument==0){
@@ -2929,7 +2930,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 								if(onInput)(*inputErrorFunction)("Another argument not allowed.");else outputError("Another argument not allowed");
 							}else{
 								_token->expr->argument=_token->expr->argument+1;
-								//if(amVerboseDebugging())
+								if(amVerboseDebugging())
 								if(!onInput||inputInfoFunction)
 								if(onInput)(*inputInfoFunction)("Number of expected arguments: %lld.",-_token->expr->argument-3);
 								else output("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
@@ -2937,7 +2938,8 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 							//////outputChar('P');
 						}else{
 							if(!onInput||inputInfoFunction)
-							if(onInput)(*inputInfoFunction)("Number of expected arguments unknown!");else output("Number of expected arguments unknown!\n");
+							if(onInput)(*inputInfoFunction)("Number of expected arguments unknown!");
+							else output("Number of expected arguments unknown!\n");
 						}
 					}else
 					if(_token->expr->type!=TT_LIST&&_token->expr->type!=TT_MAP&&_token->expr->type!=TT_EXPRESSION){
