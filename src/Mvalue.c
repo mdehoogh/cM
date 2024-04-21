@@ -4594,17 +4594,17 @@ Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_functi
  * @return a new M value hosting M environment \p _environment
  */
 Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/){
-	if(NULL==_environment)return NULL;
-	bool disowned_environment=Misdisowned(_environment);
-	Mvalue* _value=__value("environment");
-	if(NULL==_value){
+	Mvalue* _valueOfEnvironment=NULL;
+	if(_environment!=NULL){
+		bool disowned_environment=Misdisowned(_environment);
+		_valueOfEnvironment=__value("environment");
+		if(_valueOfEnvironment!=NULL){
+			_valueOfEnvironment->type=VT_ENVIRONMENT;
+			_valueOfEnvironment->value._environment=(disowned_environment?owned_environment(_environment,owner_value_data):_environment);
+		}else
 		if(disowned_environment)free_environment(_environment);
-		return NULL;
 	}
-	_value->type=VT_ENVIRONMENT;
-	// MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
-	_value->value._environment=(disowned_environment?owned_environment(_environment,owner_value_data):_environment);
-	return _value;
+	return _valueOfEnvironment;
 }/* VALIDATED */
 
 // Mfile support

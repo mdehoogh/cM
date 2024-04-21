@@ -91,9 +91,14 @@ size_t outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowne
  * @return false on failure
  */
 bool pushExecutionEnvironment(Menvironment * const _environment){Mallocationowner owner=getOwner(__LINE__);
+	// MDH@21APR2024: if the environment is NOT disowned we output a warning!!!
+	//                NOTE _getValueOfEnvironment will still host _environment inside a value
+	//                but this is not recommended!!!
+	if(_environment==NULL)return false;
+	if(!Misdisowned(_environment))outputWarning("Environment to push not disowned");
 	// MDH@28MAY2020: check if we actually obtain ownership of _environment at all
 	// MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
-	Mvalue* _environmentValue=(_environment!=NULL?_getValueOfEnvironment(_environment):NULL); // TODO check whether _environment passed in needs to be disowned or not (I think better not!!!)
+	Mvalue* _environmentValue=_getValueOfEnvironment(_environment); // TODO check whether _environment passed in needs to be disowned or not (I think better not!!!)
 	if(NULL==_environmentValue)return false;
 	// MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
 	if(NULL==_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one

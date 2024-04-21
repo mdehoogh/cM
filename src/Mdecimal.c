@@ -12,6 +12,7 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_DECIM
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 extern long double const M_LD_NAN;
 extern char const * const M_ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
+extern char const * const M_WARNING_PREFIX;
 extern Mdecimalcontext* const M_DECIMALCONTEXT; // ASSERT should not be NULL whenever M is up and running
 
 /**
@@ -3680,8 +3681,12 @@ void outputDecimalStatus(uint32_t status){
 Mdecimal* _getDecimalSqrt(Mdecimal const * const decimal){Mallocationowner owner=getOwner(__LINE__);
 	if(decimal!=NULL){
 		// I suppose we should use the same context as that of the given decimal????
-		Mdecimalcontext* decimalcontext=getExistingDecimalcontext(decimal->prec);
-		if(NULL==decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		// TODO if decimal has a certain precision shouldn't the decimal context exist?????
+		Mdecimalcontext* decimalcontext=getDecimalcontext(decimal->prec);
+		if(NULL==decimalcontext){
+			output("%sNon-existing decimal context with precision %d.\n",M_WARNING_PREFIX,decimal->prec);
+			decimalcontext=M_DECIMALCONTEXT;
+		}
 		Mdecimal* _result=owned_decimal(__decimal(decimalcontext->mpd_context,0,0),owner);
 		if(_result){
 			uint32_t status=0;

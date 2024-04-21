@@ -1119,9 +1119,14 @@ Mstring* _getIntegerText(Minteger const * const _integer){Mallocationowner owner
 	Mstring* p=_s;
 	if(amVerboseDebugging())
 			p=string_append_char(p,'i');
-	if(p&&_integer)
+	// MDH@21APR2024: represent M_LL_INVALID as NAI 
+	if(p!=NULL&&_integer!=NULL){
+		if(_integer->ll<M_LL_MIN)
+			p=string_append(p,"NAI");
+		else
 			p=appendll(p,_integer->ll); // p=string_append(p,LL_SEP(_integer->ll)); // MDH@05DEC2020 replacing: p=appendll(p,_integer->ll);
-	if(!p){FREE_STRING(_s,owner);return NULL;}
+	}
+	if(NULL==p){FREE_STRING(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return disowned_string(_s,owner);
 }/* VALIDATED */
@@ -1773,7 +1778,7 @@ Mstring* _getFloatText(Mfloat const * const _float){Mallocationowner owner=getOw
 		Mstring* p=_floatText;
 		if(amVerboseDebugging())
 			p=string_append_char(p,'r');
-		if(p){
+		if(p!=NULL){
 			// DONE TODO we should distinguish between +INF and -INF
 			switch(fpclassify(_float->ld)){
 				case FP_NAN:p=string_append(p,M_NAN);break;

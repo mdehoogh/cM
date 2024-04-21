@@ -93,6 +93,10 @@ const long double M_LD_E=(long double)M_E;
 const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 #endif
 
+// MDH@21APR2024: as comment you see the long double approximation, so that's the value getting stored
+//                the literal corresponds to the decimal with 20 significant numbers
+long double M_LD_PHI=1.6180339887498948482; /////1.618033988749894903; // MDH@21APR2024: the golden ratio
+                     
 long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
 
 const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
@@ -1040,7 +1044,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 			//					 for storing the additional arguments
 			if(forEnvironmentInitialized&&!setValue(_forEnvironment,"_",_getIntegerValue(0)))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized){
-				if(pushExecutionEnvironment(_forEnvironment)){
+				if(pushExecutionEnvironment(disowned_environment(_forEnvironment,owner))){
 					// evaluate the initialization inside the for environment once
 					if(_initializationTokenValue!=NULL){
 						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
@@ -4198,6 +4202,17 @@ Mvalue* Md(Mvalue* value,Mvalue* precisionValue){Mallocationowner owner=getOwner
 		if(_decimal!=NULL)dValue=_getValueOfDecimal(disowned_decimal(_decimal,owner));
 	}
 	return dValue;
+}
+
+/**
+ * @brief returns the precision of \p _value
+ * 
+ * @param _value 
+ * @return Mvalue* the precision of \p _value (or M_LL_INVALID if \p _value does not denote a decimal)
+ */
+Mvalue* Mprecision(Mvalue* _value){
+	long long precision=(_value!=NULL&&_value->type==VT_DECIMAL?_value->value._decimal->prec:M_LL_INVALID);
+	return _getIntegerValue(precision);
 }
 
 // MDH@18NOV2019: b/B renamed to o/O (for octets), and we're gonna create a b function for transforming to big integer
@@ -14185,6 +14200,22 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
+			Mvalue* PHI_value=_getFloatValue(M_LD_PHI);
+			if(NULL==PHI_value){
+				///////free_value(E_value);
+				outputError("Failed to create PHI");
+				return NULL;
+			}
+			if(!addVariable(_Menvironment,owner,"PHI",VT_FLOAT,true)){
+				outputError("Failed to add PHI");
+				return NULL;
+			}
+			if(!setValue(_Menvironment,"PHI",PHI_value)){
+				//////free_value(E_value);
+				outputError("Failed to initialize PHI");
+				return NULL;
+			}
+
 			// MDH@05DEC2020: obtain the current LC_ALL locale, and save it to the LOCALE variable
 			// MDH@07DEC2020: we're going to use a map to store both the current locale setting (in property '') as well as all the fields
 			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
@@ -14316,6 +14347,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!completedValueFunction(_Menvironment,owner,"q",Mq)
 					||!completedValueFunction(_Menvironment,owner,"Q",MQ)
 					||!completedValueValueFunction(_Menvironment,owner,"d",Md)
+					||!completedValueFunction(_Menvironment,owner,"precision",Mprecision)
 					||!completedValueFunction(_Menvironment,owner,"o",Mo)
 					||!completedValueFunction(_Menvironment,owner,"O",MO)){
 				outputError("Failed to register value type conversion functions");
