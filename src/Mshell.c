@@ -1516,7 +1516,7 @@ static InputResponseFunction* inputErrorFunction=NULL;
  * @return int8_t 
  */
 static int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
-	logToOutputFile("Token type: %s + % c",TOKENTYPE_STRING[inputTokenType],inputCharacterType);
+	logToOutputFile("Token type: %s + %c",TOKENTYPE_STRING[inputTokenType],inputCharacterType);
 	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
 		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
 		char* noTransition=NO_TRANSITIONS[inputTokenType];
@@ -1739,7 +1739,17 @@ Mlocalvariables *_lastLocalvariables=NULL;Mallocationowner owner_localvariables=
  * @return true 
  * @return false 
  */
-static bool pushLocalvariables(Mvalue* localvariablesMapValue,uint64_t envid){
+static bool pushLocalvariables(Mvalue* localvariablesMapValue,uint64_t envid){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==localvariablesMapValue){
+		logToOutputFile("WARNING: No local variables map value!\n");
+	}else{
+		Mstring* _localVariablesMapValueText=owned_string(_getValueText(localvariablesMapValue,true),owner);
+		if(_localVariablesMapValueText!=NULL){
+			logToOutputFile("Pushing local variables map '%s'.\n",string(_localVariablesMapValueText));
+			FREE_STRING(_localVariablesMapValueText,owner);
+		}else
+			logToOutputFile("Pushing local variables map!");
+	}
 	Mlocalvariables* _localvariables=CALLOC_1(sizeof(Mlocalvariables),'L',owner_localvariables);
 	if(NULL==_localvariables){if(inputErrorFunction)(*inputErrorFunction)("Failed to store the local variables.\n");return false;}
 	_localvariables->mapValue=localvariablesMapValue;
@@ -1795,10 +1805,20 @@ static size_t popLocalvariables(uint64_t envid){
  * @return false 
  */
 bool existsAsLocalVariable(char const * const identifierName,uint64_t envid){
+	if(NULL==identifierName){
+		if(inputErrorFunction)(*inputErrorFunction)("No identifier name.\n");
+		else logToOutputFile("No identifier name!\n");
+	}else
+		logToOutputFile("Is '%s' a local variable?\n",identifierName);
 	// if(inputInfoFunction)(*inputInfoFunction)("Checking the existence of '%s' in environment '%llu'.\n",identifierName,envid);
 	if(NULL==_lastLocalvariables||_lastLocalvariables->envid!=envid)return false;
 	Mlocalvariables* localvariables=_lastLocalvariables;
-	while(localvariables!=NULL&&!isMapProperty(localvariables->mapValue->value._map,identifierName))localvariables=localvariables->_prev;
+	while(localvariables!=NULL&&
+					(NULL==localvariables->mapValue||
+					!isMapProperty(localvariables->mapValue->value._map,identifierName))
+				)
+		localvariables=localvariables->_prev;
+	logToOutputFile(localvariables!=NULL?"A local variable!\n":"Not a local variable.\n");
 	return(localvariables!=NULL);
 }
 
@@ -1810,7 +1830,17 @@ bool existsAsLocalVariable(char const * const identifierName,uint64_t envid){
  * @param endOfInput 
  */
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
+	if(NULL==command){
+		if(inputErrorFunction)(*inputErrorFunction)("Command undefined!");else
+		logToOutputFile("No command!");
+		return;
+	}
 	Mtoken* functionToken=command->_lastToken;
+	if(NULL==functionToken){
+		if(inputErrorFunction)(*inputErrorFunction)("Last token undefined!");else
+		logToOutputFile("No last token!");
+		return;
+	}
 	char* _identifierName=_getSignificantTokenCharacters(functionToken); // same as: =_stringstart(functionToken->text,getTokenSignificantCharacterCount(functionToken)); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
 	// MDH@11JAN2020 TODO: this isn't true per se, because we now allow using local variables immediately after initializing them 
@@ -1819,6 +1849,11 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 		functionToken->type=TT_NEW_VARIABLE;
 	else
 	*/
+	if(NULL==_identifierName||strlen(_identifierName)==0){
+		if(inputErrorFunction)(*inputErrorFunction)("No identifier name!");else
+		logToOutputFile("No identifier name!");
+		return;
+	}
 	if(existsAsLocalVariable(_identifierName,functionToken->envid)||existsInCommand(command,_identifierName,functionToken->envid))
 		functionToken->type=TT_VARIABLE;
 	else{
@@ -1836,6 +1871,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	// replacing: functionToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	// if the reoutput token function is defined, execute it
+	logToOutputFile("Reoutputting the retyped token!\n");
 	if(reoutputTokenFunction)(*reoutputTokenFunction)(functionToken);else outputChar('*');
 	/* MDH@01OCT2019 because the token isn't actually removed the feed forward text associated with the token does not need to be deleted actually
 	// MDH@20SEP2019: this function is called when a function name changes into a variable name (because the user did not enter ( behind a function name)
@@ -1946,11 +1982,13 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 			//				this happens e.g. when an identifier at the end changed from function to variable
 			if(*tokenType==TT_FUNCTION){
 				*tokenType=TT_VARIABLE;
+				logToOutputFile("Assumed function token type changed to variable!");
 				newTokenType=nextTokenType(*tokenType,inputCharacterType);
 			}else
 			if(*tokenType==TT_VARIABLE){
 				if(inputCharacterType=='('&&getFunction(getExecutionEnvironment(),string(token->text))!=NULL){
 					*tokenType=TT_FUNCTION;
+					logToOutputFile("Assumed variable token type changed to function!");
 					newTokenType=nextTokenType(*tokenType,inputCharacterType);
 				}
 			}
@@ -2138,12 +2176,15 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 				//				this happens e.g. when an identifier at the end changed from function to variable
 				if(lastCommandToken->type==TT_FUNCTION){
 					// we should assume that the identifier represents a (new) variable (identifier)
+					logToOutputFile("Incorrect assumed token type function changed to variable!\n");
 					changeFunctionTokenToAVariable(command,endOfInput);
+					logToOutputFile("Function token type changed to variable.\n");
 					newTokenType=nextTokenType(lastCommandToken->type,*inputCharacterType);
 				}else
 				if(lastCommandToken->type==TT_VARIABLE){
 					if(*inputCharacterType=='('&&getFunction(getExecutionEnvironment(),string(lastCommandToken->text))!=NULL){
 						lastCommandToken->type=TT_FUNCTION;
+						logToOutputFile("Incorrect assumed token type variable changed to function!\n");
 						if(reoutputTokenFunction)(*reoutputTokenFunction)(lastCommandToken);else outputChar('*');
 						newTokenType=nextTokenType(lastCommandToken->type,*inputCharacterType);
 					}
@@ -2178,6 +2219,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 		// MDH@05FEB2024: here we can make the same change as we did in characterContinuesToken()
 		//                i.e. move newTokenType<0 to the else part (and comment out the inner if test)
 		if(/*newTokenType<0||*/newTokenType==lastCommandToken->type){
+			logToOutputFile("Same token type!\n");
 			/* 
 			   MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			   MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
@@ -2200,11 +2242,12 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 			///}
 		}else
 		if(newTokenType>=0){ // different (regular) token types
+			logToOutputFile("Different regular token type.\n");
 			// a shortcut assignment can NOT be turned into a equality comparison
 			if(*inputCharacterType=='='&&lastCommandToken->type==TT_ASSIGNMENT&&(lastCommandToken->prev->type==TT_BINARY_AeRu||lastCommandToken->prev->type==TT_BINARY_Aeru)){
 				newTokenType=TT_ERROR;
 				//if(amVerbose())
-				/////if(*inputErrorFunction)
+				if(inputErrorFunction)
 				(*inputErrorFunction)("A shortcut operator assignment cannot change into an equality.");
 			}else{
 				// MDH@26MAR2020: TODO check whether this should be done elsewhere???
@@ -2441,6 +2484,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 		if(inputChar==' ')inputChar=M_WHITESPACE_CHARACTER; // MDH@31OCT2019: so we can make the blanks visible!!
 	}
 	/////if(amDebugging())(*inputInfoFunction)("I");
+	logToOutputFile("Appending input character '%c'.",inputChar);
 	// append the typed character at getUserInputLength() minus current token offset in _userInputCommand->_lastToken->text
 	string_append_char(lastCommandToken->text,inputChar);
 	/////if(amDebugging())(*inputInfoFunction)("J");
@@ -2485,14 +2529,14 @@ static Mstring* getSubcommandText(Mtoken const * const firstSubcommandToken,Mtok
  * @param source 
  * @return Mvalue* 
  */
-Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken const * const lastSubcommandToken,TokenType expressionTypeToIgnore,TokenType endTokenTypes[],uint8_t endTokenTypeCount,Mstring const * const commandText,char* source){Mallocationowner owner=getOwner(__LINE__);
+static Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken * const lastSubcommandToken,TokenType expressionTypeToIgnore,TokenType endTokenTypes[],uint8_t endTokenTypeCount,Mstring const * const commandText,char* source){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _subcommandValue=NULL;
-	if(firstSubcommandToken&&lastSubcommandToken){
+	if(firstSubcommandToken!=NULL&&lastSubcommandToken!=NULL){
 		Mstring* _commandText=NULL;
-		if(amVerboseDebugging()){
+		///if(amVerboseDebugging()){
 			_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText);
-			output("Evaluating subcommand '%s'.\n",string(_commandText));
-		}
+			logToOutputFile("Evaluating subcommand '%s'.\n",string(_commandText));
+		///}
 		Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
 		if(_evalEnvironment!=NULL){
 			_evalEnvironment->_name=owned_chars(_getChars(source),Msubowner(owner,1));
@@ -2501,9 +2545,25 @@ Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken cons
 				int8_t aValidSubcommandIndicator=isAValidLastCommandTokenIndicator(lastSubcommandToken,expressionTypeToIgnore,false); // TODO we might need to make command immutable because I suppose we do not want it to be changed
 				if(aValidSubcommandIndicator>0){ // a valid command
 					_evalEnvironment->expressionToken=firstSubcommandToken; // prepare the current environment for executing the command
+					// MDH@23APR2024: the following helps to get a proper evaluation
+					Mtoken* lastTokenSuccessor=lastSubcommandToken->next;
+					lastSubcommandToken->next=NULL;
 					_subcommandValue=getValueOfExpression(source,'e',endTokenTypes,endTokenTypeCount); // NOTE could've used getExecutionEnvironment()->_name->chars but we know it would be eval!!
-				}else
-					output("%sSubcommand '%s' invalid (error indicator code %i)!\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)),aValidSubcommandIndicator);
+					lastSubcommandToken->next=lastTokenSuccessor;
+					if(NULL==_subcommandValue)
+						logToOutputFile("Evaluates to NULL.\n");
+					else
+					if(_subcommandValue->type!=VT_MAP)
+						logToOutputFile("%sDoes not evaluate to a map, but to %s.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[_subcommandValue->type]);
+					else{
+						Mstring* _mapValueText=owned_string(_getValueText(_subcommandValue,true),owner);
+						if(_mapValueText!=NULL){
+							logToOutputFile("Evaluates to '%s'.\n",string(_mapValueText));
+							FREE_STRING(_mapValueText,owner);
+						}
+					}
+				}else // MDH@23APR2024: can't use output() here TODO find a way to inform user
+					logToOutputFile("%sSubcommand '%s' invalid (error indicator code %i)!\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)),aValidSubcommandIndicator);
 				// replacing: _subcommandValue=getCommandValue(_evalCommand,owner,'e');
 				popExecutionEnvironment(); // pop the eval environment we successfully pushed
 			}else{
@@ -2512,8 +2572,9 @@ Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtoken cons
 			}
 		}else
 			output("%sFailed to evaluate '%s'.\n",M_ERROR_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
-		if(!commandText&&_commandText)free_string(_commandText);
-	}
+		if(NULL==commandText&&_commandText!=NULL)free_string(_commandText);
+	}else
+		logToOutputFile("Unable to evaluate a subcommand!\n");
 	return _subcommandValue;
 }
 
@@ -2890,14 +2951,18 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 							if(!onInput||inputInfoFunction)
 								if(onInput)(*inputInfoFunction)("Local variables argument!");
 								else output("Local variables argument!\n");
+							logToOutputFile("Registering local variables!\n");
 							// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
 							//				what we would do on ) 
 							if(_token->argument==0){
 								// //////outputChar('A');
 								// MDH@25FEB2021:  we can now evaluate the command from the first token in the first argument to this special function representing the local variable map of this special function
 								Mvalue* localVariablesMapValue=getSubcommandValue(_token->expr->next,prevToken,TT_FUNCTION_CALL,(TokenType[]){TT_EXPRESSION},1,NULL,"local variables");
+								if(NULL==localVariablesMapValue){
+									logToOutputFile("%sNo local variables map!\n",M_WARNING_PREFIX);
+								}
 								// //////outputChar('B');
-								if(!localVariablesMapValue||localVariablesMapValue->type==VT_MAP){
+								if(NULL==localVariablesMapValue||localVariablesMapValue->type==VT_MAP){
 									// //////outputChar('C');
 									if(amVerboseDebugging())
 										if(inputInfoFunction)(*inputInfoFunction)("Local variables map identified!");
@@ -2905,6 +2970,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 									if(!pushLocalvariables(localVariablesMapValue,_token->envid)){
 										// //////outputChar('D');
 										newTokenType=TT_ERROR; // TODO I suppose we could have a separate TT_BUG token type perhaps?????
+										logToOutputFile("Failed to push the local variables map!\n");
 										if(!onInput||inputErrorFunction)
 											if(onInput)(*inputErrorFunction)("Failed to register local variables!");else outputError("Failed to register local variables!");
 									}

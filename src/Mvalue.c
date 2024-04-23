@@ -4448,18 +4448,14 @@ Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owne
  */
 Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment){
 	if(NULL==_environment)return NULL;
-	//if(amVerboseDebugging())
-		output("Releasing ownership environment '%s'.\n",_environment->_name->chars);
+	/// do not use output here!!! if(amVerboseDebugging())output("Releasing ownership environment '%s'.\n",_environment->_name->chars);
 	disowned_chars(_environment->_name,owner_environment);
-	//if(amVerboseDebugging())
-		output("\tEnvironment name ownership released.\n");
+	/// do not use output here: if(amVerboseDebugging())output("\tEnvironment name ownership released.\n");
 	disowned_map(_environment->_variableMap,owner_environment);
-	//if(amVerboseDebugging())
-		output("\tEnvironment variable map ownership released.\n");
+	/// do not use output here!!! if(amVerboseDebugging())output("\tEnvironment variable map ownership released.\n");
 	if(_environment->_functionMap!=NULL){
 		disowned_functionmap(_environment->_functionMap,owner_environment); // all functions also need to be disowned
-		if(amVerboseDebugging())
-			output("\tEnvironment function map ownership released!");
+		/// same here: if(amVerboseDebugging())output("\tEnvironment function map ownership released!");
 	}
 	/*
 	if(_environment->blockCommandList!=NULL)

@@ -16,7 +16,7 @@
 #include <locale.h>
 
 // MDH@27FEB2020: on top of environment management we have the 'shell' for setting up the root M environment
-#include "Msession.h"
+#include "M.h"
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_MAIN,id};}
 
@@ -6139,6 +6139,13 @@ int8_t getPlaceholderBlockKeywordId(Mtoken const * const placeholderToken){
 	return blockKeywordId;
 }
 */
+
+// in order to be able to use M from a cpp kernel app
+void initializeM(){
+	output("Initializes M for use from a Jupyter Notebook kernel!\n");
+	output("Not implemented yet!");
+	// should do whatever needs doing, before the REPL is started in main()
+}
 
 /**
  * @brief main entry point of M

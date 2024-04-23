@@ -106,8 +106,7 @@ bool pushExecutionEnvironment(Menvironment * const _environment){Mallocationowne
 	assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
 	// replace the current execution environment with the new one
 	assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
-	////if(amVerboseDebugging())
-		outputExecutionEnvironmentName("New execution environment '","'.\n");
+	////do not use output here: if(amVerboseDebugging())outputExecutionEnvironmentName("New execution environment '","'.\n");
 	// MDH@16APR2024: how about storing the parent environment variable map as variable ` in the child environment?
 	//                unless getting a variable we distinguish ` from anything that starts with ` like `x to indicate the local variable x
 	/* decided to not do it this way but make getVariable() deal with it by looking at the top level property value
