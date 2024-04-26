@@ -32,7 +32,7 @@ const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
 const char* const FORWITHFUNCTION_NAME="forwith";
-const char* const DOFUNCTION_NAME="dowith"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
+const char* const DOWITHFUNCTION_NAME="dowith"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="defun"; // MDH@04MAR2020: the 'classic' approach is by defining a function with a fixed name which cannot be passed along
 const char* const DEFINEANONYMOUSFUNCTION_NAME="function"; // MDH@04MAR2020: an anonymous function that is to be assigned to a variable/argument
@@ -788,7 +788,16 @@ Mvalue* setdp(Mvalue* value){
 }
 
 // end Decimal support
-
+/* MDH@26APR2024: moved to M.c
+Mvalue* Mpython(Mvalue* commandValue){
+	// if command is a map the map keys should represent Python functions to apply
+	// if command is text, this is the text to execute
+	// if command is a file, it's the file containing the python code to execute
+	if(commandValue!=NULL){
+	}
+	return NULL;
+}
+*/
 // very special M functions
 // MDH@20DEC2020: added the _invalidTokenValue to be evaluated when the condition is negative
 //				and changed the evaluation of the condition to a sign
@@ -1271,7 +1280,7 @@ Mvalue* Mcreate(Mvalue* newVariablesValue){Mallocationowner owner=getOwner(__LIN
 						Mlistelement* listelement=(list!=NULL?list->_first:NULL);
 						Mstring* valueText=NULL;
 						while(listelement!=NULL){
-							valueText=owned_string(_getValueText(listelement->_value,true),owner);
+							valueText=owned_string(_getValueText(listelement->_value,true,true),owner);
 							if(valueText!=NULL){
 								if(addVariable(environment,getValueDataOwner(),string(valueText),VT_UNDEFINED,false))
 									result+=1;
@@ -1288,7 +1297,7 @@ Mvalue* Mcreate(Mvalue* newVariablesValue){Mallocationowner owner=getOwner(__LIN
 							Mstring* valueText=NULL;
 							long long numberOfElements=array->numberOfElements;
 							while(--numberOfElements>=0){
-								valueText=owned_string(_getValueText(array->values[numberOfElements],true),owner);
+								valueText=owned_string(_getValueText(array->values[numberOfElements],true,true),owner);
 								if(valueText!=NULL){
 									if(addVariable(environment,getValueDataOwner(),string(valueText),VT_UNDEFINED,false))
 										result+=1;
@@ -1329,7 +1338,7 @@ static long long pushInitializedEnvironment(Menvironment * const _withEnvironmen
 		result=M_FALSE;
 		Mmapelement* withNameMapelement=(localMap!=NULL?getMapelement(localMap,"."):NULL);
 		Mvariable* withNameVariable=(withNameMapelement!=NULL?withNameMapelement->_variable:NULL);
-		Mstring* _withNameText=(withNameVariable!=NULL?owned_string(_getValueText(withNameVariable->_value,true),owner):owned_string(_getString("with"),owner));
+		Mstring* _withNameText=(withNameVariable!=NULL?owned_string(_getValueText(withNameVariable->_value,true,true),owner):owned_string(_getString("with"),owner));
 		// if a property "." is defined, it's text value will be the name of the with environment
 		if(_withNameText!=NULL){
 			if(_withEnvironment->_name!=NULL){freeChars(_withEnvironment->_name);_withEnvironment->_name=NULL;}
@@ -1743,7 +1752,7 @@ static bool pushLocalvariables(Mvalue* localvariablesMapValue,uint64_t envid){Ma
 	if(NULL==localvariablesMapValue){
 		logToOutputFile("WARNING: No local variables map value!\n");
 	}else{
-		Mstring* _localVariablesMapValueText=owned_string(_getValueText(localvariablesMapValue,true),owner);
+		Mstring* _localVariablesMapValueText=owned_string(_getValueText(localvariablesMapValue,true,true),owner);
 		if(_localVariablesMapValueText!=NULL){
 			logToOutputFile("Pushing local variables map '%s'.\n",string(_localVariablesMapValueText));
 			FREE_STRING(_localVariablesMapValueText,owner);
@@ -2556,7 +2565,7 @@ static Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtok
 					if(_subcommandValue->type!=VT_MAP)
 						logToOutputFile("%sDoes not evaluate to a map, but to %s.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[_subcommandValue->type]);
 					else{
-						Mstring* _mapValueText=owned_string(_getValueText(_subcommandValue,true),owner);
+						Mstring* _mapValueText=owned_string(_getValueText(_subcommandValue,true,true),owner);
 						if(_mapValueText!=NULL){
 							logToOutputFile("Evaluates to '%s'.\n",string(_mapValueText));
 							FREE_STRING(_mapValueText,owner);
@@ -2630,7 +2639,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
  */
 Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _evalValue=NULL;
-	Mstring* _evalValueText=owned_string(_getValueText(value,true),owner);
+	Mstring* _evalValueText=owned_string(_getValueText(value,true,true),owner);
 	if(_evalValueText!=NULL){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
 		///*
@@ -2858,7 +2867,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 
 			// MDH@28OCT2020: defining user functions is no longer 'special' in that the body should simply be a list of command texts and tokenized by Mdefinefunction and Manonymousfunction itself
 			// MDH@20DEC2022: we can change this to encode the number of arguments left to enter somehow in _token->argument (for common non-special functions)
-			if(strcmp(_functionName,DOFUNCTION_NAME)&&strcmp(_functionName,FORWITHFUNCTION_NAME)){ // not a special function (like do and forw)
+			if(strcmp(_functionName,DOWITHFUNCTION_NAME)&&strcmp(_functionName,FORWITHFUNCTION_NAME)){ // not a special function (like do and forw)
 				//  MDH@20DEC2022: used to assign -2 but now -3 minus the number of function arguments (so -2 would then be considered an unknown function)
 				long long numberOfExpectedArguments=getNumberOfFunctionParameters(_functionName);////////outputChar('X');
 				_token->argument=(numberOfExpectedArguments<0?-2:-numberOfExpectedArguments-3);
@@ -4590,7 +4599,8 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(format!=NULL&&format->type!=VT_INTEG
 	Mvalue* _result=NULL;
 	// MDH@10DEC2020: this is a bit of an issue with time values in that _getValueText technically returns the epoch time text representation
 	//				and not the timestamp (calendar time)
-	Mstring* _valueText=owned_string(_getValueText(value,true),owner); // typically dequoted
+	// MDH@26APR2024: using _getValueText might be a problem when stringifying arrays and lists, because 
+	Mstring* _valueText=owned_string(_getValueText(value,true,true),owner); // typically dequoted
 	if(_valueText!=NULL){
 		if(amVerbose())
 		{outputValue("Text representation of '",value,"' before formatting: ");output("'%s'.\n",string(_valueText));}
@@ -4617,6 +4627,7 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(format!=NULL&&format->type!=VT_INTEG
 	}
 	return _result;
 }
+
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 /**
  * @brief returns the sum of the elements of the list or array wrapped in \p value
@@ -4795,7 +4806,7 @@ static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner o
 				if(listelementValue->type==VT_LIST)
 					_listelementText=owned_string(_getConcatenated(listelementValue->value._list,separator),owner);
 				else
-					_listelementText=owned_string(_getValueText(listelementValue,true),owner);
+					_listelementText=owned_string(_getValueText(listelementValue,true,true),owner);
 			}
 			if(_listelementText!=NULL){
 				if(separator!=NULL)if(string_length(_concatenated)>0)string_append(_concatenated,separator);
@@ -4819,12 +4830,12 @@ Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(_
 	Mvalue* _concatValue=NULL;
 	// the first value would be the list of things to concatenate, the second value the separator text (if any)
 	if(value1!=NULL){
-		Mstring* _separator=(value2!=NULL?owned_string(_getValueText(value2,true),owner):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
+		Mstring* _separator=(value2!=NULL?owned_string(_getValueText(value2,true,true),owner):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
 		Mstring* _concat;
 		if(value1->type==VT_LIST)
 			_concat=owned_string(_getConcatenated(value1->value._list,(_separator!=NULL?string(_separator):NULL)),owner);
 		else
-			_concat=owned_string(_getValueText(value1,true),owner);
+			_concat=owned_string(_getValueText(value1,true,true),owner);
 		if(_concat!=NULL){
 			// _result itself won't contain quotes, so in order to make it usable we need to prepend either a single quote or a double quote
 			if(string_insert_char(_concat,0,'\''))
@@ -5184,7 +5195,7 @@ static Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'s',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
 		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		// MDH@22JUL2019: it's better to dequote the name here because otherwise the name of the attribute would be in quotes (and it is clear to be text)
-		Mstring* _attributeName=owned_string(_getValueText(_attributeNameValue,true),owner); // parse the attribute name value (could be undefined though)
+		Mstring* _attributeName=owned_string(_getValueText(_attributeNameValue,true,true),owner); // parse the attribute name value (could be undefined though)
 		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
 		/////////////////////if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
@@ -5782,7 +5793,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																			if(indexorattributenameListelementValue!=NULL){
 																				// MDH@07NOV2022 BUG FIX: _getValueText returns a disowned text, of which I should take ownership immediately
-																				Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner);
+																				Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true,true),owner);
 																				if(_attributenameText!=NULL){
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																					if(NULL==newValueholder){
@@ -6176,7 +6187,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																		if(indexorattributenameListelementValue!=NULL){
 																			// MDH@19OCT2020: if we do not unquote the value we can safely remove the final quote????? by decrementing the length...
 																			// MDH@22OCT2020: however this will get us into trouble when dealing with values that are not text (e.g. integers), so we switch back to getting the text dequoted
-																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner); // MDH@19OCT2020 bug fix: take ownership
+																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true,true),owner); // MDH@19OCT2020 bug fix: take ownership
 																			if(_attributenameText!=NULL){ // we need to free _attributenameText when we're done with it
 																				if(string_insert_char(_attributenameText,0,'\'')!=NULL){ // ascertain that _attributenameText starts with a quote character, so we can use _getTextValue on it
 																					char* _attributename=string(_attributenameText)+1; // skipping the initial quote
@@ -6672,7 +6683,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(!strcmp(_significantTokenText,FORWITHFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
 							numberOfElementsToNotEvaluate=5;
 						}else
-						if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){ // all arguments to the do function should not be evaluated beforehand
+						if(!strcmp(_significantTokenText,DOWITHFUNCTION_NAME)){ // all arguments to the do function should not be evaluated beforehand
 							numberOfElementsToNotEvaluate=LLONG_MAX; // all elements should NOT be evaluated
 							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
 							numberOfFunctionParameters=LLONG_MAX; // replacing 1 with the actual number of parameters we allow for the function
@@ -6691,14 +6702,14 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								if(inputCharReadFunction){char c;output("Press any key to continue...");(*inputCharReadFunction)(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
-							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)
+							if(!strcmp(_significantTokenText,DOWITHFUNCTION_NAME)
 								||!strcmp(_significantTokenText,WHILEFUNCTION_NAME) // MDH@21DEC2020: While as well
 								||!strcmp(_significantTokenText,FORFUNCTION_NAME) // MDH@23DEC2020: for as well
 							){
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
 								if(functionCallArgumentList!=NULL&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
-									outputError("Failed to create the to do expression list");
+									output("%sFailed to create the to %s expression list.\n",M_ERROR_PREFIX,string(_significantTokenText));
 									FREE_LIST(functionCallArgumentList,owner);
 									functionCallArgumentList=NULL; // so nothing will get done!!
 								}
@@ -6713,7 +6724,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							outputValue("Function argument map: ",_getValueOfMap(_functionCallArgumentMap,false),".\n");
 							*/
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
-							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)
+							if(!strcmp(_significantTokenText,DOWITHFUNCTION_NAME)
 								||!strcmp(_significantTokenText,WHILEFUNCTION_NAME) // MDH@21DEC2020
 								||!strcmp(_significantTokenText,FORFUNCTION_NAME) // MDH@23DEC2020
 							)
@@ -9142,7 +9153,7 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if at least one of them is NULL the result is M_TRUE if _value1 is __not__ NULL (and _value2 is NULL therefore), otherwise both are NULL and they are equal
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		Mstring *_value1text=owned_string(_getValueText(_value1,true,true),owner),*_value2text=owned_string(_getValueText(_value2,true,true),owner);
 		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result>0?M_TRUE:M_FALSE);
@@ -9224,7 +9235,7 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_FALSE:M_TRUE); // if _value1 is NULL, it is smaller, so false, otherwise _value2 is NULL and yes _value1 is larger
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		Mstring *_value1text=owned_string(_getValueText(_value1,true,true),owner),*_value2text=owned_string(_getValueText(_value2,true,true),owner);
 		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result>=0?M_TRUE:M_FALSE);
@@ -9305,7 +9316,7 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 	if(NULL==_value1||NULL==_value2)return M_TRUE; // not both NULL, so unequal
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		Mstring *_value1text=owned_string(_getValueText(_value1,true,true),owner),*_value2text=owned_string(_getValueText(_value2,true,true),owner);
 		int result=(_value1text!=NULL&&_value2text!=NULL
 								?strcmp(string(_value1text),string(_value2text))
 								:(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
@@ -9390,7 +9401,7 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 	if(NULL==_value1||NULL==_value2)return M_FALSE; // either NULL but not both, definitely not equal
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		Mstring *_value1text=owned_string(_getValueText(_value1,true,true),owner),*_value2text=owned_string(_getValueText(_value2,true,true),owner);
 		int result=(_value1text!=NULL&&_value2text!=NULL
 								?strcmp(string(_value1text),string(_value2text))
 								:(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
@@ -9486,8 +9497,8 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_FALSE:M_TRUE); // if at least one of them is NULL, if _value1 is, the result should be false, true otherwise
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),
-						*_value2text=owned_string(_getValueText(_value2,true),owner);
+		Mstring *_value1text=owned_string(_getValueText(_value1,true,true),owner),
+						*_value2text=owned_string(_getValueText(_value2,true,true),owner);
 		int result=(_value1text!=NULL&&_value2text!=NULL
 								?strcmp(string(_value1text),string(_value2text)):
 								(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
@@ -10259,7 +10270,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				while(_formulaelement!=NULL){
 					_valuereference=_formulaelement->_operand;
 					if(amVerboseDebugging()){
-						Mstring* _indexidText=owned_string(_getValueText(_valuereference->_itemid,false),owner);
+						Mstring* _indexidText=owned_string(_getValueText(_valuereference->_itemid,false,true),owner);
 						if(_indexidText!=NULL){
 							output("Assignment to %s%s using operator %s!\n",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
 							FREE_STRING(_indexidText,owner);
@@ -10561,7 +10572,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 									char inputChar,inputCharType;
 									while(bodyCommandListelement!=NULL){
 										// convert the body command to a text (to be tokenized)
-										Mstring* _bodyCommandText=owned_string(_getValueText(bodyCommandListelement->_value,true),owner);
+										Mstring* _bodyCommandText=owned_string(_getValueText(bodyCommandListelement->_value,true,true),owner);
 										// TODO should we simply skip the command?????
 										if(_bodyCommandText!=NULL){
 											char *bodyCommandCharacter=string(_bodyCommandText);
@@ -13813,7 +13824,7 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 									Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentList,owner);
 									Mvalue* groupValue=getValueOfFunctionCall(function,"",_functionArgumentMap);
 									FREE_MAP(_functionArgumentMap,owner);
-									Mstring* _groupValueText=owned_string(_getValueText(groupValue,true),owner);
+									Mstring* _groupValueText=owned_string(_getValueText(groupValue,true,true),owner);
 									group=string(_groupValueText);
 									FREE_STRING(_groupValueText,owner);
 								}
@@ -14350,7 +14361,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!/*completedTokenTokenTokenTokenTokenFunction*/registerFunction(_Menvironment,owner,FORWITHFUNCTION_NAME,Mforwithfunction,5,(char*[]){"initialization","condition","increment","body","result"},(Mvalue*[]){NULL,NULL,NULL,NULL,NULL}))return false;
 
 			// MDH@05AUG2019: the do function has a single token to process
-			if(!/*completedTokenListFunction*/registerFunction(_Menvironment,owner,DOFUNCTION_NAME,Mdofunction,2,(char*[]){"local variable map","do body"},(Mvalue*[]){_getMapValue(VT_UNDEFINED,false,NULL),NULL}))return false;
+			if(!/*completedTokenListFunction*/registerFunction(_Menvironment,owner,DOWITHFUNCTION_NAME,Mdofunction,2,(char*[]){"local variable map","do body"},(Mvalue*[]){_getMapValue(VT_UNDEFINED,false,NULL),NULL}))return false;
 			if(!/*completedValueFunction*/registerFunction(_Menvironment,owner,EVALFUNCTION_NAME,Mevalfunction,1,(char*[]){"text to evaluate"},(Mvalue*[]){_getTextValue("\'"),NULL}))return false;
 			// MDH@28OCT2020: no longer internal functions as defined in Menvironment.h/c but moved over here because they need command parsing features
 			if(!/*completedStringMapTokenFunction*/registerFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME,Mdefinefunction,3,(char*[]){"function name","argument map","function body"},(Mvalue*[]){NULL,NULL,NULL}))return false;

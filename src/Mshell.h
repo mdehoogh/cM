@@ -15,6 +15,10 @@ Mvalue* getdp(Mvalue* value);
 Mvalue* setdp(Mvalue* value);
 
 // end Decimal stuff
+Mvalue* Mevalfunction(Mvalue* value);
+
+// MDH@24APR2024: python stuff
+///Mvalue* Mpython(Mvalue* commandValue);
 
 // Mcommand stuff
 // MDH@28OCT2019: because now often we need both the first and last token in a command it's probably best to combine them in a single command

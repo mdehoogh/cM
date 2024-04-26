@@ -28,8 +28,8 @@ extern const char* const M_VARIABLE_NAME; // MDH@14NOV2019: the variable to hold
 extern const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES];
 extern const char INPUTCHARACTERTYPES[];
 extern const char* const MFUNCTION_NAME; // the text to represent values that are undefined...
-extern const char* const DOFUNCTION_NAME;
-extern const char* const FORFUNCTION_NAME;
+extern const char* const DOWITHFUNCTION_NAME;
+extern const char* const FORWITHFUNCTION_NAME;
 extern const char* const DEFINEUSERFUNCTION_NAME;
 extern const char* const DEFINEANONYMOUSFUNCTION_NAME; // MDH@08FEB2020
 extern const char* const M_NULL_VALUE_TEXT; // the text to represent values that are undefined...

@@ -52,7 +52,7 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 	if(NULL==_value1||NULL==_value2)return(_value1!=NULL?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
 	// MDH@02NOV2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
-		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		Mstring *_value1text=owned_string(_getValueText(_value1,true,true),owner),*_value2text=owned_string(_getValueText(_value2,true,true),owner);
 		int result=(_value1text!=NULL&&_value2text!=NULL?strcmp(string(_value1text),string(_value2text)):(_value1text!=NULL?1:(_value2text!=NULL?-1:0))); // NULL is always supposedly smaller
 		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
 		return(result<0?M_TRUE:M_FALSE); 

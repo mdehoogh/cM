@@ -674,7 +674,7 @@ unsigned long long getNumberOfValues(){
 bool decrementReferenceCount(Mvalue * const _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(_value->count>0){(_value->count)--;return true;}
-		Mstring* _valueText=owned_string(_getValueText(_value,false),owner);
+		Mstring* _valueText=owned_string(_getValueText(_value,false,false),owner);
 		output("%sReference count of '%s' of type '%c' already zero.\n",M_BUG_PREFIX,string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
 		FREE_STRING(_valueText,owner);
 	}else
@@ -1959,6 +1959,7 @@ Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwne
  * @return Mstring* the new M string containing the text representation of M array \p _array
  */
 Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
+	bool showAll=(showAtStart==LLONG_MAX&&showAtEnd==LLONG_MAX); // MDH@26APR2024
 	// MDH@0.1.7.14+25JUN2023: arrays should now be enclosed in square brackets (and lists in parentheses) 
 	// as this is more like a tuple than a list (Python equivalent data structures)
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
@@ -1966,7 +1967,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 	if(result!=NULL){
 		Mstring* p=result;
 		unsigned long long l=(_array?_array->numberOfElements:0);
-		//if(report)
+		if(report)
 		{p=string_append_char(p,'a');p=string_append_char(p,'(');p=appendll(p,l);p=string_append_char(p,')');}
 		p=string_append_char(p,'['); // switch to using p in appends
 		if(l>0){
@@ -1992,7 +1993,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 						p=string_append_char(p,':');
 					}
 					// replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
-					Mstring* _arrayelementValueText=owned_string(_getValueText(_array->values[arrayelementindex],false),owner); // to be freed asap
+					Mstring* _arrayelementValueText=owned_string(_getValueText(_array->values[arrayelementindex],false,showAll),owner); // to be freed asap
 					if(_arrayelementValueText!=NULL){
 						p=string_append(p,string(_arrayelementValueText));
 						FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
@@ -2558,13 +2559,14 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
  * @return Mstring* the new M string containing the text representation of some elements of the M list \p _list
  */
 Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
+	bool showAll=(showAtStart==LLONG_MAX&&showAtEnd==LLONG_MAX); // MDH@26APR2024
 	// MDH@0.1.7.14+25JUN2023: lists should now be enclosed inside ( and ) instead of [ and ]
 	///////output("List to output.");char c;inputCharRead(&c);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE);
 	Mstring* result=owned_string(__string(),owner);
 	if(result!=NULL){
 		Mstring* p=result;
-		//if(report)
+		if(report)
 		{p=string_append_char(p,'l');p=string_append_char(p,'(');p=appendll(p,_list->numberOfElements);p=string_append_char(p,')');}
 		p=string_append_char(p,'('); // switch to using p in appends
 		/////////size_t l=_list->numberOfElements;
@@ -2598,7 +2600,7 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 					p=string_append_char(p,':');
 				}
 				// replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
-				Mstring* _listelementValueText=owned_string(_getValueText(_listelement->_value,false),owner); // to be freed asap
+				Mstring* _listelementValueText=owned_string(_getValueText(_listelement->_value,false,showAll),owner); // to be freed asap
 				if(_listelementValueText!=NULL){
 					p=string_append(p,string(_listelementValueText));
 					FREE_STRING(_listelementValueText,owner); // release AFTER copying over
@@ -2695,7 +2697,7 @@ Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquote
 							/////output("%s",string(p));
 							p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
 							/////output("%s",string(p));
-							Mstring* _mapelementValueText=owned_string(_getValueText(_mapVariable->_value,false),owner); // free asap
+							Mstring* _mapelementValueText=owned_string(_getValueText(_mapVariable->_value,false,true),owner); // free asap
 							/////output("Map element: %s",string(p));
 							// TODO technically NULL is also a value, so shouldn't be use the undefined value text????
 							if(_mapelementValueText!=NULL){
@@ -2751,7 +2753,7 @@ Mmap* getFilePropertyMap(Mfile* _file); // prototype
  * @param dequoted 
  * @return Mstring* the new M string containing the text representation of M value \p _value
  */
-Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getValueText(Mvalue const * const _value,bool dequoted,bool showAll){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE whatever is returned should be freed
 	Mstring* valueText=NULL;
 	////outputChar('.');
@@ -2768,8 +2770,8 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
 			case VT_TEXT:valueText=owned_string(_getStringText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
-			case VT_ARRAY:valueText=owned_string(_getArrayText(_value->value._array,M_ARRAY_ELEMENTS_AT_START,M_ARRAY_ELEMENTS_AT_END),owner);break;
-			case VT_LIST:valueText=owned_string(_getListText(_value->value._list,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END),owner);break;
+			case VT_ARRAY:valueText=owned_string(_getArrayText(_value->value._array,(showAll?LLONG_MAX:M_ARRAY_ELEMENTS_AT_START),(showAll?LLONG_MAX:M_ARRAY_ELEMENTS_AT_END)),owner);break;
+			case VT_LIST:valueText=owned_string(_getListText(_value->value._list,(showAll?LLONG_MAX:M_LIST_ELEMENTS_AT_START),(showAll?LLONG_MAX:M_LIST_ELEMENTS_AT_END)),owner);break;
 			case VT_TOKEN:
 				{ // can't just show the single token because we could have following ones
 					valueText=owned_string(__string(),owner);
@@ -2829,7 +2831,7 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 									if(_parameterMapelement->_variable){
 										p=string_append(p,_parameterMapelement->_variable->_name->chars);
 										p=string_append_char(p,':');
-										Mstring* _parameterValueText=owned_string(_getValueText(_parameterMapelement->_variable->_value,false),owner);
+										Mstring* _parameterValueText=owned_string(_getValueText(_parameterMapelement->_variable->_value,false,true),owner);
 										p=string_append(p,string(_parameterValueText));
 										FREE_STRING(_parameterValueText,owner);
 									}
@@ -2846,7 +2848,7 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 								if(functionBodyListelement!=NULL){
 									do{
 										p=string_append_char(p,',');
-										Mstring* _bodyCommandValueText=owned_string(_getValueText(functionBodyListelement->_value,true),owner);
+										Mstring* _bodyCommandValueText=owned_string(_getValueText(functionBodyListelement->_value,true,true),owner);
 										if(_bodyCommandValueText!=NULL)p=string_append(p,string(_bodyCommandValueText));
 										FREE_STRING(_bodyCommandValueText,owner);
 										functionBodyListelement=functionBodyListelement->_next;
@@ -2917,7 +2919,7 @@ size_t outputValue(char const * const prefix,Mvalue const * const value,char con
 	if(prefix!=NULL)written=output("%s",prefix);
 	if(value!=NULL){
 		// output("(%s)%u",TOKENTYPE_STRING[value->type],value->type); // DEBUG
-		Mstring* _valueText=owned_string(_getValueText(value,false),owner); // free asap
+		Mstring* _valueText=owned_string(_getValueText(value,false,true),owner); // free asap
 		if(_valueText!=NULL){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
 	}else
 		written+=outputChar('-');
@@ -3195,7 +3197,7 @@ bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist con
 					// the first element becomes the key the second element the attribute value
 					// BUT I suppose composite keys (maps or lists) are not allowed
 					Mvalue* _attributeNameValue=_maplistelementValue->value._list->_first->_value;
-					Mstring* _attributeNameValueText=owned_string(_getValueText(_attributeNameValue,true),owner); // using common _getValueText to text the first element
+					Mstring* _attributeNameValueText=owned_string(_getValueText(_attributeNameValue,true,true),owner); // using common _getValueText to text the first element
 					/* replacing:
 					if(_attributeNameValue){
 						if(_attributeNameValue->type==VT_INTEGER)_attributeNameValueText=_getIntegerText(_attributeNameValue->value._integer);else
@@ -3325,7 +3327,7 @@ Mdecimal* _getValueTextDecimal(Mvalue* value,mpd_context_t const * mpd_context){
 		if(value->type!=VT_DECIMAL){
 			// MDH@14APR2022: we're in trouble if we're not using the C locale in turning the given value into a text
 			char* locale=setlocale(LC_ALL,NULL);setlocale(LC_ALL,"C"); // replace the current locale
-			Mstring* _valueText=owned_string(_getValueText(value,true),owner); // TODO will there be any brackets around a repeating part of a 
+			Mstring* _valueText=owned_string(_getValueText(value,true,true),owner); // TODO will there be any brackets around a repeating part of a 
 			setlocale(LC_ALL,locale);
 			if(_valueText!=NULL){
 				_valueTextDecimal=owned_decimal(_getTextDecimal(string(_valueText),0,mpd_context),owner);
@@ -4697,7 +4699,7 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
  * @param filename 
  * @return Mfile* a new M file with name \p filename
  */
-static Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__LINE__);
+Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
 	// the file might not exist in which case we could get rid of _file->_stat???
 	if(_file!=NULL){
@@ -4729,7 +4731,7 @@ static Mfile* _getValueFile(Mvalue const * const file_value){
  * @param _file 
  * @return Mvalue* the new M value wrapping M file \p _file
  */
-static Mvalue* _getValueOfFile(Mfile* _file){
+Mvalue* _getValueOfFile(Mfile* _file){
 	if(NULL==_file)return NULL;
 	bool disowned_file=Misdisowned(_file);
 	Mvalue* _value=__value("file");
@@ -4876,7 +4878,7 @@ static void openFileForReadingText(Mfile* _file){
 Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
 	if(_file!=NULL){
-		long long numberofbytes=(numberofbytes_value?getValueInteger(numberofbytes_value):1); // the default is to read a single byte
+		long long numberofbytes=(numberofbytes_value!=NULL?getValueInteger(numberofbytes_value):M_LL_MAX); // the default is to read as much bytes as possible
 		if(numberofbytes>=0){ // only non-negative values are considered valid
 			// before checking the mode to see if the file can be read from, we might need to open it
 			// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
@@ -4899,7 +4901,8 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
 						return result;
 					}
 				}
-			}
+			}else
+				output("%sFile '%s' does not exist!\n",M_ERROR_PREFIX,string(_file->_name));
 		}
 	}
 	return NULL; // some error

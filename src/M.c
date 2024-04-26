@@ -2818,7 +2818,7 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				*/
 			default: // for VT_REFERENCE, VT_FUNCTION, VT_ENVIRONMENT and the like
 				{
-					Mstring* _valueText=owned_string(_getValueText(_value,false),owner);
+					Mstring* _valueText=owned_string(_getValueText(_value,false,false),owner);
 					if(_valueText!=NULL)
 					{written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);}
 				}
@@ -5310,6 +5310,138 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 }
 
 bool COMMAND_PROCESSOR_AVAILABLE=0;
+
+/**
+ * @brief executes \p shellCommandText in the shell
+ * 
+ * @param shellCommandText 
+ * @return int the return code of executing \p shellCommandText
+ */
+int execute_shellCommandText(char const * const shellCommandText){
+	// ASSERTION string_length(_shellCommand) should be positive
+	return(shellCommandText!=NULL&&strlen(shellCommandText)>0?system(shellCommandText):INT_MIN);
+}
+
+/**
+ * @brief executes the text represented in \p pythonCommandValue in the shell calling python
+ * 
+ * @param pythonCommandValue 
+ * @return Mvalue* the result of executing the given python command
+ */
+Mvalue* Mpython(Mvalue* pythonCommandValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* resultValue=NULL;
+	if(pythonCommandValue!=NULL){
+		Mstring* _shellCommandText=NULL;
+		Mfile* pythonInputfile=NULL;
+		if(pythonCommandValue->type==VT_FILE){
+			pythonInputfile=pythonCommandValue->value._file;
+		}else
+		if(pythonCommandValue->type==VT_TEXT){
+			// I'll have to write this text to a temporary file, let's use "Mpythoninput.txt by default!
+			_shellCommandText=owned_string(_getString("echo \""),owner);
+			if(_shellCommandText!=NULL){
+				Mstring* p=string_append(_shellCommandText,pythonCommandValue->value._text->_c);
+				p=string_append(p,"\" ");
+				p=string_append(p,"pythoninput.txt");
+				if(p!=NULL){
+					if(execute_shellCommandText(string(p))==0){ // success storing the python input code in the texth file
+						pythonInputfile=owned_file(_getFile("pythoninput.txt"),owner);
+						if(pythonInputfile!=NULL){
+							Mvalue* pythonInputfileValue=_getValueOfFile(disowned_file(pythonInputfile,owner));
+							if(pythonInputfileValue!=NULL){
+								Mvalue* pythonInputfileWriteValue=mfwrite(pythonInputfileValue,pythonCommandValue);
+								long long notWrittenToPythonInputFile=getValueInteger(pythonInputfileWriteValue);
+								if(notWrittenToPythonInputFile==0){ // success
+									Mvalue* flushOutputBufferValue=_getTextValue("'\nimport sys\nsys.stdout.flush()");
+									if(flushOutputBufferValue!=NULL){
+										outputValue("Writing the flush output buffer python code '",flushOutputBufferValue,"'.\n");
+										if(getValueInteger(mfwrite(pythonInputfileValue,flushOutputBufferValue))!=0)
+											outputError("Failed to write the flush output buffer python code");
+									}else
+										outputWarning("Can't write the flush output buffer python code");
+									if(getValueInteger(mfclose(pythonInputfileValue))!=M_TRUE)
+										outputError("Failed to close the python input file");
+									else
+										output("Writing the python input text to the python input file succeeded!\n");
+								}else{
+									// no need to free the file because it's wrapped and will be garbage-collected
+									pythonInputfile=NULL; // indicating failure
+									if(notWrittenToPythonInputFile==M_LL_INVALID)
+										outputError("Failed to write the python text to execute");
+									else
+										output("%sFailed to write %lld python input code characters to the python input file.\n",M_ERROR_PREFIX,notWrittenToPythonInputFile);
+								}
+							}else{ // not wrapped input file 
+								free_file(pythonInputfile);
+								pythonInputfile=NULL;
+							}
+						}
+					}else
+						outputError("Failed to store the python input code characters for execution");
+				}
+			}
+		}
+		if(_shellCommandText!=NULL)FREE_STRING(_shellCommandText,owner);
+		if(pythonInputfile!=NULL){ // an input file with python code to execute
+			_shellCommandText=owned_string(_getString("python "),owner);
+			if(_shellCommandText!=NULL){
+				Mstring* p=string_append(_shellCommandText,string(pythonInputfile->_name));
+				p=string_append(p," > pythonoutput.txt"); // will overwrite pythonoutput.txt!!!!!
+				if(p!=NULL){
+					output("Executing '%s'.\n",string(p));
+					int pythonCallErrorcode=execute_shellCommandText(string(p));
+					if(pythonCallErrorcode==0){
+						output("Retrieving the text in the python output file.\n");
+						Mfile* outputFile=owned_file(_getFile("pythonoutput.txt"),owner);
+						if(outputFile!=NULL){
+							Mvalue* outputFileValue=_getValueOfFile(disowned_file(outputFile,owner));
+							if(outputFileValue!=NULL){
+								outputValue("Processing python output file: '",outputFileValue,"'.\n");
+								// I suggest reading one line at a time using mfreadline() so we won't read the line separators
+								// which would f*ck up Mevalfunction 
+								Mlist* evaluatedLinesList=owned_list(__list("python"),owner);
+								if(evaluatedLinesList!=NULL){
+									Mvalue* outputFileLineValue=mfreadline(outputFileValue);
+									long long lineIndex=0;
+									while(outputFileLineValue!=NULL){
+										lineIndex++;
+										outputValue("Processing python output line '",outputFileLineValue,"'.\n");
+										if(outputFileLineValue->type==VT_TEXT&&strlen(outputFileLineValue->value._text->_c)>0){
+											if(appendedToList(evaluatedLinesList,owner,Mevalfunction(outputFileLineValue),lineIndex)<=0)
+												output("Failed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+										}
+										outputFileLineValue=mfreadline(outputFileValue);
+									}
+									// let's close the output file
+									if(getValueInteger(mfclose(outputFileValue))!=M_TRUE)
+										outputWarning("Failed to close the python output file");
+									output("Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
+									if(evaluatedLinesList->numberOfElements){
+										if(evaluatedLinesList->numberOfElements==1){ // a single output line
+											resultValue=evaluatedLinesList->_first->_value;
+											FREE_LIST(evaluatedLinesList,owner);
+										}else // return the list of evaluated lines (the indexes represent the lines)
+											resultValue=_getValueOfList(disowned_list(evaluatedLinesList,owner));
+									}else
+										FREE_LIST(evaluatedLinesList,owner);
+								}else
+									outputError("Failed to create the list with evaluated python output lines");
+							}else // disowned but not freed yet
+								free_file(outputFile);
+						}else
+							outputError("Failed to open the python call output file");
+					}else
+						outputError("Failed to execute python");
+				}else
+					outputError("Failed to build the python REPL command");
+			}else
+				outputError("Failed to create the python REPL command");
+		}
+		if(_shellCommandText!=NULL)FREE_STRING(_shellCommandText,owner);
+	}
+	return resultValue;
+}
+
 /**
  * @brief clears the shell command
  * 
@@ -5319,17 +5451,18 @@ void clear_shellCommand(){
 	string_setlength(_shellCommand,0/*,owner_shellCommand*/);
 	// MDH@24APR2019 obsolete: getUserInputLength()=0;
 }
+
 /**
  * @brief executes the shell command
  * 
  */
-void execute_shellCommand(){
-	// ASSERTION string_length(_shellCommand) should be positive
+void executeShellCommand(){
 	output(""); // get a new line before we see the result of executing this command!!
-	int result=system(string(_shellCommand));
+	int result=execute_shellCommandText(string(_shellCommand));
 	if(result)output("Shell command return code: %d.\n",result); // non-zero result
 	clear_shellCommand(); // ready for the next execution
 }
+
 /**
  * @brief switches to shell mode
  * 
@@ -5462,12 +5595,13 @@ bool registerCommandEvaluation(char const * const commandText,Mvalue* evaluation
  * 
  * @return Mvalue* a wrapped map containing the names of all variables in the current execution environment
  */
-Mvalue* Mvariables(){//Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mvariables(Mvalue* environmentValue){//Mallocationowner owner=getOwner(__LINE__);
 	if(amVerbose())
 		outputInfo("Getting the variables!");
+	Menvironment* environment=(environmentValue!=NULL&&environmentValue->type!=VT_ENVIRONMENT?environmentValue->value._environment:getExecutionEnvironment());
 	// returning the names of the local variables (including the hidden ones)
 	// NOTE _getVariableNamesMap() always requires a non NULL environment to start with
-	return _getValueOfMap(_getVariableNamesMap(getExecutionEnvironment()));
+	return _getValueOfMap(_getVariableNamesMap(environment));
 }
 // MDH@15NOV2019: returning value counts (per value type), passing in a list of variable names
 // MDH@25NOV2019: what about returning a table??? which is a list
@@ -5566,7 +5700,7 @@ Mvalue* Min(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _commandOutputValue=NULL;
-	Mstring* _commandText=owned_string(_getValueText(_commandValue,true),owner);
+	Mstring* _commandText=owned_string(_getValueText(_commandValue,true,true),owner);
 	if(/*_commandText&&*/string_length(_commandText)){
 		FILE *fp=popen(string(_commandText),"r");
 		if(fp!=NULL){
@@ -5643,7 +5777,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			output("Function %s registered.\n",MFUNCTION_NAME);
 	}
 
-	if(!/*completedFunction*/registerNoArgumentFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables)){
+	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables)){
 		errorflags|=16;
 		outputWarning("Failed to register the variables() function");
 	}
@@ -5668,7 +5802,12 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
 	}
 	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"tc",Mtc)){
-		errorflags|=512;		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
+		errorflags|=512;
+		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
+	}
+	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"python",Mpython)){
+		errorflags|=1024;
+		outputWarning("Failed to register the python function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	return errorflags;
@@ -7607,7 +7746,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			}else
 			if(inputMode==IM_SHELL){
 				if(string_length(_shellCommand))
-					execute_shellCommand();
+					executeShellCommand();
 				else // MDH@16APR2019: back to command mode
 					switchToCommandMode();
 			}else // Return key in control mode, always to return to command input!!

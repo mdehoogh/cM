@@ -871,7 +871,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 									unsigned long long textindex=*textcount;
 									do{
 										textindex--;
-										Mstring* _valueText=owned_string(_getValueText(textValues[textindex],true),owner);
+										Mstring* _valueText=owned_string(_getValueText(textValues[textindex],true,true),owner);
 										if(_valueText!=NULL){
 											_texts[textindex]=OWNED(_strdup(string(_valueText)),Msubowner(owner,1));
 											FREE_STRING(_valueText,owner);
@@ -902,7 +902,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 							Mlistelement* listelement=textList->_first;
 							while(listelement!=NULL){
 								if(textindex>=*textcount){outputBug("Number of elements of list incorrect trying to split texts");break;}
-								Mstring* _valueText=owned_string(_getValueText(listelement->_value,true),owner);
+								Mstring* _valueText=owned_string(_getValueText(listelement->_value,true,true),owner);
 								if(_valueText!=NULL){
 									_texts[textindex++]=OWNED(_strdup(string(_valueText)),Msubowner(owner,1));
 									FREE_STRING(_valueText,owner);
@@ -1245,7 +1245,7 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
  * @return Mvalue* the number of characters written
  */
 Mvalue* Mout(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	Mstring* _valueText=owned_string(_getValueText(_value,true),owner);
+	Mstring* _valueText=owned_string(_getValueText(_value,true,true),owner);
 	size_t result=string_length(_valueText);
 	if(result>0)output("%s",string(_valueText));
 	FREE_STRING(_valueText,owner);

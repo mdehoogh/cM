@@ -329,7 +329,7 @@ Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquote
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
 void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
 
-Mstring* _getValueText(Mvalue const * const _value,bool dequoted); // flag only applicable to string values!!!
+Mstring* _getValueText(Mvalue const * const _value,bool dequoted,bool showAll); // flag only applicable to string values!!!
 ///////Mvalue* _getStringValue(Mstring const * const _string); // MDH@28SEP2020: why wasn't this here so far?????
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
@@ -562,7 +562,7 @@ Menvironment* getValueEnvironment(Mvalue const * const _value); // MDH@03FEB2020
 Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
 
 // Mfile is added starting from v0.1.4
-// Mvalue* _getValueOfFile(Mfile* _file);
+Mvalue* _getValueOfFile(Mfile* _file);
 
 Mvalue* mfile(Mvalue* filename_value);
 Mvalue* mfdelete(Mvalue* file_value);
@@ -584,3 +584,5 @@ long long isNumeric(Mvalue* value);
 Mrational* _getRationalCopy(Mrational const * const rational);
 Mrational* _getValueRational(Mvalue const * const value);
 Mrational* getValueRational(Mvalue const * const value);
+
+Mfile* _getFile(char const * const filename);

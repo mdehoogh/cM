@@ -517,7 +517,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		// MDH@17OCT2019: we can't use _getValueText() here, because _getValueText() will resolve escape sequences which we do NOT want here
 		// MDH@28OCT2019: think twice this is only true when _value2 is also of type text
 		if(_value2->type!=VT_TEXT){
-			Mstring* _value2Text=owned_string(_getValueText(_value2,true),owner); // get the text representation of the second argument without quotes
+			Mstring* _value2Text=owned_string(_getValueText(_value2,true,true),owner); // get the text representation of the second argument without quotes
 			if(_value2Text!=NULL){p=string_append(p,string(_value2Text));FREE_STRING(_value2Text,owner);}
 		}else // second argument also of type text
 			p=string_append(p,_value2->value._text->_c);

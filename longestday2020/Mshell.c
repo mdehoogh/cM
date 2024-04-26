@@ -17,8 +17,8 @@ const char* const M_VARIABLE_NAME="M"; // MDH@14NOV2019: the variable to hold th
 const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function for getting previous results
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
-const char* const FORFUNCTION_NAME="for";
-const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
+const char* const FORWITHFUNCTION_NAME="forwith";
+const char* const DOWITHFUNCTION_NAME="dowith"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="defun"; // MDH@04MAR2020: the 'classic' approach is by defining a function with a fixed name which cannot be passed along
 const char* const DEFINEANONYMOUSFUNCTION_NAME="function"; // MDH@04MAR2020: an anonymous function that is to be assigned to a variable/argument
@@ -1191,7 +1191,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 								char* functionName=string(_userInputCommand->_lastToken->prev->text);
 								// we do not need to store the function name itself, just the argument that will contain the local variable initializations
 								if(pushInitialization("(")){
-									_lastInitialization->argument=((!strcmp(functionName,DOFUNCTION_NAME)||!strcmp(functionName,FORFUNCTION_NAME)?0:(!strcmp(functionName,DEFINEUSERFUNCTION_NAME)?1:-1)));
+									_lastInitialization->argument=((!strcmp(functionName,DOWITHFUNCTION_NAME)||!strcmp(functionName,FORFUNCTION_NAME)?0:(!strcmp(functionName,DEFINEUSERFUNCTION_NAME)?1:-1)));
 									initializationsChanged=true;
 									if(amVerbose())(*inputInfoFunction)("Function '%s' registered.",functionName);
 								}else

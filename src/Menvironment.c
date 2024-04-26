@@ -373,7 +373,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 							written+=newline(); // start a new line before outputting the table!!!
 							while(headerrowListelement!=NULL){
 								if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table header loop!");break;}
-								Mstring* _columnNameText=owned_string(_getValueText(headerrowListelement->_value,true),owner);
+								Mstring* _columnNameText=owned_string(_getValueText(headerrowListelement->_value,true,true),owner);
 								if(_columnNameText!=NULL){
 									columnLengths[columnIndex]=output("%s",string(_columnNameText));
 									written+=columnLengths[columnIndex];
@@ -397,7 +397,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 											Mlistelement* rowListelement=tablerowValueList->_first;
 											while(rowListelement){
 												if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table data row loop!");break;}
-												Mstring* _cellText=owned_string(_getValueText(rowListelement->_value,true),owner);
+												Mstring* _cellText=owned_string(_getValueText(rowListelement->_value,true,true),owner);
 												cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
 												written+=cellLength;
 												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
@@ -413,7 +413,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 										if(tablerowValueArray!=NULL){
 											size_t numberOfColumns=tablerowValueArray->numberOfElements;
 											for(size_t columnIndex=0;columnIndex<numberOfColumns;++columnIndex){
-												Mstring* _cellText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true),owner);
+												Mstring* _cellText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner);
 												cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
 												written+=cellLength;
 												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
@@ -809,7 +809,7 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 						char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name->chars,_mapVariable->_value);
 						if(NULL==constantWithValue){ // not a 'symbolic' value
 							/////output("%s",string(p));
-							Mstring* _mapelementValueText=owned_string(_getValueText(_mapVariable->_value,false),owner); // free asap
+							Mstring* _mapelementValueText=owned_string(_getValueText(_mapVariable->_value,false,true),owner); // free asap
 							/////output("Map element: %s",string(p));
 							// TODO technically NULL is also a value, so shouldn't be use the undefined value text????
 							if(_mapelementValueText!=NULL){
@@ -1291,7 +1291,7 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 				///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
 				assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
 				if(report){
-					Mstring* _valueText=owned_string(_getValueText(variable->_value,false),owner);
+					Mstring* _valueText=owned_string(_getValueText(variable->_value,false,true),owner);
 					if(_valueText!=NULL){
 						output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
 						FREE_STRING(_valueText,owner);
@@ -1369,7 +1369,7 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 				variable->_value=_value;
 				if(variable->_value!=NULL)incrementReferenceCount(variable->_value);
 				if(amVerbose()){
-					Mstring* _valueText=owned_string(_getValueText(variable->_value,false),owner);
+					Mstring* _valueText=owned_string(_getValueText(variable->_value,false,true),owner);
 					if(_valueText!=NULL){
 						output("Value '%s' (reference count: %zd) assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
 						FREE_STRING(_valueText,owner);
@@ -1883,7 +1883,7 @@ Mvalue* Mvartype(Mvalue* variableValue){Mallocationowner owner=getOwner(__LINE__
 	if(variableValue->type==VT_MAP)return _getValueOfMap(appliedToMap(variableValue->value._map,Mvartype,VT_UNDEFINED));
 	// ASSERT not a composite value
 	// TODO what happens with a reference??????
-	Mstring* _valueText=owned_string(_getValueText(variableValue,true),owner);
+	Mstring* _valueText=owned_string(_getValueText(variableValue,true,true),owner);
 	if(NULL==_valueText)return NULL;
 	output("Looking for the type of variable '%s'.\n",string(_valueText));
 	// NOTE getVariable() will also check parent environments!!!
@@ -1915,7 +1915,7 @@ Mvalue* Msetvartype(Mvalue* variableValue,Mvalue* valuetypeValue){Mallocationown
 	if(variableValue->type==VT_MAP)return _getValueOfMap(appliedToMap(variableValue->value._map,Msetvartype,valuetype));
 	// ASSERT not a composite value
 	// TODO what happens with a reference??????
-	Mstring* _valueText=owned_string(_getValueText(variableValue,true),owner);
+	Mstring* _valueText=owned_string(_getValueText(variableValue,true,true),owner);
 	if(NULL==_valueText)return NULL;
 	output("Looking for the type of variable '%s'.\n",string(_valueText));
 	// NOTE getVariable() will also check parent environments!!!
@@ -3544,7 +3544,7 @@ Mvalue* Mreturn(Mvalue* _value){
  */
 Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	long long success=M_LL_INVALID;
-	Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
+	Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true,true),owner);
 	if(_variableName!=NULL&&string_length(_variableName)>0){
 		char* variableName=string(_variableName);
 		Menvironment* executionEnvironment=getExecutionEnvironment();
@@ -3563,7 +3563,7 @@ Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value){Mallocationowner owner=g
  */
 Mvalue* Mget(Mvalue* _variableNameValue){Mallocationowner owner=getOwner(__LINE__);
 	if(_variableNameValue!=NULL){
-		Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
+		Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true,true),owner);
 		if(_variableName!=NULL){
 			Mvalue* _get=getValue(getExecutionEnvironment(),string(_variableName));
 			FREE_STRING(_variableName,owner);
