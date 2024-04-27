@@ -5328,11 +5328,12 @@ int execute_shellCommandText(char const * const shellCommandText){
  * @param pythonCommandValue 
  * @return Mvalue* the result of executing the given python command
  */
-Mvalue* Mpython(Mvalue* pythonCommandValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sysExitValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* resultValue=NULL;
 	if(pythonCommandValue!=NULL){
 		Mstring* _shellCommandText=NULL;
 		Mfile* pythonInputfile=NULL;
+		bool sysExitTextAdded=true;
 		if(pythonCommandValue->type==VT_FILE){
 			pythonInputfile=pythonCommandValue->value._file;
 		}else
@@ -5342,23 +5343,51 @@ Mvalue* Mpython(Mvalue* pythonCommandValue){Mallocationowner owner=getOwner(__LI
 			if(_shellCommandText!=NULL){
 				Mstring* p=string_append(_shellCommandText,pythonCommandValue->value._text->_c);
 				p=string_append(p,"\" ");
-				p=string_append(p,"pythoninput.txt");
+				p=string_append(p,"M.py");
 				if(p!=NULL){
-					if(execute_shellCommandText(string(p))==0){ // success storing the python input code in the texth file
-						pythonInputfile=owned_file(_getFile("pythoninput.txt"),owner);
+					if(execute_shellCommandText(string(p))==0){ // success storing the python input code in the text file
+						pythonInputfile=owned_file(_getFile("M.py"),owner);
 						if(pythonInputfile!=NULL){
 							Mvalue* pythonInputfileValue=_getValueOfFile(disowned_file(pythonInputfile,owner));
 							if(pythonInputfileValue!=NULL){
 								Mvalue* pythonInputfileWriteValue=mfwrite(pythonInputfileValue,pythonCommandValue);
 								long long notWrittenToPythonInputFile=getValueInteger(pythonInputfileWriteValue);
 								if(notWrittenToPythonInputFile==0){ // success
-									Mvalue* flushOutputBufferValue=_getTextValue("'\nimport sys\nsys.stdout.flush()");
-									if(flushOutputBufferValue!=NULL){
-										outputValue("Writing the flush output buffer python code '",flushOutputBufferValue,"'.\n");
-										if(getValueInteger(mfwrite(pythonInputfileValue,flushOutputBufferValue))!=0)
-											outputError("Failed to write the flush output buffer python code");
-									}else
-										outputWarning("Can't write the flush output buffer python code");
+									if(sysExitValue!=NULL){
+										// the essential thing here is that we cannot call sys.exit() with a text message to use as result, because there's no way of retrieving that
+										// but what we can do is simply print the sys exit text at the end, so we know the last line of the code actually is the system exit code
+										// perhaps it's a good idea to somehow mark this line e.g. by appending a comment that indicates that line to be the result text something like ## M result ##
+										Mstring* sysExitText=owned_string(_getString("\"\nimport sys\nprint('## M result')\nsys.stdout.write('{0}'.format("),owner); // prefixing f means that sysExitText may contain Python style formatting elements!!!
+										if(sysExitText!=NULL){
+											if(sysExitValue->type==VT_TEXT){
+												if(NULL==string_append(sysExitText,sysExitValue->value._text->_c))
+													sysExitTextAdded=false;
+											}else{
+												if(NULL==string_append(sysExitText,_getValueText(sysExitValue,true,true)))
+													sysExitTextAdded=false;
+											}
+											if(sysExitTextAdded)if(NULL==string_append(sysExitText,"))\nsys.stdout.flush()"))sysExitTextAdded=false;
+											if(!sysExitTextAdded||getValueInteger(mfwrite(pythonInputfileValue,_getTextValue(string(sysExitText))))){
+												sysExitTextAdded=false;
+												outputError("Failed to insert the system exit text");
+											}
+											FREE_STRING(sysExitText,owner);
+										}else
+											outputError("Failed to create the system exit text");
+									}else{
+										// we'd write the flush output buffer python code anyway
+										Mvalue* flushOutputBufferValue=_getTextValue("'\nimport sys\nsys.stdout.flush()");
+										if(flushOutputBufferValue!=NULL){
+											outputValue("Writing the flush output buffer python code '",flushOutputBufferValue,"'.\n");
+											long long flushOutputBufferValueNotWritten=getValueInteger(mfwrite(pythonInputfileValue,flushOutputBufferValue));
+											if(flushOutputBufferValueNotWritten>0)
+												output("%sFailed to write %lld flush output buffer characters.\n",M_ERROR_PREFIX,flushOutputBufferValueNotWritten);
+											else
+											if(flushOutputBufferValueNotWritten==M_LL_INVALID)
+												outputError("Failed to write the flush output buffer python code");
+										}else
+											outputWarning("Can't write the flush output buffer python code");
+									}
 									if(getValueInteger(mfclose(pythonInputfileValue))!=M_TRUE)
 										outputError("Failed to close the python input file");
 									else
@@ -5386,50 +5415,61 @@ Mvalue* Mpython(Mvalue* pythonCommandValue){Mallocationowner owner=getOwner(__LI
 			_shellCommandText=owned_string(_getString("python "),owner);
 			if(_shellCommandText!=NULL){
 				Mstring* p=string_append(_shellCommandText,string(pythonInputfile->_name));
-				p=string_append(p," > pythonoutput.txt"); // will overwrite pythonoutput.txt!!!!!
+				p=string_append(p," > M.py.out"); // will overwrite pythonoutput.txt!!!!!
 				if(p!=NULL){
 					output("Executing '%s'.\n",string(p));
 					int pythonCallErrorcode=execute_shellCommandText(string(p));
 					if(pythonCallErrorcode==0){
-						output("Retrieving the text in the python output file.\n");
-						Mfile* outputFile=owned_file(_getFile("pythonoutput.txt"),owner);
-						if(outputFile!=NULL){
-							Mvalue* outputFileValue=_getValueOfFile(disowned_file(outputFile,owner));
-							if(outputFileValue!=NULL){
-								outputValue("Processing python output file: '",outputFileValue,"'.\n");
-								// I suggest reading one line at a time using mfreadline() so we won't read the line separators
-								// which would f*ck up Mevalfunction 
-								Mlist* evaluatedLinesList=owned_list(__list("python"),owner);
-								if(evaluatedLinesList!=NULL){
-									Mvalue* outputFileLineValue=mfreadline(outputFileValue);
-									long long lineIndex=0;
-									while(outputFileLineValue!=NULL){
-										lineIndex++;
-										outputValue("Processing python output line '",outputFileLineValue,"'.\n");
-										if(outputFileLineValue->type==VT_TEXT&&strlen(outputFileLineValue->value._text->_c)>0){
-											if(appendedToList(evaluatedLinesList,owner,Mevalfunction(outputFileLineValue),lineIndex)<=0)
-												output("Failed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+						// only when the system exit text has been 'added', do we process the output file
+						if(sysExitTextAdded){
+							output("Retrieving the text in the python output file.\n");
+							Mfile* outputFile=owned_file(_getFile("M.py.out"),owner);
+							if(outputFile!=NULL){
+								Mvalue* outputFileValue=_getValueOfFile(disowned_file(outputFile,owner));
+								if(outputFileValue!=NULL){
+									outputValue("Processing python output file '",outputFileValue,"'.\n");
+									// I suggest reading one line at a time using mfreadline() so we won't read the line separators
+									// which would f*ck up Mevalfunction 
+									Mlist* evaluatedLinesList=owned_list(__list("python"),owner);
+									if(evaluatedLinesList!=NULL){
+										Mvalue * prevOutputFileLineValue=NULL,*outputFileLineValue=mfreadline(outputFileValue);
+										long long lineIndex=0;
+										while(outputFileLineValue!=NULL){
+											lineIndex++;
+											if(outputFileLineValue->type==VT_TEXT){
+												outputValue("Processing python output line '",outputFileLineValue,"'.\n");
+												if(sysExitValue!=NULL) // only interested in the last valid line!!
+													prevOutputFileLineValue=(strlen(outputFileLineValue->value._text->_c)?outputFileLineValue:NULL);
+												else // register any line in the output file!!!
+												if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/outputFileLineValue/*)*/,lineIndex)<=0)
+													output("Failed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+												// we should NOT evaluate the read line here, that's basically up to the caller
+											}
+											outputFileLineValue=mfreadline(outputFileValue);
 										}
-										outputFileLineValue=mfreadline(outputFileValue);
-									}
-									// let's close the output file
-									if(getValueInteger(mfclose(outputFileValue))!=M_TRUE)
-										outputWarning("Failed to close the python output file");
-									output("Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
-									if(evaluatedLinesList->numberOfElements){
-										if(evaluatedLinesList->numberOfElements==1){ // a single output line
-											resultValue=evaluatedLinesList->_first->_value;
+										// if we have remember the last valid line that's the result line to return!!!
+										if(prevOutputFileLineValue!=NULL)
+											if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/prevOutputFileLineValue/*)*/,lineIndex)<=0)
+												output("Failed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+										// let's close the output file
+										if(getValueInteger(mfclose(outputFileValue))!=M_TRUE)
+											outputWarning("Failed to close the python output file");
+										output("Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
+										if(evaluatedLinesList->numberOfElements){
+											if(evaluatedLinesList->numberOfElements==1){ // a single output line
+												assignValue(&resultValue,evaluatedLinesList->_first->_value);
+												FREE_LIST(evaluatedLinesList,owner);
+											}else // return the list of evaluated lines (the indexes represent the lines)
+												resultValue=_getValueOfList(disowned_list(evaluatedLinesList,owner));
+										}else
 											FREE_LIST(evaluatedLinesList,owner);
-										}else // return the list of evaluated lines (the indexes represent the lines)
-											resultValue=_getValueOfList(disowned_list(evaluatedLinesList,owner));
 									}else
-										FREE_LIST(evaluatedLinesList,owner);
-								}else
-									outputError("Failed to create the list with evaluated python output lines");
-							}else // disowned but not freed yet
-								free_file(outputFile);
-						}else
-							outputError("Failed to open the python call output file");
+										outputError("Failed to create the list with evaluated python output lines");
+								}else // disowned but not freed yet
+									free_file(outputFile);
+							}else
+								outputError("Failed to open the python call output file");
+						}
 					}else
 						outputError("Failed to execute python");
 				}else
@@ -5805,7 +5845,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 		errorflags|=512;
 		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
 	}
-	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"python",Mpython)){
+	if(!completedValueValueFunction(_Menvironment,owner_executionenvironment,"python",Mpython)){
 		errorflags|=1024;
 		outputWarning("Failed to register the python function"); // moved out of registerInternalFunctions!!!!
 	}
