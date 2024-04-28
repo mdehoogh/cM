@@ -4720,7 +4720,7 @@ static Mfile* _getValueFile(Mvalue const * const file_value){
 		if(file_value->type==VT_FILE)
 			return file_value->value._file;
 		if(file_value->type==VT_TEXT) // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
-			if(file_value->value._text)
+			if(file_value->value._text!=NULL)
 				return _getFile(file_value->value._text->_c);
 	}
 	return NULL;
@@ -4734,6 +4734,7 @@ static Mfile* _getValueFile(Mvalue const * const file_value){
 Mvalue* _getValueOfFile(Mfile* _file){
 	if(NULL==_file)return NULL;
 	bool disowned_file=Misdisowned(_file);
+	////output(disowned_file?"Disowned file":"Owned file");
 	Mvalue* _value=__value("file");
 	if(NULL==_value){
 		if(disowned_file)free_file(_file);

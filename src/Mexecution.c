@@ -1988,9 +1988,17 @@ bool isDecimalZero(Mdecimal* _decimal){
  * @return Mfile* the disowned \p _file
  */
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
-	if(!_file)return NULL;
-	if(_file->_stat)DISOWNED(_file->_stat,owner_file);
-	if(_file->_name)DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
+	if(NULL==_file)return NULL;
+	///output("Disowning file stat!\n");
+	if(_file->_stat!=NULL){
+		DISOWNED(_file->_stat,owner_file);
+	}
+	if(_file->_name!=NULL){
+		///output("Disowning file name!\n");
+		DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
+		///if(Misdisowned(_file->_name))output("File name disowned!\n");else outputError("File not disowned");
+	}
+	///output("Disowning the file!\n");
 	return DISOWNED(_file,owner_file);
 }
 /**
@@ -2001,7 +2009,8 @@ Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
  * @return Mfile* the owned \p _file
  */
 Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){
-	if(_file==NULL)return NULL;
+	if(NULL==_file)return NULL;
+	if(_file->_name!=NULL)OWNED(_file->_name,Msubowner(owner_file,1)); // MDH@28APR2024: OOPS forgot this line before!!!
 	if(_file->_stat!=NULL)OWNED(_file->_stat,Msubowner(owner_file,1));
 	return OWNED(_file,owner_file);
 }
