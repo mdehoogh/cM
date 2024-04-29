@@ -5329,133 +5329,139 @@ int execute_shellCommandText(char const * const shellCommandText){
  * @return Mvalue* the result of executing the given python command
  */
 Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sysExitValue){Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* resultValue=NULL;
-	if(pythonCommandValue!=NULL){
-		// 1. initialize the header of the python input file
-		//    we need to put a dollar sign in front of the echo literal so it won't get rid of the double quotes around {0}
-		Mstring* initializeHeaderPythonInputFileText=owned_string(_getString("echo $'import sys\nimport atexit\ndef Matexit(): "),owner);
-		if(initializeHeaderPythonInputFileText!=NULL){
-			Mstring* p=initializeHeaderPythonInputFileText;
-			if(sysExitValue!=NULL){ // a result expression text defined
-				p=string_append(p,"sys.stdout.write(\"{0}\".format(");
-				if(sysExitValue->type==VT_TEXT)
-					p=string_append(p,sysExitValue->value._text->_c);
-				else
-					p=string_append(p,_getValueText(sysExitValue,false,true));
-				p=string_append(p,")); ");
-			}
-			// finish the Matexit() Python function by flushing the Python output buffer, and register it in the atexit module
-			p=string_append(p,"sys.stdout.flush(); return\natexit.register(Matexit)\n' > M.py");
-			if(p!=NULL){
-				int initializeHeaderPythonInputFileErrorCode=execute_shellCommandText(string(initializeHeaderPythonInputFileText));
-				if(initializeHeaderPythonInputFileErrorCode==0){
-					// 2. append the python code to the Python input file
-					bool inputFileCompleted=false;
-					if(pythonCommandValue->type==VT_FILE){
-						Mstring* completeInputFileCommandText=owned_string(_getString("cat "),owner);
-						if(completeInputFileCommandText!=NULL){
-							Mstring* p=string_append(completeInputFileCommandText,pythonCommandValue->value._file->_name);
-							p=string_append(p,">> M.py");
-							if(p!=NULL){
-								int completeInputFileErrorCode=system(string(p));
-								if(completeInputFileErrorCode==0)
-									inputFileCompleted=true;
-								else
-									output("%sThe shell command to complete the Python input file failed with error code %d.\n",M_ERROR_PREFIX,completeInputFileErrorCode);
+ 	Mvalue* resultValue=NULL;
+	// if pythonCommandValue exists it needs to be a file, a text or a list or array
+ 	if(pythonCommandValue!=NULL&&(pythonCommandValue->type==VT_FILE||pythonCommandValue->type==VT_TEXT||pythonCommandValue->type==VT_LIST||pythonCommandValue->type==VT_ARRAY)){
+ 		// 1. CREATE AND FILL THE PYTHON SCRIPT FILE
+		Mfile* pythonScriptFile=owned_file(_getFile("M.py"),owner);
+		if(pythonScriptFile!=NULL){
+			// now we need to open this script file
+			Mvalue* pythonScriptFileValue=_getValueOfFile(disowned_file(pythonScriptFile,owner)); // will free the file when failing to wrap it
+			if(pythonScriptFileValue!=NULL){
+				if(mfopen(pythonScriptFileValue,_getTextValue("w"))!=NULL){
+					// 1a. WRITE THE HEADER LINES 
+					bool headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'import sys" FILE_EOLN)))==0);
+					if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'import atexit" FILE_EOLN)))==0);
+					if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'def Matexit(): ")))==0);
+					if(sysExitValue!=NULL){
+						if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'print(\"{0}\".format(")))==0);
+						if(sysExitValue->type!=VT_TEXT){
+							Mstring* _sysExitExpressionText=owned_string(_getValueText(sysExitValue,false,true),owner);
+							if(_sysExitExpressionText!=NULL){
+								if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_sysExitExpressionText))))==0);
+								FREE_STRING(_sysExitExpressionText,owner);
+							}
+						}else{ // the text to write is already wrapped, so we're writing it as is (we're not going to use _getStringText to dequote it??????)
+							if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,sysExitValue))==0);
+						}
+						if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("')); ")))==0);
+					}
+					if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'sys.stdout.flush(); return" FILE_EOLN "atexit.register(Matexit)" FILE_EOLN "# end of header inserted by M, do ** NOT ** edit before this line!" FILE_EOLN)))==0);
+					bool pythonScriptLinesWritten=false;
+					if(headerLinesWritten){ // the header was written successfully
+						// 1b. WRITE THE LINES represented by pythonCommandValue
+						if(pythonCommandValue!=NULL){
+							if(pythonCommandValue->type==VT_FILE){
+								pythonScriptLinesWritten=true;
+								output("Copying the Python script lines from '%s' to the Python script file.\n",string(pythonCommandValue->value._file->_name));
+								// TODO should we close it before reading the lines from it????
+								unsigned long long lineIndex=0;
+								Mvalue* pythonSourceLineValue=mfreadline(pythonCommandValue);
+								while(pythonSourceLineValue!=NULL){
+									lineIndex++;
+									// do not write any empty lines at the end
+									if(pythonSourceLineValue->value._text->_c[0]){
+										if(getValueInteger(mfwrite(pythonScriptFileValue,pythonSourceLineValue))==0){ // the source line written successfully
+											// construct and write the comment telling what the source line was!
+											Mstring* _sourceLineTextComment=owned_string(_getString("' # source: "),owner);
+											Mstring* p=_sourceLineTextComment;
+											if(p!=NULL){
+												p=string_append(p,string(pythonCommandValue->value._file->_name)); // appending the name of the inserted file
+												p=string_append_char(p,':');
+												p=string_append_ull(p,lineIndex);
+												if(p!=NULL&&getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(p))))!=0)
+													pythonScriptLinesWritten=false;
+												if(_sourceLineTextComment!=NULL)FREE_STRING(_sourceLineTextComment,owner);
+											}
+										}else
+											pythonScriptLinesWritten=false;
+									}
+									// always write EOLN
+									if(pythonScriptLinesWritten&&getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'"FILE_EOLN)))!=0)
+										pythonScriptLinesWritten=false;
+									if(!pythonScriptLinesWritten){
+										outputValue("ERROR: Failed to write '",pythonSourceLineValue,"' to the Python script file.\n");
+										break;
+									}
+									///////output("Reading the next line!\n");
+									pythonSourceLineValue=mfreadline(pythonCommandValue);
+								}
+								output("Number of Python source lines written: %u.\n",lineIndex);
+								if(getValueInteger(mfclose(pythonCommandValue))!=M_TRUE)
+									outputError("Failed to close the Python source file");
 							}else
-								outputError("Failed to create the complete input file shell command");
-							FREE_STRING(completeInputFileCommandText,owner);
+							if(pythonCommandValue->type==VT_TEXT){
+								Mstring* _pythonCommandText=owned_string(_getStringText(pythonCommandValue->value._text,true),owner);
+								if(_pythonCommandText!=NULL){
+									if(string_prepend(_pythonCommandText,"'")!=NULL&&string_append(_pythonCommandText,FILE_EOLN)!=NULL&&
+											getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))==0)
+										pythonScriptLinesWritten=true;
+									FREE_STRING(_pythonCommandText,owner);
+								}
+							}else
+							if(pythonCommandValue->type==VT_ARRAY){
+								// write every array element as a python script line
+								Mvalue** arrayValues=pythonCommandValue->value._array->values;
+								size_t arrayElementIndex=0;
+								Mvalue* arrayElementValue;
+								pythonScriptLinesWritten=true;
+								while(arrayElementIndex<pythonCommandValue->value._array->numberOfElements){
+									arrayElementValue=arrayValues[arrayElementIndex];
+									if(arrayElementValue!=NULL&&arrayElementValue->type==VT_TEXT){
+										Mstring* _pythonCommandText=owned_string(_getStringText(arrayElementValue->value._text,true),owner);
+										if(_pythonCommandText!=NULL){
+											if(NULL==string_prepend(_pythonCommandText,"'")||NULL==string_append(_pythonCommandText,FILE_EOLN)||
+													getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))!=0)
+												pythonScriptLinesWritten=false;
+											FREE_STRING(_pythonCommandText,owner);
+										}else
+											outputError("Failed to write a Python source command to the Python script file");
+										if(!pythonScriptLinesWritten)break;
+									}
+									arrayElementIndex++;
+								}
+							}else
+							if(pythonCommandValue->type==VT_LIST){
+								pythonScriptLinesWritten=true;
+								Mvalue* listElementValue;
+								Mlistelement* pythonCommandListelement=pythonCommandValue->value._list->_first;
+								pythonScriptLinesWritten=true;
+								while(pythonCommandListelement!=NULL){
+									listElementValue=pythonCommandListelement->_value;
+									if(listElementValue!=NULL&&listElementValue->type==VT_TEXT){
+										Mstring* _pythonCommandText=owned_string(_getStringText(listElementValue->value._text,true),owner);
+										if(_pythonCommandText!=NULL){
+											// ascertain to add a FILE_EOLN to write to the Python script file as well
+											if(NULL==string_prepend(_pythonCommandText,"'")||NULL==string_append(_pythonCommandText,FILE_EOLN)||
+													getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))!=0)
+												pythonScriptLinesWritten=false;
+											FREE_STRING(_pythonCommandText,owner);
+										}else
+											outputError("Failed to write a Python source command to the Python script file");
+										if(!pythonScriptLinesWritten)break;
+									}
+									pythonCommandListelement=pythonCommandListelement->_next;
+								}
+							}
 						}
 					}else
-					if(pythonCommandValue->type==VT_TEXT){
-						// simply echoing the Python code to execute 
-						Mstring* completeInputFileCommandText=owned_string(_getString("echo $'"),owner);
-						if(completeInputFileCommandText!=NULL){
-							Mstring* p=completeInputFileCommandText;
-							// I'll have to write this text to a temporary file, let's use "Mpythoninput.txt by default!
-							p=string_append(p,pythonCommandValue->value._text->_c);
-							p=string_append(p,"' >> M.py");
-							if(p!=NULL){
-								if(execute_shellCommandText(string(p))==0){ // success storing the python input code in the text file
-									inputFileCompleted=true;
-									/* replacing:
-									Mfile* pythonInputfile=owned_file(_getFile("M.py"),owner);
-									if(pythonInputfile!=NULL){
-										Mvalue* pythonInputfileValue=_getValueOfFile(disowned_file(pythonInputfile,owner));
-										if(pythonInputfileValue!=NULL){
-											Mvalue* pythonInputfileWriteValue=mfwrite(pythonInputfileValue,pythonCommandValue);
-											long long notWrittenToPythonInputFile=getValueInteger(pythonInputfileWriteValue);
-											if(notWrittenToPythonInputFile==0){ // success
-												if(sysExitValue!=NULL){
-													// the essential thing here is that we cannot call sys.exit() with a text message to use as result, because there's no way of retrieving that
-													// but what we can do is simply print the sys exit text at the end, so we know the last line of the code actually is the system exit code
-													// perhaps it's a good idea to somehow mark this line e.g. by appending a comment that indicates that line to be the result text something like ## M result ##
-													Mstring* sysExitText=owned_string(_getString("\"\nimport sys\nprint('## M result')\nsys.stdout.write('{0}'.format("),owner); // prefixing f means that sysExitText may contain Python style formatting elements!!!
-													if(sysExitText!=NULL){
-														if(sysExitValue->type==VT_TEXT){
-															if(NULL==string_append(sysExitText,sysExitValue->value._text->_c))
-																sysExitTextAdded=false;
-														}else{
-															if(NULL==string_append(sysExitText,_getValueText(sysExitValue,true,true)))
-																sysExitTextAdded=false;
-														}
-														if(sysExitTextAdded)if(NULL==string_append(sysExitText,"))\nsys.stdout.flush()"))sysExitTextAdded=false;
-														if(!sysExitTextAdded||getValueInteger(mfwrite(pythonInputfileValue,_getTextValue(string(sysExitText))))){
-															sysExitTextAdded=false;
-															outputError("Failed to insert the system exit text");
-														}
-														FREE_STRING(sysExitText,owner);
-													}else
-														outputError("Failed to create the system exit text");
-												}else{
-													// we'd write the flush output buffer python code anyway
-													Mvalue* flushOutputBufferValue=_getTextValue("'\nimport sys\nsys.stdout.flush()");
-													if(flushOutputBufferValue!=NULL){
-														outputValue("Writing the flush output buffer python code '",flushOutputBufferValue,"'.\n");
-														long long flushOutputBufferValueNotWritten=getValueInteger(mfwrite(pythonInputfileValue,flushOutputBufferValue));
-														if(flushOutputBufferValueNotWritten>0)
-															output("%sFailed to write %lld flush output buffer characters.\n",M_ERROR_PREFIX,flushOutputBufferValueNotWritten);
-														else
-														if(flushOutputBufferValueNotWritten==M_LL_INVALID)
-															outputError("Failed to write the flush output buffer python code");
-													}else
-														outputWarning("Can't write the flush output buffer python code");
-												}
-												if(getValueInteger(mfclose(pythonInputfileValue))!=M_TRUE)
-													outputError("Failed to close the python input file");
-												else
-													output("Writing the python input text to the python input file succeeded!\n");
-											}else{
-												// no need to free the file because it's wrapped and will be garbage-collected
-												pythonInputfile=NULL; // indicating failure
-												if(notWrittenToPythonInputFile==M_LL_INVALID)
-													outputError("Failed to write the python text to execute");
-												else
-													output("%sFailed to write %lld python input code characters to the python input file.\n",M_ERROR_PREFIX,notWrittenToPythonInputFile);
-											}
-										}else{ // not wrapped input file 
-											free_file(pythonInputfile);
-											pythonInputfile=NULL;
-										}
-									}
-									*/
-								}else
-									outputError("Failed to complete the Python input file with the Python code");
-							}else
-								outputError("Failed to construct the shell command to complete the Python input file");
-							FREE_STRING(completeInputFileCommandText,owner);
-						}else
-							outputError("Failed to create the complete input file shell command");
-					}else
-					if(pythonCommandValue->type==VT_ARRAY){
-						// every element in the array represents a line of text to append to the Python input file
-					}else
-					if(pythonCommandValue->type==VT_LIST){
-
-					}
-					if(inputFileCompleted){
-						// 3. execute the code from the python input file
-						// TODO we should replace 'python' with the full path returned by whereis python (or where python in Windows)
+						outputError("Not all header lines written to the Python script file to run");
+					// 1c. CLOSE THE PYTHON SCRIPT FILE
+					if(getValueInteger(mfclose(pythonScriptFileValue))!=M_TRUE)
+						outputError("Failed to close the Python script file");
+					// only when we've succeeded in writing the Python script lines to the Python script file are we going to execute it!!
+					if(pythonScriptLinesWritten){
+						// 2. EXECUTE THE PYTHON SCRIPT
 						int pythonCallErrorcode=execute_shellCommandText("python M.py > M.py.out");
 						if(pythonCallErrorcode==0){
 							output("Retrieving the contents of the Python output file.\n");
@@ -5509,15 +5515,206 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 								outputError("Failed to wrap the Python output file");
 						}else
 							outputError("Failed to execute the Python script file");
-					}
+					}else
+						outputError("Failed to add all Python source commands to the Python script file to run");
 				}else
-					output("%sFailed to initialize the Python script file (error code %d).\n",M_ERROR_PREFIX,initializeHeaderPythonInputFileErrorCode);
-			}else
-				outputError("Failed to construct the header of the Python script file");	
-			FREE_STRING(initializeHeaderPythonInputFileText,owner);
-		}
-	}
-	return resultValue;
+					outputError("Failed to open the Python script file for writing to it");
+			}
+		}else
+			outputError("Failed to create the Python scipt file");
+}
+// replacing (what worked just fine but relied on os commands that may or may not correctly work on every OS)
+// Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sysExitValue){Mallocationowner owner=getOwner(__LINE__);
+// 	Mvalue* resultValue=NULL;
+// 	// if pythonCommandValue exists it needs to be a file, a text or a list or array
+// 	if(pythonCommandValue!=NULL&&(pythonCommandValue->type==VT_FILE||pythonCommandValue->type==VT_TEXT||pythonCommandValue->type==VT_LIST||pythonCommandValue->type==VT_ARRAY)){
+// 		// 1. initialize the header of the python script file
+// 		//    we need to put a dollar sign in front of the echo literal so it won't get rid of the double quotes around {0}
+// 		Mstring* initializeHeaderPythonInputFileText=owned_string(_getString("echo $'import sys\nimport atexit\ndef Matexit(): "),owner);
+// 		if(initializeHeaderPythonInputFileText!=NULL){
+// 			Mstring* p=initializeHeaderPythonInputFileText;
+// 			if(sysExitValue!=NULL){ // a result expression text defined
+// 				p=string_append(p,"sys.stdout.write(\"{0}\".format(");
+// 				if(sysExitValue->type==VT_TEXT)
+// 					p=string_append(p,sysExitValue->value._text->_c);
+// 				else
+// 					p=string_append(p,_getValueText(sysExitValue,false,true));
+// 				p=string_append(p,")); ");
+// 			}
+// 			// finish the Matexit() Python function by flushing the Python output buffer, and register it in the atexit module
+// 			p=string_append(p,"sys.stdout.flush(); return\natexit.register(Matexit)\n' > M.py");
+// 			if(p!=NULL){
+// 				int initializeHeaderPythonInputFileErrorCode=execute_shellCommandText(string(initializeHeaderPythonInputFileText));
+// 				if(initializeHeaderPythonInputFileErrorCode==0){
+// 					// 2. append the python code to the Python input file
+// 					bool inputFileCompleted=false;
+// 					if(pythonCommandValue->type==VT_FILE){
+// 						Mstring* completeInputFileCommandText=owned_string(_getString("cat "),owner);
+// 						if(completeInputFileCommandText!=NULL){
+// 							Mstring* p=string_append(completeInputFileCommandText,pythonCommandValue->value._file->_name);
+// 							p=string_append(p,">> M.py");
+// 							if(p!=NULL){
+// 								int completeInputFileErrorCode=system(string(p));
+// 								if(completeInputFileErrorCode==0)
+// 									inputFileCompleted=true;
+// 								else
+// 									output("%sThe shell command to complete the Python input file failed with error code %d.\n",M_ERROR_PREFIX,completeInputFileErrorCode);
+// 							}else
+// 								outputError("Failed to create the complete input file shell command");
+// 							FREE_STRING(completeInputFileCommandText,owner);
+// 						}
+// 					}else
+// 					if(pythonCommandValue->type==VT_TEXT){
+// 						// simply echoing the Python code to execute 
+// 						Mstring* completeInputFileCommandText=owned_string(_getString("echo $'"),owner);
+// 						if(completeInputFileCommandText!=NULL){
+// 							Mstring* p=completeInputFileCommandText;
+// 							// I'll have to write this text to a temporary file, let's use "Mpythoninput.txt by default!
+// 							p=string_append(p,pythonCommandValue->value._text->_c);
+// 							p=string_append(p,"' >> M.py");
+// 							if(p!=NULL){
+// 								if(execute_shellCommandText(string(p))==0){ // success storing the python input code in the text file
+// 									inputFileCompleted=true;
+// 									/* replacing:
+// 									Mfile* pythonInputfile=owned_file(_getFile("M.py"),owner);
+// 									if(pythonInputfile!=NULL){
+// 										Mvalue* pythonInputfileValue=_getValueOfFile(disowned_file(pythonInputfile,owner));
+// 										if(pythonInputfileValue!=NULL){
+// 											Mvalue* pythonInputfileWriteValue=mfwrite(pythonInputfileValue,pythonCommandValue);
+// 											long long notWrittenToPythonInputFile=getValueInteger(pythonInputfileWriteValue);
+// 											if(notWrittenToPythonInputFile==0){ // success
+// 												if(sysExitValue!=NULL){
+// 													// the essential thing here is that we cannot call sys.exit() with a text message to use as result, because there's no way of retrieving that
+// 													// but what we can do is simply print the sys exit text at the end, so we know the last line of the code actually is the system exit code
+// 													// perhaps it's a good idea to somehow mark this line e.g. by appending a comment that indicates that line to be the result text something like ## M result ##
+// 													Mstring* sysExitText=owned_string(_getString("\"\nimport sys\nprint('## M result')\nsys.stdout.write('{0}'.format("),owner); // prefixing f means that sysExitText may contain Python style formatting elements!!!
+// 													if(sysExitText!=NULL){
+// 														if(sysExitValue->type==VT_TEXT){
+// 															if(NULL==string_append(sysExitText,sysExitValue->value._text->_c))
+// 																sysExitTextAdded=false;
+// 														}else{
+// 															if(NULL==string_append(sysExitText,_getValueText(sysExitValue,true,true)))
+// 																sysExitTextAdded=false;
+// 														}
+// 														if(sysExitTextAdded)if(NULL==string_append(sysExitText,"))\nsys.stdout.flush()"))sysExitTextAdded=false;
+// 														if(!sysExitTextAdded||getValueInteger(mfwrite(pythonInputfileValue,_getTextValue(string(sysExitText))))){
+// 															sysExitTextAdded=false;
+// 															outputError("Failed to insert the system exit text");
+// 														}
+// 														FREE_STRING(sysExitText,owner);
+// 													}else
+// 														outputError("Failed to create the system exit text");
+// 												}else{
+// 													// we'd write the flush output buffer python code anyway
+// 													Mvalue* flushOutputBufferValue=_getTextValue("'\nimport sys\nsys.stdout.flush()");
+// 													if(flushOutputBufferValue!=NULL){
+// 														outputValue("Writing the flush output buffer python code '",flushOutputBufferValue,"'.\n");
+// 														long long flushOutputBufferValueNotWritten=getValueInteger(mfwrite(pythonInputfileValue,flushOutputBufferValue));
+// 														if(flushOutputBufferValueNotWritten>0)
+// 															output("%sFailed to write %lld flush output buffer characters.\n",M_ERROR_PREFIX,flushOutputBufferValueNotWritten);
+// 														else
+// 														if(flushOutputBufferValueNotWritten==M_LL_INVALID)
+// 															outputError("Failed to write the flush output buffer python code");
+// 													}else
+// 														outputWarning("Can't write the flush output buffer python code");
+// 												}
+// 												if(getValueInteger(mfclose(pythonInputfileValue))!=M_TRUE)
+// 													outputError("Failed to close the python input file");
+// 												else
+// 													output("Writing the python input text to the python input file succeeded!\n");
+// 											}else{
+// 												// no need to free the file because it's wrapped and will be garbage-collected
+// 												pythonInputfile=NULL; // indicating failure
+// 												if(notWrittenToPythonInputFile==M_LL_INVALID)
+// 													outputError("Failed to write the python text to execute");
+// 												else
+// 													output("%sFailed to write %lld python input code characters to the python input file.\n",M_ERROR_PREFIX,notWrittenToPythonInputFile);
+// 											}
+// 										}else{ // not wrapped input file 
+// 											free_file(pythonInputfile);
+// 											pythonInputfile=NULL;
+// 										}
+// 									}
+// 									*/
+// 								}else
+// 									outputError("Failed to complete the Python input file with the Python code");
+// 							}else
+// 								outputError("Failed to construct the shell command to complete the Python input file");
+// 							FREE_STRING(completeInputFileCommandText,owner);
+// 						}else
+// 							outputError("Failed to create the complete input file shell command");
+// 					}else
+// 					if(pythonCommandValue->type==VT_ARRAY){
+// 						// every element in the array represents a line of text to append to the Python input file
+// 					}else
+// 					if(pythonCommandValue->type==VT_LIST){
+
+// 					}
+// 					if(inputFileCompleted){
+// 						// 3. execute the code from the python input file
+// 						// TODO we should replace 'python' with the full path returned by whereis python (or where python in Windows)
+// 						int pythonCallErrorcode=execute_shellCommandText("python M.py > M.py.out");
+// 						if(pythonCallErrorcode==0){
+// 							output("Retrieving the contents of the Python output file.\n");
+// 							Mfile* outputFile=owned_file(_getFile("M.py.out"),owner);
+// 							if(outputFile!=NULL){
+// 								//////output("Output file '%s' created.\n",string(outputFile->_name));
+// 								Mvalue* outputFileValue=_getValueOfFile(disowned_file(outputFile,owner));
+// 								if(outputFileValue!=NULL){
+// 									outputValue("Processing Python output file '",outputFileValue,"'.\n");
+// 									// I suggest reading one line at a time using mfreadline() so we won't read the line separators
+// 									// which would f*ck up Mevalfunction 
+// 									Mlist* evaluatedLinesList=owned_list(__list("python"),owner);
+// 									if(evaluatedLinesList!=NULL){
+// 										Mvalue * prevOutputFileLineValue=NULL,*outputFileLineValue=mfreadline(outputFileValue);
+// 										long long lineIndex=0;
+// 										while(outputFileLineValue!=NULL){
+// 											lineIndex++;
+// 											if(outputFileLineValue->type==VT_TEXT){
+// 												outputValue("Processing python output line '",outputFileLineValue,"'.\n");
+// 												if(sysExitValue!=NULL){ // only interested in the last valid line!!
+// 													if(strlen(outputFileLineValue->value._text->_c))
+// 														assignValue(&prevOutputFileLineValue,outputFileLineValue);
+// 												}else // register any line in the output file!!!
+// 												if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/outputFileLineValue/*)*/,lineIndex)<=0)
+// 													output("Failed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+// 												// we should NOT evaluate the read line here, that's basically up to the caller
+// 											}
+// 											outputFileLineValue=mfreadline(outputFileValue);
+// 										}
+// 										// if we have remember the last valid line that's the result line to return!!!
+// 										if(prevOutputFileLineValue!=NULL)
+// 											if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/prevOutputFileLineValue/*)*/,lineIndex)<=0)
+// 												output("Failed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+// 										// let's close the output file
+// 										if(getValueInteger(mfclose(outputFileValue))!=M_TRUE)
+// 											outputWarning("Failed to close the python output file");
+// 										output("Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
+// 										if(evaluatedLinesList->numberOfElements){
+// 											if(evaluatedLinesList->numberOfElements==1){ // a single output line
+// 												assignValue(&resultValue,evaluatedLinesList->_first->_value);
+// 												FREE_LIST(evaluatedLinesList,owner);
+// 											}else // return the list of evaluated lines (the indexes represent the lines)
+// 												resultValue=_getValueOfList(disowned_list(evaluatedLinesList,owner));
+// 										}else
+// 											FREE_LIST(evaluatedLinesList,owner);
+// 									}else
+// 										outputError("Failed to create the list with evaluated python output lines");
+// 								}else // disowned but not freed yet
+// 									free_file(outputFile);
+// 							}else
+// 								outputError("Failed to wrap the Python output file");
+// 						}else
+// 							outputError("Failed to execute the Python script file");
+// 					}
+// 				}else
+// 					output("%sFailed to initialize the Python script file (error code %d).\n",M_ERROR_PREFIX,initializeHeaderPythonInputFileErrorCode);
+// 			}else
+// 				outputError("Failed to construct the header of the Python script file");	
+// 			FREE_STRING(initializeHeaderPythonInputFileText,owner);
+// 		}
+// 	}
+ 	return resultValue;
 }
 
 /**

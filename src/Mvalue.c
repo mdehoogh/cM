@@ -5093,28 +5093,30 @@ Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=g
 	// how about returning the number of bytes NOT written...
 	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
 	if(_file!=NULL){ // something to write to
-		if(write_value&&write_value->type==VT_TEXT&&write_value->value._text->_c[0]){ // something to write
-			if(NULL==_file->_f)openFile(_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
-			if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-				long long notwritten=0;
-				char* p=write_value->value._text->_c; // _c is an array so a pointer
-				size_t towrite=strlen(p);
-				if(towrite>0){
-					if(_file->mode[2]=='b'){ // binary write
-						notwritten=towrite-fwrite(p,sizeof(char),strlen(p),_file->_f);
-					}else{ // text write (i.e. as characters)
+		if(write_value!=NULL&&write_value->type==VT_TEXT){
+			Mtext* textToWrite=write_value->value._text;
+			char* p=textToWrite->_c; // _c is an array so a pointer
+			size_t towrite=strlen(p); // the number of characters to write
+			long long notwritten=0;
+			// if there's actually nothing to write we assume success (and notwritten will remain 0)
+			if(towrite>0){ // something left to write
+				if(NULL==_file->_f)openFile(_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
+				if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(_file->mode[2]!='b'){ // text write (i.e. as characters)
 						// in case there are escape sequences in the text, we need to resolve these which _getStringText() does
-						Mstring* _towrite=_getStringText(write_value->value._text,true);
+						Mstring* _towrite=owned_string(_getStringText(write_value->value._text,true),owner);
 						if(_towrite!=NULL){
 							char* p=string(_towrite);
 							while(*p){if(fputc(*p,_file->_f)==EOF)break;p++;}
-							while(*p){notwritten++;p++;}
+							while(*p){notwritten++;p++;} // NOTE that's one way of dealing with it
+							FREE_STRING(_towrite,owner); // MDH@29APR2024: BUG FIX should be here
 						}else
 							notwritten=towrite;
-					}
+					}else // binary write
+						notwritten=towrite-fwrite(p,sizeof(char),towrite,_file->_f);
 				}
-				return _getIntegerValue(notwritten);
 			}
+			return _getIntegerValue(notwritten);
 		}
 	}
 	return _getIntegerValue(M_LL_INVALID);

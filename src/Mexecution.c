@@ -1810,13 +1810,13 @@ char hexdigit(char c){
  * @param dequoted the flag indicating whether or not to dequote \p _text
  * @return Mstring* the (dequoted) text represented by the M text pointed to by \p _text, NULL on failure e.g. when \p _text is NULL
  */
-Mstring* _getStringText(Mtext const * const _text,bool dequoted){if(!_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getStringText(Mtext const * const _text,bool dequoted){if(NULL==_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _stringText=owned_string(__string(),owner);
-	if(_stringText){
+	if(_stringText!=NULL){
 		Mstring* p=_stringText;
 		if(amVerboseDebugging())
 			p=string_append_char(p,'s');
-		if(p){
+		if(p!=NULL){
 			// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
 			if(dequoted){
 				// TODO can we do the following using pointers somehow????
@@ -1873,7 +1873,7 @@ Mstring* _getStringText(Mtext const * const _text,bool dequoted){if(!_text)retur
 				p=string_append_char(p,_text->presuffix);
 			}
 		}
-		if(!p){FREE_STRING(_stringText,owner);return NULL;}
+		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}
 	}
 	return disowned_string(_stringText,owner);
 }/* VALIDATED */
