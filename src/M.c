@@ -5338,25 +5338,25 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 			// now we need to open this script file
 			Mvalue* pythonScriptFileValue=_getValueOfFile(disowned_file(pythonScriptFile,owner)); // will free the file when failing to wrap it
 			if(pythonScriptFileValue!=NULL){
-				if(mfopen(pythonScriptFileValue,_getTextValue("w"))!=NULL){
+				if(Mfopen(pythonScriptFileValue,_getTextValue("w"))!=NULL){
 					// 1a. WRITE THE HEADER LINES 
-					bool headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'import sys" FILE_EOLN)))==0);
-					if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'import atexit" FILE_EOLN)))==0);
-					if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'def Matexit(): ")))==0);
+					bool headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'import sys" FILE_EOLN)))==0);
+					if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'import atexit" FILE_EOLN)))==0);
+					if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'def Matexit(): ")))==0);
 					if(sysExitValue!=NULL){
-						if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'print(\"{0}\".format(")))==0);
+						if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'print(\"{0}\".format(")))==0);
 						if(sysExitValue->type!=VT_TEXT){
 							Mstring* _sysExitExpressionText=owned_string(_getValueText(sysExitValue,false,true),owner);
 							if(_sysExitExpressionText!=NULL){
-								if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_sysExitExpressionText))))==0);
+								if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue(string(_sysExitExpressionText))))==0);
 								FREE_STRING(_sysExitExpressionText,owner);
 							}
 						}else{ // the text to write is already wrapped, so we're writing it as is (we're not going to use _getStringText to dequote it??????)
-							if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,sysExitValue))==0);
+							if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,sysExitValue))==0);
 						}
-						if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("')); ")))==0);
+						if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("')); ")))==0);
 					}
-					if(headerLinesWritten)headerLinesWritten=(getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'sys.stdout.flush(); return" FILE_EOLN "atexit.register(Matexit)" FILE_EOLN "# end of header inserted by M, do ** NOT ** edit before this line!" FILE_EOLN)))==0);
+					if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'sys.stdout.flush(); return" FILE_EOLN "atexit.register(Matexit)" FILE_EOLN "# end of header inserted by M, do ** NOT ** edit before this line!" FILE_EOLN)))==0);
 					bool pythonScriptLinesWritten=false;
 					if(headerLinesWritten){ // the header was written successfully
 						// 1b. WRITE THE LINES represented by pythonCommandValue
@@ -5366,12 +5366,12 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 								output("Copying the Python script lines from '%s' to the Python script file.\n",string(pythonCommandValue->value._file->_name));
 								// TODO should we close it before reading the lines from it????
 								unsigned long long lineIndex=0;
-								Mvalue* pythonSourceLineValue=mfreadline(pythonCommandValue);
+								Mvalue* pythonSourceLineValue=Mfreadline(pythonCommandValue);
 								while(pythonSourceLineValue!=NULL){
 									lineIndex++;
 									// do not write any empty lines at the end
 									if(pythonSourceLineValue->value._text->_c[0]){
-										if(getValueInteger(mfwrite(pythonScriptFileValue,pythonSourceLineValue))==0){ // the source line written successfully
+										if(getValueInteger(Mfwrite(pythonScriptFileValue,pythonSourceLineValue))==0){ // the source line written successfully
 											// construct and write the comment telling what the source line was!
 											Mstring* _sourceLineTextComment=owned_string(_getString("' # source: "),owner);
 											Mstring* p=_sourceLineTextComment;
@@ -5379,7 +5379,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 												p=string_append(p,string(pythonCommandValue->value._file->_name)); // appending the name of the inserted file
 												p=string_append_char(p,':');
 												p=string_append_ull(p,lineIndex);
-												if(p!=NULL&&getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(p))))!=0)
+												if(p!=NULL&&getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue(string(p))))!=0)
 													pythonScriptLinesWritten=false;
 												if(_sourceLineTextComment!=NULL)FREE_STRING(_sourceLineTextComment,owner);
 											}
@@ -5387,24 +5387,24 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 											pythonScriptLinesWritten=false;
 									}
 									// always write EOLN
-									if(pythonScriptLinesWritten&&getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue("'"FILE_EOLN)))!=0)
+									if(pythonScriptLinesWritten&&getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'"FILE_EOLN)))!=0)
 										pythonScriptLinesWritten=false;
 									if(!pythonScriptLinesWritten){
 										outputValue("ERROR: Failed to write '",pythonSourceLineValue,"' to the Python script file.\n");
 										break;
 									}
 									///////output("Reading the next line!\n");
-									pythonSourceLineValue=mfreadline(pythonCommandValue);
+									pythonSourceLineValue=Mfreadline(pythonCommandValue);
 								}
 								output("Number of Python source lines written: %u.\n",lineIndex);
-								if(getValueInteger(mfclose(pythonCommandValue))!=M_TRUE)
+								if(getValueInteger(Mfclose(pythonCommandValue))!=M_TRUE)
 									outputError("Failed to close the Python source file");
 							}else
 							if(pythonCommandValue->type==VT_TEXT){
 								Mstring* _pythonCommandText=owned_string(_getStringText(pythonCommandValue->value._text,true),owner);
 								if(_pythonCommandText!=NULL){
 									if(string_prepend(_pythonCommandText,"'")!=NULL&&string_append(_pythonCommandText,FILE_EOLN)!=NULL&&
-											getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))==0)
+											getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))==0)
 										pythonScriptLinesWritten=true;
 									FREE_STRING(_pythonCommandText,owner);
 								}
@@ -5421,7 +5421,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 										Mstring* _pythonCommandText=owned_string(_getStringText(arrayElementValue->value._text,true),owner);
 										if(_pythonCommandText!=NULL){
 											if(NULL==string_prepend(_pythonCommandText,"'")||NULL==string_append(_pythonCommandText,FILE_EOLN)||
-													getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))!=0)
+													getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))!=0)
 												pythonScriptLinesWritten=false;
 											FREE_STRING(_pythonCommandText,owner);
 										}else
@@ -5443,7 +5443,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 										if(_pythonCommandText!=NULL){
 											// ascertain to add a FILE_EOLN to write to the Python script file as well
 											if(NULL==string_prepend(_pythonCommandText,"'")||NULL==string_append(_pythonCommandText,FILE_EOLN)||
-													getValueInteger(mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))!=0)
+													getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))!=0)
 												pythonScriptLinesWritten=false;
 											FREE_STRING(_pythonCommandText,owner);
 										}else
@@ -5457,7 +5457,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 					}else
 						outputError("Not all header lines written to the Python script file to run");
 					// 1c. CLOSE THE PYTHON SCRIPT FILE
-					if(getValueInteger(mfclose(pythonScriptFileValue))!=M_TRUE)
+					if(getValueInteger(Mfclose(pythonScriptFileValue))!=M_TRUE)
 						outputError("Failed to close the Python script file");
 					// only when we've succeeded in writing the Python script lines to the Python script file are we going to execute it!!
 					if(pythonScriptLinesWritten){
@@ -5475,7 +5475,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									// which would f*ck up Mevalfunction 
 									Mlist* evaluatedLinesList=owned_list(__list("python"),owner);
 									if(evaluatedLinesList!=NULL){
-										Mvalue * prevOutputFileLineValue=NULL,*outputFileLineValue=mfreadline(outputFileValue);
+										Mvalue * prevOutputFileLineValue=NULL,*outputFileLineValue=Mfreadline(outputFileValue);
 										long long lineIndex=0;
 										while(outputFileLineValue!=NULL){
 											lineIndex++;
@@ -5489,14 +5489,14 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 													output("Failed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
 												// we should NOT evaluate the read line here, that's basically up to the caller
 											}
-											outputFileLineValue=mfreadline(outputFileValue);
+											outputFileLineValue=Mfreadline(outputFileValue);
 										}
 										// if we have remember the last valid line that's the result line to return!!!
 										if(prevOutputFileLineValue!=NULL)
 											if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/prevOutputFileLineValue/*)*/,lineIndex)<=0)
 												output("Failed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
 										// let's close the output file
-										if(getValueInteger(mfclose(outputFileValue))!=M_TRUE)
+										if(getValueInteger(Mfclose(outputFileValue))!=M_TRUE)
 											outputWarning("Failed to close the python output file");
 										output("Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
 										if(evaluatedLinesList->numberOfElements){
@@ -5597,7 +5597,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 																sysExitTextAdded=false;
 // 														}
 // 														if(sysExitTextAdded)if(NULL==string_append(sysExitText,"))\nsys.stdout.flush()"))sysExitTextAdded=false;
-// 														if(!sysExitTextAdded||getValueInteger(mfwrite(pythonInputfileValue,_getTextValue(string(sysExitText))))){
+// 														if(!sysExitTextAdded||getValueInteger(Mfwrite(pythonInputfileValue,_getTextValue(string(sysExitText))))){
 // 															sysExitTextAdded=false;
 // 															outputError("Failed to insert the system exit text");
 // 														}
@@ -5609,7 +5609,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 													Mvalue* flushOutputBufferValue=_getTextValue("'\nimport sys\nsys.stdout.flush()");
 // 													if(flushOutputBufferValue!=NULL){
 // 														outputValue("Writing the flush output buffer python code '",flushOutputBufferValue,"'.\n");
-// 														long long flushOutputBufferValueNotWritten=getValueInteger(mfwrite(pythonInputfileValue,flushOutputBufferValue));
+// 														long long flushOutputBufferValueNotWritten=getValueInteger(Mfwrite(pythonInputfileValue,flushOutputBufferValue));
 // 														if(flushOutputBufferValueNotWritten>0)
 // 															output("%sFailed to write %lld flush output buffer characters.\n",M_ERROR_PREFIX,flushOutputBufferValueNotWritten);
 // 														else
@@ -5618,7 +5618,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 													}else
 // 														outputWarning("Can't write the flush output buffer python code");
 // 												}
-// 												if(getValueInteger(mfclose(pythonInputfileValue))!=M_TRUE)
+// 												if(getValueInteger(Mfclose(pythonInputfileValue))!=M_TRUE)
 // 													outputError("Failed to close the python input file");
 // 												else
 // 													output("Writing the python input text to the python input file succeeded!\n");
@@ -5687,7 +5687,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 											if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/prevOutputFileLineValue/*)*/,lineIndex)<=0)
 // 												output("Failed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
 // 										// let's close the output file
-// 										if(getValueInteger(mfclose(outputFileValue))!=M_TRUE)
+// 										if(getValueInteger(Mfclose(outputFileValue))!=M_TRUE)
 // 											outputWarning("Failed to close the python output file");
 // 										output("Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
 // 										if(evaluatedLinesList->numberOfElements){

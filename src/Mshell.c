@@ -14559,15 +14559,15 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 			// MDH@28SEP2020: register file functions
-			if(!completedValueFunction(_Menvironment,owner,"file",mfile)
-				||!completedValueFunction(_Menvironment,owner,"fdelete",mfdelete)
-				||!completedValueFunction(_Menvironment,owner,"files",mfiles)
-				||!completedValueValueFunction(_Menvironment,owner,"fopen",mfopen)
-				||!completedValueFunction(_Menvironment,owner,"fclose",mfclose)
-				||!completedValueValueFunction(_Menvironment,owner,"fread",mfread)
-				||!completedValueFunction(_Menvironment,owner,"freadline",mfreadline)
-				||!completedValueValueFunction(_Menvironment,owner,"freadlines",mfreadlines)
-				||!completedValueValueFunction(_Menvironment,owner,"fwrite",mfwrite)){
+			if(!completedValueFunction(_Menvironment,owner,"file",Mnewfile)
+				||!completedValueFunction(_Menvironment,owner,"fdelete",Mfdelete)
+				||!completedValueFunction(_Menvironment,owner,"files",Mfiles)
+				||!completedValueValueFunction(_Menvironment,owner,"fopen",Mfopen)
+				||!completedValueFunction(_Menvironment,owner,"fclose",Mfclose)
+				||!completedValueValueFunction(_Menvironment,owner,"fread",Mfread)
+				||!completedValueFunction(_Menvironment,owner,"freadline",Mfreadline)
+				||!completedValueValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
+				||!completedValueValueFunction(_Menvironment,owner,"fwrite",Mfwrite)){
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}

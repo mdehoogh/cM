@@ -562,17 +562,30 @@ Menvironment* getValueEnvironment(Mvalue const * const _value); // MDH@03FEB2020
 Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
 
 // Mfile is added starting from v0.1.4
-Mvalue* _getValueOfFile(Mfile* _file);
+Mvalue* _getValueOfFile(Mfile const * const _file);
 
-Mvalue* mfile(Mvalue* filename_value);
-Mvalue* mfdelete(Mvalue* file_value);
-Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value);
-Mvalue* mfclose(Mvalue* file_value);
-Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value); // reads at most count_value 
-Mvalue* mfreadline(Mvalue* file_value); // reads all bytes until a new line character is encountered 
-Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value); // reads all bytes until a new line character is encountered 
-Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value);
-Mvalue* mfiles(Mvalue* wildcard_value);
+// MDH@30APR2024: internal equivalents of the M interpreter file functions
+// use _getFile() instead!!! Mfile* __file(char const * const filename);
+long long fDeleted(Mfile * const file);
+long long fOpened(Mfile * const file,char openmodeSpec[]);
+long long fClosed(Mfile * const file);
+Mstring* fRead(Mfile const * const file,size_t numberOfBytes);
+Mstring* fReadLine(Mfile const * const file);
+Mlist* fReadLines(Mfile const * const file);
+long long fWrite(Mfile const * const file,Mstring * const towrite); // returns amount of bytes not written
+long long fWriteLine(Mfile const * const file,Mstring * const towrite); // return amount of bytes not written
+long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite); // returns the number of lines not written
+
+Mvalue* Mnewfile(Mvalue* filename_value);
+Mvalue* Mfdelete(Mvalue* file_value);
+Mvalue* Mfopen(Mvalue* file_value,Mvalue* mode_value);
+Mvalue* Mfclose(Mvalue* file_value);
+Mvalue* Mfread(Mvalue* file_value,Mvalue* numberofbytes_value); // reads at most count_value 
+Mvalue* Mfreadline(Mvalue* file_value); // reads all bytes until a new line character is encountered 
+Mvalue* Mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value); // reads all bytes until a new line character is encountered 
+Mvalue* Mfwrite(Mvalue* file_value,Mvalue* write_value);
+
+Mvalue* Mfiles(Mvalue* wildcard_value);
 
 // MDH@08DEC2020
 Mvalue* _getValueOfTime(Mtime* _time);

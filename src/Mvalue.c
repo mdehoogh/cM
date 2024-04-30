@@ -4731,7 +4731,7 @@ static Mfile* _getValueFile(Mvalue const * const file_value){
  * @param _file 
  * @return Mvalue* the new M value wrapping M file \p _file
  */
-Mvalue* _getValueOfFile(Mfile* _file){
+Mvalue* _getValueOfFile(Mfile const * const _file){
 	if(NULL==_file)return NULL;
 	bool disowned_file=Misdisowned(_file);
 	////output(disowned_file?"Disowned file":"Owned file");
@@ -4777,6 +4777,95 @@ static bool isFileWriteable(Mfile* _file){
 	return false;
 	// a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
 }
+
+// MDH@30APR2024: most of the M functions delegate to these internal functions that are easier to use directly, so we won't have to Mvalue wrap a lot of data
+/**
+ * @brief returns M_TRUE when \p file is deleted, M_FALSE otherwise
+ * @details updates the statistics of \p file accordingly, if possible
+ * @param file the (unopened) M file object
+ * @return M_TRUE on success
+ * @return M_FALSE on failure
+ */
+long long fDeleted(Mfile * const file){
+	// can only delete an existing file that is not currently open
+	bool result=M_LL_INVALID;
+	if(file!=NULL&&file->_name!=NULL&&NULL==file->_f){ // a file with a name that is not currently open
+		// if remove returns a non-zero value, removing the file failed!!!!
+		result=(remove(string(file->_name))?M_FALSE:M_TRUE);
+		if(result==M_TRUE){
+			// update stat accordingly, if we succeed we should free _stat
+			if(stat(string(file->_name),file->_stat)==0){FREE_1(file->_stat,'f');file->_stat=NULL;}
+			else outputError("Failed to update the statistics of a deleted file.");
+		}
+	}
+	return result;
+}
+/**
+ * @brief returns M_TRUE on successful opening \p file, M_FALSE otherwise
+ * @details returns M_LL_INVALID if \p file does not denote a file
+ * @param file the M file to open
+ * @return M_TRUE on success, M_FALSE otherwise
+ */
+long long fOpened(Mfile * const file,char openmodeSpec[]){
+	long long result=M_LL_INVALID;
+	if(file!=NULL){
+		if(NULL==file->_f){
+			// how about checking whether the mode_value argument is correct first??????
+			char openmode=(openmodeSpec[0]?openmodeSpec[0]:(file->_stat!=NULL?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
+			// let's NOT allow overwriting an existing file!!!
+			if(openmode=='w'||openmode=='r'||openmode=='a'){ // a valid open mode
+				if(openmode!='w'||NULL==file->_stat){ // but do NOT allow deleting existing content
+					// let's initialize the default mode
+					char mode[4]={openmode}; // initialize mode to openmode NOTE mode always needs to end with '\0'
+					if(openmodeSpec[0]){ // accepting two additional mode characters '+' and 'b'
+						// let's simply copy the characters (even if they are wrong)
+						mode[1]=openmodeSpec[1];
+						if(mode[1])mode[2]=openmodeSpec[2];
+					}else // for optimal flexibility allow for writing as well
+						mode[1]='+';
+					// try to open the file
+					openFile(file,mode);
+					/* replacing and augmenting:
+					_file->_f=fopen(string(_file->_name),mode);
+					if(_file->_f){_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2];} // remember the opening mode when the file was successfully opened
+					*/
+				}
+			}
+			result=(file->_f!=NULL?M_TRUE:M_FALSE);
+		}
+	}
+	return result;
+}
+
+long long fClosed(Mfile * const file){
+	long long result=M_LL_INVALID;
+	if(file!=NULL){
+
+	}
+	return result;
+}
+Mstring* fRead(Mfile const * const file,size_t numberOfBytes){
+	return NULL;
+}
+Mstring* fReadLine(Mfile const * const file){
+	return NULL;
+}
+Mlist* fReadLines(Mfile const * const file){
+	return NULL;
+}
+long long fWrite(Mfile const * const file,Mstring * const towrite){ // returns amount of bytes not written
+	long long result=M_LL_INVALID;
+	return result;
+}
+long long fWriteLine(Mfile const * const file,Mstring * const towrite){ // return amount of bytes not written
+	long long result=M_LL_INVALID;
+	return result;
+}
+long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite){ // returns the number of lines not written
+	long long result=M_LL_INVALID;
+	return result;
+}
+
 // end file helper functions
 /**
  * @brief returns a new M value wrapping the M file stored or represented by \p file_value
@@ -4784,9 +4873,11 @@ static bool isFileWriteable(Mfile* _file){
  * @param file_value 
  * @return Mvalue* a new M value wrapping the M file stored or represented by \p file_value
  */
-Mvalue* mfile(Mvalue* file_value){
+Mvalue* Mnewfile(Mvalue* file_value){
 	return(NULL==file_value||file_value->type==VT_FILE?file_value:_getValueOfFile(_getValueFile(file_value)));
 }
+
+// things we can do with an Mfile
 // delete a file
 /**
  * @brief returns M boolean M_TRUE when the file hosted in \p file_value is delete, M_FALSE otherwise
@@ -4794,64 +4885,33 @@ Mvalue* mfile(Mvalue* file_value){
  * @param file_value 
  * @return Mvalue* wrapping M_TRUE or M_FALSE
  */
-Mvalue* mfdelete(Mvalue* file_value){
-	if(file_value!=NULL&&file_value->type==VT_FILE){
-		// can only delete an existing file that is not currently open
-		Mfile* _file=file_value->value._file;
-		if(_file&&_file->_name&&!_file->_f){ // a file with a name that is not currently open
-			int success=remove(string(_file->_name));
-			if(success)return _getIntegerValue(M_FALSE); // if success is not zero return failure
-			// update stat accordingly, if we succeed we should free _stat
-			if(stat(string(_file->_name),_file->_stat)==0){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
-			return _getIntegerValue(M_TRUE);
-		}
-	}
-	return NULL;
+Mvalue* Mfdelete(Mvalue* file_value){
+	long long result=(file_value!=NULL&&file_value->type==VT_FILE?(fDeleted(file_value->value._file)?M_TRUE:M_FALSE):M_LL_INVALID);
+	return _getIntegerValue(result);
 }
-// things we can do with a Mfile
 /**
  * @brief returns information on opening the M file hosted in \p file_value in mode \p mode_value
  * 
  * @param file_value 
- * @param mode_value 
- * @return Mvalue* 
+ * @param mode_value
+ * @return Mvalue* the mode the file was opened in
  */
-Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){Mallocationowner owner=getOwner(__LINE__);
-	Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-	if(_file!=NULL){ // there's a Mfile 
-		Mstring* mode_str=owned_string(_getString("'"),owner);
-		if(mode_str!=NULL){
-			if(NULL==_file->_f){
-				// how about checking whether the mode_value argument is correct first??????
-				char openmode=(mode_value?(mode_value->type==VT_TEXT?mode_value->value._text->_c[0]:'\0'):(_file->_stat?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
-				// let's NOT allow overwriting an existing file!!!
-				if(openmode=='w'||openmode=='r'||openmode=='a'){ // a valid open mode
-					if(openmode!='w'||_file->_stat==NULL){ // but do NOT allow deleting existing content
-						// let's initialize the default mode
-						char mode[4]={openmode}; // initialize mode to openmode NOTE mode always needs to end with '\0'
-						if(mode_value){ // accepting two additional mode characters '+' and 'b'
-							// let's simply copy the characters (even if they are wrong)
-							mode[1]=mode_value->value._text->_c[1];
-							if(mode[1])mode[2]=mode_value->value._text->_c[2];
-						}else // for optimal flexibility allow for writing as well
-							mode[1]='+';
-						// try to open the file
-						openFile(_file,mode); 
-						/* replacing and augmenting:
-						_file->_f=fopen(string(_file->_name),mode);
-						if(_file->_f){_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2];} // remember the opening mode when the file was successfully opened
-						*/
-					}
-				}
-			}
-			if(_file->_f!=NULL){ // the file is (now) open
+Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner owner=getOwner(__LINE__);
+	// we need a valid open mode text value to start with
+	char* openmodeText=(openmodeTextValue!=NULL&&openmodeTextValue->type==VT_TEXT?openmodeTextValue->value._text->_c:NULL);
+	if(openmodeText!=NULL&&*openmodeText){ // there's an open mode spec which is NOT empty
+		Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
+		if(_file!=NULL){ // there's a Mfile 
+			long long fileOpened=fOpened(_file,openmodeText);
+			if(fileOpened==M_TRUE)
+				return(fileValue->type==VT_FILE?fileValue:_getValueOfFile(disowned_file(_file,owner)));
+				/*
 				if(_file->mode[0])string_append_char(mode_str,_file->mode[0]);
 				if(_file->mode[1])string_append_char(mode_str,_file->mode[1]);
 				if(_file->mode[2])string_append_char(mode_str,_file->mode[2]);
-			}
-			Mvalue* result=_getTextValue(string(mode_str));
-			FREE_STRING(mode_str,owner);
-			return result;
+				*/
+			// opening failed, so if we created the file from the file's name, we have to free it
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // free the file we created because it won't be returned Mvalue wrapped
 		}
 	}
 	return NULL;
@@ -4876,7 +4936,7 @@ static void openFileForReadingText(Mfile* _file){
  * @param numberofbytes_value 
  * @return Mvalue* the new M string containing the read bytes
  */
-Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
 	if(_file!=NULL){
 		long long numberofbytes=(numberofbytes_value!=NULL?getValueInteger(numberofbytes_value):M_LL_MAX); // the default is to read as much bytes as possible
@@ -4914,7 +4974,7 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
  * @param file_value 
  * @return Mvalue* a full text line M styring value read from the M file hosted in \p file_value
  */
-Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
+Mvalue* Mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
 	// MDH@27DEC2020: file_value really needs to be a file, although theoretically one
 	//				might want to read the first line of a file only???????
 	//				for now let's allow both although using the filename is not recommended
@@ -4969,7 +5029,7 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
  * @param numberoflines_value 
  * @return Mvalue* a list containing all lines read from \p file_value
  */
-Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	Mvalue* result=NULL;
 	Mfile* _file=_getValueFile(file_value);
@@ -5069,7 +5129,7 @@ Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationo
  * @param file_value 
  * @return Mvalue* M_TRUE on success, M_FALSE on failure, or M_LL_INVALID if \p file_value does not host a file
  */
-Mvalue* mfclose(Mvalue* file_value){
+Mvalue* Mfclose(Mvalue* file_value){
 	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
 	return _getIntegerValue(_file!=NULL?(closeFile(_file)?M_TRUE:M_FALSE):M_LL_INVALID);
 }
@@ -5089,7 +5149,7 @@ static void openFileForWriting(Mfile* _file){
  * @param write_value 
  * @return Mvalue* the number of characters NOT written, M_LL_INVALID if writing failed
  */
-Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
+Mvalue* Mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
 	// how about returning the number of bytes NOT written...
 	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
 	if(_file!=NULL){ // something to write to
@@ -5130,7 +5190,7 @@ Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=g
  * @param write_value 
  * @return Mvalue* the number of bytes written
  */
-Mvalue* mfsave(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mfsave(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__);
 	long long result=M_LL_INVALID;
 	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
 	if(_file!=NULL){ // something to write to
@@ -5144,7 +5204,7 @@ Mvalue* mfsave(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=ge
  * @param file_value 
  * @return Mvalue* the M value loaded
  */
-Mvalue* mfload(Mvalue* file_value){
+Mvalue* Mfload(Mvalue* file_value){
 	Mvalue* _result=NULL;
 	Mfile* _file=(file_value!=NULL&&file_value->type==VT_FILE?file_value->value._file:NULL);
 	if(_file!=NULL){ // something to read from which should currently be open for reading text from
@@ -5158,7 +5218,7 @@ Mvalue* mfload(Mvalue* file_value){
  * @param file_value 
  * @return Mvalue* a new M value hosting a list of file names in \p file_value
  */
-Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
 	// let's allow either a text or a file, in any case we need a foldername
 	if(file_value!=NULL){
 		char* directoryname=NULL;
