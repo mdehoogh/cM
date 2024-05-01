@@ -5338,8 +5338,8 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 			// now we need to open this script file
 			Mvalue* pythonScriptFileValue=_getValueOfFile(disowned_file(pythonScriptFile,owner)); // will free the file when failing to wrap it
 			if(pythonScriptFileValue!=NULL){
-				if(Mfopen(pythonScriptFileValue,_getTextValue("w"))!=NULL){
-					// 1a. WRITE THE HEADER LINES 
+				if(Mfopen(pythonScriptFileValue,_getTextValue("'w"))!=NULL){
+					// 1a. WRITE THE HEADER LINES
 					bool headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'import sys" FILE_EOLN)))==0);
 					if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'import atexit" FILE_EOLN)))==0);
 					if(headerLinesWritten)headerLinesWritten=(getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue("'def Matexit(): ")))==0);
@@ -5401,7 +5401,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									outputError("Failed to close the Python source file");
 							}else
 							if(pythonCommandValue->type==VT_TEXT){
-								Mstring* _pythonCommandText=owned_string(_getStringText(pythonCommandValue->value._text,true),owner);
+								Mstring* _pythonCommandText=owned_string(_getStringOfText(pythonCommandValue->value._text,true),owner);
 								if(_pythonCommandText!=NULL){
 									if(string_prepend(_pythonCommandText,"'")!=NULL&&string_append(_pythonCommandText,FILE_EOLN)!=NULL&&
 											getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))==0)
@@ -5418,7 +5418,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 								while(arrayElementIndex<pythonCommandValue->value._array->numberOfElements){
 									arrayElementValue=arrayValues[arrayElementIndex];
 									if(arrayElementValue!=NULL&&arrayElementValue->type==VT_TEXT){
-										Mstring* _pythonCommandText=owned_string(_getStringText(arrayElementValue->value._text,true),owner);
+										Mstring* _pythonCommandText=owned_string(_getStringOfText(arrayElementValue->value._text,true),owner);
 										if(_pythonCommandText!=NULL){
 											if(NULL==string_prepend(_pythonCommandText,"'")||NULL==string_append(_pythonCommandText,FILE_EOLN)||
 													getValueInteger(Mfwrite(pythonScriptFileValue,_getTextValue(string(_pythonCommandText))))!=0)
@@ -5439,7 +5439,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 								while(pythonCommandListelement!=NULL){
 									listElementValue=pythonCommandListelement->_value;
 									if(listElementValue!=NULL&&listElementValue->type==VT_TEXT){
-										Mstring* _pythonCommandText=owned_string(_getStringText(listElementValue->value._text,true),owner);
+										Mstring* _pythonCommandText=owned_string(_getStringOfText(listElementValue->value._text,true),owner);
 										if(_pythonCommandText!=NULL){
 											// ascertain to add a FILE_EOLN to write to the Python script file as well
 											if(NULL==string_prepend(_pythonCommandText,"'")||NULL==string_append(_pythonCommandText,FILE_EOLN)||

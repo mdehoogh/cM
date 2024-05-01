@@ -290,7 +290,9 @@ Mstring* _getTimeText(Mtime const * const _time);
 Mstring* _getBigintegerText(Mbiginteger const * const _biginteger);
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
 Mstring* _getFloatText(Mfloat const * const _real);
-Mstring* _getStringText(Mtext const * const _string,bool dequoted);
+Mstring* _getStringOfText(Mtext const * const _string,bool dequoted);
+
+Mstring* _getStringOfChars(char const * const chars,char quoteChar); // MDH@01MAY2024: either return chars enquoted, or decode by resolving the escape characters
 
 long long isBigintegerUndefined(Mbiginteger const * const biginteger);
 long long isTextUndefined(Mtext const * const text);

@@ -14567,7 +14567,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!completedValueValueFunction(_Menvironment,owner,"fread",Mfread)
 				||!completedValueFunction(_Menvironment,owner,"freadline",Mfreadline)
 				||!completedValueValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
-				||!completedValueValueFunction(_Menvironment,owner,"fwrite",Mfwrite)){
+				||!completedValueValueFunction(_Menvironment,owner,"fwrite",Mfwrite)
+				||!completedValueValueFunction(_Menvironment,owner,"fwriteline",Mfwriteline)
+				||!completedValueValueFunction(_Menvironment,owner,"fwritelines",Mfwritelines)){
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}

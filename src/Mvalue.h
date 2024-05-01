@@ -572,7 +572,8 @@ long long fClosed(Mfile * const file);
 Mstring* fRead(Mfile const * const file,long long numberOfBytes);
 Mstring* fReadLine(Mfile const * const file);
 Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report);
-long long fWrite(Mfile const * const file,Mtext const * const towrite,bool writeEoln); // returns amount of bytes not written
+long long fWriteChars(Mfile const * const file,char const * const chars,bool writeEoln); // returns amount of chars not written
+long long fWriteText(Mfile const * const file,Mtext const * const towrite,bool writeEoln); // returns amount of bytes not written
 // long long fWriteLine(Mfile const * const file,Mstring * const towrite); // return amount of bytes not written
 long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite); // returns the number of lines not written
 
@@ -585,6 +586,7 @@ Mvalue* Mfreadline(Mvalue* fileValue); // reads all bytes until a new line chara
 Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue); // reads all bytes until a new line character is encountered 
 Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue);
 Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineTextValue);
+Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue);
 
 Mvalue* Mfiles(Mvalue* wildcard_value);
 

@@ -1803,6 +1803,85 @@ char hexdigit(char c){
 	if(c>=48&&c<=57)return c-48;
 	return '\0';
 }
+
+// MDH@01MAY2024: convenient to have a _getStringOfText(Chars that we may call directly on a C string
+/**
+ * @brief returns a new M string containing the (dequoted) text pointed to by \p chars
+ * 
+ * @param chars the C string to decode
+ * @param dequoted 
+ * @return Mstring* the decoded C string
+ */
+Mstring* _getStringOfChars(char const * const chars,char quoteChar){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _stringText=owned_string(__string(),owner);
+	if(_stringText!=NULL){
+		Mstring* p=_stringText;
+		/*
+		if(amVerboseDebugging())
+			p=string_append_char(p,'s');
+			*/
+		if(p!=NULL){
+			// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
+			if(!quoteChar){ // not to return enquoted but simply decoded...
+				// TODO can we do the following using pointers somehow????
+				char c;
+				size_t lastindex=strlen(chars);
+				if(lastindex>0){
+					lastindex--;
+					for(size_t index=0;index<=lastindex;index++){
+						c=chars[index];
+						if(index<lastindex&&c=='\\'){
+							c=chars[++index];
+							switch(c){
+								case 'a':p=string_append_char(p,0x07);break;
+								case 'b':p=string_append_char(p,0x08);break;
+								case 'e':p=string_append_char(p,0x1B);break;
+								case 'f':p=string_append_char(p,0x0C);break;
+								case 'n':p=string_append_char(p,0x0A);break;
+								case 'r':p=string_append_char(p,0x0D);break;
+								case 't':p=string_append_char(p,0x09);break;
+								case 'v':p=string_append_char(p,0x0B);break;
+								case '\\':p=string_append_char(p,0x5C);break;
+								case '\'':p=string_append_char(p,0x27);break;
+								case '"':p=string_append_char(p,0x22);break;
+								case '?':p=string_append_char(p,0x3F);break;
+								case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
+									{ // octal representations can't have 8 or 9 in it
+										char oct=(c-48);
+										// check successive characters if they are octal digits
+										while(index+1<=lastindex){
+											c=chars[index+1];
+											if(c<48||c>55)break; // not an octal digit
+											oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
+											index++;
+										}
+										p=string_append_char(p,oct);
+										// replacing: _p=string_append_char(_p,8*(8*(c-48)+(chars[++index]-48))+(chars[++index]-48));
+									}
+									break; // assume octal
+								case 8:case 9:break; // this would be invalid
+								case 'x':case 'X':
+									{
+											if(index+2<=lastindex){p=string_append_char(p,(hexdigit(chars[index+1])<<4)+hexdigit(chars[index+2]));}
+											index+=2;
+									}
+									break; // TODO for now skip, so still left to do
+							}
+						}else
+							p=string_append_char(p,c);
+					}
+				}
+			}else{ // just return enquoted inside the quoteChar
+				p=string_append_char(p,quoteChar);
+				p=string_append(p,chars);
+				p=string_append_char(p,quoteChar);
+			}
+		}
+		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}
+	}
+	return disowned_string(_stringText,owner);
+}
+
 /**
  * @brief returns the pointer to a new M string containing the (dequoted) text pointed to by \p _text
  * 
@@ -1810,12 +1889,13 @@ char hexdigit(char c){
  * @param dequoted the flag indicating whether or not to dequote \p _text
  * @return Mstring* the (dequoted) text represented by the M text pointed to by \p _text, NULL on failure e.g. when \p _text is NULL
  */
-Mstring* _getStringText(Mtext const * const _text,bool dequoted){if(NULL==_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getStringOfText(Mtext const * const _text,bool dequoted){if(NULL==_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _stringText=owned_string(__string(),owner);
 	if(_stringText!=NULL){
 		Mstring* p=_stringText;
+		/*
 		if(amVerboseDebugging())
-			p=string_append_char(p,'s');
+			p=string_append_char(p,'s');*/
 		if(p!=NULL){
 			// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
 			if(dequoted){
@@ -2023,6 +2103,7 @@ Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=CALLOC_1(sizeof(struct Mfile),'F',owner);
 	if(_file==NULL)return NULL;
 	_file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
+	if(NULL==_file->_stat){FREE_FILE(_file,owner);return NULL;} // MDH@01MAY2024: having a stat is crucial!!
 	return disowned_file(_file,owner);
 }
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
@@ -2076,26 +2157,34 @@ void free_file(Mfile* _file){
 void openFile(Mfile* _file,char* mode){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
 	// only open when defined and currently not open
-	if(_file!=NULL&&mode){ // valid input
+	if(_file!=NULL&&mode!=NULL){ // valid input
 		if(_file->_f==NULL){ // not opened yet
+			output("Opening file '%s' in mode '%s'.\n",string(_file->_name),mode);
 			if(_file->_stat==NULL||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
-				assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
+				//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 				_file->_f=fopen(string(_file->_name),mode);
 				if(_file->_f!=NULL){ // now opened
 					if(report)
 						output("'%s' opened!\n",string(_file->_name));
 					_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
 					// update stat (even if already set, because the file existed to start with)
-					if(stat(string(_file->_name),_file->_stat)!=0){
+					/*if(NULL==_file->_stat)_file->stat=(struct stat*)DISOWNED(CALLOC_1(sizeof(struct stat),'s'owner));*/
+					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);
+					if(updateStatsErrorCode){ // updating stat failed
+						output("%sFailed to update the stats of file '%s' in mode '%s' (error code: %d).\n",M_ERROR_PREFIX,string(_file->_name),_file->mode,updateStatsErrorCode);
+						// perhaps we should never do the following???? although somehow we are using _file->_stat for certain purposes!!!
 						FREE_1(_file->_stat,'f');
 						_file->_stat=NULL;
-						output("%sFailed to update the stats of '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 					}else
 					if(report)
-						output("Stats of '%s' updated.\n",string(_file->_name));
+						output("Stats of file '%s' updated.\n",string(_file->_name));
 				}else
-					output("%sFailed to open '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
-			}
+					output("%sFailed to open file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+			}else
+			if(_file->_stat!=NULL)
+				output("Can't open a '%s': it is a directory!\n",M_ERROR_PREFIX,string(_file->_name));
+			else
+				output("%sFile '%s' already opened!\n",M_WARNING_PREFIX,string(_file->_name));
 		}else
 			output("%s'%s' already open!\n",M_WARNING_PREFIX,string(_file->_name));
 	}
