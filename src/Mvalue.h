@@ -566,9 +566,10 @@ Mvalue* _getValueOfFile(Mfile const * const _file);
 
 // MDH@30APR2024: internal equivalents of the M interpreter file functions
 // use _getFile() instead!!! Mfile* __file(char const * const filename);
-long long fDeleted(Mfile * const file);
-long long fOpened(Mfile * const file,char openmodeSpec[]);
-long long fClosed(Mfile * const file);
+long long fDeleted(Mfile * const file,Mallocationowner owner_file);
+long long fOpened(Mfile * const file,Mallocationowner owner_file,char openmodeSpec[]);
+long long fClosed(Mfile * const file,Mallocationowner owner_file);
+
 Mstring* fRead(Mfile const * const file,long long numberOfBytes);
 Mstring* fReadLine(Mfile const * const file);
 Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report);

@@ -320,7 +320,7 @@ Mfile* __file();
 bool closeFile(Mfile* _file);
 void free_file(Mfile* _file);
 #define FREE_FILE(_file,owner_file) free_file(disowned_file(_file,owner_file))
-void openFile(Mfile* _file,char* mode);
+void openFile(Mfile* _file,Mallocationowner owner_file,char* mode);
 
 Mtime* owned_time(Mtime* _time,Mallocationowner owner_time);
 Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time);

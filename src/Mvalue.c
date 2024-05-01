@@ -4704,7 +4704,12 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 	// the file might not exist in which case we could get rid of _file->_stat???
 	if(_file!=NULL){
 		_file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
-		if(stat(string(_file->_name),_file->_stat)!=0){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
+		// MDH@01MAY2024: if the file exists we want statistics!!!
+		if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner,1)); // no need to disown here!!!!
+		if(_file->_stat!=NULL){
+			if(stat(string(_file->_name),_file->_stat)!=0){FREE_DISOWNED_1(_file->_stat,'f',owner);_file->_stat=NULL;}
+		}else
+			outputError("Unable to obtain the file stats");
 		return disowned_file(_file,owner);
 	}
 	return NULL;
@@ -4786,18 +4791,30 @@ static bool isFileWriteable(Mfile* _file){
  * @return M_TRUE on success
  * @return M_FALSE on failure
  */
-long long fDeleted(Mfile * const file){
+long long fDeleted(Mfile * const file,Mallocationowner owner_file){
 	// can only delete an existing file that is not currently open
 	bool result=M_LL_INVALID;
-	if(file!=NULL&&file->_name!=NULL&&NULL==file->_f){ // a file with a name that is not currently open
-		// if remove returns a non-zero value, removing the file failed!!!!
-		result=(remove(string(file->_name))?M_FALSE:M_TRUE);
-		if(result==M_TRUE){
-			// update stat accordingly, if we succeed we should free _stat
-			if(stat(string(file->_name),file->_stat)==0){FREE_1(file->_stat,'f');file->_stat=NULL;}
-			else outputError("Failed to update the statistics of a deleted file.");
-		}
-	}
+	if(file!=NULL&&file->_name!=NULL){
+		if(NULL==file->_f){ // a file with a name that is not currently open
+			// if remove returns a non-zero value, removing the file failed!!!!
+			if(file->_stat!=NULL){
+				result=(remove(string(file->_name))?M_FALSE:M_TRUE);
+				if(result==M_TRUE){
+					// we may assume the file no longer exists, so we should fail getting the stats
+					if(stat(string(file->_name),file->_stat)!=0){
+						FREE_DISOWNED_1(file->_stat,'f',owner_file);
+						file->_stat=NULL;
+					}else
+						outputError("Failed to remove the stats of the deleted file");
+				}else // failure, so the stats stay!!!
+					outputError("Failed to delete the file");
+			}else
+				output("%sFile '%s' cannot be deleted: it does not exist!\n",M_ERROR_PREFIX,string(file->_name));
+		}else
+			output("%sIt is not allowed to delete an opened file '%s'!\n",M_ERROR_PREFIX,string(file->_name));
+	}else
+	if(file!=NULL)
+		outputError("Cannot delete an unnamed file");
 	return result;
 }
 /**
@@ -4806,7 +4823,7 @@ long long fDeleted(Mfile * const file){
  * @param file the M file to open
  * @return M_TRUE on success, M_FALSE otherwise
  */
-long long fOpened(Mfile * const file,char openmodeSpec[]){
+long long fOpened(Mfile * const file,Mallocationowner owner_file,char openmodeSpec[]){
 	long long result=M_LL_INVALID;
 	if(file!=NULL){
 		if(NULL==file->_f){
@@ -4825,7 +4842,7 @@ long long fOpened(Mfile * const file,char openmodeSpec[]){
 					}else // for optimal flexibility allow for writing as well
 						mode[1]='+';
 					// try to open the file
-					openFile(file,mode);
+					openFile(file,owner_file,mode);
 					/* replacing and augmenting:
 					_file->_f=fopen(string(_file->_name),mode);
 					if(_file->_f){_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2];} // remember the opening mode when the file was successfully opened
@@ -4834,7 +4851,7 @@ long long fOpened(Mfile * const file,char openmodeSpec[]){
 				if(openmode=='w')
 					output("%sCan't overwrite existing content in '%s'.\n",M_ERROR_PREFIX,string(file->_name));
 				else
-					output("%s_getStringOfText( '%s'.\n",M_ERROR_PREFIX,string(file->_name));
+					output("%Can't open directory '%s'.\n",M_ERROR_PREFIX,string(file->_name));
 			}
 			result=(file->_f!=NULL?M_TRUE:M_FALSE);
 		}else
@@ -4848,8 +4865,9 @@ long long fOpened(Mfile * const file,char openmodeSpec[]){
  * @param file the file to close
  * @return long long M_TRUE on success, M_FALSE on failure, or M_LL_INVALID when \p file equals NULL
  */
-long long fClosed(Mfile * const file){
+long long fClosed(Mfile * const file,Mallocationowner owner_file){
 	long long result=(file!=NULL?(closeFile(file)?M_TRUE:M_FALSE):M_LL_INVALID);
+	// closeFile() already takes care of clearing file->_f!!!! if(result==M_TRUE){FREE_DISOWNED_1(file->_f,'f',owner);file->_f=NULL;}
 	return result;
 }
 
@@ -4860,28 +4878,31 @@ long long fClosed(Mfile * const file){
  * @param numberOfBytes the maximum number of bytes to read
  * @return Mstring* the bytes read
  */
-Mstring* fRead(Mfile const * const file,long long numberOfBytes){Mallocationowner owner=getOwner(__LINE__);
+Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long long numberOfBytes){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _bytesRead=NULL;
 	if(file!=NULL){
 		// before checking the mode to see if the file can be read from, we might need to open it
 		// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 		if(file->_stat!=NULL){ // an existing file
-			// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
-			if(NULL==file->_f)openFile(file,"r+");
-			// if the file can be read from, we do
-			if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-				_bytesRead=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
-				if(_bytesRead!=NULL){
-					// the file could be empty to start with
-					while(numberOfBytes>0&&!feof(file->_f)){
-						if(NULL==string_append_char(_bytesRead,fgetc(file->_f)))break;
-						numberOfBytes--;
+			if(file->_f!=NULL){ // and opened
+				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
+				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
+				// if the file can be read from, we do
+				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					_bytesRead=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
+					if(_bytesRead!=NULL){
+						// the file could be empty to start with
+						while(numberOfBytes>0&&!feof(file->_f)){
+							if(NULL==string_append_char(_bytesRead,fgetc(file->_f)))break;
+							numberOfBytes--;
+						}
+						if(numberOfBytes<=0)return disowned_string(_bytesRead,owner);
+						output("%sFailed to read %d bytes.\n",M_ERROR_PREFIX,numberOfBytes);
+						FREE_STRING(_bytesRead,owner);
 					}
-					if(numberOfBytes<=0)return disowned_string(_bytesRead,owner);
-					output("%sFailed to read %d bytes.\n",M_ERROR_PREFIX,numberOfBytes);
-					FREE_STRING(_bytesRead,owner);
 				}
-			}
+			}else
+				outputError("Can't read from unopened file");
 		}else
 			output("%sFile '%s' does not exist!",M_ERROR_PREFIX,string(file->_name));
 	}
@@ -4893,43 +4914,46 @@ Mstring* fRead(Mfile const * const file,long long numberOfBytes){Mallocationowne
  * @param file the file to read the text line from
  * @return Mstring* the single text line (without EOLN)
  */
-Mstring* fReadLine(Mfile const * const file){Mallocationowner owner=getOwner(__LINE__);
+Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _bytesRead=NULL;
 	if(file!=NULL){
 		if(file->_stat!=NULL){ // an existing file
-			if(NULL==file->_f)openFile(file,"r+");
-			// if the file is not binary and can be read from
-			if(file->_f!=NULL&&file->mode[2]!='b'&&(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
-				if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
-					_bytesRead=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
-					if(_bytesRead!=NULL){
-						Mstring* p=_bytesRead;
-						// the file could be empty to start with
-						int c=0;
-						while(1){
-							c=fgetc(file->_f);
-							if(feof(file->_f))break; // to be tested AFTER reading
-							// MDH@27DEC2020: whatever is read, it must not be negative!!!!
-							if(c<SCHAR_MIN||c>SCHAR_MAX){
-								output("%sInvalid character code (%i) read from '%s'.\n",M_ERROR_PREFIX,c,string(file->_name));
-								break;
+			////////if(NULL==file->_f)openFile(file,owner_file,"r+");
+			if(file->_f!=NULL){
+				// if the file is not binary and can be read from
+				if(file->_f!=NULL&&file->mode[2]!='b'&&(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
+						_bytesRead=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
+						if(_bytesRead!=NULL){
+							Mstring* p=_bytesRead;
+							// the file could be empty to start with
+							int c=0;
+							while(1){
+								c=fgetc(file->_f);
+								if(feof(file->_f))break; // to be tested AFTER reading
+								// MDH@27DEC2020: whatever is read, it must not be negative!!!!
+								if(c<SCHAR_MIN||c>SCHAR_MAX){
+									output("%sInvalid character code (%i) read from '%s'.\n",M_ERROR_PREFIX,c,string(file->_name));
+									break;
+								}
+								// let me suggest to only stop on \n and remove the \r if there's one in front of the \n
+								if(c=='\n'){
+									if(string_last_char(p)=='\r')string_declength(p);
+									break; // either LF or CR would stop the reading
+								}
+								p=string_append_char(p,c);
+								if(NULL==p){outputError("Failed to read all text line characters");break;}
 							}
-							// let me suggest to only stop on \n and remove the \r if there's one in front of the \n
-							if(c=='\n'){
-								if(string_last_char(p)=='\r')string_declength(p);
-								break; // either LF or CR would stop the reading
-							}
-							p=string_append_char(p,c);
-							if(NULL==p){outputError("Failed to read all text line characters");break;}
+							/* MDH@30APR2024: since we didn't break on '\r' there's no need to actually do the following anymore
+							// skip the optional linefeed following any carriage return, if something else push back again
+							if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
+							*/
+							if(NULL==p){FREE_STRING(_bytesRead,owner);return NULL;}
 						}
-						/* MDH@30APR2024: since we didn't break on '\r' there's no need to actually do the following anymore
-						// skip the optional linefeed following any carriage return, if something else push back again
-						if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
-						*/
-						if(NULL==p){FREE_STRING(_bytesRead,owner);return NULL;}
 					}
 				}
-			}
+			}else
+				outputError("Can't read from an unopened file");
 		}
 		/* not here!!
 		// if the file is disowned (which it will be if it was created)
@@ -4948,7 +4972,7 @@ Mstring* fReadLine(Mfile const * const file){Mallocationowner owner=getOwner(__L
  * @param file 
  * @return Mlist* the list of lines read from \p file
  */
-Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report){Mallocationowner owner=getOwner(__LINE__);
+Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long long numberOfLines,bool report){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _linesReadList=NULL;
 	if(numberOfLines>=0&&file!=NULL){
 		if(file->_stat!=NULL&&!S_ISDIR(file->_stat->st_mode)){ // an existing (non directory) file
@@ -4957,72 +4981,75 @@ Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report){
 			// before checking the mode to see if the file can be read from, we might need to open it
 			// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 			// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
-			if(NULL==file->_f)openFile(file,"r+");
-			// if the file can be read from, we do
-			if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-				if(file->mode[2]!='b'){
-					_linesReadList=owned_list(_getListOfType(VT_TEXT),owner);
-					if(_linesReadList!=NULL){
-						char buffer[256]; // the buffer to use with fgets
-						size_t buffer_length;
-						bool eoln;
-						Mlistelement* listelement=NULL;
-						while(!feof(file->_f)){ // there are still additional lines
-							// MDH@27DEC2020: 
-							// by appending a list element (with value NULL) we can tell whether
-							// reading the file failed afterwards (if the last list element is NULL)
-							// if storing the line text fails, listelement must be NULLed so that the
-							// entire list will be freed (and nothing is returned)
-							listelement=getAppendedListelement(_linesReadList,owner);
-							if(NULL==listelement)break;
-							Mstring* _line=owned_string(_getString("'"),owner);
-							if(NULL==_line)break;
-							eoln=false;
-							char* newbuffer;
-							 // keep reading until all of the line is read (or some error occurs)
-							do{
-								buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
-								newbuffer=fgets(buffer,256,file->_f);
-								// detect read error
-								if(NULL==newbuffer&&!feof(file->_f)){
-									FREE_STRING(_line,owner);
-									_line=NULL;
-									output("%sSome error reading text from '%s'.\n",M_ERROR_PREFIX,string(file->_name));
-								}else{
-									// the problem is that buffer might not end with a new line
-									buffer_length=strlen(buffer);
-									if(buffer_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
-									buffer_length--;
-									if(buffer[buffer_length]=='\n'){ // eoln
-										buffer[buffer_length]='\0';
-										eoln=true;
-									}
-									if(NULL==newbuffer)eoln=true; // we do want to add the last buffer
-									if(NULL==string_append(_line,buffer)){ // error appending the buffer
+			///////////if(NULL==file->_f)openFile(file,owner_file,"r+");
+			if(file->_f!=NULL){
+				// if the file can be read from, we do
+				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(file->mode[2]!='b'){
+						_linesReadList=owned_list(_getListOfType(VT_TEXT),owner);
+						if(_linesReadList!=NULL){
+							char buffer[256]; // the buffer to use with fgets
+							size_t buffer_length;
+							bool eoln;
+							Mlistelement* listelement=NULL;
+							while(!feof(file->_f)){ // there are still additional lines
+								// MDH@27DEC2020: 
+								// by appending a list element (with value NULL) we can tell whether
+								// reading the file failed afterwards (if the last list element is NULL)
+								// if storing the line text fails, listelement must be NULLed so that the
+								// entire list will be freed (and nothing is returned)
+								listelement=getAppendedListelement(_linesReadList,owner);
+								if(NULL==listelement)break;
+								Mstring* _line=owned_string(_getString("'"),owner);
+								if(NULL==_line)break;
+								eoln=false;
+								char* newbuffer;
+								// keep reading until all of the line is read (or some error occurs)
+								do{
+									buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
+									newbuffer=fgets(buffer,256,file->_f);
+									// detect read error
+									if(NULL==newbuffer&&!feof(file->_f)){
 										FREE_STRING(_line,owner);
 										_line=NULL;
+										output("%sSome error reading text from '%s'.\n",M_ERROR_PREFIX,string(file->_name));
 									}else{
-										if(report)
-											output("Buffer '%s' appended to '%s'.\n",buffer,string(_line));
-										// if eoln the current line should be considered complete
-										if(eoln)break;
+										// the problem is that buffer might not end with a new line
+										buffer_length=strlen(buffer);
+										if(buffer_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
+										buffer_length--;
+										if(buffer[buffer_length]=='\n'){ // eoln
+											buffer[buffer_length]='\0';
+											eoln=true;
+										}
+										if(NULL==newbuffer)eoln=true; // we do want to add the last buffer
+										if(NULL==string_append(_line,buffer)){ // error appending the buffer
+											FREE_STRING(_line,owner);
+											_line=NULL;
+										}else{
+											if(report)
+												output("Buffer '%s' appended to '%s'.\n",buffer,string(_line));
+											// if eoln the current line should be considered complete
+											if(eoln)break;
+										}
 									}
-								}
-							}while(_line!=NULL&&newbuffer!=NULL&&--numberOfLines>0); // MDH@30APR2024: testing for numberOfLines still not equal to zero!!!
-							if(NULL==_line)break;
-							// register this line
-							assignValue(&listelement->_value,_getTextValue(string(_line)));
-							if(report)
-								output("Line '%s' read.\n",string(_line));
-							FREE_STRING(_line,owner);
+								}while(_line!=NULL&&newbuffer!=NULL&&--numberOfLines>0); // MDH@30APR2024: testing for numberOfLines still not equal to zero!!!
+								if(NULL==_line)break;
+								// register this line
+								assignValue(&listelement->_value,_getTextValue(string(_line)));
+								if(report)
+									output("Line '%s' read.\n",string(_line));
+								FREE_STRING(_line,owner);
+							}
+							// if we have a listelement we succeeded, well mostly
+							if(listelement==NULL){FREE_LIST(_linesReadList,owner);return NULL;}
 						}
-						// if we have a listelement we succeeded, well mostly
-						if(listelement==NULL){FREE_LIST(_linesReadList,owner);return NULL;}
-					}
+					}else
+						output("%sUnable to read text lines from binary file '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->mode);
 				}else
-					output("%sUnable to read text lines from binary file '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->mode);
+					output("%sUnable to read the lines in '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->mode);
 			}else
-				output("%sUnable to read the lines in '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->mode);
+				outputError("Can't read from an unopened file");
 		}else
 		if(NULL==file->_stat)
 			output("%s'$s' does not exist.\n",M_ERROR_PREFIX,string(file->_name));
@@ -5039,40 +5066,43 @@ Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report){
  * @param chars 
  * @return long long the number of characters not written, or M_LL_INVALID when the input is incorrect (e.g. when we can't write to the ouput file)
  */
-long long fWriteChars(Mfile const * const file,char const * const chars,bool writeEoln){Mallocationowner owner=getOwner(__LINE__);
+long long fWriteChars(Mfile const * const file/*,Mallocationowner owner_file*/,char const * const chars,bool writeEoln){Mallocationowner owner=getOwner(__LINE__);
 	long long result=M_LL_INVALID;
 	if(file!=NULL&&chars!=NULL){
-		size_t towrite=strlen(chars); // the number of characters to write
-		size_t eolntowrite=(writeEoln?strlen(FILE_EOLN):0);
-		long long notwritten=0;
-		// if there's actually nothing to write we assume success (and notwritten will remain 0)
-		if(towrite>0){ // something left to write
-			if(NULL==file->_f)openFile(file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
-			if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-				if(file->mode[2]!='b'){ // text write (i.e. as characters)
-					// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
-					Mstring* _textToWrite=owned_string(_getStringOfChars(chars,'\0'),owner); // NOTE: replaces the _getStringOfText() call as used in fWriteText()
-					if(_textToWrite!=NULL){
-						char* p=_textToWrite->_chars->chars;
-						while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
-						while(*p){notwritten++;p++;} // count what has not been written
-						FREE_STRING(_textToWrite,owner); // MDH@29APR2024: BUG FIX should be here
-					}else
-						notwritten=towrite;
-				}else // binary write
-					notwritten=towrite-fwrite(chars,sizeof(char),towrite,file->_f);
-				// write end-of-line characters if required
-				if(eolntowrite){ // also some EOLN characters to write
-					if(notwritten==0){ // succeeded so far
-						char* p=FILE_EOLN;
-						// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
-						while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
-						while(*p){notwritten++;p++;} // NOTE count what has not been written
-					}else
-						notwritten+=eolntowrite;
+		if(file->_f!=NULL){
+			size_t towrite=strlen(chars); // the number of characters to write
+			size_t eolntowrite=(writeEoln?strlen(FILE_EOLN):0);
+			long long notwritten=0;
+			// if there's actually nothing to write we assume success (and notwritten will remain 0)
+			if(towrite>0){ // something left to write
+				////////////////if(NULL==file->_f)openFile(file,owner_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
+				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(file->mode[2]!='b'){ // text write (i.e. as characters)
+						// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
+						Mstring* _textToWrite=owned_string(_getStringOfChars(chars,'\0'),owner); // NOTE: replaces the _getStringOfText() call as used in fWriteText()
+						if(_textToWrite!=NULL){
+							char* p=_textToWrite->_chars->chars;
+							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
+							while(*p){notwritten++;p++;} // count what has not been written
+							FREE_STRING(_textToWrite,owner); // MDH@29APR2024: BUG FIX should be here
+						}else
+							notwritten=towrite;
+					}else // binary write
+						notwritten=towrite-fwrite(chars,sizeof(char),towrite,file->_f);
+					// write end-of-line characters if required
+					if(eolntowrite){ // also some EOLN characters to write
+						if(notwritten==0){ // succeeded so far
+							char* p=FILE_EOLN;
+							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
+							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
+							while(*p){notwritten++;p++;} // NOTE count what has not been written
+						}else
+							notwritten+=eolntowrite;
+					}
 				}
 			}
-		}
+		}else
+			outputError("Can't write to an unopened file");
 	}
 	return result;
 }
@@ -5087,37 +5117,40 @@ long long fWriteChars(Mfile const * const file,char const * const chars,bool wri
 long long fWriteText(Mfile const * const file,Mtext const * const textToWrite,bool writeEoln){Mallocationowner owner=getOwner(__LINE__); // returns amount of bytes not written
 	long long notwritten=M_LL_INVALID;
 	if(file!=NULL&&textToWrite!=NULL){ // something to write
-		char* p=textToWrite->_c; // _c is an array so a pointer
-		size_t towrite=strlen(p); // the number of characters to write
-		size_t eolntowrite=(writeEoln?strlen(FILE_EOLN):0);
-		long long notwritten=0;
-		// if there's actually nothing to write we assume success (and notwritten will remain 0)
-		if(towrite>0){ // something left to write
-			if(NULL==file->_f)openFile(file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
-			if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-				if(file->mode[2]!='b'){ // text write (i.e. as characters)
-					// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
-					Mstring* _textToWrite=owned_string(_getStringOfText(textToWrite,true),owner);
-					if(_textToWrite!=NULL){
-						char* p=_textToWrite->_chars->chars; // TODO not certain about this
-						while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
-						while(*p){notwritten++;p++;} // NOTE that's one way of dealing with it
-						FREE_STRING(_textToWrite,owner); // MDH@29APR2024: BUG FIX should be here
-					}else
-						notwritten=towrite;
-				}else{ // binary write
-					notwritten=towrite-fwrite(p,sizeof(char),towrite,file->_f);
-				if(eolntowrite){
-					if(notwritten==0){
-						char* p=FILE_EOLN;
-						// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
-						while(*p){if(fputc(*p,file->_f)==EOF)break;}p++;}
-						while(*p){notwritten++;p++;} // count what we didn't write
-					}else // failed to write the end-of-line as well
-						notwritten+=eolntowrite;
+		if(file->_f!=NULL){ // an opened file we can write to
+			char* p=textToWrite->_c; // _c is an array so a pointer
+			size_t towrite=strlen(p); // the number of characters to write
+			size_t eolntowrite=(writeEoln?strlen(FILE_EOLN):0);
+			// if there's actually nothing to write we assume success (and notwritten will remain 0)
+			notwritten=0;
+			if(towrite>0){ // something left to write
+				///////////if(NULL==file->_f)openFile(file,owner_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
+				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(file->mode[2]!='b'){ // text write (i.e. as characters)
+						// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
+						Mstring* _textToWrite=owned_string(_getStringOfText(textToWrite,true),owner);
+						if(_textToWrite!=NULL){
+							char* p=_textToWrite->_chars->chars; // TODO not certain about this
+							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
+							while(*p){notwritten++;p++;} // NOTE that's one way of dealing with it
+							FREE_STRING(_textToWrite,owner); // MDH@29APR2024: BUG FIX should be here
+						}else
+							notwritten=towrite;
+					}else{ // binary write
+						notwritten=towrite-fwrite(p,sizeof(char),towrite,file->_f);
+					if(eolntowrite){
+						if(notwritten==0){
+							char* p=FILE_EOLN;
+							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
+							while(*p){if(fputc(*p,file->_f)==EOF)break;}p++;}
+							while(*p){notwritten++;p++;} // count what we didn't write
+						}else // failed to write the end-of-line as well
+							notwritten+=eolntowrite;
+					}
 				}
 			}
-		}
+		}else
+			outputError("Can't write to an unopened file");
 	}
 	return notwritten;
 }
@@ -5134,25 +5167,38 @@ long long fWriteLine(Mfile const * const file,Mstring * const towrite){ // retur
 */
 long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite){Mallocationowner owner=getOwner(__LINE__); // returns the number of lines not written
 	long long result=M_LL_INVALID;
-	if(file!=NULL&&linesToWrite!=NULL){
-		result=M_TRUE;
-		if(linesToWrite->numberOfElements>0){ // some lines to write
-			Mlistelement* lineListelement=linesToWrite->_first;
-			while(result==M_TRUE&&lineListelement!=NULL){
-				if(lineListelement->_value!=NULL){
-					// TODO what if the value to write is not text????
-					Mtext* _lineText=(lineListelement->_value->type==VT_TEXT?lineListelement->_value->value._text:NULL);
-					//// replacing: Mstring* _lineText=owned_string(_getValueText(lineListelement->_value,true,true),owner);
-					if(_lineText==NULL){
-						result=M_FALSE;
-						output("%sFailed to construct the line to write at list index %llu.",M_ERROR_PREFIX,lineListelement->index);
-					}else
-						result=fWriteText(file,_lineText,true);
+	if(file!=NULL){
+		if(linesToWrite!=NULL){
+			if(file->_f!=NULL){
+				result=0;
+				long long numberOfLinesToWrite=linesToWrite->numberOfElements;
+				if(numberOfLinesToWrite>0){ // some lines to write
+					Mlistelement* lineListelement=linesToWrite->_first;
+					while(result==0&&lineListelement!=NULL){
+						if(lineListelement->_value!=NULL){
+							// TODO what if the value to write is not text????
+							Mtext* _lineText=(lineListelement->_value->type==VT_TEXT?lineListelement->_value->value._text:NULL);
+							//// replacing: Mstring* _lineText=owned_string(_getValueText(lineListelement->_value,true,true),owner);
+							if(_lineText==NULL){
+								result=M_FALSE;
+								output("%sFailed to construct the line to write at list index %llu.",M_ERROR_PREFIX,lineListelement->index);
+							}else{
+								if(fWriteText(file,_lineText,true)!=M_TRUE){
+									result=numberOfLinesToWrite;
+									break;
+								}
+								--numberOfLinesToWrite;
+							}
+						}
+						lineListelement=lineListelement->_next;
+					}
 				}
-				lineListelement=lineListelement->_next;
-			}
-		}
-	}
+			}else
+				outputError("Can't write to an unopened file");
+		}else
+			outputError("Nothing to write");
+	}else
+		outputError("No file to write to");
 	return result;
 }
 
@@ -5179,7 +5225,7 @@ Mvalue* Mfdelete(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 	long long result=M_LL_INVALID;
 	if(fileValue!=NULL){
 		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
-		result=fDeleted(_file);
+		result=fDeleted(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner));
 		if(_file!=NULL&&fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // release the created file
 	}
 	return _getIntegerValue(result);
@@ -5197,7 +5243,7 @@ Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner own
 	if(openmodeText!=NULL&&*openmodeText){ // there's an open mode spec which is NOT empty
 		Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
 		if(_file!=NULL){ // there's a Mfile 
-			long long fileOpened=fOpened(_file,openmodeText);
+			long long fileOpened=fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),openmodeText);
 			if(fileOpened==M_TRUE)
 				return(fileValue->type==VT_FILE?fileValue:_getValueOfFile(disowned_file(_file,owner)));
 			outputError("Opening the file failed");
@@ -5240,13 +5286,24 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 	Mvalue* result=NULL;
 	long long numberOfBytes=(numberOfBytesValue!=NULL?getValueInteger(numberOfBytesValue):M_LL_MAX); // the default is to read as much bytes as possible
 	if(numberOfBytes>=0){ // only non-negative values are considered valid
-		Mfile* file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-		// get the result of reading at most numberOfBytes bytes
-		Mstring* _bytesRead=owned_string(fRead(file,numberOfBytes),owner); // do not forget to take over the ownership
-		if(_bytesRead!=NULL){
-			result=_getTextValue(string(_bytesRead)); // TODO this would copy what was read again, can we speed this up????
-			FREE_STRING(_bytesRead,owner);
-		}
+		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
+		if(_file!=NULL){
+			if(NULL==_file->_f){ // try to open the file to read from
+				openFile(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),'r+'); // we can call openFile() here as we know who the owner of the file is
+				if(NULL==_file->_f)
+					outputError("Failed to open the file to read from");
+			}
+			if(_file->_f!=NULL){
+				// get the result of reading at most numberOfBytes bytes
+				Mstring* _bytesRead=owned_string(fRead(_file,numberOfBytes),owner); // do not forget to take over the ownership
+				if(_bytesRead!=NULL){
+					result=_getTextValue(string(_bytesRead)); // TODO this would copy what was read again, can we speed this up????
+					FREE_STRING(_bytesRead,owner);
+				}
+			}
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
+		}else
+			outputError("No file to read from");
 	}
 	return result; // some error
 }
@@ -5263,11 +5320,18 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* result=NULL;
 	if(fileValue!=NULL){
 		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
-		if(_file!=NULL){ // we've got a file to read from
-			Mstring* _textLineRead=owned_string(fReadLine(_file),owner);
-			if(_textLineRead!=NULL){
-				result=_getTextValue(string(_textLineRead)); // an immutable version of the bytes obtained
-				FREE_STRING(_textLineRead,owner);
+		if(_file!=NULL){
+			if(NULL==_file->_f){
+				openFile(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),'r+'); // we can call openFile() here as we know who the owner of the file is
+				if(NULL==_file->_f)
+					outputError("Failed to open the file to read from");
+			}
+			if(_file->_f!=NULL){
+				Mstring* _textLineRead=owned_string(fReadLine(_file),owner);
+				if(_textLineRead!=NULL){
+					result=_getTextValue(string(_textLineRead)); // an immutable version of the bytes obtained
+					FREE_STRING(_textLineRead,owner);
+				}
 			}
 			// free the file when it was created
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
@@ -5292,10 +5356,18 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue){Mallocationown
 		if(fileValue!=NULL){
 			Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
 			if(_file!=NULL){ // we've got a file to read from
-				Mlist* _textLinesRead=owned_list(fReadLines(_file,numberOfLines,report),owner);
-				if(_textLinesRead!=NULL)result=_getValueOfList(disowned_list(_textLinesRead,owner));
+				if(NULL==_file->_f){
+					openFile(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),'r+');
+					if(NULL==_file->_f)
+						output("%sFailed to open file '%s' for reading.\n",M_ERROR_PREFIX,string(_file->_name));
+				}
+				if(_file->_f!=NULL){
+					Mlist* _textLinesRead=owned_list(fReadLines(_file,numberOfLines,report),owner);
+					if(_textLinesRead!=NULL)result=_getValueOfList(disowned_list(_textLinesRead,owner));
+				}
 				if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
-			}
+			}else
+				outputError("No file to read from");
 		}else
 			outputError("No file to read lines from specified");
 	}else
@@ -5311,8 +5383,9 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue){Mallocationown
  */
 Mvalue* Mfclose(Mvalue* fileValue){
 	Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-	return _getIntegerValue(_file!=NULL?(closeFile(_file)?M_TRUE:M_FALSE):M_LL_INVALID);
+	return _getIntegerValue(fClosed(_file,getValueDataOwner())); // NOTE in the future we might not need to pass the owner to fClosed anymore
 }
+
 /*
 static void openFileForWriting(Mfile* _file){
 	// ASSERT _file should NOT be NULL and _file->_f should be NULL (but _file->stat might be NULL)
@@ -5335,7 +5408,12 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 	if(writeValue!=NULL&&writeValue->type==VT_TEXT){
 		Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
 		if(_file!=NULL){
-			result=fWriteChars(_file,writeValue->value._text->_c,false); // not to write an end-of-line
+			if(NULL==_file->_f){
+				openFile(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),'w+');
+				if(NULL==_file->_f)outputError("Failed to open the file to write to");
+			}
+			if(_file->_f!=NULL)
+				result=(fWriteChars(_file,writeValue->value._text->_c,false)==0?M_TRUE:M_FALSE); // not to write an end-of-line
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
 		}
 	}
@@ -5353,7 +5431,12 @@ Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineToWriteValue){Mallocationowner
 	if(lineToWriteValue!=NULL&&lineToWriteValue->type==VT_TEXT){
 		Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
 		if(_file!=NULL){
-			result=fWriteChars(_file,lineToWriteValue->value._text->_c,true); // and write the end-of-line as well
+			if(NULL==_file->_f){
+				openFile(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),'w+');
+				if(NULL==_file->_f)outputError("Failed to open the file to write to");
+			}
+			if(_file->_f!=NULL)
+				result=(fWriteChars(_file,lineToWriteValue->value._text->_c,true)==0?M_TRUE:M_FALSE); // and write the end-of-line as well
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
 		}
 	}
@@ -5371,17 +5454,24 @@ Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue){Mallocationown
 	if(linesToWriteValue!=NULL){
 		Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
 		if(_file!=NULL){
-			if(linesToWriteValue->type==VT_LIST){
-				result=fWriteLines(_file,linesToWriteValue->value._list);
-			}else
-			if(linesToWriteValue->type==VT_ARRAY){
-				result=M_TRUE;
-				Mvalue** values=linesToWriteValue->value._array->values;
-				Mvalue* valueToWrite=values[0];
-				long long numberOfLinesToWrite=linesToWriteValue->value._array->numberOfElements;
-				while(--numberOfLinesToWrite>=0){
-					if(Mfwriteline(_file,valueToWrite)!=M_TRUE){result=M_FALSE;break;} // delegate to Mfwriteline() to write the single value text as a line (followed by an end-of-line)
-					++valueToWrite;
+			if(NULL==_file->_f){
+				openFile(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),'w+');
+				if(NULL==_file->_f)outputError("Failed to open the file to write to");
+			}
+			if(_file->_f!=NULL){
+				if(linesToWriteValue->type==VT_LIST){
+					result=fWriteLines(_file,linesToWriteValue->value._list);
+				}else
+				if(linesToWriteValue->type==VT_ARRAY){
+					result=0; // assume all lines will be written
+					Mvalue** values=linesToWriteValue->value._array->values;
+					Mvalue* valueToWrite=values[0];
+					long long numberOfLinesToWrite=linesToWriteValue->value._array->numberOfElements;
+					while(numberOfLinesToWrite>0){
+						if(Mfwriteline(_file,valueToWrite)!=M_TRUE){result=numberOfLinesToWrite;break;} // delegate to Mfwriteline() to write the single value text as a line (followed by an end-of-line)
+						++valueToWrite;
+						--numberOfLinesToWrite;
+					}
 				}
 			}
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);

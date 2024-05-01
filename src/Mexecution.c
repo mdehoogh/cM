@@ -2102,8 +2102,10 @@ Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){
 Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=CALLOC_1(sizeof(struct Mfile),'F',owner);
 	if(_file==NULL)return NULL;
+	/* MDH@01MAY2024: no need to have a _file->_stat at this point
 	_file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
 	if(NULL==_file->_stat){FREE_FILE(_file,owner);return NULL;} // MDH@01MAY2024: having a stat is crucial!!
+	*/
 	return disowned_file(_file,owner);
 }
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
@@ -2154,7 +2156,7 @@ void free_file(Mfile* _file){
  * @param _file the pointer to the M file
  * @param mode the mode in which to open the M file
  */
-void openFile(Mfile* _file,char* mode){
+void openFile(Mfile* _file,Mallocationowner owner_file,char* mode){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
 	// only open when defined and currently not open
 	if(_file!=NULL&&mode!=NULL){ // valid input
@@ -2168,12 +2170,12 @@ void openFile(Mfile* _file,char* mode){
 						output("'%s' opened!\n",string(_file->_name));
 					_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
 					// update stat (even if already set, because the file existed to start with)
-					/*if(NULL==_file->_stat)_file->stat=(struct stat*)DISOWNED(CALLOC_1(sizeof(struct stat),'s'owner));*/
+					if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner_file,1));
 					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);
 					if(updateStatsErrorCode){ // updating stat failed
 						output("%sFailed to update the stats of file '%s' in mode '%s' (error code: %d).\n",M_ERROR_PREFIX,string(_file->_name),_file->mode,updateStatsErrorCode);
 						// perhaps we should never do the following???? although somehow we are using _file->_stat for certain purposes!!!
-						FREE_1(_file->_stat,'f');
+						FREE_DISOWNED_1(_file->_stat,'f',owner_file);
 						_file->_stat=NULL;
 					}else
 					if(report)
