@@ -307,16 +307,18 @@ size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,c
 // Mfile holds all information related to a single file
 // MDH@28DEC2020: opening and closing a file is moved from Mvalue.c/h to here!!!!
 typedef struct Mfile{
-    struct stat* _stat;
-    Mstring* _name; // if the file exists _name will contain the name of the file
-    // keep track of open file attributes
-    FILE* _f; // the pointer to the opened file
-    off_t pos; // the current position in the file
-    char mode[3]; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
+	struct stat stat; // MDH@02MAY2024: replacing: struct stat* _stat;
+	int staterrno; // MDH@02MAY2024: the status of stat (negative=not up to date (i.e. dirty), 0=stat ok, >0: some error setting the stat)
+	Mstring* _name; // if the file exists _name will contain the name of the file
+	// keep track of open file attributes
+	FILE* _f; // the pointer to the opened file
+	off_t pos; // the current position in the file
+	char mode[3]; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
 }Mfile;
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* __file();
+void fUpdateStats(Mfile * const file); // MDH@02MAY2024
 bool closeFile(Mfile* _file);
 void free_file(Mfile* _file);
 #define FREE_FILE(_file,owner_file) free_file(disowned_file(_file,owner_file))

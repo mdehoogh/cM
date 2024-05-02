@@ -4639,31 +4639,33 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 				fpos_t filepos;fgetpos(_file->_f,&filepos);
 				Minteger* _integer=owned_integer(_getInteger(filepos),owner);
 				appendedToMap(_map,owner,"position",_getValueOfInteger(disowned_integer(_integer,owner)));
-			} 
+			}
 
-			struct stat* stats=_file->_stat;
+			if(_file->staterrno>=0){ // the stats have been determined!!!
 
-			if(stats!=NULL){
+				appendedToMap(_map,owner,"errno",_getValueOfInteger(_getInteger(_file->staterrno))); // NOTE integer returned by _getInteger freed by _getValueOfInteger when failing to wrap it
+				if(_file->staterrno>0)
+					appendedToMap(_map,owner,"error",_getValueOfText(_getStringOfChars(strerror(_file->staterrno),'\'')));
 
-				struct tm dt;
-
+				struct stat filestat=_file->stat; // MDH@02MAY2024
 				// File permissions
 				Mstring* _access=owned_string(_getString("'"),owner);
-
-				// File access property
-				if(S_ISDIR(stats->st_mode))string_append_char(_access,'d'); // TODO we might need to consider other types as well like links, devices and the like
-				if(stats->st_mode & R_OK)string_append_char(_access,'r');
-				if(stats->st_mode & W_OK)string_append_char(_access,'w');
-				if(stats->st_mode & X_OK)string_append_char(_access,'x');
-				appendedToMap(_map,owner,"access",_getTextValue(string(_access)));
-				FREE_STRING(_access,owner);
+				if(_access!=NULL){
+					// File access property
+					if(S_ISDIR(filestat.st_mode))string_append_char(_access,'d'); // TODO we might need to consider other types as well like links, devices and the like
+					if(filestat.st_mode & R_OK)string_append_char(_access,'r');
+					if(filestat.st_mode & W_OK)string_append_char(_access,'w');
+					if(filestat.st_mode & X_OK)string_append_char(_access,'x');
+					appendedToMap(_map,owner,"access",_getTextValue(string(_access)));
+					FREE_STRING(_access,owner);
+				}
 
 				// File size property
-				Minteger* _integer=owned_integer(_getInteger(stats->st_size),owner);
+				Minteger* _integer=owned_integer(_getInteger(filestat.st_size),owner);
 				if(_integer!=NULL)appendedToMap(_map,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)));
 
 				// Get file creation time in seconds and convert seconds to date and time format
-				dt = *(gmtime(&stats->st_ctime));
+				struct tm dt = *(gmtime(&filestat.st_ctime));
 				Mstring* _created=owned_string(__string(),owner);
 				if(_created!=NULL){
 					if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
@@ -4674,7 +4676,7 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 				// from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
 
 				// File modification time
-				dt = *(gmtime(&stats->st_mtime));
+				dt = *(gmtime(&filestat.st_mtime));
 				Mstring* _modified=owned_string(__string(),owner);
 				if(_modified!=NULL){
 					if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
@@ -4683,14 +4685,28 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
 					FREE_STRING(_modified,owner);
 				}
 			}
-
-				// from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
+			// from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
 			return disowned_map(_map,owner);
 		
 		}
 	}
 	return NULL;
 
+}
+
+/**
+ * @brief returns M_TRUE when \p file exists, M_FALSE when it does not, or M_LL_INVALID when \p file it is not a (named) file
+ * 
+ * @param file 
+ * @return long long M_TRUE when \p file exists, M_FALSE when it does not, or M_LL_INVALID when \p file it is not a (named) file
+ */
+long long fExists(Mfile * const file){
+	long long result=M_LL_INVALID;
+	if(file!=NULL&&file->_name!=NULL){
+		if(file->staterrno<0)fUpdateStats(file);
+		result=(file->staterrno!=0?M_FALSE:M_TRUE);
+	}
+	return result;
 }
 
 /**
@@ -4704,12 +4720,18 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 	// the file might not exist in which case we could get rid of _file->_stat???
 	if(_file!=NULL){
 		_file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
+		if(NULL==_file->_name)
+			output("%sFailed to set the name of the file to '%s'.\n",M_ERROR_PREFIX,filename);
+		else
+			fUpdateStats(_file); // MDH@02MAY2024: initialization of the stats delegated to fUpdateStats()
+		/*
 		// MDH@01MAY2024: if the file exists we want statistics!!!
 		if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner,1)); // no need to disown here!!!!
 		if(_file->_stat!=NULL){
 			if(stat(string(_file->_name),_file->_stat)!=0){FREE_DISOWNED_1(_file->_stat,'f',owner);_file->_stat=NULL;}
 		}else
 			outputError("Unable to obtain the file stats");
+		*/
 		return disowned_file(_file,owner);
 	}
 	return NULL;
@@ -4763,7 +4785,8 @@ static bool isFileReadable(Mfile* _file){
 		if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='w'); // an open file is readable if it can be read from
 		// an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
 		// I suppose an open file is also readable when it has not been opened in write-only mode
-		return(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)&&_file->_stat->st_mode&R_OK);
+		if(_file->staterrno<0)fUpdateStats(_file);
+		return(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&R_OK);
 	}
 	return false;
 }
@@ -4777,7 +4800,8 @@ static bool isFileReadable(Mfile* _file){
 static bool isFileWriteable(Mfile* _file){
 	if(_file){
 		if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='r');
-		return(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)&&_file->_stat->st_mode&W_OK);
+		if(_file->staterrno<0)fUpdateStats(_file);
+		return(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&W_OK);
 	}
 	return false;
 	// a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
@@ -4797,15 +4821,19 @@ long long fDeleted(Mfile * const file,Mallocationowner owner_file){
 	if(file!=NULL&&file->_name!=NULL){
 		if(NULL==file->_f){ // a file with a name that is not currently open
 			// if remove returns a non-zero value, removing the file failed!!!!
-			if(file->_stat!=NULL){
+			if(file->staterrno<0)fUpdateStats(file);
+			if(file->staterrno==0){
 				result=(remove(string(file->_name))?M_FALSE:M_TRUE);
 				if(result==M_TRUE){
 					// we may assume the file no longer exists, so we should fail getting the stats
+					file->staterrno=INT_MIN; // indicating that the stats are now dirty
+					/* replacing:
 					if(stat(string(file->_name),file->_stat)!=0){
 						FREE_DISOWNED_1(file->_stat,'f',owner_file);
 						file->_stat=NULL;
 					}else
 						outputError("Failed to remove the stats of the deleted file");
+					*/
 				}else // failure, so the stats stay!!!
 					outputError("Failed to delete the file");
 			}else
@@ -4828,11 +4856,12 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char openmodeSp
 	if(file!=NULL){
 		if(NULL==file->_f){
 			output("Trying to open file '%s'.\n",string(file->_name));
+			if(file->staterrno<0)fUpdateStats(file);
 			// how about checking whether the mode_value argument is correct first??????
-			char openmode=(openmodeSpec[0]?openmodeSpec[0]:(file->_stat!=NULL?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
+			char openmode=(openmodeSpec[0]?openmodeSpec[0]:(file->staterrno==0?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
 			// let's NOT allow overwriting an existing file!!!
 			if(openmode=='w'||openmode=='r'||openmode=='a'){ // a valid open mode
-				if(openmode!='w'||NULL==file->_stat){ // but do NOT allow deleting existing content
+				if(openmode!='w'||file->staterrno!=0){ // but do NOT allow deleting existing content
 					// let's initialize the default mode
 					char mode[4]={openmode}; // initialize mode to openmode NOTE mode always needs to end with '\0'
 					if(openmodeSpec[0]){ // accepting two additional mode characters '+' and 'b'
@@ -4883,7 +4912,8 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 	if(file!=NULL){
 		// before checking the mode to see if the file can be read from, we might need to open it
 		// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
-		if(file->_stat!=NULL){ // an existing file
+		if(file->staterrno<0)fUpdateStats(file);
+		if(file->staterrno==0&&!S_ISDIR(file->stat.st_mode)){ // an existing file
 			if(file->_f!=NULL){ // and opened
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
 				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
@@ -4917,7 +4947,8 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _bytesRead=NULL;
 	if(file!=NULL){
-		if(file->_stat!=NULL){ // an existing file
+		if(file->staterrno<0)fUpdateStats(file);
+		if(file->staterrno==0&&!S_ISDIR(file->stat.st_mode)){ // an existing file
 			////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 			if(file->_f!=NULL){
 				// if the file is not binary and can be read from
@@ -4975,7 +5006,8 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long long numberOfLines,bool report){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _linesReadList=NULL;
 	if(numberOfLines>=0&&file!=NULL){
-		if(file->_stat!=NULL&&!S_ISDIR(file->_stat->st_mode)){ // an existing (non directory) file
+		if(file->staterrno<0)fUpdateStats(file);
+		if(file->staterrno==0&&!S_ISDIR(file->stat.st_mode)){ // an existing (non directory) file
 			if(report)
 				output("'%s' is a file.\n",file);
 			// before checking the mode to see if the file can be read from, we might need to open it
@@ -5051,8 +5083,8 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 			}else
 				outputError("Can't read from an unopened file");
 		}else
-		if(NULL==file->_stat)
-			output("%s'$s' does not exist.\n",M_ERROR_PREFIX,string(file->_name));
+		if(0!=file->staterrno)
+			output("%sFile '%s' does not exist.\n",M_ERROR_PREFIX,string(file->_name));
 		else
 			output("%s'%s' is a directory not a file.\n",M_ERROR_PREFIX,string(file->_name));
 	}

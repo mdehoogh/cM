@@ -564,6 +564,10 @@ Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner own
 // Mfile is added starting from v0.1.4
 Mvalue* _getValueOfFile(Mfile const * const _file);
 
+// MDH@02MAY2024
+//////void fUpdateStats(Mfile* file);
+long long fExists(Mfile * const file);
+
 // MDH@30APR2024: internal equivalents of the M interpreter file functions
 // use _getFile() instead!!! Mfile* __file(char const * const filename);
 long long fDeleted(Mfile * const file,Mallocationowner owner_file);

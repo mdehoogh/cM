@@ -12,6 +12,7 @@
 #include <limits.h>
 #include <math.h>
 #include <time.h>
+#include <errno.h>
 
 #include "Mexecution.h"
 
@@ -2070,9 +2071,9 @@ bool isDecimalZero(Mdecimal* _decimal){
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
 	if(NULL==_file)return NULL;
 	///output("Disowning file stat!\n");
-	if(_file->_stat!=NULL){
+	/*if(_file->_stat!=NULL){
 		DISOWNED(_file->_stat,owner_file);
-	}
+	}*/
 	if(_file->_name!=NULL){
 		///output("Disowning file name!\n");
 		DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
@@ -2091,7 +2092,7 @@ Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
 Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){
 	if(NULL==_file)return NULL;
 	if(_file->_name!=NULL)OWNED(_file->_name,Msubowner(owner_file,1)); // MDH@28APR2024: OOPS forgot this line before!!!
-	if(_file->_stat!=NULL)OWNED(_file->_stat,Msubowner(owner_file,1));
+	///if(_file->_stat!=NULL)OWNED(_file->_stat,Msubowner(owner_file,1));
 	return OWNED(_file,owner_file);
 }
 /**
@@ -2102,12 +2103,32 @@ Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){
 Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
 	Mfile* _file=CALLOC_1(sizeof(struct Mfile),'F',owner);
 	if(_file==NULL)return NULL;
+	_file->staterrno=INT_MIN; // this is to indicate that the stat field has not yet been set
 	/* MDH@01MAY2024: no need to have a _file->_stat at this point
 	_file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
 	if(NULL==_file->_stat){FREE_FILE(_file,owner);return NULL;} // MDH@01MAY2024: having a stat is crucial!!
 	*/
 	return disowned_file(_file,owner);
 }
+
+/**
+ * @brief updates the stats stored of \p file stored in file->stat calling the C stat() function
+ * @details stores 0 in file->staterrno on success, or the error number (from errno) on failure
+ * @param file 
+ */
+void fUpdateStats(Mfile * const file){
+	if(file!=NULL&&file->_name!=NULL){
+		int stat_errno=file->staterrno; // the current status of the stats info
+		file->staterrno=(stat(string(file->_name),&file->stat)!=0?errno:0); // failure, some error occurred
+		if(stat_errno!=file->staterrno){ // some change
+			if(file->staterrno)
+				output("%s%s (error code: %d) in file '%s'.\n",M_ERROR_PREFIX,strerror(file->staterrno),file->staterrno,string(file->_name));
+			else
+				output("The status information of file '%s' updated successfully.\n",string(file->_name));
+		}
+	}
+}
+
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
 /**
  * @brief closes the M file pointed to by \p _file
@@ -2144,7 +2165,7 @@ bool closeFile(Mfile* _file){
 void free_file(Mfile* _file){
 	if(_file!=NULL){
 		if(_file->_f!=NULL)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
-		if(_file->_stat!=NULL){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
+		////if(_file->_stat!=NULL){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
 		if(_file->_name!=NULL){FREE_1(_file->_name,'S');_file->_name=NULL;}
 		FREE_1(_file,'F');
 	}
@@ -2162,7 +2183,8 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode){
 	if(_file!=NULL&&mode!=NULL){ // valid input
 		if(_file->_f==NULL){ // not opened yet
 			output("Opening file '%s' in mode '%s'.\n",string(_file->_name),mode);
-			if(_file->_stat==NULL||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
+			if(_file->staterrno<0)fUpdateStats(_file);
+			if(_file->staterrno>0||!S_ISDIR(_file->stat.st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
 				//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 				_file->_f=fopen(string(_file->_name),mode);
 				if(_file->_f!=NULL){ // now opened
@@ -2170,6 +2192,8 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode){
 						output("'%s' opened!\n",string(_file->_name));
 					_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
 					// update stat (even if already set, because the file existed to start with)
+					fUpdateStats(_file); // TODO or should we just make the staterrno dirty?
+					/*
 					if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner_file,1));
 					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);
 					if(updateStatsErrorCode){ // updating stat failed
@@ -2180,10 +2204,11 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode){
 					}else
 					if(report)
 						output("Stats of file '%s' updated.\n",string(_file->_name));
+						*/
 				}else
 					output("%sFailed to open file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 			}else
-			if(_file->_stat!=NULL)
+			if(_file->staterrno==0)
 				output("Can't open a '%s': it is a directory!\n",M_ERROR_PREFIX,string(_file->_name));
 			else
 				output("%sFile '%s' already opened!\n",M_WARNING_PREFIX,string(_file->_name));
