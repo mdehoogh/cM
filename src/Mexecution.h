@@ -313,7 +313,8 @@ typedef struct Mfile{
 	// keep track of open file attributes
 	FILE* _f; // the pointer to the opened file
 	off_t pos; // the current position in the file
-	char mode[4]; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
+	// _mode when not NULL will point to the (unmanaged) heap allocation C string when opened successfully
+	char* _mode; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
 }Mfile;
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);

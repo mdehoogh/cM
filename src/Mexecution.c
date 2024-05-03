@@ -1825,64 +1825,63 @@ Mstring* _getStringOfChars(char const * const chars,char quoteChar){Mallocationo
 		if(amVerboseDebugging())
 			p=string_append_char(p,'s');
 			*/
-		if(p!=NULL){
-			// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
-			if(!quoteChar){ // not to return enquoted but simply decoded...
-				// TODO can we do the following using pointers somehow????
-				char c;
-				size_t lastindex=strlen(chars);
-				if(lastindex>0){
-					lastindex--;
-					for(size_t index=0;index<=lastindex;index++){
-						c=chars[index];
-						if(index<lastindex&&c=='\\'){
-							c=chars[++index];
-							switch(c){
-								case 'a':p=string_append_char(p,0x07);break;
-								case 'b':p=string_append_char(p,0x08);break;
-								case 'e':p=string_append_char(p,0x1B);break;
-								case 'f':p=string_append_char(p,0x0C);break;
-								case 'n':p=string_append_char(p,0x0A);break;
-								case 'r':p=string_append_char(p,0x0D);break;
-								case 't':p=string_append_char(p,0x09);break;
-								case 'v':p=string_append_char(p,0x0B);break;
-								case '\\':p=string_append_char(p,0x5C);break;
-								case '\'':p=string_append_char(p,0x27);break;
-								case '"':p=string_append_char(p,0x22);break;
-								case '?':p=string_append_char(p,0x3F);break;
-								case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
-									{ // octal representations can't have 8 or 9 in it
-										char oct=(c-48);
-										// check successive characters if they are octal digits
-										while(index+1<=lastindex){
-											c=chars[index+1];
-											if(c<48||c>55)break; // not an octal digit
-											oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
-											index++;
-										}
-										p=string_append_char(p,oct);
-										// replacing: _p=string_append_char(_p,8*(8*(c-48)+(chars[++index]-48))+(chars[++index]-48));
+		// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
+		if(!quoteChar){ // not to return enquoted but simply decoded...
+			// TODO can we do the following using pointers somehow????
+			char c;
+			size_t lastindex=strlen(chars);
+			if(lastindex>0){
+				lastindex--;
+				for(size_t index=0;index<=lastindex;index++){
+					c=chars[index];
+					if(index<lastindex&&c=='\\'){
+						c=chars[++index];
+						switch(c){
+							case 'a':p=string_append_char(p,0x07);break;
+							case 'b':p=string_append_char(p,0x08);break;
+							case 'e':p=string_append_char(p,0x1B);break;
+							case 'f':p=string_append_char(p,0x0C);break;
+							case 'n':p=string_append_char(p,0x0A);break;
+							case 'r':p=string_append_char(p,0x0D);break;
+							case 't':p=string_append_char(p,0x09);break;
+							case 'v':p=string_append_char(p,0x0B);break;
+							case '\\':p=string_append_char(p,0x5C);break;
+							case '\'':p=string_append_char(p,0x27);break;
+							case '"':p=string_append_char(p,0x22);break;
+							case '?':p=string_append_char(p,0x3F);break;
+							case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
+								{ // octal representations can't have 8 or 9 in it
+									char oct=(c-48);
+									// check successive characters if they are octal digits
+									while(index+1<=lastindex){
+										c=chars[index+1];
+										if(c<48||c>55)break; // not an octal digit
+										oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
+										index++;
 									}
-									break; // assume octal
-								case 8:case 9:break; // this would be invalid
-								case 'x':case 'X':
-									{
-											if(index+2<=lastindex){p=string_append_char(p,(hexdigit(chars[index+1])<<4)+hexdigit(chars[index+2]));}
-											index+=2;
-									}
-									break; // TODO for now skip, so still left to do
-							}
-						}else
-							p=string_append_char(p,c);
-					}
+									p=string_append_char(p,oct);
+									// replacing: _p=string_append_char(_p,8*(8*(c-48)+(chars[++index]-48))+(chars[++index]-48));
+								}
+								break; // assume octal
+							case 8:case 9:break; // this would be invalid
+							case 'x':case 'X':
+								{
+										if(index+2<=lastindex){p=string_append_char(p,(hexdigit(chars[index+1])<<4)+hexdigit(chars[index+2]));}
+										index+=2;
+								}
+								break; // TODO for now skip, so still left to do
+						}
+					}else
+						p=string_append_char(p,c);
 				}
-			}else{ // just return enquoted inside the quoteChar
-				p=string_append_char(p,quoteChar);
-				p=string_append(p,chars);
-				p=string_append_char(p,quoteChar);
 			}
+		}else{ // just return enquoted inside the quoteChar
+			p=string_append_char(p,quoteChar);
+			p=string_append(p,chars);
+			p=string_append_char(p,quoteChar);
 		}
-		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}
+		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}else
+		output("Unescaped text of '%s': '%s'.\n",chars,string(_stringText));
 	}
 	return disowned_string(_stringText,owner);
 }
@@ -2196,12 +2195,16 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
  */
 bool closeFile(Mfile* _file){
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
-	if(_file==NULL){outputWarning("No file to close");return false;} // nothing to close
-	assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
-	if(_file->_f==NULL){output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));return true;} // already closed
+	if(NULL==_file){outputWarning("No file to close");return false;} // nothing to close
+	if(NULL==_file->_name){outputWarning("File has no name");return true;} // must be closed
+	//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
+	if(_file->_f==NULL){
+		output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));
+		return true;
+	} // already closed
 	if(report)
 		output("Closing '%s'.\n",string(_file->_name));
-	if(fclose(_file->_f)==0){
+	if(fclose(_file->_f)==0){ // success
 		_file->_f=NULL;
 		if(report)
 			output("'%s' closed.\n",string(_file->_name));
@@ -2244,8 +2247,10 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report){
 				if(_file->_f!=NULL){ // now opened
 					if(report)
 						output("'%s' opened!\n",string(_file->_name));
+					/* MDH@03MAY2024: fOpened() will take care of copying the mode the file was opened in
 					// TODO find a better way to copy *mode
 					_file->mode[0]=*mode;if(*mode){_file->mode[1]=*(++mode);if(*mode){_file->mode[2]=*(++mode);if(*mode)_file->mode[3]='\0';}} // register the opening mode (which consists of exactly three characters)
+					*/
 					// update stat (even if already set, because the file existed to start with)
 					_file->staterrno=INT_MIN; // replacing: fUpdateStats(_file); // TODO or should we just make the staterrno dirty?
 					/*

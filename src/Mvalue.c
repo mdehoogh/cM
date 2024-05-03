@@ -4631,6 +4631,11 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 
 			if(_file->_f!=NULL){ // the file is currently open
 				// show the mode the file was opened in
+				if(_file->_mode!=NULL)
+					appendedToMap(_map,owner,"mode",_getTextValue(_file->_mode));
+				else
+					outputBug("File mode of opened file vanished!");
+				/* replacing:
 				Mstring* _openmode=owned_string(_getString("'"),owner);
 				if(_openmode!=NULL){
 					if(_file->mode[0])string_append_char(_openmode,_file->mode[0]);
@@ -4639,6 +4644,7 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 					appendedToMap(_map,owner,"mode",_getTextValue(string(_openmode)));
 					FREE_STRING(_openmode,owner);
 				}
+				*/
 				fpos_t filepos;fgetpos(_file->_f,&filepos);
 				Minteger* _integer=owned_integer(_getInteger(filepos),owner);
 				appendedToMap(_map,owner,"position",_getValueOfInteger(disowned_integer(_integer,owner)));
@@ -4786,8 +4792,9 @@ Mvalue* _getValueOfFile(Mfile const * const _file){
  * @return false 
  */
 static bool isFileReadable(Mfile* _file){
-	if(_file){
-		if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='w'); // an open file is readable if it can be read from
+	if(_file!=NULL){
+		if(_file->_f!=NULL)
+			return(_file->_mode[1]=='+'||_file->_mode[2]=='+'||_file->_mode[0]!='w'); // an open file is readable if it can be read from
 		// an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
 		// I suppose an open file is also readable when it has not been opened in write-only mode
 		if(_file->staterrno<0)fUpdateStats(_file,false);
@@ -4803,8 +4810,9 @@ static bool isFileReadable(Mfile* _file){
  * @return false 
  */
 static bool isFileWriteable(Mfile* _file){
-	if(_file){
-		if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='r');
+	if(_file!=NULL){
+		if(_file->_f!=NULL)
+			return(_file->_mode[1]=='+'||_file->_mode[2]=='+'||_file->_mode[0]!='r');
 		if(_file->staterrno<0)fUpdateStats(_file,false);
 		return(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&W_OK);
 	}
@@ -4861,6 +4869,8 @@ long long fDeleted(Mfile * const file,Mallocationowner owner_file){
 long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * openmodeSpec,bool allowExistingWrite,bool report){
 	long long result=M_LL_INVALID;
 	if(file!=NULL){
+		/* MDH@03MAY2024: what I want to do here is attempt to open the file
+		                  and if we succeed store openmodeSpec in file->_mode
 		if(file->staterrno<0)fUpdateStats(file,false);
 		////////outputChar('X');
 		char openmode=(openmodeSpec!=NULL&&*openmodeSpec?*openmodeSpec:(file->staterrno==0?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
@@ -4872,30 +4882,61 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * op
 			if(mode[1])mode[2]=*(++openmodeSpec);
 		}else // for optimal flexibility allow for writing as well
 			mode[1]='+';
+		*/
+		// how about checking whether the mode_value argument is correct first??????
+		// let's NOT allow overwriting an existing file!!!
+		/* there's a better way to do this
+		if(file->staterrno<0)fUpdateStats(file,report);
+		// if we leave file->_mode the way it was, we allow the user to reopen the file in the same mode
+		char openmode=(openmodeSpec!=NULL?*openmodeSpec:'\0');
+		if(!openmode&&file->_mode!=NULL)openmode=*file->_mode;
+		if(!openmode){
+			openmode=(file->staterrno==0?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
+		}
+		char mode[4]={openmode}; // initialize mode to openmode NOTE mode always needs to end with '\0'
+		if(openmodeSpec!=NULL&&*openmodeSpec){ // accepting two additional mode characters '+' and 'b'
+			// let's simply copy the characters (even if they are wrong)
+			mode[1]=*(++openmodeSpec);if(mode[1]>=65&&mode[1]<=90)mode[1]+=32;
+			if(mode[1])mode[2]=*(++openmodeSpec);
+		}else // for optimal flexibility allow for writing as well
+			mode[1]='+';
 		/////output("Requested open mode: '%s'.\n",mode);
-		if(NULL==file->_f){
-			// how about checking whether the mode_value argument is correct first??????
-			// let's NOT allow overwriting an existing file!!!
-			if(report)output("Opening file '%s' in mode '%s'.\n",string(file->_name),mode);
-			if(openmode=='w'||openmode=='r'||openmode=='a'){ // a valid open mode
-				if(openmode!='w'||file->staterrno!=0||allowExistingWrite){ // but do NOT allow deleting existing content unless allowExistingWrite flag is set!!!
+		*/
+		if(file->staterrno<0)fUpdateStats(file,report);
+		// let's determine the opening mode
+		char* mode=openmodeSpec;
+		if(NULL==mode||!*mode)mode=file->_mode;
+		if(NULL==mode||!*mode){
+			mode=(file->staterrno==0?"w":"r");
+		}
+		result=(file->_f!=NULL?M_TRUE:M_FALSE);
+		if(result==M_FALSE){ // not currently opened
+			if(report)
+				output("Opening the %sexisting file '%s' in mode '%c'.\n",(file->staterrno?"non-":""),string(file->_name),mode);
+			if(*mode=='w'||*mode=='r'||*mode=='a'){ // a valid open mode
+				if(*mode!='w'||file->staterrno!=0||allowExistingWrite){ // but do NOT allow deleting existing content unless allowExistingWrite flag is set!!!
 					// let's initialize the default mode
 					// try to open the file
 					openFile(file,owner_file,mode,!report); // if I'm doing the reporting openFile shouldn't
+					// get rid of the current file mode whatever it is
+					if(file->_mode!=NULL){free(file->_mode);file->_mode=NULL;}
+					if(file->_f!=NULL){ // successfully opened the file in mode 'mode'
+						file->_mode=_strdup(mode); // register the actual mode the file was opened in
+						result=M_TRUE;
+					}
 					/* replacing and augmenting:
 					_file->_f=fopen(string(_file->_name),mode);
 					if(_file->_f){_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2];} // remember the opening mode when the file was successfully opened
 					*/
 				}else
-				if(openmode=='w')
+				if(*mode=='w')
 					output("%sCan't overwrite existing content in '%s'.\n",M_ERROR_PREFIX,string(file->_name));
 				else
 					output("%Can't open directory '%s'.\n",M_ERROR_PREFIX,string(file->_name));
 			}
-			result=(file->_f!=NULL?M_TRUE:M_FALSE);
 		}else
-		if(strcmp(mode,file->mode))
-			output("%sFile '%s' already open in mode '%s' instead of the requested mode '%s'!\n",M_WARNING_PREFIX,string(file->_name),file->mode,mode);
+		if(strcmp(mode,file->_mode))
+			output("%sFile '%s' already open in mode '%s' instead of the requested mode '%s'!\n",M_WARNING_PREFIX,string(file->_name),file->_mode,mode);
 		else
 			output("%sFile '%s' already open!\n",M_WARNING_PREFIX,string(file->_name));
 	}
@@ -4931,7 +4972,7 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
 				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 				// if the file can be read from, we do
-				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+				if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					_bytesRead=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
 					if(_bytesRead!=NULL){
 						// the file could be empty to start with
@@ -4965,7 +5006,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 			////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 			if(file->_f!=NULL){
 				// if the file is not binary and can be read from
-				if(file->_f!=NULL&&file->mode[2]!='b'&&(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
+				if(file->_f!=NULL&&file->_mode[2]!='b'&&(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
 						_bytesRead=owned_string(_getString("'"),owner); // NO do NOT start the string with a single quote for create a Mtext from it
 						if(_bytesRead!=NULL){
@@ -5029,8 +5070,8 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 			///////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 			if(file->_f!=NULL){
 				// if the file can be read from, we do
-				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-					if(file->mode[2]!='b'){
+				if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(file->_mode[2]!='b'){
 						_linesReadList=owned_list(_getListOfType(VT_TEXT),owner);
 						if(_linesReadList!=NULL){
 							char buffer[256]; // the buffer to use with fgets
@@ -5090,9 +5131,9 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 							if(listelement==NULL){FREE_LIST(_linesReadList,owner);return NULL;}
 						}
 					}else
-						output("%sUnable to read text lines from binary file '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->mode);
+						output("%sUnable to read text lines from binary file '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->_mode);
 				}else
-					output("%sUnable to read the lines in '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->mode);
+					output("%sUnable to read the lines in '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->_mode);
 			}else
 				outputError("Can't read from an unopened file");
 		}else
@@ -5121,8 +5162,8 @@ long long fWriteChars(Mfile const * const file/*,Mallocationowner owner_file*/,c
 			// if there's actually nothing to write we assume success (and notwritten will remain 0)
 			if(towrite>0){ // something left to write
 				////////////////if(NULL==file->_f)openFile(file,owner_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
-				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-					if(file->mode[2]!='b'){ // text write (i.e. as characters)
+				if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(file->_mode[1]!='b'){ // text write (i.e. as characters)
 						// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
 						Mstring* _textToWrite=owned_string(_getStringOfChars(chars,'\0'),owner); // NOTE: replaces the _getStringOfText() call as used in fWriteText()
 						if(_textToWrite!=NULL){
@@ -5174,8 +5215,8 @@ long long fWriteText(Mfile const * const file,Mtext const * const textToWrite,bo
 			notwritten=0;
 			if(towrite>0){ // something left to write
 				///////////if(NULL==file->_f)openFile(file,owner_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
-				if(file->mode[1]=='+'||file->mode[0]=='a'||file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-					if(file->mode[2]!='b'){ // text write (i.e. as characters)
+				if(file->_mode[1]=='+'||file->_mode[2]=='+'||file->_mode[0]=='a'||file->_mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					if(file->_mode[1]!='b'){ // text write (i.e. as characters)
 						// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
 						Mstring* _textToWrite=owned_string(_getStringOfText(textToWrite,true),owner);
 						if(_textToWrite!=NULL){
