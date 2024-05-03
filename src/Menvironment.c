@@ -835,14 +835,14 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 }/* VALIDATED */
 // MDH@24OCT2019 END
 
-// use Mexists to determine if a variable exists passed in as text, we might decide to return the name of the environment it exists in
+// use Mvexists to determine if a variable exists passed in as text, we might decide to return the name of the environment it exists in
 /**
  * @brief returns M_TRUE if variable with name in \p nameValue exists in the current execution environment, M_FALSE or M_LL_INVALID otherwise
  * @details returns M_LL_INVALID if \p nameValue does not wrap a text
  * @param _nameValue 
  * @return Mvalue* M_TRUE if variable with name in \p nameValue exists in the current execution environment, M_FALSE or M_LL_INVALID otherwise
  */
-Mvalue* Mexists(Mvalue* _nameValue){
+Mvalue* Mvexists(Mvalue* _nameValue){
 	long long result=M_LL_INVALID;
 	if(_nameValue!=NULL&&_nameValue->type==VT_TEXT)
 		result=(getVariable(getExecutionEnvironment(),_nameValue->value._text->_c,false)!=NULL?M_TRUE:M_FALSE);

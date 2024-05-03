@@ -313,16 +313,16 @@ typedef struct Mfile{
 	// keep track of open file attributes
 	FILE* _f; // the pointer to the opened file
 	off_t pos; // the current position in the file
-	char mode[3]; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
+	char mode[4]; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
 }Mfile;
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* __file();
-void fUpdateStats(Mfile * const file); // MDH@02MAY2024
+void fUpdateStats(Mfile * const file,bool report); // MDH@02MAY2024
 bool closeFile(Mfile* _file);
 void free_file(Mfile* _file);
 #define FREE_FILE(_file,owner_file) free_file(disowned_file(_file,owner_file))
-void openFile(Mfile* _file,Mallocationowner owner_file,char* mode);
+void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report);
 
 Mtime* owned_time(Mtime* _time,Mallocationowner owner_time);
 Mtime* disowned_time(Mtime* _time,Mallocationowner owner_time);

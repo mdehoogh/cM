@@ -13,6 +13,10 @@
 #include <math.h>
 #include <time.h>
 #include <errno.h>
+#include <pwd.h>
+#include <grp.h>
+#include <langinfo.h>
+#include <locale.h>
 
 #include "Mexecution.h"
 
@@ -2111,18 +2115,67 @@ Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
 	return disowned_file(_file,owner);
 }
 
+/* Mmap is not yet defined here, so we should report in another way!!!
+static Mstring* _fInfoText(Mfile* file){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _filePropertyMap=owned_map(_getFilePropertyMap(file),owner);
+	Mstring* result=_getValueText(_getFilePropertyMap(file),true,true,true);
+	FREE_MAP(_filePropertyMap,owner);
+	return result;
+}
+*/
+
+static Mstring* _permissionsText(mode_t perms){Mallocationowner owner=getOwner(__LINE__);
+	Mstring *_result=owned_string(__string(),owner);
+	if(_result!=NULL){
+		Mstring* p=string_append_char(_result,(perms & S_IRUSR) ? 'r' : '-');
+		p=string_append_char(_result,(perms & S_IWUSR) ? 'w' : '-');
+		p=string_append_char(_result,(perms & S_IXUSR) ? 'x' : '-');
+		p=string_append_char(_result,(perms & S_IRGRP) ? 'r' : '-');
+		p=string_append_char(_result,(perms & S_IWGRP) ? 'w' : '-');
+		p=string_append_char(_result,(perms & S_IXGRP) ? 'x' : '-');
+		p=string_append_char(_result,(perms & S_IROTH) ? 'r' : '-');
+		p=string_append_char(_result,(perms & S_IWOTH) ? 'w' : '-');
+		p=string_append_char(_result,(perms & S_IXOTH) ? 'x' : '-');
+		if(NULL==p){FREE_STRING(_result,owner);return NULL;}
+	}
+	return disowned_string(_result,owner);
+}
 /**
  * @brief updates the stats stored of \p file stored in file->stat calling the C stat() function
  * @details stores 0 in file->staterrno on success, or the error number (from errno) on failure
  * @param file 
  */
-void fUpdateStats(Mfile * const file){
+void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwner(__LINE__);
 	if(file!=NULL&&file->_name!=NULL){
 		int stat_errno=file->staterrno; // the current status of the stats info
 		file->staterrno=(stat(string(file->_name),&file->stat)!=0?errno:0); // failure, some error occurred
+		if(file->staterrno==0){
+			///if(report){
+				/*
+				Mstring* _fileInfoText=owned_string(_fInfoText(file),owner);
+				if(_fileInfoText!=NULL){output("File '%s' stats: %s\n",string(_fileInfoText));FREE_STRING(_fileInfoText,owner);}
+				*/
+				struct passwd *pwd;struct group *grp;char datestring[256];struct tm *tm;
+				output("File '%s':\n",string(file->_name));
+				output("  permissions:");
+				Mstring* _permissions=owned_string(_permissionsText(file->stat.st_mode),owner);if(_permissions!=NULL){output(" %10.10s",string(_permissions));FREE_STRING(_permissions,owner);}
+				output(" (%o)\n",file->stat.st_mode);
+
+				output("  link       : '%4d'\n",file->stat.st_nlink);
+				
+				if((pwd=getpwuid(file->stat.st_uid))!=NULL)output("  user       : %-8.8s\n",pwd->pw_name);else output("  user       : %-8d\n",file->stat.st_uid);
+				
+				if((grp=getgrgid(file->stat.st_gid))!=NULL)output("  group      : %-8.8s\n",grp->gr_name);else output("  group      : %-8d\n",file->stat.st_gid);
+				
+				output("  size       : %llu\n",file->stat.st_size);
+				
+				tm=localtime(&file->stat.st_mtime);strftime(datestring,sizeof(datestring),nl_langinfo(D_T_FMT),tm);
+				output("  modified   : %s\n",datestring);
+			////}
+		}
 		if(stat_errno!=file->staterrno){ // some change
 			if(file->staterrno)
-				output("%s%s (error code: %d) in file '%s'.\n",M_ERROR_PREFIX,strerror(file->staterrno),file->staterrno,string(file->_name));
+				output("%s%s (error code: %d) updating the status information of file '%s'.\n",M_ERROR_PREFIX,strerror(file->staterrno),file->staterrno,string(file->_name));
 			else
 				output("The status information of file '%s' updated successfully.\n",string(file->_name));
 		}
@@ -2177,22 +2230,24 @@ void free_file(Mfile* _file){
  * @param _file the pointer to the M file
  * @param mode the mode in which to open the M file
  */
-void openFile(Mfile* _file,Mallocationowner owner_file,char* mode){
-	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
+void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report){
+	//////bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
 	// only open when defined and currently not open
-	if(_file!=NULL&&mode!=NULL){ // valid input
+	if(_file!=NULL&&mode!=NULL&&*mode){ // valid input
 		if(_file->_f==NULL){ // not opened yet
-			output("Opening file '%s' in mode '%s'.\n",string(_file->_name),mode);
-			if(_file->staterrno<0)fUpdateStats(_file);
+			if(report)
+				output("Opening file '%s' in mode '%s'.\n",string(_file->_name),mode);
+			if(_file->staterrno<0)fUpdateStats(_file,report);
 			if(_file->staterrno>0||!S_ISDIR(_file->stat.st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
 				//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 				_file->_f=fopen(string(_file->_name),mode);
 				if(_file->_f!=NULL){ // now opened
 					if(report)
 						output("'%s' opened!\n",string(_file->_name));
-					_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
+					// TODO find a better way to copy *mode
+					_file->mode[0]=*mode;if(*mode){_file->mode[1]=*(++mode);if(*mode){_file->mode[2]=*(++mode);if(*mode)_file->mode[3]='\0';}} // register the opening mode (which consists of exactly three characters)
 					// update stat (even if already set, because the file existed to start with)
-					fUpdateStats(_file); // TODO or should we just make the staterrno dirty?
+					_file->staterrno=INT_MIN; // replacing: fUpdateStats(_file); // TODO or should we just make the staterrno dirty?
 					/*
 					if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner_file,1));
 					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);

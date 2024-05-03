@@ -3002,19 +3002,19 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 							if(_token->expr->argument==-3){ // already reached the total number of expected arguments
 								newTokenType=TT_ERROR;
 								if(!onInput||inputErrorFunction)
-								if(onInput)(*inputErrorFunction)("Another argument not allowed.");else outputError("Another argument not allowed");
+								if(onInput)(*inputErrorFunction)("Another argument not allowed.");// else outputError("Another argument not allowed");
 							}else{
 								_token->expr->argument=_token->expr->argument+1;
 								if(amVerboseDebugging())
 								if(!onInput||inputInfoFunction)
 								if(onInput)(*inputInfoFunction)("Number of expected arguments: %lld.",-_token->expr->argument-3);
-								else output("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
+								//else output("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
 							}
 							//////outputChar('P');
 						}else{
 							if(!onInput||inputInfoFunction)
 							if(onInput)(*inputInfoFunction)("Number of expected arguments unknown!");
-							else output("Number of expected arguments unknown!\n");
+							//else output("Number of expected arguments unknown!\n");
 						}
 					}else
 					if(_token->expr->type!=TT_LIST&&_token->expr->type!=TT_MAP&&_token->expr->type!=TT_EXPRESSION){
@@ -3176,8 +3176,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool on
 		if(tokenType!=TT_ERROR&&_newCommandToken->type==TT_ERROR){
 			if(onInput)
 				if(inputErrorFunction)(*inputErrorFunction)("Assumed new error token type corrected!\n");else;
-			else
-				outputError("Assumed new error token type corrected");
+			//else outputError("Assumed new error token type corrected");
 		}
 		setTokenType(_newCommandToken,tokenType);
 	}else
@@ -14448,7 +14447,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return NULL;
 			}
-			if(!completedValueFunction(_Menvironment,owner,"exists",Mexists)
+			if(!completedValueFunction(_Menvironment,owner,"vexists",Mvexists)
 					||!completedValueFunction(_Menvironment,owner,"numeric",Misnumeric)
 					||!completedValueFunction(_Menvironment,owner,"list",Misalist)
 					||!completedValueFunction(_Menvironment,owner,"scalar",Mscalar)
@@ -14562,11 +14561,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!completedValueFunction(_Menvironment,owner,"file",Mnewfile)
 				||!completedValueFunction(_Menvironment,owner,"fdelete",Mfdelete)
 				||!completedValueFunction(_Menvironment,owner,"files",Mfiles)
+				||!completedValueFunction(_Menvironment,owner,"exists",Mexists)
+				||!completedValueFunction(_Menvironment,owner,"fexists",Mfexists)
+				||!completedValueValueFunction(_Menvironment,owner,"open",Mopen)
 				||!completedValueValueFunction(_Menvironment,owner,"fopen",Mfopen)
 				||!completedValueFunction(_Menvironment,owner,"fclose",Mfclose)
 				||!completedValueValueFunction(_Menvironment,owner,"fread",Mfread)
 				||!completedValueFunction(_Menvironment,owner,"freadline",Mfreadline)
-				||!completedValueValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
+				||!completedValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
 				||!completedValueValueFunction(_Menvironment,owner,"fwrite",Mfwrite)
 				||!completedValueValueFunction(_Menvironment,owner,"fwriteline",Mfwriteline)
 				||!completedValueValueFunction(_Menvironment,owner,"fwritelines",Mfwritelines)){
