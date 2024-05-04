@@ -4628,12 +4628,15 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 					FREE_STRING(_filename,owner);
 				}
 			}
-
 			if(_file->_f!=NULL){ // the file is currently open
 				// show the mode the file was opened in
-				if(_file->_mode!=NULL)
-					appendedToMap(_map,owner,"mode",_getTextValue(_file->_mode));
-				else
+				if(_file->_mode!=NULL){
+					Mstring* _filemode=owned_string(_getString("'"),owner);
+					string_append(_filemode,_file->_mode);
+					//////output("File mode: '%s'.\n",_file->_mode);
+					appendedToMap(_map,owner,"mode",_getTextValue(string(_filemode)));
+					FREE_STRING(_filemode,owner);
+				}else
 					outputBug("File mode of opened file vanished!");
 				/* replacing:
 				Mstring* _openmode=owned_string(_getString("'"),owner);
@@ -4791,14 +4794,18 @@ Mvalue* _getValueOfFile(Mfile const * const _file){
  * @return true 
  * @return false 
  */
-static bool isFileReadable(Mfile* _file){
-	if(_file!=NULL){
-		if(_file->_f!=NULL)
-			return(_file->_mode[1]=='+'||_file->_mode[2]=='+'||_file->_mode[0]!='w'); // an open file is readable if it can be read from
+bool isFileReadable(Mfile const * const _file){
+	if(NULL==_file)return false;
+	if(_file->_f!=NULL){ // an open file
+		int l=strlen(_file->_mode);
+		if((_file->_mode[0]!='w')||(l>1&&_file->_mode[1]=='+')||(l>2&&_file->_mode[2]=='+'))
+			return true;
+	}else{ // not an opened file!!
 		// an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
 		// I suppose an open file is also readable when it has not been opened in write-only mode
 		if(_file->staterrno<0)fUpdateStats(_file,false);
-		return(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&R_OK);
+		if(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&R_OK)
+			return true;
 	}
 	return false;
 }
@@ -4809,12 +4816,15 @@ static bool isFileReadable(Mfile* _file){
  * @return true 
  * @return false 
  */
-static bool isFileWriteable(Mfile* _file){
-	if(_file!=NULL){
-		if(_file->_f!=NULL)
-			return(_file->_mode[1]=='+'||_file->_mode[2]=='+'||_file->_mode[0]!='r');
+bool isFileWriteable(Mfile const * const _file){
+	if(NULL==_file)return false;
+	if(_file->_f!=NULL){
+		int l=strlen(_file->_mode);
+		return((_file->_mode[0]!='r')&&(l>1&&_file->_mode[1]=='+')||(l>2&&_file->_mode[2]=='+'));
+	}else{
 		if(_file->staterrno<0)fUpdateStats(_file,false);
-		return(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&W_OK);
+		if(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&W_OK)
+			return true;
 	}
 	return false;
 	// a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
@@ -4922,7 +4932,7 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * op
 					if(file->_mode!=NULL){free(file->_mode);file->_mode=NULL;}
 					if(file->_f!=NULL){ // successfully opened the file in mode 'mode'
 						file->_mode=_strdup(mode); // register the actual mode the file was opened in
-						result=M_TRUE;
+						if(file->_mode!=NULL)result=M_TRUE;else outputError("Failed to set the file mode");
 					}
 					/* replacing and augmenting:
 					_file->_f=fopen(string(_file->_name),mode);
@@ -4966,9 +4976,8 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 	if(file!=NULL){
 		// before checking the mode to see if the file can be read from, we might need to open it
 		// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
-		if(file->staterrno<0)fUpdateStats(file,true);
-		if(file->staterrno==0&&!S_ISDIR(file->stat.st_mode)){ // an existing file
-			if(file->_f!=NULL){ // and opened
+		if(file->_f!=NULL){ // and opened
+			if(isFileReadable(file)){ // and readable
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
 				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 				// if the file can be read from, we do
@@ -4986,10 +4995,11 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 					}
 				}
 			}else
-				outputError("Can't read from unopened file");
+				output("%sCan't read from '%s': it is not readable.\n",M_ERROR_PREFIX,string(file->_name));
 		}else
-			output("%sFile '%s' does not exist!",M_ERROR_PREFIX,string(file->_name));
-	}
+			output("%sCan't read from file '%s': it is not open.\n",M_ERROR_PREFIX,string(file->_name));
+	}else
+		outputError("No file specified to read from");
 	return NULL;
 }
 /**
@@ -5001,15 +5011,50 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _bytesRead=NULL;
 	if(file!=NULL){
-		if(file->staterrno<0)fUpdateStats(file,true);
-		if(file->staterrno==0&&!S_ISDIR(file->stat.st_mode)){ // an existing file
-			////////if(NULL==file->_f)openFile(file,owner_file,"r+");
-			if(file->_f!=NULL){
+		if(file->_f!=NULL){
+			if(isFileReadable(file)){
 				// if the file is not binary and can be read from
 				if(file->_f!=NULL&&file->_mode[2]!='b'&&(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
 						_bytesRead=owned_string(_getString("'"),owner); // NO do NOT start the string with a single quote for create a Mtext from it
 						if(_bytesRead!=NULL){
+							// _bytesRead->_chars is a pointer to a Mchars which basically is simply a char array
+							// of course getline() will allocate memory for the characters which might not be a multiple
+							// of what blocks would do!!!
+							// TODO can we write the characters read directly into _bytesRead->_chars????
+							char* _lineRead=NULL;
+							size_t len=0;
+							ssize_t nread;
+							nread=getline(&_lineRead,&len,file->_f);
+							bool failed=true;
+							if(nread!=-1){
+								output("Number of characters read: %d.\n",len);
+								// we have to remove the end-of-line characters
+								// this means we have to look for '\n'
+								while(len-->0&&_lineRead[len]!='\n');
+								if(len>0||_lineRead[len]=='\n'){
+									if(len>1&&_lineRead[len-1]=='\r')
+										_lineRead[len-1]='\0';
+									else
+										_lineRead[len]='\0';
+								}
+								/* replacing:
+								char* p=(_lineRead+len);
+								while(len>0&&!*p){len--;p--;}; // skip all '\0'
+								while(len-->0){
+									p--;
+									if(*p!=13&&*p!=10)break;
+									*p='\0';
+								}
+								*/
+								if(string_append(_bytesRead,_lineRead)!=NULL)
+									failed=false;
+							}
+							if(failed){
+								FREE_STRING(_bytesRead,owner);_bytesRead=NULL;
+							}
+							free(_lineRead);
+							/* replacing: reading the line one character at a time
 							Mstring* p=_bytesRead;
 							// the file could be empty to start with
 							int c=0;
@@ -5029,17 +5074,18 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 								p=string_append_char(p,c);
 								if(NULL==p){outputError("Failed to read all text line characters");break;}
 							}
-							/* MDH@30APR2024: since we didn't break on '\r' there's no need to actually do the following anymore
-							// skip the optional linefeed following any carriage return, if something else push back again
-							if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
-							*/
+							///* MDH@30APR2024: since we didn't break on '\r' there's no need to actually do the following anymore
+							//// skip the optional linefeed following any carriage return, if something else push back again
+							//if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
 							if(NULL==p){FREE_STRING(_bytesRead,owner);return NULL;}
+							*/
 						}
 					}
 				}
 			}else
-				outputError("Can't read from an unopened file");
-		}
+				output("%sCan't read a line from file '%s': it is not readable.\n",M_ERROR_PREFIX,string(file->_name));
+		}else
+			output("Can't read a line from file '%s': it is not open.\n",M_ERROR_PREFIX,string(file->_name));
 		/* not here!!
 		// if the file is disowned (which it will be if it was created)
 		if(Misdisowned(file)){

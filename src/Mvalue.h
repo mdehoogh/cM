@@ -573,7 +573,8 @@ long long fExists(Mfile * const file,bool report);
 long long fDeleted(Mfile * const file,Mallocationowner owner_file);
 long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * openmodeSpec,bool allowExistingWrite,bool report);
 long long fClosed(Mfile * const file,Mallocationowner owner_file);
-
+bool isFileReadable(Mfile const * const _file);
+bool isFileWriteable(Mfile const * const _file);
 Mstring* fRead(Mfile const * const file,long long numberOfBytes);
 Mstring* fReadLine(Mfile const * const file);
 Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report);

@@ -1880,8 +1880,8 @@ Mstring* _getStringOfChars(char const * const chars,char quoteChar){Mallocationo
 			p=string_append(p,chars);
 			p=string_append_char(p,quoteChar);
 		}
-		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}else
-		output("Unescaped text of '%s': '%s'.\n",chars,string(_stringText));
+		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}
+		///else output("Unescaped text of '%s': '%s'.\n",chars,string(_stringText));
 	}
 	return disowned_string(_stringText,owner);
 }
@@ -1958,6 +1958,7 @@ Mstring* _getStringOfText(Mtext const * const _text,bool dequoted){if(NULL==_tex
 			}
 		}
 		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}
+		////else output("Unescaped text of '%c%s': '%s'.\n",_test->presuffix,_text->_c,string(_stringText));
 	}
 	return disowned_string(_stringText,owner);
 }/* VALIDATED */
@@ -2223,6 +2224,7 @@ void free_file(Mfile* _file){
 		if(_file->_f!=NULL)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
 		////if(_file->_stat!=NULL){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
 		if(_file->_name!=NULL){FREE_1(_file->_name,'S');_file->_name=NULL;}
+		if(_file->_mode!=NULL){free(_file->_mode);_file->_mode=NULL;} // MDH@04MAY2024: _file->_mode is currently unmanaged!!
 		FREE_1(_file,'F');
 	}
 }

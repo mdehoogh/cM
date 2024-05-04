@@ -19,7 +19,7 @@ extern char const * const M_WARNING_PREFIX;
  */
 char* _strdup(char const * const _c){Mallocationowner owner=getOwner(__LINE__);
 	char* _hc=NULL;
-	if(_c){
+	if(_c!=NULL){
 			size_t l=strlen(_c)+1;
 			_hc=MALLOC(sizeof(char),l,-'"',owner); // a single character
 			// replacing: char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
