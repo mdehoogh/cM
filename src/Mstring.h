@@ -92,4 +92,7 @@ size_t string_trailing(Mstring* str,char c);
 
 bool string_endswith(Mstring const * const str,char const * const pc);
 
+// MDH@05MAY2024: reading a line of characters directly into an Mstring from an open file (similar to what getline() would)
+Mstring* string_freadline(Mstring * const str,FILE* const file);
+
 #endif /* __MSTRING_H__ */

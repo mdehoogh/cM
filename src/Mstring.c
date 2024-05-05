@@ -463,6 +463,22 @@ Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc){
 }
 
 /**
+ * @brief adds a block of characters to \p str
+ * 
+ * @param str the valid M string to add a block of characters to
+ * @return true on success
+ * @return false on failure
+ */
+static bool string_blockappended(Mstring* const str){
+	Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
+	if(NULL==new_chars)return false;
+	////////printf("resized!\n");
+	++(str->blocks);
+	str->_chars=new_chars;
+	return true;
+}
+
+/**
  * @brief appends character \p c to the Mstring pointed to by \p str
  * 
  * @param str the Mstring*
@@ -477,11 +493,14 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
 			if(l==getNumberOfChars(str)){
 				////////printf("Realloc string_append_char()...");
 				// size_t sizeOfChars=getSizeOfChars(str);
+				if(!string_blockappended(str))return NULL;
+				/* replacing:
 				Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
 				if(NULL==new_chars)return NULL;
 				////////printf("resized!\n");
 				++(str->blocks);
 				str->_chars=new_chars;
+				*/
 				/* replacing:
 				char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
 				if (!new_str)return NULL; // failure!!
@@ -490,13 +509,59 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
 				*/
 				////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);
 			}
-			if(l>=getNumberOfChars(str))return NULL;
+			//// not needed anymore!!! if(l>=getNumberOfChars(str))return NULL;
 			str->_chars->chars[str->length]=c; // MDH@17APR2020 replacing: str->chars[str->length]=c;
 			++(str->length);
 		}
 		// MDH@21JUN2019 removing: str->chars[str->length]='\0';
 	}
 	return str;
+}
+
+// MDH@05MAY2024: reading a text line directly into an Mstring
+/**
+ * @brief appends the characters read from \p file up until the next end-of-line directly into \p str
+ * 
+ * @param str the Mstring to read into
+ * @param file the file to read from
+ * @return Mstring* \p str on success, NULL otherwise
+ */
+Mstring* string_freadline(Mstring * const str,FILE* const file){
+	if(str!=NULL&&str->_chars!=NULL){ // str is valid
+		if(file!=NULL&&!feof(file)){ // file is defined and there's stuff to read from it
+			// how many characters can we fit in the current block
+			size_t numberOfStrChars=str->length; // where we are in the block (we should overwrite the \0 at the end)
+			// if the current block is full, append a new block
+			if(numberOfStrChars>0&&((numberOfStrChars+1)%M_BLOCK_CHARACTERS)==0)if(!string_blockappended(str))return NULL; // failed to allocate a new block
+			size_t charsRead,nonEOLNchars,leftInBlock=getNumberOfChars(str)-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
+			while(leftInBlock){
+				char* insertPosition=(str->_chars->chars+numberOfStrChars); // the address of where to insert new characters (the position of the NUL terminator)
+				charsRead=fread(insertPosition,1,leftInBlock,file); // read at most leftInBlock characters from file
+				if(charsRead<=0)break;
+				nonEOLNchars=0; // the number of characters left to search for '\n'
+				// locate the end-of-line i.e. the '\n' then we know we are done
+				while(nonEOLNchars<charsRead&&*insertPosition!='\n'){insertPosition++;nonEOLNchars++;}
+				if(nonEOLNchars<charsRead){ // end-of-line found
+					numberOfStrChars+=nonEOLNchars;
+					// is there a CR in front of it?
+					if(numberOfStrChars>1&&*(insertPosition-1)=='\r')numberOfStrChars--;
+					break;
+				}
+				// end-of-line character not found
+				numberOfStrChars+=charsRead;
+				// if the block is full, try to append another block
+				if(charsRead>=leftInBlock){
+					if(!string_blockappended(str))return NULL;
+					leftInBlock=M_BLOCK_CHARACTERS;
+				}else
+					leftInBlock-=charsRead;
+			}
+			str->length=numberOfStrChars;
+			// we must be able to place the NUL character therefore if the string buffer is full a block should be appended for sure
+			if(numberOfStrChars<getNumberOfChars(str)||string_blockappended(str))return str;
+		}
+	}
+	return NULL;
 }
 
 // MDH@12JUL2019: we can set a specific char which should only fail if pos is larger than the length

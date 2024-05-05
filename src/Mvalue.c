@@ -5018,6 +5018,11 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
 						_bytesRead=owned_string(_getString("'"),owner); // NO do NOT start the string with a single quote for create a Mtext from it
 						if(_bytesRead!=NULL){
+							if(string_freadline(_bytesRead,file->_f)==NULL){
+								outputError("Failed to read the line directly");
+								FREE_STRING(_bytesRead,owner);_bytesRead=NULL;
+							}
+							/* replacing:
 							// _bytesRead->_chars is a pointer to a Mchars which basically is simply a char array
 							// of course getline() will allocate memory for the characters which might not be a multiple
 							// of what blocks would do!!!
@@ -5038,15 +5043,14 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 									else
 										_lineRead[len]='\0';
 								}
-								/* replacing:
-								char* p=(_lineRead+len);
-								while(len>0&&!*p){len--;p--;}; // skip all '\0'
-								while(len-->0){
-									p--;
-									if(*p!=13&&*p!=10)break;
-									*p='\0';
-								}
-								*/
+								///* replacing:
+								//char* p=(_lineRead+len);
+								//while(len>0&&!*p){len--;p--;}; // skip all '\0'
+								//while(len-->0){
+								//	p--;
+								//	if(*p!=13&&*p!=10)break;
+								//	*p='\0';
+								//}
 								if(string_append(_bytesRead,_lineRead)!=NULL)
 									failed=false;
 							}
@@ -5054,6 +5058,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 								FREE_STRING(_bytesRead,owner);_bytesRead=NULL;
 							}
 							free(_lineRead);
+							*/
 							/* replacing: reading the line one character at a time
 							Mstring* p=_bytesRead;
 							// the file could be empty to start with
