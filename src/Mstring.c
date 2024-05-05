@@ -5,6 +5,7 @@
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //				TODO if blocks is zero failed to 
 extern unsigned long long M_MODULE_DEBUGGING;
+extern char* M_ERROR_PREFIX;
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_STRING,id};}
 
@@ -533,16 +534,29 @@ Mstring* string_freadline(Mstring * const str,FILE* const file){
 			size_t numberOfStrChars=str->length; // where we are in the block (we should overwrite the \0 at the end)
 			// if the current block is full, append a new block
 			if(numberOfStrChars>0&&((numberOfStrChars+1)%M_BLOCK_CHARACTERS)==0)if(!string_blockappended(str))return NULL; // failed to allocate a new block
-			size_t charsRead,nonEOLNchars,leftInBlock=getNumberOfChars(str)-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
+			size_t charsRead,leftInBlock=getNumberOfChars(str)-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
+			long long EOLNchars;
+			/*
+			fpos_t fpos;
+			if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
+			*/
 			while(leftInBlock){
 				char* insertPosition=(str->_chars->chars+numberOfStrChars); // the address of where to insert new characters (the position of the NUL terminator)
 				charsRead=fread(insertPosition,1,leftInBlock,file); // read at most leftInBlock characters from file
-				if(charsRead<=0)break;
-				nonEOLNchars=0; // the number of characters left to search for '\n'
-				// locate the end-of-line i.e. the '\n' then we know we are done
-				while(nonEOLNchars<charsRead&&*insertPosition!='\n'){insertPosition++;nonEOLNchars++;}
-				if(nonEOLNchars<charsRead){ // end-of-line found
-					numberOfStrChars+=nonEOLNchars;
+				if(charsRead<=0)break; // failure
+				// '\n' may appear at any of the positions in the block (insertPosition up until insertPosition+charsRead-1), or not
+				EOLNchars=charsRead; // the number of characters left to search for '\n'
+				// locate the first end-of-line character i.e. the '\n' then we know we are done
+				while(EOLNchars&&*insertPosition!='\n'){insertPosition++;EOLNchars--;}
+				if(EOLNchars){ // end-of-line found
+					numberOfStrChars+=(charsRead-EOLNchars);
+					// essential to return to the start of the following line (of which part may have been read)
+					if(fseek(file,1L-EOLNchars,SEEK_CUR))
+						output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars);
+					/*else{
+						output("Moved the file cursor %lld positions back.\n",EOLNchars);
+						if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
+					}*/
 					// is there a CR in front of it?
 					if(numberOfStrChars>1&&*(insertPosition-1)=='\r')numberOfStrChars--;
 					break;
