@@ -534,25 +534,33 @@ Mstring* string_freadline(Mstring * const str,FILE* const file){
 			size_t numberOfStrChars=str->length; // where we are in the block (we should overwrite the \0 at the end)
 			// if the current block is full, append a new block
 			if(numberOfStrChars>0&&((numberOfStrChars+1)%M_BLOCK_CHARACTERS)==0)if(!string_blockappended(str))return NULL; // failed to allocate a new block
-			size_t charsRead,leftInBlock=getNumberOfChars(str)-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
-			long long EOLNchars;
+			size_t numberOfChars=getNumberOfChars(str); // the total number of characters we can store
+			size_t charsRead,leftInBlock=numberOfChars-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
+			//long int charsOnLine;
+			long int EOLNchars;
 			/*
 			fpos_t fpos;
 			if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
 			*/
+			char* insertPosition; // char *firstInvalidPosition=(str->_chars->chars+numberOfChars),*firstInsertPosition,*eolnPosition;
 			while(leftInBlock){
-				char* insertPosition=(str->_chars->chars+numberOfStrChars); // the address of where to insert new characters (the position of the NUL terminator)
+				insertPosition=(str->_chars->chars+numberOfStrChars); // the address of where to insert new characters (the position of the NUL terminator)
 				charsRead=fread(insertPosition,1,leftInBlock,file); // read at most leftInBlock characters from file
 				if(charsRead<=0)break; // failure
 				// '\n' may appear at any of the positions in the block (insertPosition up until insertPosition+charsRead-1), or not
-				EOLNchars=charsRead; // the number of characters left to search for '\n'
 				// locate the first end-of-line character i.e. the '\n' then we know we are done
+				/*
+				eolnPosition=firstInsertPosition;
+				while(eolnPosition!=firstInvalidPosition&&*eolnPosition!='\n')eolnPosition++;
+				charsOnLine=(eolnPosition-firstInsertPosition);
+				*/
+				EOLNchars=charsRead; // the number of characters left to search for '\n'
 				while(EOLNchars&&*insertPosition!='\n'){insertPosition++;EOLNchars--;}
-				if(EOLNchars){ // end-of-line found
-					numberOfStrChars+=(charsRead-EOLNchars);
+				if(EOLNchars>0){ // replacing: charsOnLine<charsRead){ // end-of-line found
+					numberOfStrChars+=(charsRead-EOLNchars); // replacing: charsOnLine;
 					// essential to return to the start of the following line (of which part may have been read)
-					if(fseek(file,1L-EOLNchars,SEEK_CUR))
-						output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars);
+					if(fseek(file,1L-EOLNchars/* replacing: (charsRead-charsOnLine)*/,SEEK_CUR))
+						output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars); // replacing: (charsRead-charsOnLine));
 					/*else{
 						output("Moved the file cursor %lld positions back.\n",EOLNchars);
 						if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
@@ -566,6 +574,7 @@ Mstring* string_freadline(Mstring * const str,FILE* const file){
 				// if the block is full, try to append another block
 				if(charsRead>=leftInBlock){
 					if(!string_blockappended(str))return NULL;
+					/////firstInvalidPosition+=M_BLOCK_CHARACTERS;
 					leftInBlock=M_BLOCK_CHARACTERS;
 				}else
 					leftInBlock-=charsRead;

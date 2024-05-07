@@ -8,5 +8,3 @@ long long isBigintegerPositive(Mbiginteger const * const biginteger);
 long long isBigintegerNegative(Mbiginteger const * const biginteger);
 
 long long isBigintegerZero(Mbiginteger const * const biginteger);
-
-long long getBigintegerInteger(Mbiginteger const * const biginteger);

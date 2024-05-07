@@ -244,6 +244,8 @@ long long isIntegerZero(Minteger* integer);
 long long isIntegerPositive(Minteger* integer);
 long long isIntegerNegative(Minteger* integer);
 
+long long getBigintegerInteger(Mbiginteger const * const biginteger);
+
 // direct long double functions
 long double ldShift(long double ld,long long shift); // 'shifting' a double means either doubling or halving a number of times
 

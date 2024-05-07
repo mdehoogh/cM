@@ -240,6 +240,33 @@ const Mbiginteger* getBigintegerTwo(){if(bi2==NULL)bi2=owned_biginteger(_getBigi
  */
 const Mbiginteger* getBigintegerThree(){if(bi3==NULL)bi3=owned_biginteger(_getBiginteger(3),owner_biginteger);return bi3;}/* VALIDATED */
 
+// MDH@24OCT2019: we need a method that can convert a big integer to an integer
+// TODO probably best to move this to Mbiginteger.c/h NO we need it here so we can use it in Mvalue.c/h
+/**
+ * @brief get the long long equivalent of big integer \p biginteger
+ * @details returns M_LL_INVALID on failure
+ * @param biginteger 
+ * @return long long the equivalent of big integer \p biginteger
+ */
+long long getBigintegerInteger(Mbiginteger const * const biginteger){
+	long long result=M_LL_INVALID;
+	if(biginteger!=NULL){
+		if(amVerboseDebugging())
+			outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
+		if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&
+				mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+			result=mp_get_i64(MP_INT_POINTER(biginteger));
+			if(amVerboseDebugging())
+				outputInfo("Big integer converted to a small integer.");
+		}else
+			if(amVerboseDebugging())
+				outputInfo("Big integer cannot be converted to a small integer.");
+	}
+	if(amVerboseDebugging())
+		output("Small integer result: %lld.\n",result);
+	return result;
+}
+
 /**
  * @brief returns long integer value 1 if the M big integer pointed to by \p biginteger equals 1, otherwise 0, or M_LL_INVALID if the \p biginteger is NULL
  * 
@@ -2224,7 +2251,12 @@ void free_file(Mfile* _file){
 		if(_file->_f!=NULL)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
 		////if(_file->_stat!=NULL){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
 		if(_file->_name!=NULL){FREE_1(_file->_name,'S');_file->_name=NULL;}
-		if(_file->_mode!=NULL){free(_file->_mode);_file->_mode=NULL;} // MDH@04MAY2024: _file->_mode is currently unmanaged!!
+		if(_file->_mode!=NULL){
+			output("File mode '%s'",_file->_mode);
+			FREE(_file->_mode,1+strlen(_file->_mode),-'"'); // _file->_mode was assigned using _strdup() which IS managed!!! so don't use free()
+			output(" freed!\n");
+			_file->_mode=NULL;
+		} // MDH@04MAY2024: _file->_mode is currently unmanaged!!
 		FREE_1(_file,'F');
 	}
 }
@@ -2244,6 +2276,7 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report){
 				output("Opening file '%s' in mode '%s'.\n",string(_file->_name),mode);
 			if(_file->staterrno<0)fUpdateStats(_file,report);
 			if(_file->staterrno>0||!S_ISDIR(_file->stat.st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
+				output("Opening file '%s'.\n",string(_file->_name));
 				//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 				_file->_f=fopen(string(_file->_name),mode);
 				if(_file->_f!=NULL){ // now opened
@@ -2254,7 +2287,8 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report){
 					_file->mode[0]=*mode;if(*mode){_file->mode[1]=*(++mode);if(*mode){_file->mode[2]=*(++mode);if(*mode)_file->mode[3]='\0';}} // register the opening mode (which consists of exactly three characters)
 					*/
 					// update stat (even if already set, because the file existed to start with)
-					_file->staterrno=INT_MIN; // replacing: fUpdateStats(_file); // TODO or should we just make the staterrno dirty?
+					fUpdateStats(_file,report);
+					///_file->staterrno=INT_MIN; // replacing: fUpdateStats(_file); // TODO or should we just make the staterrno dirty?
 					/*
 					if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner_file,1));
 					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);

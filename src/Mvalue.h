@@ -596,6 +596,8 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue); // reads all 
 Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue);
 Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineTextValue);
 Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue);
+Mvalue* Mfpos(Mvalue* fileValue);
+Mvalue* Mfseek(Mvalue* fileValue,Mvalue* positionValue);
 
 Mvalue* Mfiles(Mvalue* wildcard_value);
 

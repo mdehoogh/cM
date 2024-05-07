@@ -1704,7 +1704,8 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 	// if variable is undefined, return -1
 	if(result==0){
 		if(NULL==variable){
-			if(report>0)output("'%s' does not exist.",name);else if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' does not exist.",name);
+			/////if(report>0)output("'%s' does not exist.",name);else 
+			if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' does not exist.",name);
 			result=-1;
 		}
 	}
@@ -1713,11 +1714,13 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 		// if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
 		logToOutputFile("Looking for function '%s'.\n",name);
 		if(representsAFunction(variable)){
-			if(report>0)output("'%s' holds a function, not a value.\n",name);else if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' holds a function, not a value.\n",name);
+			////if(report>0)output("'%s' holds a function, not a value.\n",name);else 
+			if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' holds a function, not a value.\n",name);
 			result=1;
 		}else{
 			result=2;
-			if(report>0)output("'%s' exists.\n",name);else if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' exists.\n",name);
+			///if(report>0)output("'%s' exists.\n",name);else 
+			if(report<0&&inputInfoFunction!=NULL)(*inputInfoFunction)("'%s' exists.\n",name);
 		}
 	}
 	logToOutputFile("Result: %d.\n",result);
@@ -14567,8 +14570,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!completedValueValueFunction(_Menvironment,owner,"fopen",Mfopen)
 				||!completedValueFunction(_Menvironment,owner,"fclose",Mfclose)
 				||!completedValueValueFunction(_Menvironment,owner,"fread",Mfread)
+				||!completedValueValueFunction(_Menvironment,owner,"fseek",Mfseek)
+				||!completedValueFunction(_Menvironment,owner,"fpos",Mfpos)
 				||!completedValueFunction(_Menvironment,owner,"freadline",Mfreadline)
-				||!completedValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
+				||!completedValueValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
 				||!completedValueValueFunction(_Menvironment,owner,"fwrite",Mfwrite)
 				||!completedValueValueFunction(_Menvironment,owner,"fwriteline",Mfwriteline)
 				||!completedValueValueFunction(_Menvironment,owner,"fwritelines",Mfwritelines)){
