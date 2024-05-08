@@ -4,8 +4,18 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <locale.h>
+#include <errno.h>
 
 #include "Mvalue.h"
+
+// in order to be able to use access to determine if a file exists
+#if defined _WIN32 || defined _WIN64 || defined __WIN32 || defined _WCE || defined MSDOS || defined __MSDOS || defined OS2 || defined _OS2 || defined __OS2___
+#include <io.h>
+#define F_OK 0
+#define access _access
+#else
+#include <unistd.h>
+#endif
 
 static bool DEBUGGING=true;
 
@@ -4659,7 +4669,7 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 
 				appendedToMap(_map,owner,"errno",_getValueOfInteger(_getInteger(_file->staterrno))); // NOTE integer returned by _getInteger freed by _getValueOfInteger when failing to wrap it
 				if(_file->staterrno>0)
-					appendedToMap(_map,owner,"error",_getValueOfText(_getStringOfChars(strerror(_file->staterrno),'\'')));
+					appendedToMap(_map,owner,"error",_getValueOfText(_getSingleQuotedText(strerror(_file->staterrno))));
 
 				struct stat filestat=_file->stat; // MDH@02MAY2024
 				// File permissions
@@ -4717,8 +4727,20 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 long long fExists(Mfile * const file,bool report){
 	long long result=M_LL_INVALID;
 	if(file!=NULL&&file->_name!=NULL){
-		if(file->staterrno<0)fUpdateStats(file,report);
+		////result=(access(file->_name,F_OK)==0?M_TRUE:M_FALSE); // TODO access() does not guarantee existence as well, probably for the same reason!!!!
+		// force updating the stats!!! if(file->staterrno<0)
+		fUpdateStats(file,report);
 		result=(file->staterrno!=0?M_FALSE:M_TRUE);
+	}
+	return result;
+}
+
+long long fIsDir(Mfile * const file,bool report){
+	long long result=M_LL_INVALID;
+	if(file!=NULL&&file->_name!=NULL){
+		// force updating the stats!!! if(file->staterrno<0)
+		fUpdateStats(file,report);
+		if(file->staterrno==0)result=(S_ISDIR(file->stat.st_mode)?M_TRUE:M_FALSE);
 	}
 	return result;
 }
@@ -5363,6 +5385,17 @@ long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite)
 	return result;
 }
 
+/**
+ * @brief returns the current position in opened file \p file
+ * @details returns M_LL_INVALID if \p file does not denote a file or is not open
+ * @param file 
+ * @return long long the current position in \p file
+ */
+static fpos_t fPosition(Mfile const * const file){
+	fpos_t filepos=M_LL_INVALID;
+	if(file!=NULL&&file->_f!=NULL)fgetpos(file->_f,&filepos);
+	return filepos;
+}
 // end file helper functions
 /**
  * @brief returns a new M value wrapping the M file stored or represented by \p file_value
@@ -5509,6 +5542,96 @@ Mvalue* Mexists(Mvalue* filenameValue){Mallocationowner owner=getOwner(__LINE__)
 	return NULL;
 }
 
+Mvalue* Misdir(Mvalue const * const filenameValue){Mallocationowner owner=getOwner(__LINE__);
+	long long result=M_LL_INVALID;
+	if(filenameValue!=NULL){
+		if(filenameValue->type==VT_TEXT){
+			Mfile* _file=owned_file(_getFile(filenameValue->value._text->_c),owner);
+			if(_file!=NULL){	
+				result=(fIsDir(_file,false)?M_TRUE:M_FALSE);
+				FREE_FILE(_file,owner);
+			}else	
+				outputError("Failed to create the temporary file object");
+		}else
+		if(filenameValue->type==VT_FILE)
+			result=(fIsDir(filenameValue->value._file,false)?M_TRUE:M_FALSE);
+		else
+			outputError("Invalid input to the isdir() function");
+	}
+	return _getIntegerValue(result);	
+}
+Mvalue* Mfisdir(Mvalue const * const fileValue){
+	return Misdir(fileValue);
+}
+
+/**
+ * @brief returns M_TRUE if nothing can be read from \p fileValue anymore, M_FALSE otherwise
+ * @details returns M_LL_INVALID when \p fileValue does not represent a file or a file that is not opened
+ * @param fileValue 
+ * @return Mvalue* M_TRUE if nothing can be read from \p fileValue anymore, M_FALSE otherwise
+ */
+Mvalue* Mfeof(Mvalue const * const fileValue){
+	long long result=M_LL_INVALID;
+	// can only be tested on an opened file
+	if(fileValue!=NULL&&fileValue->type==VT_FILE&&fileValue->value._file->_f!=NULL)
+		result=(feof(fileValue->value._file->_f)?M_TRUE:M_FALSE);
+	return _getIntegerValue(result);
+}
+/**
+ * @brief returns M_TRUE if \p fileValue denotes an opened file, M_FALSE otherwise
+ * 
+ * @param fileValue 
+ * @return Mvalue* M_TRUE if \p fileValue denotes an opened file, M_FALSE otherwise
+ */
+Mvalue* Mfisopen(Mvalue const * const fileValue){
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL&&fileValue->type==VT_FILE)
+		result=(fileValue->value._file->_f!=NULL?M_TRUE:M_FALSE);
+	return _getIntegerValue(result);
+}
+/**
+ * @brief return the size (in bytes) of \p fileValue
+ * 
+ * @param fileValue 
+ * @return Mvalue* the size (in bytes) of \p fileValue
+ */
+Mvalue* Mfsize(Mvalue const * const fileValue){
+	// if the file is open there's an easy way to do it
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL){
+		if(fileValue->type==VT_FILE){
+			Mfile* file=fileValue->value._file;
+			if(fExists(file,false)==M_TRUE){ // we know that file->stat is now up to date and contains the size of the file
+#if defined _WIN32 || defined _WIN64 || defined __WIN32 || defined _WCE || defined MSDOS || defined __MSDOS || defined OS2 || defined _OS2 || defined __OS2___
+				long long filepos=fPosition(file);
+				bool fileisopen=(filepos!=M_LL_INVALID);
+				// TODO how to deal with files opened in binary mode????
+				if(!fileisopen&&fOpened(file,getValueDataOwner(),"r",false,false)==M_TRUE)filepos=fPosition(file);
+				if(filepos!=M_LL_INVALID){ // the current position is known
+					if(fseek(file,0L,SEEK_END)==0){ // move position to the end of the file
+						result=fPosition(file); // determine the 
+						if(fseek(file,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
+					}else
+						outputError("Failed to move to the end of the file");
+				}
+				if(filepos!=M_LL_INVALID)if(!fileisopen)if(fClosed(file,getValueDataOwner())!=M_TRUE)outputError("Failed to close a temporarily opened file");
+#else
+				if(file->staterrno==0)
+					result=file->stat.st_size; // easiest way to get the size of the file
+				else
+					output("Can't obtain the size of file '%s' because of error '%s'.\n",M_ERROR_PREFIX,string(file->_name),strerror(file->staterrno));
+#endif
+			}else
+				output("%sCan't get the size of file '%s': it does not exist!\n",M_ERROR_PREFIX,string(file->_name));
+		}else
+		if(fileValue->type==VT_TEXT){
+			struct stat filestats;
+			if(stat(fileValue->value._text->_c,&filestats)==0)result=filestats.st_size;else output("%sError '%s' occurred accessing the status of file '%s'.\n",M_ERROR_PREFIX,strerror(errno),fileValue->value._text->_c);
+		}
+	}
+	return _getIntegerValue(result);
+}
+
 /*
 // reading from a file by specifying the number of bytes to read
 static void openFileForReadingText(Mfile* _file){
@@ -5535,7 +5658,8 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 	if(numberOfBytes>=0){ // only non-negative values are considered valid
 		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
 		if(_file!=NULL){
-			if(NULL==_file->_f){ // try to open the file to read from
+			bool fileisopen=(_file->_f!=NULL);
+			if(!fileisopen){ // try to open the file to read from
 				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"r",false,false)!=M_TRUE)
 					output("%sFailed to open file '%s' to read from.\n",M_ERROR_PREFIX,string(_file->_name));
 				/* replacing:
@@ -5545,12 +5669,17 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 					*/
 			}
 			if(_file->_f!=NULL){
-				// get the result of reading at most numberOfBytes bytes
-				Mstring* _bytesRead=owned_string(fRead(_file,numberOfBytes),owner); // do not forget to take over the ownership
-				if(_bytesRead!=NULL){
-					result=_getTextValue(string(_bytesRead)); // TODO this would copy what was read again, can we speed this up????
-					FREE_STRING(_bytesRead,owner);
-				}
+				if(!feof(_file->_f)){
+					// get the result of reading at most numberOfBytes bytes
+					Mstring* _bytesRead=owned_string(fRead(_file,numberOfBytes),owner); // do not forget to take over the ownership
+					if(_bytesRead!=NULL){
+						result=_getTextValue(string(_bytesRead)); // TODO this would copy what was read again, can we speed this up????
+						FREE_STRING(_bytesRead,owner);
+					}else
+						output("%sCan't read from file '%s': not enough memory available!\n",M_ERROR_PREFIX,string(_file->_name));
+				}else
+					output("%sCan't read from file '%s': end-of-file reached!\n",M_ERROR_PREFIX,string(_file->_name));
+				if(!fileisopen)if(!closeFile(_file->_f))outputError("Failed to close the temporarily opened file");
 			}
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
 		}else
@@ -5572,7 +5701,8 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 	if(fileValue!=NULL){
 		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
 		if(_file!=NULL){
-			if(NULL==_file->_f){
+			bool fileisopen=(_file->_f!=NULL);
+			if(!fileisopen){
 				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"r",false,false)!=M_TRUE)
 					output("%sFailed to open file '%s' to read a text line from.\n",M_ERROR_PREFIX,string(_file->_name));
 				/* replacing:
@@ -5583,13 +5713,18 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 					_file->_mode=_strdup("r");*/
 			}
 			if(_file->_f!=NULL){
-				output("Reading a line from '%s'.\n",string(_file->_name));
-				Mstring* _textLineRead=owned_string(fReadLine(_file),owner);
-				if(_textLineRead!=NULL){
-					output("Line read: '%s'.\n",string(_textLineRead));
-					result=_getTextValue(string(_textLineRead)); // an immutable version of the bytes obtained
-					FREE_STRING(_textLineRead,owner);
-				}
+				if(!feof(_file->_f)){
+					/////output("Reading a line from '%s'.\n",string(_file->_name));
+					Mstring* _textLineRead=owned_string(fReadLine(_file),owner);
+					if(_textLineRead!=NULL){
+						///output("Line read: '%s'.\n",string(_textLineRead));
+						result=_getTextValue(string(_textLineRead)); // an immutable version of the bytes obtained
+						FREE_STRING(_textLineRead,owner);
+					}else
+						output("%sFailed to obtain memory to read a text line from '%s' into.\n",M_ERROR_PREFIX,string(_file->_name));
+				}else
+					output("%sCan't read a text line from '%s': end-of-file reached.\n",M_ERROR_PREFIX,string(_file->_name));
+				if(!fileisopen)if(!closeFile(_file->_f))outputError("Failed to close the temporarily opened file");
 			}
 			// free the file when it was created
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
@@ -5626,19 +5761,26 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue){Mallocationown
 						_file->_mode=_strdup("r");*/
 				}
 				if(_file->_f!=NULL){
-					output("Reading text lines from '%s'.\n",string(_file->_name));
-					Mlist* _textLinesRead=owned_list(fReadLines(_file,numberOfLines,report),owner);
-					if(_textLinesRead!=NULL)result=_getValueOfList(disowned_list(_textLinesRead,owner));
+					if(!feof(_file->_f)){ // end-of-file not reached yet!!
+						output("Reading text lines from '%s'.\n",string(_file->_name));
+						fpos_t filepos=fPosition(_file); // MDH@08MAY2024: we'll need the current file position to know whether to close the file again or not
+						Mlist* _textLinesRead=owned_list(fReadLines(_file,numberOfLines,report),owner);
+						if(_textLinesRead!=NULL)result=_getValueOfList(disowned_list(_textLinesRead,owner));
+						// if we've reached the end of the file and we've read ALL lines, we close the file as a service to the user
+						if(fileValue->type==VT_FILE&&feof(_file->_f)){
+							if(filepos==0){
+								if(closeFile(_file))
+									output("File '%s' from which all text lines were read closed!\n",string(_file->_name));
+								else
+									output("%sFailed to close file '%s'!",M_ERROR_PREFIX,string(_file->_name));
+							}else
+								output("%sFile '%s' not closed, although end-of-file reached.\n",M_WARNING_PREFIX,string(_file->_name));
+						}
+					}else
+						output("%sCan't read from file '%s': end-of-file reached.\n",M_ERROR_PREFIX,string(_file->_name));
 				}else
 					output("%sCan't read from unopened file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
-				if(fileValue->type!=VT_FILE)
-					FREE_FILE(_file,owner); // opened by name
-				else // close the file if we've reached end-of-file
-				if(feof(_file->_f))
-					if(closeFile(_file))
-						output("File '%s' from which all text lines were read closed!\n",string(_file->_name));
-					else
-						outputError("Failed to close the text file!");
+				if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // opened by name, freeing should also take care of closing it
 			}else
 				outputError("No file to read from");
 		}else
@@ -5667,8 +5809,7 @@ Mvalue* Mfclose(Mvalue* fileValue){
  */
 Mvalue* Mfpos(Mvalue* fileValue){
 	Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-	fpos_t filepos=M_LL_INVALID;
-	if(_file!=NULL&&_file->_f!=NULL)fgetpos(_file->_f,&filepos);
+	fpos_t filepos=fPosition(_file);
 	return _getIntegerValue(filepos);
 }
 /**
@@ -5680,9 +5821,8 @@ Mvalue* Mfpos(Mvalue* fileValue){
  */
 Mvalue* Mfseek(Mvalue* fileValue,Mvalue* positionValue){
 	Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-	fpos_t filepos;
-	if(_file!=NULL&&_file->_f!=NULL){
-		fgetpos(_file->_f,&filepos);
+	fpos_t filepos=fPosition(_file);
+	if(filepos!=M_LL_INVALID){
 		output("The current position in file '%s' is %lld.\n",string(_file->_name),filepos);
 		fpos_t position=M_LL_INVALID;
 		if(positionValue!=NULL){

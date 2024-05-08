@@ -2154,7 +2154,8 @@ static Mstring* _fInfoText(Mfile* file){Mallocationowner owner=getOwner(__LINE__
 static Mstring* _permissionsText(mode_t perms){Mallocationowner owner=getOwner(__LINE__);
 	Mstring *_result=owned_string(__string(),owner);
 	if(_result!=NULL){
-		Mstring* p=string_append_char(_result,(perms & S_IRUSR) ? 'r' : '-');
+		Mstring* p=string_append_char(_result,(S_ISDIR(perms)) ? 'd' : ' ');
+		p=string_append_char(_result,(perms & S_IRUSR) ? 'r' : '-');
 		p=string_append_char(_result,(perms & S_IWUSR) ? 'w' : '-');
 		p=string_append_char(_result,(perms & S_IXUSR) ? 'x' : '-');
 		p=string_append_char(_result,(perms & S_IRGRP) ? 'r' : '-');
@@ -2167,6 +2168,7 @@ static Mstring* _permissionsText(mode_t perms){Mallocationowner owner=getOwner(_
 	}
 	return disowned_string(_result,owner);
 }
+
 /**
  * @brief updates the stats stored of \p file stored in file->stat calling the C stat() function
  * @details stores 0 in file->staterrno on success, or the error number (from errno) on failure
@@ -2175,7 +2177,8 @@ static Mstring* _permissionsText(mode_t perms){Mallocationowner owner=getOwner(_
 void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwner(__LINE__);
 	if(file!=NULL&&file->_name!=NULL){
 		int stat_errno=file->staterrno; // the current status of the stats info
-		file->staterrno=(stat(string(file->_name),&file->stat)!=0?errno:0); // failure, some error occurred
+		// MDH@08MAY2024: use fstat() instead of stat() on an opened file!!
+		file->staterrno=((file->_f!=NULL?fstat(file->_f,&file->stat):stat(string(file->_name),&file->stat))!=0?errno:0); // failure, some error occurred
 		if(file->staterrno==0){
 			///if(report){
 				/*
