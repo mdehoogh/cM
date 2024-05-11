@@ -2753,7 +2753,7 @@ void outputMap(char const * const prefix,Mmap const * const map,char const * con
 static Mstring* _nullValueTextRepresentation=NULL;
 Mstring* _getNullValueTextRepresentation(){if(!_nullValueTextRepresentation)_nullValueTextRepresentation=_getString(M_NULL_VALUE_TEXT_REPRESENTATION);return _getNullValueTextRepresentation;}
 */
-
+Mmap* _getFileStatPropertyMap(Mfile const * const _file); // MDH@11MAY2024
 Mmap* _getFilePropertyMap(Mfile const * const _file); // prototype
 
 /**
@@ -3288,10 +3288,9 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,c
 					// if we fail to construct the maplist element or to add it
 					// NOTE the attribute name does not start with a quote character wich we need to call _getTextValue
 					// TODO the following could be restructured I suppose
-					Mstring* _attributeName=owned_string(__string(),owner);
+					Mstring* _attributeName=owned_string(_getString("'"),owner);
 					if(_attributeName!=NULL){ // should be freed
 						Mstring* p=_attributeName;
-						p=string_append_char(p,'\'');
 						p=string_append(p,_mapelement->_variable->_name->chars);
 						if(p!=NULL){
 							Mvalue* _attributeNameValue=_getTextValue(string(_attributeName));
@@ -4620,6 +4619,112 @@ Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner own
 // Mfile support
 #include "unistd.h"
 #include "time.h"
+
+Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=getOwner(__LINE__);
+	if(_file!=NULL){
+		Mmap* _fileStatMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
+		if(_fileStatMap!=NULL){
+			// MDH@11MAY2024: force updating the stats if _file->staterrno does not equal 0, if it equals to 0 we're assuming it's up to date, but trying again even if staterrno equals errno (when positive) just in case it changed!!!
+			if(_file->staterrno!=0)fUpdateStats(_file,false); // do NOT report here, because you'd get a circular reference that way!!
+			if(_file->staterrno>=0){ // the stats have been determined!!!
+				appendedToMap(_fileStatMap,owner,"exists",_getTextValue("'yes"));
+				appendedToMap(_fileStatMap,owner,"errno",_getValueOfInteger(_getInteger(_file->staterrno))); // NOTE integer returned by _getInteger freed by _getValueOfInteger when failing to wrap it
+				if(_file->staterrno>0)
+					appendedToMap(_fileStatMap,owner,"error",_getValueOfText(_getSingleQuotedText(strerror(_file->staterrno))));
+				struct stat filestat=_file->stat; // MDH@02MAY2024
+				// File permissions
+				Mstring* _permissionsText=owned_string(_getFilePermissionsText(filestat.st_mode),owner);
+				if(_permissionsText!=NULL)
+					if(appendedToMap(_fileStatMap,owner,"permissions",_getTextValue(string(_permissionsText)))>0)
+						///output("Permissions property added to the file stat map.\n")
+						;
+				/* replacing:
+				if(_permissions!=NULL){
+					// File access property can tell us more than whether it is a directory
+					if(S_ISDIR(filestat.st_mode))string_append_char(_permissions,'d');else
+					if(S_ISREG(filestat.st_mode))string_append_char(_permissions,'f');else string_append_char(_permissions,'?');
+					 // TODO we might need to consider other types as well like links, devices and the like
+					if(filestat.st_mode & R_OK)string_append_char(_permissions,'r');
+					if(filestat.st_mode & W_OK)string_append_char(_permissions,'w');
+					if(filestat.st_mode & X_OK)string_append_char(_permissions,'x');
+					if(appendedToMap(_fileStatMap,owner,"permissions",_getTextValue(string(_permissions)))>0)
+						///output("Permissions property added to the file stat map.\n")
+						;
+					FREE_STRING(_permissions,owner);
+				}else
+					outputError("Failed to represent the file permissions");
+				*/
+				// File size property
+				Minteger* _integer=owned_integer(_getInteger(filestat.st_size),owner);
+				if(_integer!=NULL){
+					if(appendedToMap(_fileStatMap,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)))>0)
+						///output("File size added to file stat map.\n")
+					;
+				}else
+					outputError("Failed to represent the file size");
+
+				// Get file creation time in seconds and convert seconds to date and time format
+				struct tm dt = *(gmtime(&filestat.st_ctime));
+				Mstring* _created=owned_string(_getString("'"),owner);
+				if(_created!=NULL){
+					if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+					if(appendedToMap(_fileStatMap,owner,"created",_getTextValue(string(_created)))>0)
+						///output("File creation timestamp added to the file stat map.\n")
+						;
+					FREE_STRING(_created,owner);
+				}
+				// from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
+
+				// File modification time
+				dt = *(gmtime(&filestat.st_mtime));
+				Mstring* _modified=owned_string(_getString("'"),owner);
+				if(_modified!=NULL){
+					if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+					if(appendedToMap(_fileStatMap,owner,"modified",_getTextValue(string(_modified)))>0)
+						///output("File modification timestamp added to the file stat map.\n")
+						;
+					FREE_STRING(_modified,owner);
+				}
+			}else
+				appendedToMap(_fileStatMap,owner,"exists",_getTextValue("'no"));
+
+			// from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
+			return disowned_map(_fileStatMap,owner);
+		}
+	}
+	return NULL;
+}
+
+static bool fIsReadable(char const * const filename){
+	return(access(filename,R_OK)==0);
+}
+static bool fIsExecutable(char const * const filename){
+	return(access(filename,X_OK)==0);
+}
+static bool fIsWriteable(char const * const filename){
+	return(access(filename,W_OK)==0);
+}
+Mmap* _getFileAccessPropertyMap(Mfile const * const _file){Mallocationowner owner=getOwner(__LINE__);
+	if(_file!=NULL&&_file->_name!=NULL){
+		Mmap* _fileAccessMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
+		////output("Adding file access properties.\n");
+		bool fileExists=(access(string(_file->_name),F_OK)==0); // NOTE: NOT using fExists() here, because we only want to use the access() function
+		if(fileExists){
+			appendedToMap(_fileAccessMap,owner,"exists",_getTextValue("'yes"));
+			bool aRegularFile=fIsRegularFile(_file,false);
+			appendedToMap(_fileAccessMap,owner,"regularfile",_getTextValue(aRegularFile?"'yes":"'no"));
+			if(aRegularFile){
+				appendedToMap(_fileAccessMap,owner,"executable",_getTextValue((fIsExecutable(string(_file->_name))?"'yes":"'no")));
+				appendedToMap(_fileAccessMap,owner,"readable",_getTextValue((fIsReadable(string(_file->_name))?"'yes":"'no")));
+				appendedToMap(_fileAccessMap,owner,"writable",_getTextValue((fIsWriteable(string(_file->_name))?"'yes":"'no")));
+			}
+		}else
+			appendedToMap(_fileAccessMap,owner,"exists",_getTextValue("'no"));
+		return disowned_map(_fileAccessMap,owner);
+	}
+	return NULL;
+}
+
 /**
  * @brief returns a new M map containing the properties of M file \p _file
  * 
@@ -4630,22 +4735,32 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 	if(_file!=NULL){
 		Mmap* _map=owned_map(_getMapOfType(VT_UNDEFINED),owner);
 		if(_map!=NULL){
+			
 			if(_file->_name!=NULL){
+				///output("Adding the name of the file to the file property map.\n");
 				Mstring* _filename=owned_string(_getString("'"),owner);
 				if(_filename!=NULL){
-					string_append(_filename,string(_file->_name));
-					appendedToMap(_map,owner,"name",_getTextValue(string(_filename)));
+					if(string_append(_filename,string(_file->_name))!=NULL)
+						if(appendedToMap(_map,owner,"name",_getTextValue(string(_filename)))>0)
+							///output("File name added to file property map.\n")
+							;
 					FREE_STRING(_filename,owner);
 				}
 			}
+
 			if(_file->_f!=NULL){ // the file is currently open
+				///output("Adding the properties of the opened file.\n");
+				appendedToMap(_map,owner,"status",_getValueOfText(_getText("'opened")));
 				// show the mode the file was opened in
 				if(_file->_mode!=NULL){
 					Mstring* _filemode=owned_string(_getString("'"),owner);
-					string_append(_filemode,_file->_mode);
-					//////output("File mode: '%s'.\n",_file->_mode);
-					appendedToMap(_map,owner,"mode",_getTextValue(string(_filemode)));
-					FREE_STRING(_filemode,owner);
+					if(_filemode!=NULL){
+						if(string_append(_filemode,_file->_mode)!=NULL)
+							if(appendedToMap(_map,owner,"mode",_getTextValue(string(_filemode)))>0)
+								///output("File mode appended to file property map.\n")
+								;
+						FREE_STRING(_filemode,owner);
+					}
 				}else
 					outputBug("File mode of opened file vanished!");
 				/* replacing:
@@ -4658,61 +4773,28 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 					FREE_STRING(_openmode,owner);
 				}
 				*/
-				fpos_t filepos;fgetpos(_file->_f,&filepos);
+				///output("Adding the position in the file.\n");
+				fpos_t filepos=fPosition(_file);
 				Minteger* _integer=owned_integer(_getInteger(filepos),owner);
 				appendedToMap(_map,owner,"position",_getValueOfInteger(disowned_integer(_integer,owner)));
+			}else{
+				///output("Unopened file.\n");
+				appendedToMap(_map,owner,"status",_getValueOfText(_getText("'unopened")));
 			}
 
-			if(_file->staterrno<0)fUpdateStats(_file,false); // do NOT report here, because you'd get a circular reference that way!!
+			//                the information we get through calling (f)stat is placed inside the "stat" property
+			/////output("Adding file stat properties.\n");
+			Mmap* _fileStatMap=owned_map(_getFileStatPropertyMap(_file),owner);
+			if(_fileStatMap!=NULL)appendedToMap(_map,owner,"stat",_getValueOfMap(disowned_map(_fileStatMap,owner)));
 
-			if(_file->staterrno>=0){ // the stats have been determined!!!
+			// can we use access to get information on what access we can have to the 'file'???
+			Mmap* _fileAccessMap=owned_map(_getFileAccessPropertyMap(_file),owner);
+			if(_fileAccessMap!=NULL)appendedToMap(_map,owner,"access",_getValueOfMap(disowned_map(_fileAccessMap,owner)));
 
-				appendedToMap(_map,owner,"errno",_getValueOfInteger(_getInteger(_file->staterrno))); // NOTE integer returned by _getInteger freed by _getValueOfInteger when failing to wrap it
-				if(_file->staterrno>0)
-					appendedToMap(_map,owner,"error",_getValueOfText(_getSingleQuotedText(strerror(_file->staterrno))));
-
-				struct stat filestat=_file->stat; // MDH@02MAY2024
-				// File permissions
-				Mstring* _access=owned_string(_getString("'"),owner);
-				if(_access!=NULL){
-					// File access property
-					if(S_ISDIR(filestat.st_mode))string_append_char(_access,'d'); // TODO we might need to consider other types as well like links, devices and the like
-					if(filestat.st_mode & R_OK)string_append_char(_access,'r');
-					if(filestat.st_mode & W_OK)string_append_char(_access,'w');
-					if(filestat.st_mode & X_OK)string_append_char(_access,'x');
-					appendedToMap(_map,owner,"access",_getTextValue(string(_access)));
-					FREE_STRING(_access,owner);
-				}
-
-				// File size property
-				Minteger* _integer=owned_integer(_getInteger(filestat.st_size),owner);
-				if(_integer!=NULL)appendedToMap(_map,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)));
-
-				// Get file creation time in seconds and convert seconds to date and time format
-				struct tm dt = *(gmtime(&filestat.st_ctime));
-				Mstring* _created=owned_string(__string(),owner);
-				if(_created!=NULL){
-					if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
-					string_insert_char(_created,0,'\'');
-					appendedToMap(_map,owner,"created",_getTextValue(string(_created)));
-					FREE_STRING(_created,owner);
-				}
-				// from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
-
-				// File modification time
-				dt = *(gmtime(&filestat.st_mtime));
-				Mstring* _modified=owned_string(__string(),owner);
-				if(_modified!=NULL){
-					if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
-					string_insert_char(_modified,0,'\'');
-					appendedToMap(_map,owner,"modified",_getTextValue(string(_modified)));
-					FREE_STRING(_modified,owner);
-				}
-			}
-			// from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
 			return disowned_map(_map,owner);
-		
-		}
+
+		}else
+			outputError("Failed to create the file property map");
 	}
 	return NULL;
 
@@ -4729,7 +4811,7 @@ long long fExists(Mfile * const file,bool report){
 	if(file!=NULL&&file->_name!=NULL){
 		////result=(access(file->_name,F_OK)==0?M_TRUE:M_FALSE); // TODO access() does not guarantee existence as well, probably for the same reason!!!!
 		// force updating the stats!!! if(file->staterrno<0)
-		fUpdateStats(file,report);
+		if(file->staterrno!=0)fUpdateStats(file,report);
 		result=(file->staterrno!=0?M_FALSE:M_TRUE);
 	}
 	return result;
@@ -4739,10 +4821,17 @@ long long fIsDir(Mfile * const file,bool report){
 	long long result=M_LL_INVALID;
 	if(file!=NULL&&file->_name!=NULL){
 		// force updating the stats!!! if(file->staterrno<0)
-		fUpdateStats(file,report);
+		if(file->staterrno!=0)fUpdateStats(file,report); // a chance to become zero!!!
 		if(file->staterrno==0)result=(S_ISDIR(file->stat.st_mode)?M_TRUE:M_FALSE);
 	}
 	return result;
+}
+long long fIsRegularFile(Mfile * const file,bool report){
+	long long result=M_LL_INVALID;
+	if(file!=NULL){
+		if(file->staterrno!=0)fUpdateStats(file,report); // a chance to become zero!!!
+		if(file->staterrno==0)result=(S_ISREG(file->stat.st_mode)?M_TRUE:M_FALSE);
+	}
 }
 
 /**
@@ -4755,11 +4844,13 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 	Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
 	// the file might not exist in which case we could get rid of _file->_stat???
 	if(_file!=NULL){
-		_file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
-		if(NULL==_file->_name)
-			output("%sFailed to set the name of the file to '%s'.\n",M_ERROR_PREFIX,filename);
-		else
-			fUpdateStats(_file,false); // MDH@02MAY2024: initialization of the stats delegated to fUpdateStats()
+		if(filename!=NULL&&strlen(filename)){
+			_file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
+			if(NULL==_file->_name)
+				output("%sFailed to set the name of the file to '%s'.\n",M_ERROR_PREFIX,filename);
+			else
+				fUpdateStats(_file,false); // MDH@02MAY2024: initialization of the stats delegated to fUpdateStats()
+		}
 		/*
 		// MDH@01MAY2024: if the file exists we want statistics!!!
 		if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner,1)); // no need to disown here!!!!
@@ -4773,19 +4864,32 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 	return NULL;
 }
 /**
- * @brief returns the M file wrapped in M value \p file_value
+ * @brief returns the M file wrapped in M value \p filenameValue
  * 
- * @param file_value 
- * @return Mfile* the M file wrapped in M value \p file_value
+ * @param filenameValue 
+ * @return Mfile* the M file wrapped in M value \p filenameValue
  */
-static Mfile* _getValueFile(Mvalue const * const file_value){
-	if(file_value){
-		if(file_value->type==VT_FILE)
-			return file_value->value._file;
-		if(file_value->type==VT_TEXT) // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
-			if(file_value->value._text!=NULL)
-				return _getFile(file_value->value._text->_c);
-	}
+static Mfile* _getFileWithName(Mvalue const * const filenameValue){
+	if(filenameValue!=NULL){
+		/* don't actually want this!!!
+		if(filenameValue->type==VT_FILE)
+			return filenameValue->value._file;
+		*/
+		if(filenameValue->type==VT_TEXT) // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
+			if(filenameValue->value._text!=NULL){
+				char* filename=filenameValue->value._text->_c;
+				if(filename!=NULL){
+					output("Creating file with name '%s'.\n",filename);
+					Mfile* _file=_getFile(filename);
+					if(_file!=NULL)return _getFile(filename);
+					output("%sFailed to create a file object with name '%s'.\n",M_ERROR_PREFIX,filename);
+				}else
+					outputError("Vanished filename");
+			}else
+				outputError("Filename undefined");
+		outputError("Assumed filename of wrong type");
+	}else
+		outputError("No filename specified");
 	return NULL;
 }
 /**
@@ -5391,20 +5495,20 @@ long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite)
  * @param file 
  * @return long long the current position in \p file
  */
-static fpos_t fPosition(Mfile const * const file){
+fpos_t fPosition(Mfile const * const file){
 	fpos_t filepos=M_LL_INVALID;
 	if(file!=NULL&&file->_f!=NULL)fgetpos(file->_f,&filepos);
 	return filepos;
 }
 // end file helper functions
 /**
- * @brief returns a new M value wrapping the M file stored or represented by \p file_value
+ * @brief returns a new M value wrapping the M file stored or represented by \p filenameValue
  * 
- * @param file_value 
- * @return Mvalue* a new M value wrapping the M file stored or represented by \p file_value
+ * @param filenameValue 
+ * @return Mvalue* a new M value wrapping the M file stored or represented by \p filenameValue
  */
-Mvalue* Mnewfile(Mvalue* file_value){
-	return(NULL==file_value||file_value->type==VT_FILE?file_value:_getValueOfFile(_getValueFile(file_value)));
+Mvalue* Mnewfile(Mvalue const * const filenameValue){
+	return(filenameValue!=NULL?(filenameValue->type==VT_FILE?filenameValue:_getValueOfFile(_getFileWithName(filenameValue))):NULL);
 }
 
 // things we can do with an Mfile
@@ -5423,6 +5527,39 @@ Mvalue* Mfdelete(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 		if(_file!=NULL&&fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // release the created file
 	}
 	return _getIntegerValue(result);
+}
+/**
+ * @brief returns M_TRUE if \p fileValue represents a regular file, M_FALSE otherwise
+ * 
+ * @param fileValue 
+ * @return Mvalue* M_TRUE if \p fileValue represents a regular file, M_FALSE otherwise
+ */
+Mvalue* Mfisfile(Mvalue const * const fileValue){Mallocationowner owner=getOwner(__LINE__);
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL){
+		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
+		if(_file!=NULL){
+			result=fIsRegularFile(_file,false);
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // release the created file
+		}
+	}
+	return _getIntegerValue(result);
+}
+/**
+ * @brief returns the file stat property map
+ * 
+ * @param fileValue 
+ * @return Mvalue* the file stat property map
+ */
+Mvalue* Mfstat(Mvalue const * const fileValue){Mallocationowner owner=getOwner(__LINE__);
+	if(fileValue!=NULL){
+		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
+		Mmap* _fileStatPropertyMap=owned_map(_getFileStatPropertyMap(_file),owner);
+		if(_file!=NULL&&fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // release the created file
+		if(_fileStatPropertyMap!=NULL)
+			return _getValueOfMap(disowned_map(_fileStatPropertyMap,owner));
+	}
+	return NULL;
 }
 
 /**
@@ -5672,7 +5809,7 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 				if(!feof(_file->_f)){
 					// get the result of reading at most numberOfBytes bytes
 					Mstring* _bytesRead=owned_string(fRead(_file,numberOfBytes),owner); // do not forget to take over the ownership
-					if(_bytesRead!=NULL){
+					if(_bytesRead!=NULL){ // a single quoted text!!!
 						result=_getTextValue(string(_bytesRead)); // TODO this would copy what was read again, can we speed this up????
 						FREE_STRING(_bytesRead,owner);
 					}else
@@ -5716,7 +5853,7 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 				if(!feof(_file->_f)){
 					/////output("Reading a line from '%s'.\n",string(_file->_name));
 					Mstring* _textLineRead=owned_string(fReadLine(_file),owner);
-					if(_textLineRead!=NULL){
+					if(_textLineRead!=NULL){ // a single quoted string
 						///output("Line read: '%s'.\n",string(_textLineRead));
 						result=_getTextValue(string(_textLineRead)); // an immutable version of the bytes obtained
 						FREE_STRING(_textLineRead,owner);
@@ -5994,8 +6131,11 @@ Mvalue* Mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
 					Mstring* _filename=owned_string(_getString("'"),owner);
 					if(_filename!=NULL){
 						// let's NOT prepend the directory name!!!! string_append(_filename,directoryname);
-						string_append(_filename,en->d_name);
-						appendedToList(files_list,owner,_getTextValue(string(_filename)),M_LL_INVALID);
+						if(string_append(_filename,en->d_name)!=NULL){
+							if(appendedToList(files_list,owner,_getTextValue(string(_filename)),M_LL_INVALID)<=0)
+								outputError("Failed to append the name of a list");
+						}else
+							outputError("Failed to construct the name of a file");
 						FREE_STRING(_filename,owner);
 					}
 				}

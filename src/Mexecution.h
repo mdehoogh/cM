@@ -335,3 +335,5 @@ void free_time(Mtime* _time);
 #define FREE_TIME(_time,owner_time) free_time(disowned_time(_time,owner_time))
 
 long long getTimeLongLong(Mtime* _time);
+
+Mstring* _getFilePermissionsText(mode_t perms);

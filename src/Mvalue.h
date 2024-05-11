@@ -568,6 +568,8 @@ Mvalue* _getValueOfFile(Mfile const * const _file);
 //////void fUpdateStats(Mfile* file);
 long long fExists(Mfile * const file,bool report);
 long long fIsDir(Mfile * const file,bool report);
+long long fIsRegularFile(Mfile * const file,bool report);
+fpos_t fPosition(Mfile const * const file);
 
 // MDH@30APR2024: internal equivalents of the M interpreter file functions
 // use _getFile() instead!!! Mfile* __file(char const * const filename);
@@ -585,7 +587,7 @@ long long fWriteText(Mfile const * const file,Mtext const * const towrite,bool w
 // long long fWriteLine(Mfile const * const file,Mstring * const towrite); // return amount of bytes not written
 long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite); // returns the number of lines not written
 
-Mvalue* Mnewfile(Mvalue* filenameValue);
+Mvalue* Mnewfile(Mvalue const * const filenameValue);
 Mvalue* Mfdelete(Mvalue* fileValue);
 Mvalue* Mfexists(Mvalue* fileValue);
 Mvalue* Mexists(Mvalue* filenameValue);
@@ -605,7 +607,8 @@ Mvalue* Mfisopen(Mvalue const * const fileValue);
 Mvalue* Mfeof(Mvalue const * const fileValue);
 Mvalue* Mfisdir(Mvalue const * const fileValue);
 Mvalue* Misdir(Mvalue const * const filenameValue);
-
+Mvalue* Mfisfile(Mvalue const * const fileValue);
+Mvalue* Mfstat(Mvalue const * const fileValue);
 Mvalue* Mfiles(Mvalue* wildcard_value);
 
 // MDH@08DEC2020

@@ -2151,8 +2151,8 @@ static Mstring* _fInfoText(Mfile* file){Mallocationowner owner=getOwner(__LINE__
 }
 */
 
-static Mstring* _permissionsText(mode_t perms){Mallocationowner owner=getOwner(__LINE__);
-	Mstring *_result=owned_string(__string(),owner);
+Mstring* _getFilePermissionsText(mode_t perms){Mallocationowner owner=getOwner(__LINE__);
+	Mstring *_result=owned_string(_getString("'"),owner);
 	if(_result!=NULL){
 		Mstring* p=string_append_char(_result,(S_ISDIR(perms)) ? 'd' : ' ');
 		p=string_append_char(_result,(perms & S_IRUSR) ? 'r' : '-');
@@ -2188,7 +2188,12 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
 				struct passwd *pwd;struct group *grp;char datestring[256];struct tm *tm;
 				output("File '%s':\n",string(file->_name));
 				output("  permissions:");
-				Mstring* _permissions=owned_string(_permissionsText(file->stat.st_mode),owner);if(_permissions!=NULL){output(" %10.10s",string(_permissions));FREE_STRING(_permissions,owner);}
+				Mstring* _permissionsText=owned_string(_getFilePermissionsText(file->stat.st_mode),owner);
+				if(_permissionsText!=NULL){
+					output(" %10.10s",string_remainder(_permissionsText,1));
+					FREE_STRING(_permissionsText,owner);
+				}
+
 				output(" (%o)\n",file->stat.st_mode);
 
 				output("  link       : '%4d'\n",file->stat.st_nlink);
@@ -2209,7 +2214,11 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
 			else
 				output("The status information of file '%s' updated successfully.\n",string(file->_name));
 		}
-	}
+	}else
+	if(file!=NULL)
+		outputError("Cannot update the file stats of an unnamed file");
+	else
+		outputError("No file specified");
 }
 
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
