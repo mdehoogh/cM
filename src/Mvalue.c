@@ -4707,7 +4707,7 @@ Mmap* _getFileAccessPropertyMap(Mfile const * const _file){Mallocationowner owne
 	if(_file!=NULL&&_file->_name!=NULL){
 		Mmap* _fileAccessMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
 		////output("Adding file access properties.\n");
-		bool fileExists=(access(string(_file->_name),F_OK)==0); // NOTE: NOT using fExists() here, because we only want to use the access() function
+		bool fileExists=(fExists(_file,false)==M_TRUE); // NOTE: NOT using fExists() here, because we only want to use the access() function
 		if(fileExists){
 			appendedToMap(_fileAccessMap,owner,"exists",_getTextValue("'yes"));
 			bool aRegularFile=fIsRegularFile(_file,false);
@@ -4806,31 +4806,76 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
  * @return long long M_TRUE when \p file exists, M_FALSE when it does not, or M_LL_INVALID when \p file it is not a (named) file
  */
 long long fExists(Mfile * const file,bool report){
-	long long result=M_LL_INVALID;
 	if(file!=NULL&&file->_name!=NULL){
-		////result=(access(file->_name,F_OK)==0?M_TRUE:M_FALSE); // TODO access() does not guarantee existence as well, probably for the same reason!!!!
+		if(access(file->_name,F_OK)==0)return M_TRUE; // the file or directory exists
+		// ASSERT the file or directory does not exist
+		if(report){
+			switch(errno){
+				case EACCES:output("%s'The permissions specified by amode (%d) are denied, or search permission is denied on a component of the path prefix",M_ERROR_PREFIX,F_OK);break;
+				case EINTR:output("%s'Interrupted by a signal",M_ERROR_PREFIX);break;
+				case EINVAL:output("%s'Invalid amode (%d)",M_BUG_PREFIX,F_OK);break;
+				case ELOOP:output("%s'Too many levels of symbolic links or prefixes",M_ERROR_PREFIX);break;
+				case ENAMETOOLONG:output("%s'The length of the file/directory name exceeds %d, or one of the parts of the file/directory name is longer than %d",M_ERROR_PREFIX,PATH_MAX,NAME_MAX);break;
+				case ENOENT:output("%s'A component of the path isn't valid",M_ERROR_PREFIX);break;
+				case ENOSYS:output("%s'The access() function isn't implemented for the filesystem underlying the file/directory specified");break;
+				case ENOTDIR:output("%s'A component of the path isn't a directory",M_ERROR_PREFIX);break;
+				case EROFS:output("%s'Write access was requested for a file residing on a read-only file system",M_ERROR_PREFIX);break;
+			}
+			output("' checking for the existence of file/directory '%s'.\n",string(file->_name));
+		}
+		return M_FALSE;
+		/* replacing:
+		result=(access(file->_name,F_OK)==0?M_TRUE:M_FALSE); // TODO access() does not guarantee existence as well, probably for the same reason!!!!
 		// force updating the stats!!! if(file->staterrno<0)
 		if(file->staterrno!=0)fUpdateStats(file,report);
 		result=(file->staterrno!=0?M_FALSE:M_TRUE);
+		*/
 	}
-	return result;
+	return M_LL_INVALID;
 }
-
+/**
+ * @brief returns M_TRUE when M file \p file denotes an existing directory, M_FALSE otherwise
+ * @details returns M_LL_INVALID when \p file equals NULL or does not have a name
+ * @param file 
+ * @param report 
+ * @return long long M_TRUE when \p file denotes an existing directory, M_FALSE or M_LL_INVALID (see @details) otherwise 
+ */
 long long fIsDir(Mfile * const file,bool report){
-	long long result=M_LL_INVALID;
-	if(file!=NULL&&file->_name!=NULL){
-		// force updating the stats!!! if(file->staterrno<0)
-		if(file->staterrno!=0)fUpdateStats(file,report); // a chance to become zero!!!
-		if(file->staterrno==0)result=(S_ISDIR(file->stat.st_mode)?M_TRUE:M_FALSE);
+	long long result=fExists(file,report); 
+	// file needs to exist as prerequisite to testing whether it is a directory
+	if(result==M_TRUE){ // an existing file/directory
+		if(file->staterrno!=0){
+			fUpdateStats(file,report); // a chance to become zero!!!
+			if(file->staterrno!=0){
+				output("%sExisting file '%s' failed to update the file stats of file/directory '%s'.\n");
+				result=M_FALSE;
+			}
+		}
+		if(result==M_TRUE&&!S_ISDIR(file->stat.st_mode))result=M_FALSE;
 	}
 	return result;
 }
+/**
+ * @brief returns M_TRUE when M file \p file denotes an existing file, M_FALSE otherwise
+ * @details returns M_LL_INVALID when \p file equals NULL or does not have a name
+ * @param file 
+ * @param report 
+ * @return long long M_TRUE when \p file denotes an existing file, M_FALSE or M_LL_INVALID (see @details) otherwise 
+ */
 long long fIsRegularFile(Mfile * const file,bool report){
-	long long result=M_LL_INVALID;
-	if(file!=NULL){
-		if(file->staterrno!=0)fUpdateStats(file,report); // a chance to become zero!!!
-		if(file->staterrno==0)result=(S_ISREG(file->stat.st_mode)?M_TRUE:M_FALSE);
+	long long result=fExists(file,report); 
+	// file needs to exist as prerequisite to testing whether it is a directory
+	if(result==M_TRUE){ // an existing file/directory
+		if(file->staterrno!=0){
+			fUpdateStats(file,report); // a chance to become zero!!!
+			if(file->staterrno!=0){
+				output("%sExisting file '%s' failed to update the file stats of file/directory '%s'.\n");
+				result=M_FALSE;
+			}
+		}
+		if(result==M_TRUE&&!S_ISDIR(file->stat.st_mode))result=M_FALSE;
 	}
+	return result;
 }
 
 /**
@@ -4845,10 +4890,13 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 	if(_file!=NULL){
 		if(filename!=NULL&&strlen(filename)){
 			_file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
-			if(NULL==_file->_name)
+			if(NULL==_file->_name){
 				output("%sFailed to set the name of the file to '%s'.\n",M_ERROR_PREFIX,filename);
-			else
-				fUpdateStats(_file,false); // MDH@02MAY2024: initialization of the stats delegated to fUpdateStats()
+				FREE_FILE(_file,owner);
+				return NULL;
+			}
+			fUpdateStats(_file,false); // MDH@02MAY2024: initialization of the stats delegated to fUpdateStats()
+			return disowned_file(_file,owner);
 		}
 		/*
 		// MDH@01MAY2024: if the file exists we want statistics!!!
@@ -4858,7 +4906,6 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 		}else
 			outputError("Unable to obtain the file stats");
 		*/
-		return disowned_file(_file,owner);
 	}
 	return NULL;
 }
@@ -4874,19 +4921,16 @@ static Mfile* _getFileWithName(Mvalue const * const filenameValue){
 		if(filenameValue->type==VT_FILE)
 			return filenameValue->value._file;
 		*/
-		if(filenameValue->type==VT_TEXT) // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
+		if(filenameValue->type==VT_TEXT){ // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
 			if(filenameValue->value._text!=NULL){
 				char* filename=filenameValue->value._text->_c;
-				if(filename!=NULL){
-					output("Creating file with name '%s'.\n",filename);
-					Mfile* _file=_getFile(filename);
-					if(_file!=NULL)return _getFile(filename);
-					output("%sFailed to create a file object with name '%s'.\n",M_ERROR_PREFIX,filename);
-				}else
-					outputError("Vanished filename");
+				Mfile* _file=_getFile(filename);
+				if(_file!=NULL)return _file;
+				output("%sFailed to create a file object with name '%s'.\n",M_ERROR_PREFIX,filename);
 			}else
-				outputError("Filename undefined");
-		outputError("Assumed filename of wrong type");
+				outputBug("Filename vanished");
+		}else
+			outputError("Assumed filename of wrong type");
 	}else
 		outputError("No filename specified");
 	return NULL;
@@ -4913,45 +4957,76 @@ Mvalue* _getValueOfFile(Mfile const * const _file){
 }
 
 /**
- * @brief returns true if M file \p _file is readable, false otherwise
- * 
+ * @brief returns M_TRUE if M file \p _file is an existing and readable file, M_FALSE or M_LL_INVALID otherwise
+ * @details returns M_LL_INVALID when \p _file does not denote an existing file
  * @param _file 
- * @return true 
- * @return false 
+ * @return M_TRUE if M file \p _file is an existing and readable file, M_FALSE or M_LL_INVALID otherwise
  */
-bool isFileReadable(Mfile const * const _file){
-	if(NULL==_file)return false;
-	if(_file->_f!=NULL){ // an open file
-		int l=strlen(_file->_mode);
-		if((_file->_mode[0]!='w')||(l>1&&_file->_mode[1]=='+')||(l>2&&_file->_mode[2]=='+'))
+long long isFileReadable(Mfile const * const _file,bool report){
+	long long result=M_LL_INVALID;
+	if(_file!=NULL){
+		if(_file->_f!=NULL){ // an open file
+			// we may inspect the mode in which the file was opened to determine if it is readable or not
+			int l=strlen(_file->_mode);
+			result=((_file->_mode[0]!='w')||(l>1&&_file->_mode[1]=='+')||(l>2&&_file->_mode[2]=='+')?M_TRUE:M_FALSE);
+		}else{ // not an opened file!!
+			// anything that is not an existing regular file is not considered readable
+			result=fIsRegularFile(_file,report); // NOTE will call fExists() as well
+			if(result==M_TRUE&&!access(_file->_name,R_OK))result=M_FALSE;
+			/* replacing:
+			// an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
+			// I suppose an open file is also readable when it has not been opened in write-only mode
+			if(_file->staterrno<0)fUpdateStats(_file,false);
+			if(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&R_OK)
 			return true;
-	}else{ // not an opened file!!
-		// an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
-		// I suppose an open file is also readable when it has not been opened in write-only mode
-		if(_file->staterrno<0)fUpdateStats(_file,false);
-		if(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&R_OK)
-			return true;
-	}
-	return false;
+			*/
+		}
+	}else
+	if(report)
+		outputError("No file specified to determine the readability of");
+	return result;
 }
 /**
- * @brief returns true if \p _file is writable, false otherwise
- * 
+ * @brief returns M_TRUE if \p _file is a writable file, M_FALSE or M_LL_INVALID otherwise
+ * @details returns M_LL_INVALID if \p _file does not denote an existing file
  * @param _file 
- * @return true 
- * @return false 
+ * @return M_TRUE if \p _file is a writable file, M_FALSE or M_LL_INVALID otherwise
  */
-bool isFileWriteable(Mfile const * const _file){
+long long isFileWriteable(Mfile const * const _file,bool report){
+	long long result=M_LL_INVALID;
+	if(_file!=NULL){
+		if(_file->_f!=NULL){ // an open file
+			// we may inspect the mode in which the file was opened to determine if it is readable or not
+			int l=strlen(_file->_mode);
+			result=((_file->_mode[0]!='r')||(l>1&&_file->_mode[1]=='+')||(l>2&&_file->_mode[2]=='+')?M_TRUE:M_FALSE);
+		}else{ // not an opened file!!
+			// anything that is not an existing regular file is not considered readable
+			result=fIsRegularFile(_file,report); // NOTE will call fExists() as well
+			if(result==M_TRUE&&!access(_file->_name,W_OK))result=M_FALSE;
+			/* replacing:
+			// an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
+			// I suppose an open file is also readable when it has not been opened in write-only mode
+			if(_file->staterrno<0)fUpdateStats(_file,false);
+			if(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&R_OK)
+			return true;
+			*/
+		}
+	}else
+	if(report)
+		outputError("No file specified to determine the readability of");
+	return result;
+	/* replacing:
 	if(NULL==_file)return false;
 	if(_file->_f!=NULL){
 		int l=strlen(_file->_mode);
-		return((_file->_mode[0]!='r')&&(l>1&&_file->_mode[1]=='+')||(l>2&&_file->_mode[2]=='+'));
+		return((_file->_mode[0]!='r')||(l>1&&_file->_mode[1]=='+')||(l>2&&_file->_mode[2]=='+'));
 	}else{
 		if(_file->staterrno<0)fUpdateStats(_file,false);
 		if(_file->staterrno==0&&!S_ISDIR(_file->stat.st_mode)&&_file->stat.st_mode&W_OK)
 			return true;
 	}
 	return false;
+	*/
 	// a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
 }
 
@@ -4963,11 +5038,20 @@ bool isFileWriteable(Mfile const * const _file){
  * @return M_TRUE on success
  * @return M_FALSE on failure
  */
-long long fDeleted(Mfile * const file,Mallocationowner owner_file){
+long long fDeleted(Mfile * const _file,Mallocationowner owner_file){
 	// can only delete an existing file that is not currently open
 	bool result=M_LL_INVALID;
-	if(file!=NULL&&file->_name!=NULL){
-		if(NULL==file->_f){ // a file with a name that is not currently open
+	if(_file!=NULL&&_file->_name!=NULL){
+		if(NULL==_file->_f){ // a file with a name that is not currently open
+			result=fIsRegularFile(_file,true);
+			if(result==M_TRUE){
+				if(remove(string(_file->_name))){ // failure because remove() returns 0 on success
+					result=M_FALSE;
+					output("%sFailed to delete file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+				}
+			}else
+				output("%sCan't delete '%s': it is not a regular (existing) file.\n",M_ERROR_PREFIX,string(_file->_name));
+			/* replacing:
 			// if remove returns a non-zero value, removing the file failed!!!!
 			if(file->staterrno<0)fUpdateStats(file,true);
 			if(file->staterrno==0){
@@ -4975,24 +5059,27 @@ long long fDeleted(Mfile * const file,Mallocationowner owner_file){
 				if(result==M_TRUE){
 					// we may assume the file no longer exists, so we should fail getting the stats
 					file->staterrno=INT_MIN; // indicating that the stats are now dirty
-					/* replacing:
-					if(stat(string(file->_name),file->_stat)!=0){
-						FREE_DISOWNED_1(file->_stat,'f',owner_file);
-						file->_stat=NULL;
-					}else
-						outputError("Failed to remove the stats of the deleted file");
-					*/
+					////* replacing:
+					///if(stat(string(file->_name),file->_stat)!=0){
+					///	FREE_DISOWNED_1(file->_stat,'f',owner_file);
+					///	file->_stat=NULL;
+					///}else
+					///	outputError("Failed to remove the stats of the deleted file");
+					///
 				}else // failure, so the stats stay!!!
 					output("%sFailed to delete file '%s'.",M_ERROR_PREFIX,string(file->_name));
 			}else{
 				result=M_TRUE; // safe to return true as well!!!
 				output("%sFile '%s' cannot be deleted: it does not exist!\n",M_ERROR_PREFIX,string(file->_name));
 			}
+			*/
 		}else
-			output("%sIt is not allowed to delete an opened file '%s'!\n",M_ERROR_PREFIX,string(file->_name));
+			output("%sIt is not allowed to delete an opened file '%s'!\n",M_ERROR_PREFIX,string(_file->_name));
 	}else
-	if(file!=NULL)
+	if(_file!=NULL)
 		outputError("Cannot delete an unnamed file");
+	else
+		outputError("No file to delete specified");
 	return result;
 }
 /**
@@ -5103,7 +5190,7 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 		// before checking the mode to see if the file can be read from, we might need to open it
 		// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 		if(file->_f!=NULL){ // and opened
-			if(isFileReadable(file)){ // and readable
+			if(isFileReadable(file,false)){ // and readable
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
 				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 				// if the file can be read from, we do
@@ -5140,7 +5227,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 	Mstring* _bytesRead=NULL;
 	if(file!=NULL){
 		if(file->_f!=NULL){
-			if(isFileReadable(file)){
+			if(isFileReadable(file,false)){
 				// if the file is not binary and can be read from
 				if(file->_mode[1]!='b'&&(strlen(file->_mode)<3||file->_mode[2]!='b')){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
@@ -5242,7 +5329,7 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 	if((numberOfLines==M_LL_INVALID||numberOfLines>0)&&file!=NULL){
 		output("About to read lines from file '%s'.\n",string(file->_name));
 		if(file->_f!=NULL){
-			if(isFileReadable(file)){
+			if(isFileReadable(file,false)){
 				// before checking the mode to see if the file can be read from, we might need to open it
 				// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
@@ -5500,7 +5587,28 @@ fpos_t fPosition(Mfile const * const file){
 	if(file!=NULL&&file->_f!=NULL)fgetpos(file->_f,&filepos);
 	return filepos;
 }
+long long fSetPosition(Mfile const * const file,fpos_t newposition){
+	long long result=M_LL_INVALID;
+	if(file!=NULL&&file->_f!=NULL){
+		result=M_FALSE;
+		if(newposition>=0){
+			fpos_t position;fgetpos(file->_f,&position);
+			if(newposition>position){
+				// we do not want to allow moving beyond the end of the file but we need to know what the end-of-file position is
+				if(fseek(file->_f,0L,SEEK_END)==0){ // managed to move to end-of-file
+					fpos_t filesize;fgetpos(file->_f,&filesize); // store the last possible file position in filesize
+					// if we're supposed to jump after the end-of-file nothing to do, otherwise we move there!!!
+					if(newposition>=filesize||fseek(file->_f,newposition,SEEK_SET)==0)result=M_TRUE;
+				}
+			}else
+				if(fseek(file->_f,newposition,SEEK_SET)==0)result=M_TRUE;
+		}else // moves the file cursor position back but won't move it beyond the start of the file
+			if(fseek(file->_f,newposition,SEEK_CUR)==0)result=M_TRUE;
+	}
+	return result;
+}
 // end file helper functions
+
 /**
  * @brief returns a new M value wrapping the M file stored or represented by \p filenameValue
  * 
@@ -5558,6 +5666,46 @@ Mvalue* Mfstat(Mvalue const * const fileValue){Mallocationowner owner=getOwner(_
 		if(_file!=NULL&&fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // release the created file
 		if(_fileStatPropertyMap!=NULL)
 			return _getValueOfMap(disowned_map(_fileStatPropertyMap,owner));
+	}
+	return NULL;
+}
+/**
+ * @brief returns the type of the file \p fileValue
+ * 
+ * @param fileValue 
+ * @return Mvalue* the type of the file \p fileValue
+ */
+Mvalue* Mftype(Mvalue const * const fileValue){Mallocationowner owner=getOwner(__LINE__);
+	if(fileValue!=NULL){
+		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
+		if(fIsRegularFile(_file,true)==M_TRUE){
+			Mstring* _typetext=owned_string(_getString("'"),owner);
+			bool success=false;
+			if(_typetext!=NULL){
+				fUpdateStats(_file,true);
+				if(_file->staterrno==0){
+					if(S_ISDIR(_file->stat.st_mode)){if(string_append(_typetext,"directory")!=NULL)success=true;}else
+					if(S_ISCHR(_file->stat.st_mode)){if(string_append(_typetext,"character special file")!=NULL)success=true;}else
+					if(S_ISBLK(_file->stat.st_mode)){if(string_append(_typetext,"block special file")!=NULL)success=true;}else
+					if(S_ISREG(_file->stat.st_mode)){if(string_append(_typetext,"file")!=NULL)success=true;}else
+					if(S_ISFIFO(_file->stat.st_mode)){if(string_append(_typetext,"FIFO special file/pipe")!=NULL)success=true;}else
+					if(S_ISLNK(_file->stat.st_mode)){if(string_append(_typetext,"symbolic link")!=NULL)success=true;}else
+					if(S_ISSOCK(_file->stat.st_mode)){if(string_append(_typetext,"socket")!=NULL)success=true;}
+					else output("%sUnknown file type '%d'.\n",M_ERROR_PREFIX,_file->stat.st_mode);
+				}
+			}else
+				outputError("Failed to create the file type text representation");
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // release the created file
+			if(_typetext!=NULL){
+				Mvalue* result=(success?_getValueOfText(_getText(string(_typetext))):NULL);
+				FREE_STRING(_typetext,owner);
+				if(result!=NULL)return result;
+			}
+		}else
+		if(_file!=NULL)
+			output("%sCan't determine the type of the file: '%s' is not an existing regular file.\n",M_ERROR_PREFIX,string(_file->_name));
+		else
+			outputError("No file specified");
 	}
 	return NULL;
 }
@@ -6001,10 +6149,33 @@ Mvalue* Mfclose(Mvalue* fileValue){
  * @param fileValue the wrapper of the opened file
  * @return Mvalue* the current file position
  */
-Mvalue* Mfpos(Mvalue* fileValue){
+Mvalue* Mfpos(Mvalue const * const fileValue){
 	Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
 	fpos_t filepos=fPosition(_file);
 	return _getIntegerValue(filepos);
+}
+/**
+ * @brief sets the current position in file \p fileValue to \p newpositionValue
+ * 
+ * @param fileValue 
+ * @param newpositionValue 
+ * @return Mvalue* the current file position on sucess, M_LL_INVALID on failure
+ */
+Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue){
+	long long result=M_LL_INVALID;
+	if(newpositionValue!=NULL&&(newpositionValue->type==VT_INTEGER||newpositionValue->type==VT_BIGINTEGER)){
+		Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
+		if(_file!=NULL&&_file->_f!=NULL){
+			long long newposition=getValueInteger(newpositionValue); // TODO newpositionValue should be a valid integer somehow
+			if(newposition!=M_LL_INVALID&&fSetPosition(_file,newposition)==M_TRUE)result=fPosition(_file);
+		}else
+		if(_file!=NULL)
+			outputError("No open file specified");
+		else
+			outputError("No file specified");
+	}else
+		outputError("No or an invalid position specified");
+	return _getIntegerValue(result);
 }
 /**
  * @brief sets the file position in \p fileValue to \p positionValue

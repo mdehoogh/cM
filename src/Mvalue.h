@@ -569,7 +569,10 @@ Mvalue* _getValueOfFile(Mfile const * const _file);
 long long fExists(Mfile * const file,bool report);
 long long fIsDir(Mfile * const file,bool report);
 long long fIsRegularFile(Mfile * const file,bool report);
+long long isFileReadable(Mfile const * const _file,bool report);
+long long isFileWriteable(Mfile const * const _file,bool report);
 fpos_t fPosition(Mfile const * const file);
+long long fSetPosition(Mfile const * const file,fpos_t position);
 
 // MDH@30APR2024: internal equivalents of the M interpreter file functions
 // use _getFile() instead!!! Mfile* __file(char const * const filename);
@@ -577,8 +580,6 @@ long long fDeleted(Mfile * const file,Mallocationowner owner_file);
 long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * openmodeSpec,bool allowExistingWrite,bool report);
 long long fClosed(Mfile * const file,Mallocationowner owner_file);
 //////// now static!!! fpos_t fPosition(Mfile const * const file); // returns the current position in the file
-bool isFileReadable(Mfile const * const _file);
-bool isFileWriteable(Mfile const * const _file);
 Mstring* fRead(Mfile const * const file,long long numberOfBytes);
 Mstring* fReadLine(Mfile const * const file);
 Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report);
@@ -600,7 +601,8 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue); // reads all 
 Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue);
 Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineTextValue);
 Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue);
-Mvalue* Mfpos(Mvalue* fileValue);
+Mvalue* Mfpos(Mvalue const * const fileValue);
+Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue);
 Mvalue* Mfseek(Mvalue* fileValue,Mvalue* positionValue);
 Mvalue* Mfsize(Mvalue const * const fileValue);
 Mvalue* Mfisopen(Mvalue const * const fileValue);
@@ -609,6 +611,7 @@ Mvalue* Mfisdir(Mvalue const * const fileValue);
 Mvalue* Misdir(Mvalue const * const filenameValue);
 Mvalue* Mfisfile(Mvalue const * const fileValue);
 Mvalue* Mfstat(Mvalue const * const fileValue);
+Mvalue* Mftype(Mvalue const * const fileValue);
 Mvalue* Mfiles(Mvalue* wildcard_value);
 
 // MDH@08DEC2020
