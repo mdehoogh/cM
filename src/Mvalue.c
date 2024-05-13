@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <locale.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "Mvalue.h"
 
@@ -16,6 +17,7 @@
 #else
 #include <unistd.h>
 #endif
+#include <time.h>
 
 static bool DEBUGGING=true;
 
@@ -4617,9 +4619,6 @@ Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner own
 }/* VALIDATED */
 
 // Mfile support
-#include "unistd.h"
-#include "time.h"
-
 Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=getOwner(__LINE__);
 	if(_file!=NULL){
 		Mmap* _fileStatMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
@@ -5003,6 +5002,7 @@ long long fDeleted(Mfile * const file,Mallocationowner owner_file){
  * @return M_TRUE on success, M_FALSE otherwise
  */
 long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * openmodeSpec,bool allowExistingWrite,bool report){
+	// ASSERT openmodeSpec (as checked in Mfopen) should be a valid mode specification
 	long long result=M_LL_INVALID;
 	if(file!=NULL){
 		/* MDH@03MAY2024: what I want to do here is attempt to open the file
@@ -5038,7 +5038,7 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * op
 			mode[1]='+';
 		/////output("Requested open mode: '%s'.\n",mode);
 		*/
-		if(file->staterrno<0)fUpdateStats(file,report);
+		if(file->staterrno!=0)fUpdateStats(file,report);
 		// let's determine the opening mode
 		char* mode=openmodeSpec;
 		if(NULL==mode||!*mode)mode=file->_mode;
@@ -5571,27 +5571,53 @@ Mvalue* Mfstat(Mvalue const * const fileValue){Mallocationowner owner=getOwner(_
  */
 Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner owner=getOwner(__LINE__);
 	// we need a valid open mode text value to start with
-	char* openmodeText=(openmodeTextValue!=NULL&&openmodeTextValue->type==VT_TEXT?openmodeTextValue->value._text->_c:NULL);
-	if(openmodeText!=NULL&&*openmodeText){ // there's an open mode spec which is NOT empty
-		Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
-		if(_file!=NULL){ // there's a Mfile 
-			long long fileOpened=fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),openmodeText,false,true);
-			if(fileOpened==M_TRUE)
-				return(fileValue->type==VT_FILE?fileValue:_getValueOfFile(disowned_file(_file,owner)));
-			outputError("Opening the file failed");
-				/*
-				if(_file->mode[0])string_append_char(mode_str,_file->mode[0]);
-				if(_file->mode[1])string_append_char(mode_str,_file->mode[1]);
-				if(_file->mode[2])string_append_char(mode_str,_file->mode[2]);
-				*/
-			// opening failed, so if we created the file from the file's name, we have to free it
-			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // free the file we created because it won't be returned Mvalue wrapped
-		}
+	Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
+	if(_file!=NULL){ // there's a Mfile 
+		if(NULL==_file->_f){ // an unopened file
+			if(openmodeTextValue==NULL||openmodeTextValue->type==VT_TEXT){
+				char* openmodeText=(openmodeTextValue!=NULL?openmodeTextValue->value._text->_c:NULL);
+				// we allow a missing (NULL) openmode text but only when _file has a valid mode (from the previous opening as default)
+				if(openmodeText!=NULL||_file->_mode!=NULL){
+					if(NULL==openmodeText||*openmodeText>=65){ // there's an open mode spec which at least is alphabetic
+						char firstModeCharacter=(openmodeText!=NULL?tolower(*openmodeText):'\0');
+						if(!firstModeCharacter||firstModeCharacter=='r'||firstModeCharacter=='w'||firstModeCharacter=='a'){
+							char secondModeCharacter=(firstModeCharacter?tolower(*(openmodeText+1)):'\0');
+							if(!secondModeCharacter||secondModeCharacter=='b'||secondModeCharacter=='+'){
+								char thirdModeCharacter=(secondModeCharacter?tolower(*(openmodeText+2)):'\0');
+								if(!thirdModeCharacter||thirdModeCharacter=='b'||thirdModeCharacter=='+'){
+									if(!secondModeCharacter||!thirdModeCharacter||secondModeCharacter!=thirdModeCharacter){
+										long long fileOpened=fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),openmodeText,false,true);
+										if(fileOpened==M_TRUE)
+											return(fileValue->type==VT_FILE?fileValue:_getValueOfFile(disowned_file(_file,owner)));
+										output("%sOpening the file in mode '%s' failed",M_ERROR_PREFIX,openmodeText);
+											/*
+											if(_file->mode[0])string_append_char(mode_str,_file->mode[0]);
+											if(_file->mode[1])string_append_char(mode_str,_file->mode[1]);
+											if(_file->mode[2])string_append_char(mode_str,_file->mode[2]);
+											*/
+										// opening failed, so if we created the file from the file's name, we have to free it
+										if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // free the file we created because it won't be returned Mvalue wrapped
+									}else
+										outputError("The second and third mode character should be different!");
+								}else
+									outputError("The third mode character should be either 'b' or '+'");
+							}else
+								outputError("The second mode character should be either 'b' or '+'");
+						}else
+							outputError("%sThe first mode character should be either 'r', 'w' or 'a'");
+					}else
+					if(openmodeText!=NULL)
+						output("%sInvalid open mode '%s'.\n",M_ERROR_PREFIX,openmodeText);
+					else
+						outputError("Invalid open mode");
+				}else
+					outputError("If there is no default file mode (from a previous file opening) a second argument representing the open mode is required");
+			}else
+				outputError("The mode argument should be of type text");
+		}else
+			output("%sFile '%s' is already open. Close it first before reopening it!\n",M_ERROR_PREFIX,string(_file->_name));
 	}else
-	if(openmodeText!=NULL)
-		output("%sInvalid open mode '%s'.\n",M_ERROR_PREFIX,openmodeText);
-	else
-		outputError("Invalid open mode");
+		outputError("The file argument should either of type file or text (denoting the filename)");
 	return NULL;
 }
 /**
@@ -5602,6 +5628,9 @@ Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner own
  * @return Mvalue* 
  */
 Mvalue* Mopen(Mvalue* filenameValue,Mvalue* openmodeTextValue){Mallocationowner owner=getOwner(__LINE__);
+	// TODO delegating to Mfopen is probably best
+	return Mfopen(filenameValue,openmodeTextValue);
+	/* replacing:
 	Mvalue* result=NULL;
 	if(filenameValue!=NULL&&(openmodeTextValue==NULL||openmodeTextValue->type==VT_TEXT)){
 		char* openmodeSpec=(openmodeTextValue!=NULL?openmodeTextValue->value._text->_c:NULL);
@@ -5626,6 +5655,7 @@ Mvalue* Mopen(Mvalue* filenameValue,Mvalue* openmodeTextValue){Mallocationowner 
 	}else
 		outputError("Invalid input to open()");
 	return result;
+	*/
 }
 /**
  * @brief returns M_TRUE if \p fileValue exists, M_FALSE otherwise
@@ -5737,34 +5767,61 @@ Mvalue* Mfsize(Mvalue const * const fileValue){
 	long long result=M_LL_INVALID;
 	if(fileValue!=NULL){
 		if(fileValue->type==VT_FILE){
+			// if the file is currently open it's pretty straight-forward
 			Mfile* file=fileValue->value._file;
-			if(fExists(file,false)==M_TRUE){ // we know that file->stat is now up to date and contains the size of the file
-#if defined _WIN32 || defined _WIN64 || defined __WIN32 || defined _WCE || defined MSDOS || defined __MSDOS || defined OS2 || defined _OS2 || defined __OS2___
+			if(file!=NULL){
+				// if fPosition returns something unequal to M_LL_INVALID it is considered to be open currently
 				long long filepos=fPosition(file);
-				bool fileisopen=(filepos!=M_LL_INVALID);
-				// TODO how to deal with files opened in binary mode????
-				if(!fileisopen&&fOpened(file,getValueDataOwner(),"r",false,false)==M_TRUE)filepos=fPosition(file);
-				if(filepos!=M_LL_INVALID){ // the current position is known
-					if(fseek(file,0L,SEEK_END)==0){ // move position to the end of the file
+				if(filepos!=M_LL_INVALID){ // treat the file as an opened file
+					// TODO how to deal with files opened in binary mode????
+					if(fseek(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
 						result=fPosition(file); // determine the 
-						if(fseek(file,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
-					}else
-						outputError("Failed to move to the end of the file");
+						if(fseek(file->_f,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
+					}else{
+						filepos==M_LL_INVALID;
+						outputError("Failed to move the file position to the end of the file to determine the file size");
+					}
 				}
-				if(filepos!=M_LL_INVALID)if(!fileisopen)if(fClosed(file,getValueDataOwner())!=M_TRUE)outputError("Failed to close a temporarily opened file");
+				if(filepos==M_LL_INVALID){ // determining the file size from an opened file failed or it is not open to start with
+					if(file->_f!=NULL)outputWarning("Failed to determine the current file position");
+					bool fileExists=(fExists(file,false)==M_TRUE);
+					if(fileExists&&fIsRegularFile(file,false)){ // we know that file->stat is now up to date and contains the size of the file
+#if defined _WIN32 || defined _WIN64 || defined __WIN32 || defined _WCE || defined MSDOS || defined __MSDOS || defined OS2 || defined _OS2 || defined __OS2___
+						long long filepos=fPosition(file);
+						bool fileisopen=(filepos!=M_LL_INVALID);
+						// TODO how to deal with files opened in binary mode????
+						if(!fileisopen&&fOpened(file,getValueDataOwner(),"r",false,false)==M_TRUE)filepos=fPosition(file);
+						if(filepos!=M_LL_INVALID){ // the current position is known
+							if(fseek(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
+								result=fPosition(file); // determine the 
+								if(fseek(file,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
+							}else
+								outputError("Failed to move to the end of the file");
+						}
+						if(filepos!=M_LL_INVALID)if(!fileisopen)if(fClosed(file,getValueDataOwner())!=M_TRUE)outputError("Failed to close a temporarily opened file");
 #else
-				if(file->staterrno==0)
-					result=file->stat.st_size; // easiest way to get the size of the file
-				else
-					output("Can't obtain the size of file '%s' because of error '%s'.\n",M_ERROR_PREFIX,string(file->_name),strerror(file->staterrno));
+						if(file->staterrno==0)
+							result=file->stat.st_size; // easiest way to get the size of the file
+						else
+							output("Can't obtain the size of file '%s' because of error '%s'.\n",M_ERROR_PREFIX,string(file->_name),strerror(file->staterrno));
 #endif
+					}else
+					if(fileExists)
+						output("%sCan't determine the size of '%s': it is not a regular file.\n",M_ERROR_PREFIX,string(file->_name));
+					else
+						output("%sCan't get the size of file '%s': it does not exist!\n",M_ERROR_PREFIX,string(file->_name));
+				}
 			}else
-				output("%sCan't get the size of file '%s': it does not exist!\n",M_ERROR_PREFIX,string(file->_name));
+				outputError("File argument undefined");
 		}else
 		if(fileValue->type==VT_TEXT){
 			struct stat filestats;
-			if(stat(fileValue->value._text->_c,&filestats)==0)result=filestats.st_size;else output("%sError '%s' occurred accessing the status of file '%s'.\n",M_ERROR_PREFIX,strerror(errno),fileValue->value._text->_c);
-		}
+			if(stat(fileValue->value._text->_c,&filestats)==0)
+				result=filestats.st_size;
+			else 
+				output("%sError '%s' occurred accessing the status of file '%s'.\n",M_ERROR_PREFIX,strerror(errno),fileValue->value._text->_c);
+		}else
+			outputError("The argument should either be of type file or of type text (denoting the name of an existing file)");
 	}
 	return _getIntegerValue(result);
 }

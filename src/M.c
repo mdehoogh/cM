@@ -3068,8 +3068,8 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	// output the commandText
 	if(_commandText!=NULL){
 		output("%s",string(_commandText));
-		FREE_STRING(_commandText,owner);}
-	else 
+		FREE_STRING(_commandText,owner);
+	}else 
 		output("%sFailed to obtain the command result text",M_ERROR_PREFIX);
 	output(" = ");
 
