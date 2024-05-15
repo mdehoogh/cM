@@ -5632,11 +5632,13 @@ long long fSetPosition(Mfile const * const file,long long newposition){
 			else
 				newposition+=position;
 		}
-		// when newposition is valid, and we succeed in setting the file position to newposition, position should be set to that newposition
-		if(newposition>=0){
-			if(fseeko(file->_f,newposition,SEEK_SET)==0)position=newposition;else output("%sFailed to set the file position to '%lld'.\n",M_ERROR_PREFIX,newposition);
-		}
-	}
+	}else
+		output("Failed to obtain the current file position in setting the file position to '%lld'.\n",M_ERROR_PREFIX,newposition);
+	// when newposition is valid, and we succeed in setting the file position to newposition, position should be set to that newposition
+	if(newposition>=0){
+		if(fseeko(file->_f,newposition,SEEK_SET)==0)position=newposition;else output("%sFailed to set the file position to '%lld'.\n",M_ERROR_PREFIX,newposition);
+	}else
+		output("%sNew file position '%lld' invalid.\n",M_ERROR_PREFIX,newposition);
 	return position;
 }
 // end file helper functions
@@ -6223,7 +6225,7 @@ Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue){
 		Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
 		if(_file!=NULL&&_file->_f!=NULL){
 			long long newposition=getValueInteger(newpositionValue); // TODO newpositionValue should be a valid integer somehow
-			if(newposition!=M_LL_INVALID&&fSetPosition(_file,newposition)==M_TRUE)result=fPosition(_file);
+			if(newposition!=M_LL_INVALID)result=fSetPosition(_file,newposition);
 		}else
 		if(_file!=NULL)
 			outputError("No open file specified");
