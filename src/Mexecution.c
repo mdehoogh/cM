@@ -2283,24 +2283,23 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report){
 	//////bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
 	// only open when defined and currently not open
 	if(_file!=NULL&&mode!=NULL&&*mode){ // valid input
-		if(_file->_f==NULL){ // not opened yet
+		if(NULL==_file->_f){ // not opened yet
 			if(report)
 				output("Opening file '%s' in mode '%s'.\n",string(_file->_name),mode);
-			if(_file->staterrno<0)fUpdateStats(_file,report);
-			if(_file->staterrno>0||!S_ISDIR(_file->stat.st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
+			if(_file->staterrno!=0)fUpdateStats(_file,report);
+			if(_file->staterrno!=0||!S_ISDIR(_file->stat.st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
 				output("Opening file '%s'.\n",string(_file->_name));
 				//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 				_file->_f=fopen(string(_file->_name),mode);
 				if(_file->_f!=NULL){ // now opened
+					// update stat (even if already set, because the file existed to start with)
+					_file->staterrno=INT_MIN; // replacing: fUpdateStats(_file,report); // TODO or should we just make the staterrno dirty?
 					if(report)
-						output("'%s' opened!\n",string(_file->_name));
+						output("File '%s' opened!\n",string(_file->_name));
 					/* MDH@03MAY2024: fOpened() will take care of copying the mode the file was opened in
 					// TODO find a better way to copy *mode
 					_file->mode[0]=*mode;if(*mode){_file->mode[1]=*(++mode);if(*mode){_file->mode[2]=*(++mode);if(*mode)_file->mode[3]='\0';}} // register the opening mode (which consists of exactly three characters)
 					*/
-					// update stat (even if already set, because the file existed to start with)
-					fUpdateStats(_file,report);
-					///_file->staterrno=INT_MIN; // replacing: fUpdateStats(_file); // TODO or should we just make the staterrno dirty?
 					/*
 					if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner_file,1));
 					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);

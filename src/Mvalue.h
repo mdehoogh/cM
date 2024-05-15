@@ -589,6 +589,7 @@ long long fWriteText(Mfile const * const file,Mtext const * const towrite,bool w
 long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite); // returns the number of lines not written
 
 Mvalue* Mnewfile(Mvalue const * const filenameValue);
+Mvalue* Mfflush(Mvalue const * const fileValue);
 Mvalue* Mfdelete(Mvalue* fileValue);
 Mvalue* Mfexists(Mvalue* fileValue);
 Mvalue* Mexists(Mvalue* filenameValue);

@@ -14,8 +14,13 @@
 #include <io.h>
 #define F_OK 0
 #define access _access
+#define ftello _ftelli64
+#define fseeko _fseeki64
 #else
 #include <unistd.h>
+#include <sys/types.h>
+// force off_t to be 64 bits because we want to be able to access files larger than 2GB
+#define _FILE_OFFSET_BITS 64
 #endif
 #include <time.h>
 
@@ -4666,7 +4671,7 @@ Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=
 				struct tm dt = *(gmtime(&filestat.st_ctime));
 				Mstring* _created=owned_string(_getString("'"),owner);
 				if(_created!=NULL){
-					if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+					if(string_setlength(_created,51))string_setlength(_created,1+strftime(_created->_chars->chars+1,50,"%Y-%m-%d %H:%M:%S",&dt));
 					if(appendedToMap(_fileStatMap,owner,"created",_getTextValue(string(_created)))>0)
 						///output("File creation timestamp added to the file stat map.\n")
 						;
@@ -4678,7 +4683,7 @@ Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=
 				dt = *(gmtime(&filestat.st_mtime));
 				Mstring* _modified=owned_string(_getString("'"),owner);
 				if(_modified!=NULL){
-					if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+					if(string_setlength(_modified,51))string_setlength(_modified,1+strftime(_modified->_chars->chars+1,50,"%Y-%m-%d %H:%M:%S",&dt));
 					if(appendedToMap(_fileStatMap,owner,"modified",_getTextValue(string(_modified)))>0)
 						///output("File modification timestamp added to the file stat map.\n")
 						;
@@ -4807,6 +4812,9 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
  */
 long long fExists(Mfile * const file,bool report){
 	if(file!=NULL&&file->_name!=NULL){
+		// ok, let's attempt to use file stats to determine existence as our first method
+		fUpdateStats(file,report);
+		if(file->staterrno==0)return M_TRUE; // if we have file statistics it's reasonable to assume that the file exists
 		if(access(file->_name,F_OK)==0)return M_TRUE; // the file or directory exists
 		// ASSERT the file or directory does not exist
 		if(report){
@@ -4824,12 +4832,6 @@ long long fExists(Mfile * const file,bool report){
 			output("' checking for the existence of file/directory '%s'.\n",string(file->_name));
 		}
 		return M_FALSE;
-		/* replacing:
-		result=(access(file->_name,F_OK)==0?M_TRUE:M_FALSE); // TODO access() does not guarantee existence as well, probably for the same reason!!!!
-		// force updating the stats!!! if(file->staterrno<0)
-		if(file->staterrno!=0)fUpdateStats(file,report);
-		result=(file->staterrno!=0?M_FALSE:M_TRUE);
-		*/
 	}
 	return M_LL_INVALID;
 }
@@ -5125,28 +5127,33 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * op
 			mode[1]='+';
 		/////output("Requested open mode: '%s'.\n",mode);
 		*/
-		if(file->staterrno!=0)fUpdateStats(file,report);
+		/////// if we use fExists() we do NOT need to update the file stats... if(file->staterrno!=0)fUpdateStats(file,report);
 		// let's determine the opening mode
+		bool fileExists=(fExists(file,true)==M_TRUE);
 		char* mode=openmodeSpec;
 		if(NULL==mode||!*mode)mode=file->_mode;
 		if(NULL==mode||!*mode){
-			mode=(file->staterrno==0?"w":"r");
-		}
+			mode=(fileExists?"r+":"w");
+			output("Will attempt to open file '%s' in system default mode '%s'.\n",string(file->_name),mode);
+		}else
+		if(NULL==openmodeSpec)
+			output("Using the last used file mode '%s' to open file '%s' in.\n",file->_mode,string(file->_name));
 		result=(file->_f!=NULL?M_TRUE:M_FALSE);
 		if(result==M_FALSE){ // not currently opened
 			if(report)
-				output("Opening the %sexisting file '%s' in mode '%c'.\n",(file->staterrno?"non-":""),string(file->_name),mode);
+				output("Opening the %sexisting file '%s' in mode '%s'.\n",(!fileExists?"non-":""),string(file->_name),mode);
 			if(*mode=='w'||*mode=='r'||*mode=='a'){ // a valid open mode
 				if(*mode!='w'||file->staterrno!=0||allowExistingWrite){ // but do NOT allow deleting existing content unless allowExistingWrite flag is set!!!
 					// let's initialize the default mode
 					// try to open the file
-					openFile(file,owner_file,mode,!report); // if I'm doing the reporting openFile shouldn't
+					openFile(file,owner_file,mode,report); // if I'm doing the reporting openFile shouldn't
 					// get rid of the current file mode whatever it is
-					if(file->_mode!=NULL){FREE(file->_mode,1+strlen(file->_mode),-'"');file->_mode=NULL;}
+					if(file->_mode!=NULL){FREE(file->_mode,1+strlen(file->_mode),-'"');file->_mode=NULL;output("Registered file mode released.\n");}
 					if(file->_f!=NULL){ // successfully opened the file in mode 'mode'
 						file->_mode=_strdup(mode); // register the actual mode the file was opened in
-						if(file->_mode!=NULL)result=M_TRUE;else outputError("Failed to set the file mode");
-					}
+						if(file->_mode!=NULL)result=M_TRUE;else output("%sFailed to register '%s' as the mode file '%s' was opened in.\n",M_ERROR_PREFIX,mode,string(file->_name));
+					}else
+						output("%sFailed to open file '%s' in mode '%s'.\n",M_ERROR_PREFIX,string(file->_name),mode);
 					/* replacing and augmenting:
 					_file->_f=fopen(string(_file->_name),mode);
 					if(_file->_f){_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2];} // remember the opening mode when the file was successfully opened
@@ -5156,7 +5163,8 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * op
 					output("%sCan't overwrite existing content in '%s'.\n",M_ERROR_PREFIX,string(file->_name));
 				else
 					output("%Can't open directory '%s'.\n",M_ERROR_PREFIX,string(file->_name));
-			}
+			}else
+				output("%sCan't open file '%s': invalid mode '%s'.\n",M_ERROR_PREFIX,string(file->_name),mode);
 		}else
 		if(strcmp(mode,file->_mode))
 			output("%sFile '%s' already open in mode '%s' instead of the requested mode '%s'!\n",M_WARNING_PREFIX,string(file->_name),file->_mode,mode);
@@ -5576,36 +5584,60 @@ long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite)
 	return result;
 }
 
+// MDH@15MAY2024: getting and setting the file position is problematic because we're assuming that the file position is integer
+//                which isn't guaranteed with fpos_t objects and fpos_t is returned by getpos() and cannot be constructed by yourself
+//                since we're assuming a file is simply a sequence of bytes (although containing ASCII character text for now)
+//                we'd have to switch to using ftell/fseek but in the long long (64-bit) variants ftello64 and fseek64
+//                TODO will ftello64/fseeko64 always be available???????
 /**
  * @brief returns the current position in opened file \p file
  * @details returns M_LL_INVALID if \p file does not denote a file or is not open
  * @param file 
  * @return long long the current position in \p file
  */
-fpos_t fPosition(Mfile const * const file){
-	fpos_t filepos=M_LL_INVALID;
-	if(file!=NULL&&file->_f!=NULL)fgetpos(file->_f,&filepos);
-	return filepos;
-}
-long long fSetPosition(Mfile const * const file,fpos_t newposition){
-	long long result=M_LL_INVALID;
+long long fPosition(Mfile const * const file){
 	if(file!=NULL&&file->_f!=NULL){
-		result=M_FALSE;
-		if(newposition>=0){
-			fpos_t position;fgetpos(file->_f,&position);
-			if(newposition>position){
-				// we do not want to allow moving beyond the end of the file but we need to know what the end-of-file position is
-				if(fseek(file->_f,0L,SEEK_END)==0){ // managed to move to end-of-file
-					fpos_t filesize;fgetpos(file->_f,&filesize); // store the last possible file position in filesize
-					// if we're supposed to jump after the end-of-file nothing to do, otherwise we move there!!!
-					if(newposition>=filesize||fseek(file->_f,newposition,SEEK_SET)==0)result=M_TRUE;
-				}
-			}else
-				if(fseek(file->_f,newposition,SEEK_SET)==0)result=M_TRUE;
-		}else // moves the file cursor position back but won't move it beyond the start of the file
-			if(fseek(file->_f,newposition,SEEK_CUR)==0)result=M_TRUE;
+		long long position=ftello(file->_f);
+		if(position>=0)return position;
+		switch(errno){
+			case EBADF:output("'The file descriptor is not valid'");break;
+			case EOVERFLOW:output("'The current file offset cannot be represented correctly in an object with the specified return type'");break;
+			case ESPIPE:output("'The file descriptor underlying stream is associated with a pipe or FIFO'");break;
+			default:output("Unknown error");break;
+		}
+		output(" reading the file position of file '%s'.\n",string(file->_name));
 	}
-	return result;
+	return M_LL_INVALID;
+}
+long long fSetPosition(Mfile const * const file,long long newposition){
+	long long position=fPosition(file);
+	if(position>=0){ // the file is apparently open
+		// determine the absolute position to move to 
+		if(newposition>position){ // moving up
+			// we do not want to allow moving beyond the end of the file but we need to know what the end-of-file position is
+			if(fseeko(file->_f,0L,SEEK_END)==0){ // managed to move to end-of-file
+				long long filesize=ftello(file->_f);
+				if(newposition>filesize)newposition=filesize;
+			}else{
+				newposition=M_LL_INVALID;
+				if(file->_name!=NULL)
+					output("Failed to obtain the size of file '%s'.\n",M_ERROR_PREFIX,string(file->_name));
+				else
+					outputError("Failed to obtain the size of the file");
+			}
+		}else // moving back but relative if newposition is negative, but non-negative newposition values should be reachable!!
+		if(newposition<0){
+			if(position+newposition<0)
+				newposition=0;
+			else
+				newposition+=position;
+		}
+		// when newposition is valid, and we succeed in setting the file position to newposition, position should be set to that newposition
+		if(newposition>=0){
+			if(fseeko(file->_f,newposition,SEEK_SET)==0)position=newposition;else output("%sFailed to set the file position to '%lld'.\n",M_ERROR_PREFIX,newposition);
+		}
+	}
+	return position;
 }
 // end file helper functions
 
@@ -5617,6 +5649,28 @@ long long fSetPosition(Mfile const * const file,fpos_t newposition){
  */
 Mvalue* Mnewfile(Mvalue const * const filenameValue){
 	return(filenameValue!=NULL?(filenameValue->type==VT_FILE?filenameValue:_getValueOfFile(_getFileWithName(filenameValue))):NULL);
+}
+/**
+ * @brief flushes \p fileValue when open, returns M_TRUE on sucess, M_FALSE otherwise
+ * 
+ * @param fileValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE otherwise or M_LL_INVALID when called on an unopened file
+ */
+Mvalue* Mfflush(Mvalue const * const fileValue){
+	long long result=M_LL_INVALID;
+	Mfile* file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
+	if(file!=NULL){
+		if(file->_f!=NULL){
+			if(fflush(file->_f)){
+				result=M_FALSE;
+				outputError("Failed to flush the file");
+			}else
+				result=M_TRUE;
+		}else
+			outputError("Can't flush an unopened file");
+	}else
+		outputError("Argument to fflush() not of type file");
+	return _getIntegerValue(result);
 }
 
 // things we can do with an Mfile
@@ -5724,8 +5778,8 @@ Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner own
 		if(NULL==_file->_f){ // an unopened file
 			if(openmodeTextValue==NULL||openmodeTextValue->type==VT_TEXT){
 				char* openmodeText=(openmodeTextValue!=NULL?openmodeTextValue->value._text->_c:NULL);
-				// we allow a missing (NULL) openmode text but only when _file has a valid mode (from the previous opening as default)
-				if(openmodeText!=NULL||_file->_mode!=NULL){
+				// not anymore, fOpened will use whatever it can come up with!!! we allow a missing (NULL) openmode text but only when _file has a valid mode (from the previous opening as default)
+				///if(openmodeText!=NULL||_file->_mode!=NULL){
 					if(NULL==openmodeText||*openmodeText>=65){ // there's an open mode spec which at least is alphabetic
 						char firstModeCharacter=(openmodeText!=NULL?tolower(*openmodeText):'\0');
 						if(!firstModeCharacter||firstModeCharacter=='r'||firstModeCharacter=='w'||firstModeCharacter=='a'){
@@ -5734,10 +5788,13 @@ Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner own
 								char thirdModeCharacter=(secondModeCharacter?tolower(*(openmodeText+2)):'\0');
 								if(!thirdModeCharacter||thirdModeCharacter=='b'||thirdModeCharacter=='+'){
 									if(!secondModeCharacter||!thirdModeCharacter||secondModeCharacter!=thirdModeCharacter){
-										long long fileOpened=fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),openmodeText,false,true);
+										long long fileOpened=fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),openmodeText,false,false);
 										if(fileOpened==M_TRUE)
 											return(fileValue->type==VT_FILE?fileValue:_getValueOfFile(disowned_file(_file,owner)));
-										output("%sOpening the file in mode '%s' failed",M_ERROR_PREFIX,openmodeText);
+										if(openmodeText!=NULL)
+											output("%sOpening the file in mode '%s' failed.\n",M_ERROR_PREFIX,openmodeText);
+										else
+											outputError("Failed to open the file in the default file mode");
 											/*
 											if(_file->mode[0])string_append_char(mode_str,_file->mode[0]);
 											if(_file->mode[1])string_append_char(mode_str,_file->mode[1]);
@@ -5758,8 +5815,7 @@ Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner own
 						output("%sInvalid open mode '%s'.\n",M_ERROR_PREFIX,openmodeText);
 					else
 						outputError("Invalid open mode");
-				}else
-					outputError("If there is no default file mode (from a previous file opening) a second argument representing the open mode is required");
+				///}else outputError("If there is no default file mode (from a previous file opening) a second argument representing the open mode is required");
 			}else
 				outputError("The mode argument should be of type text");
 		}else
@@ -5922,9 +5978,9 @@ Mvalue* Mfsize(Mvalue const * const fileValue){
 				long long filepos=fPosition(file);
 				if(filepos!=M_LL_INVALID){ // treat the file as an opened file
 					// TODO how to deal with files opened in binary mode????
-					if(fseek(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
+					if(fseeko(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
 						result=fPosition(file); // determine the 
-						if(fseek(file->_f,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
+						if(fseeko(file->_f,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
 					}else{
 						filepos==M_LL_INVALID;
 						outputError("Failed to move the file position to the end of the file to determine the file size");
@@ -5940,9 +5996,9 @@ Mvalue* Mfsize(Mvalue const * const fileValue){
 						// TODO how to deal with files opened in binary mode????
 						if(!fileisopen&&fOpened(file,getValueDataOwner(),"r",false,false)==M_TRUE)filepos=fPosition(file);
 						if(filepos!=M_LL_INVALID){ // the current position is known
-							if(fseek(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
+							if(fseeko(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
 								result=fPosition(file); // determine the 
-								if(fseek(file,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
+								if(fseeko(file,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
 							}else
 								outputError("Failed to move to the end of the file");
 						}
@@ -6184,30 +6240,21 @@ Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue){
  * @param positionValue 
  * @return Mvalue* the current file position
  */
-Mvalue* Mfseek(Mvalue* fileValue,Mvalue* positionValue){
-	Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-	fpos_t filepos=fPosition(_file);
-	if(filepos!=M_LL_INVALID){
-		output("The current position in file '%s' is %lld.\n",string(_file->_name),filepos);
-		fpos_t position=M_LL_INVALID;
-		if(positionValue!=NULL){
-			if(positionValue->type==VT_INTEGER)
-				position=positionValue->value._integer->ll;
-			else
-			if(positionValue->type==VT_BIGINTEGER)
-				position=getBigintegerInteger(positionValue->value._biginteger);
-		}
-		if(position!=M_LL_INVALID){
-			if(position<0)position+=filepos;
-			if(position>=0){
-				output("The requested position is %lld.\n",position);
-				fseek(_file->_f,position,SEEK_SET);
-				fgetpos(_file->_f,&filepos);
-			}else
-				output("%sCan't change the file position to '%lld'.\n",M_ERROR_PREFIX,position);
-		}
+Mvalue* Mfseek(Mvalue* fileValue,Mvalue* newpositionValue){
+	long long newposition=M_LL_INVALID;
+	if(newpositionValue!=NULL){
+		if(newpositionValue->type==VT_INTEGER)
+			newposition=newpositionValue->value._integer->ll;
+		else
+		if(newpositionValue->type==VT_BIGINTEGER)
+			newposition=getBigintegerInteger(newpositionValue->value._biginteger);
 	}
-	return _getIntegerValue(filepos);
+	if(newposition!=M_LL_INVALID){
+		Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
+		if(_file!=NULL)newposition=fSetPosition(_file,newposition);else outputError("File argument to fseek() not of type file");
+	}else
+		outputError("Invalid second (new file position) argument to fseek()");
+	return _getIntegerValue(newposition);
 }
 /*
 static void openFileForWriting(Mfile* _file){

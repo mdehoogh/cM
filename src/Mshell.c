@@ -14564,6 +14564,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!completedValueFunction(_Menvironment,owner,"file",Mnewfile)
 				||!completedValueFunction(_Menvironment,owner,"fdelete",Mfdelete)
 				||!completedValueFunction(_Menvironment,owner,"files",Mfiles)
+				||!completedValueFunction(_Menvironment,owner,"fflush",Mfflush)
 				||!completedValueFunction(_Menvironment,owner,"exists",Mexists)
 				||!completedValueFunction(_Menvironment,owner,"fexists",Mfexists)
 				||!completedValueValueFunction(_Menvironment,owner,"open",Mopen)
