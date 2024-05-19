@@ -4699,13 +4699,13 @@ Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=
 	return NULL;
 }
 
-static bool fIsReadable(char const * const filename){
+static bool fCanRead(char const * const filename){
 	return(access(filename,R_OK)==0);
 }
-static bool fIsExecutable(char const * const filename){
+static bool fCanExecute(char const * const filename){
 	return(access(filename,X_OK)==0);
 }
-static bool fIsWriteable(char const * const filename){
+static bool fCanWrite(char const * const filename){
 	return(access(filename,W_OK)==0);
 }
 Mmap* _getFileAccessPropertyMap(Mfile const * const _file){Mallocationowner owner=getOwner(__LINE__);
@@ -4718,9 +4718,9 @@ Mmap* _getFileAccessPropertyMap(Mfile const * const _file){Mallocationowner owne
 			bool aRegularFile=fIsRegularFile(_file,false);
 			appendedToMap(_fileAccessMap,owner,"regularfile",_getTextValue(aRegularFile?"'yes":"'no"));
 			if(aRegularFile){
-				appendedToMap(_fileAccessMap,owner,"executable",_getTextValue((fIsExecutable(string(_file->_name))?"'yes":"'no")));
-				appendedToMap(_fileAccessMap,owner,"readable",_getTextValue((fIsReadable(string(_file->_name))?"'yes":"'no")));
-				appendedToMap(_fileAccessMap,owner,"writable",_getTextValue((fIsWriteable(string(_file->_name))?"'yes":"'no")));
+				appendedToMap(_fileAccessMap,owner,"executable",_getTextValue((fCanExecute(string(_file->_name))?"'yes":"'no")));
+				appendedToMap(_fileAccessMap,owner,"readable",_getTextValue((fCanRead(string(_file->_name))?"'yes":"'no")));
+				appendedToMap(_fileAccessMap,owner,"writable",_getTextValue((fCanWrite(string(_file->_name))?"'yes":"'no")));
 			}
 		}else
 			appendedToMap(_fileAccessMap,owner,"exists",_getTextValue("'no"));
@@ -4964,7 +4964,7 @@ Mvalue* _getValueOfFile(Mfile const * const _file){
  * @param _file 
  * @return M_TRUE if M file \p _file is an existing and readable file, M_FALSE or M_LL_INVALID otherwise
  */
-long long isFileReadable(Mfile const * const _file,bool report){
+long long fIsReadable(Mfile const * const _file,bool report){
 	long long result=M_LL_INVALID;
 	if(_file!=NULL){
 		if(_file->_f!=NULL){ // an open file
@@ -4994,7 +4994,7 @@ long long isFileReadable(Mfile const * const _file,bool report){
  * @param _file 
  * @return M_TRUE if \p _file is a writable file, M_FALSE or M_LL_INVALID otherwise
  */
-long long isFileWriteable(Mfile const * const _file,bool report){
+long long fIsWriteable(Mfile const * const _file,bool report){
 	long long result=M_LL_INVALID;
 	if(_file!=NULL){
 		if(_file->_f!=NULL){ // an open file
@@ -5198,7 +5198,7 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 		// before checking the mode to see if the file can be read from, we might need to open it
 		// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 		if(file->_f!=NULL){ // and opened
-			if(isFileReadable(file,false)){ // and readable
+			if(fIsReadable(file,false)){ // and readable
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
 				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 				// if the file can be read from, we do
@@ -5235,7 +5235,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 	Mstring* _bytesRead=NULL;
 	if(file!=NULL){
 		if(file->_f!=NULL){
-			if(isFileReadable(file,false)){
+			if(fIsReadable(file,false)){
 				// if the file is not binary and can be read from
 				if(file->_mode[1]!='b'&&(strlen(file->_mode)<3||file->_mode[2]!='b')){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
@@ -5337,7 +5337,7 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 	if((numberOfLines==M_LL_INVALID||numberOfLines>0)&&file!=NULL){
 		output("About to read lines from file '%s'.\n",string(file->_name));
 		if(file->_f!=NULL){
-			if(isFileReadable(file,false)){
+			if(fIsReadable(file,false)){
 				// before checking the mode to see if the file can be read from, we might need to open it
 				// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
@@ -5595,9 +5595,9 @@ long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite)
  * @param file 
  * @return long long the current position in \p file
  */
-long long fPosition(Mfile const * const file){
+off_t fPosition(Mfile const * const file){
 	if(file!=NULL&&file->_f!=NULL){
-		long long position=ftello(file->_f);
+		off_t position=ftello(file->_f);
 		if(position>=0)return position;
 		switch(errno){
 			case EBADF:output("'The file descriptor is not valid'");break;
@@ -5609,14 +5609,14 @@ long long fPosition(Mfile const * const file){
 	}
 	return M_LL_INVALID;
 }
-long long fSetPosition(Mfile const * const file,long long newposition){
-	long long position=fPosition(file);
+off_t fSetPosition(Mfile const * const file,off_t newposition){
+	off_t position=fPosition(file);
 	if(position>=0){ // the file is apparently open
 		// determine the absolute position to move to 
 		if(newposition>position){ // moving up
 			// we do not want to allow moving beyond the end of the file but we need to know what the end-of-file position is
 			if(fseeko(file->_f,0L,SEEK_END)==0){ // managed to move to end-of-file
-				long long filesize=ftello(file->_f);
+				off_t filesize=ftello(file->_f);
 				if(newposition>filesize)newposition=filesize;
 			}else{
 				newposition=M_LL_INVALID;
@@ -5636,11 +5636,84 @@ long long fSetPosition(Mfile const * const file,long long newposition){
 		output("Failed to obtain the current file position in setting the file position to '%lld'.\n",M_ERROR_PREFIX,newposition);
 	// when newposition is valid, and we succeed in setting the file position to newposition, position should be set to that newposition
 	if(newposition>=0){
-		if(fseeko(file->_f,newposition,SEEK_SET)==0)position=newposition;else output("%sFailed to set the file position to '%lld'.\n",M_ERROR_PREFIX,newposition);
+		if(fseeko(file->_f,(off_t)newposition,SEEK_SET)==0)position=newposition;else output("%sFailed to set the file position to '%lld'.\n",M_ERROR_PREFIX,newposition);
 	}else
 		output("%sNew file position '%lld' invalid.\n",M_ERROR_PREFIX,newposition);
 	return position;
 }
+/**
+ * @brief pushes the current file position in \p file calling fGetPos() and stores it
+ * @details returns M_LL_INVALID when \p file is undefined or is not opened, or storing the current file position failed
+ * @param file 
+ * @return long long M_TRUE on success, M_FALSE on failure
+ */
+long long fPushPosition(Mfile * const file,Mallocationowner file_owner){Mallocationowner owner=getOwner(__LINE__);
+	if(file!=NULL&&file->_f!=NULL){
+		// we will need to allocate a new Mfileposition
+		Mfileposition* _fileposition=(Mfileposition*)MALLOC_1(sizeof(Mfileposition),'P',owner);
+		if(_fileposition!=NULL){
+			_fileposition->next=file->_filepositionstack;
+			if(fgetpos(file->_f,&_fileposition->fpos)==0){ // success
+				file->_filepositionstack=OWNED(DISOWNED(_fileposition,owner),Msubowner(file_owner,1));
+				return M_TRUE;
+			}
+			outputError("Failed to store the current file position");
+			FREE_DISOWNED_1(_fileposition,'P',owner);
+		}else
+			outputError("Failed to create a file position object");
+		return M_FALSE;
+	}
+	return M_LL_INVALID;
+}
+/**
+ * @brief restores the file position to the last stored fle position of \p file
+ * @details returns M_LL_INVALID when \p file is not an opened file or popping the file position fails
+ * @param file 
+ * @param file_owner 
+ * @return long long M_TRUE on success, M_FALSE on failure
+ */
+long long fPopPosition(Mfile * const file,Mallocationowner file_owner){
+	if(file!=NULL&&file->_f!=NULL){
+		if(file->_filepositionstack!=NULL){
+			output("Restoring the file position.\n");
+			if(fsetpos(file->_f,file->_filepositionstack->fpos)!=0)
+				outputError("Failed to restore the file position, but popping the stored file position anway");
+			else
+				output("File position restored.\n");
+			Mfileposition* nextFileposition=file->_filepositionstack->next;
+			FREE_DISOWNED_1(file->_filepositionstack,'P',file_owner);
+			output("File position popped!\n");
+			file->_filepositionstack=nextFileposition;
+		}
+	}
+	return M_LL_INVALID;
+}
+/**
+ * @brief sets the file position cursor of \p file to the start of the file
+ * @details returns M_LL_INVALID when \p file does not denote an opened file, or positioning the file position cursor fails
+ * @param file 
+ * @return long long M_TRUE on success, M_FALSE on failure
+ */
+long long fJumpToStart(Mfile const * const file){
+	if(file!=NULL&&file->_f!=NULL){
+		// TODO how about using rewind()
+		return(fseek(file->_f,0L,SEEK_SET)==0?M_TRUE:M_FALSE);
+	}
+	return M_LL_INVALID;
+}
+/**
+ * @brief sets the file position cursor of \p file to the start of the file
+ * @details returns M_LL_INVALID when \p file does not denote an opened file, or positioning the file position cursor fails
+ * @param file 
+ * @return long long M_TRUE on success, M_FALSE on failure
+ */
+long long fJumpToEnd(Mfile const * const file){
+	if(file!=NULL&&file->_f!=NULL){
+		return(fseek(file->_f,0L,SEEK_END)==0?M_TRUE:M_FALSE);
+	}
+	return M_LL_INVALID;
+}
+
 // end file helper functions
 
 /**
@@ -6209,7 +6282,7 @@ Mvalue* Mfclose(Mvalue* fileValue){
  */
 Mvalue* Mfpos(Mvalue const * const fileValue){
 	Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-	fpos_t filepos=fPosition(_file);
+	long long filepos=(long long)fPosition(_file);
 	return _getIntegerValue(filepos);
 }
 /**
@@ -6225,7 +6298,7 @@ Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue){
 		Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
 		if(_file!=NULL&&_file->_f!=NULL){
 			long long newposition=getValueInteger(newpositionValue); // TODO newpositionValue should be a valid integer somehow
-			if(newposition!=M_LL_INVALID)result=fSetPosition(_file,newposition);
+			if(newposition!=M_LL_INVALID)result=(long long)fSetPosition(_file,newposition);
 		}else
 		if(_file!=NULL)
 			outputError("No open file specified");
@@ -6233,6 +6306,56 @@ Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue){
 			outputError("No file specified");
 	}else
 		outputError("No or an invalid position specified");
+	return _getIntegerValue(result);
+}
+/**
+ * @brief remembers the current file position in \p fileValue onto the file position stack
+ * @details returns M_LL_INVALID when \p fileValue does not represent an opened file, or when remembering the file position fails
+ * @param fileValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE on failure
+ */
+Mvalue* Mfpushpos(Mvalue const * const fileValue){
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL&&fileValue->type==VT_FILE){
+		result=fPushPosition(fileValue->value._file,getValueDataOwner());
+	}else
+		outputError("The argument to fpushpos() does not denote an opened file");
+	return _getIntegerValue(result);
+}
+Mvalue* Mfpoppos(Mvalue const * const fileValue){
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL&&fileValue->type==VT_FILE){
+		result=fPopPosition(fileValue->value._file,getValueDataOwner());
+	}else
+		outputError("The argument to fpoppos() does not denote an opened file");
+	return _getIntegerValue(result);
+}
+/**
+ * @brief moves the file position in opened file \p fileValue to the start of the file
+ * @details returns M_LL_INVALID when \p fileValue does not denote an opened file, or moving the file position to the start fails
+ * @param fileValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE on failure
+ */
+Mvalue* Mftostart(Mvalue const * const fileValue){
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL&&fileValue->type==VT_FILE){
+		result=fJumpToStart(fileValue->value._file);
+	}else
+		outputError("The argument to fpushpos() does not denote an opened file");
+	return _getIntegerValue(result);
+}
+/**
+ * @brief moves the file position in opened file \p fileValue to the end
+ * @details returns M_LL_INVALID when \p fileValue does not denote an opened file, or moving the file position to the end fails
+ * @param fileValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE on failure
+ */
+Mvalue* Mftoend(Mvalue const * const fileValue){
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL&&fileValue->type==VT_FILE){
+		result=fJumpToEnd(fileValue->value._file);
+	}else
+		outputError("The argument to fpushpos() does not denote an opened file");
 	return _getIntegerValue(result);
 }
 /**

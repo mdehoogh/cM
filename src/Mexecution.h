@@ -306,6 +306,10 @@ size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,c
 // starting with v0.1.4 we have file I/O support
 #include "sys/stat.h"
 
+typedef struct Mfileposition{
+	fpos_t fpos;
+	struct Mfileposition *next;
+}Mfileposition;
 // Mfile holds all information related to a single file
 // MDH@28DEC2020: opening and closing a file is moved from Mvalue.c/h to here!!!!
 typedef struct Mfile{
@@ -317,6 +321,7 @@ typedef struct Mfile{
 	off_t pos; // the current position in the file
 	// _mode when not NULL will point to the (unmanaged) heap allocation C string when opened successfully
 	char* _mode; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
+	Mfileposition* _filepositionstack; // MDH@19MAY2024: keep a stack of remembered fpos_t file position
 }Mfile;
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);

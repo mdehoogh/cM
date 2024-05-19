@@ -2254,6 +2254,16 @@ bool closeFile(Mfile* _file){
 	return false;
 }
 /**
+ * @brief frees \p _fileposition
+ * 
+ * @param _fileposition 
+ */
+static void free_fileposition(Mfileposition*  _fileposition){
+	assert(_fileposition!=NULL);
+	if(_fileposition->next!=NULL)free_fileposition(_fileposition->next);
+	FREE_1(_fileposition,'P');
+}
+/**
  * @brief frees the M file pointed to by _file
  * @details always attempts to close the M file pointed to by \p _file first
  * @param _file 
@@ -2268,6 +2278,7 @@ void free_file(Mfile* _file){
 			FREE(_file->_mode,1+strlen(_file->_mode),-'"'); // _file->_mode was assigned using _strdup() which IS managed!!! so don't use free()
 			output(" freed!\n");
 			_file->_mode=NULL;
+			if(_file->_filepositionstack!=NULL)free_fileposition(_file->_filepositionstack);
 		} // MDH@04MAY2024: _file->_mode is currently unmanaged!!
 		FREE_1(_file,'F');
 	}
