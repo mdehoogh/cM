@@ -5673,20 +5673,21 @@ long long fPushPosition(Mfile * const file,Mallocationowner file_owner){Mallocat
  * @return long long M_TRUE on success, M_FALSE on failure
  */
 long long fPopPosition(Mfile * const file,Mallocationowner file_owner){
+	long long result=M_LL_INVALID;
 	if(file!=NULL&&file->_f!=NULL){
 		if(file->_filepositionstack!=NULL){
-			output("Restoring the file position.\n");
-			if(fsetpos(file->_f,file->_filepositionstack->fpos)!=0)
+			//output("Restoring the file position.\n");
+			result=(fsetpos(file->_f,&file->_filepositionstack->fpos)?M_FALSE:M_TRUE);
+			if(result==M_FALSE)
 				outputError("Failed to restore the file position, but popping the stored file position anway");
-			else
-				output("File position restored.\n");
+			//else output("File position restored.\n");
 			Mfileposition* nextFileposition=file->_filepositionstack->next;
 			FREE_DISOWNED_1(file->_filepositionstack,'P',file_owner);
 			output("File position popped!\n");
 			file->_filepositionstack=nextFileposition;
 		}
 	}
-	return M_LL_INVALID;
+	return result;
 }
 /**
  * @brief sets the file position cursor of \p file to the start of the file
