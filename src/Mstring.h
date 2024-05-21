@@ -93,6 +93,8 @@ size_t string_trailing(Mstring* str,char c);
 bool string_endswith(Mstring const * const str,char const * const pc);
 
 // MDH@05MAY2024: reading a line of characters directly into an Mstring from an open file (similar to what getline() would)
-Mstring* string_freadline(Mstring * const str,FILE* const file);
+long long string_freadline(Mstring * const str,FILE* const file,bool resetPosition);
+// MDH@21MAY2024: string_freadline() may have unprocessed characters at the end that need to be moved up to begin the next line to return on the next call
+long long string_move_from_end(Mstring* str,size_t numberOfCharsAtEnd,size_t newPosition);
 
 #endif /* __MSTRING_H__ */

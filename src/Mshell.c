@@ -14587,7 +14587,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!completedValueFunction(_Menvironment,owner,"fisfile",Mfisfile)
 				||!completedValueFunction(_Menvironment,owner,"fstat",Mfstat)
 				||!completedValueFunction(_Menvironment,owner,"freadline",Mfreadline)
-				||!completedValueValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
+				||!completedValueValueValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
 				||!completedValueValueFunction(_Menvironment,owner,"fwrite",Mfwrite)
 				||!completedValueValueFunction(_Menvironment,owner,"fwriteline",Mfwriteline)
 				||!completedValueValueFunction(_Menvironment,owner,"fwritelines",Mfwritelines)){

@@ -586,7 +586,7 @@ long long fClosed(Mfile * const file,Mallocationowner owner_file);
 //////// now static!!! fpos_t fPosition(Mfile const * const file); // returns the current position in the file
 Mstring* fRead(Mfile const * const file,long long numberOfBytes);
 Mstring* fReadLine(Mfile const * const file);
-Mlist* fReadLines(Mfile const * const file,long long numberOfLines,bool report);
+long long fReadLines(Mfile const * const file,long long numberOfLines,Mlist* list,Mallocationowner owner_list,bool report);
 long long fWriteChars(Mfile const * const file,char const * const chars,bool writeEoln); // returns amount of chars not written
 long long fWriteText(Mfile const * const file,Mtext const * const towrite,bool writeEoln); // returns amount of bytes not written
 // long long fWriteLine(Mfile const * const file,Mstring * const towrite); // return amount of bytes not written
@@ -602,7 +602,7 @@ Mvalue* Mopen(Mvalue* filenameValue,Mvalue* openmodeSpecValue);
 Mvalue* Mfclose(Mvalue* fileValue);
 Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue); // reads at most count_value 
 Mvalue* Mfreadline(Mvalue* fileValue); // reads all bytes until a new line character is encountered 
-Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue); // reads all bytes until a new line character is encountered 
+Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listValue); // reads all bytes until a new line character is encountered 
 Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue);
 Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineTextValue);
 Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue);

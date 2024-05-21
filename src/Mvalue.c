@@ -5241,7 +5241,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
 						_bytesRead=owned_string(_getString("'"),owner); // NO do NOT start the string with a single quote for create a Mtext from it
 						if(_bytesRead!=NULL){
-							if(string_freadline(_bytesRead,file->_f)==NULL){
+							if(string_freadline(_bytesRead,file->_f,true)<0){
 								outputError("Failed to read the line directly");
 								FREE_STRING(_bytesRead,owner);_bytesRead=NULL;
 							}
@@ -5332,9 +5332,9 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
  * @param file 
  * @return Mlist* the list of lines read from \p file
  */
-Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long long numberOfLines,bool report){Mallocationowner owner=getOwner(__LINE__);
-	Mlist* _linesReadList=NULL;
-	if((numberOfLines==M_LL_INVALID||numberOfLines>0)&&file!=NULL){
+long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long long numberOfLines,Mlist* linesReadList,Mallocationowner owner_linesReadList,bool report){Mallocationowner owner=getOwner(__LINE__);
+	long long result=M_LL_INVALID;
+	if((numberOfLines==M_LL_INVALID||numberOfLines>=0)&&file!=NULL&&linesReadList!=NULL){
 		output("About to read lines from file '%s'.\n",string(file->_name));
 		if(file->_f!=NULL){
 			if(fIsReadable(file,false)){
@@ -5344,16 +5344,21 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 				///////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 				// if the file can be read from, we do
 				if(file->_mode[1]!='b'&&(strlen(file->_mode)<3||file->_mode[2]!='b')){ // the mode is defined (i.e. unequal to it's initial value '\0')
-					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
+					result=0; // keep track of the number of lines read
+					if(numberOfLines!=0){ // either all or some lines to read
+						if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
+						/*
 						_linesReadList=owned_list(_getListOfType(VT_TEXT),owner);
-						if(_linesReadList!=NULL){
+						if(_linesReadList!=NULL){*/
 							/*
 							char buffer[256]; // the buffer to use with fgets
 							size_t buffer_length;
 							bool eoln;
 							*/
+							// we'll be using a single line to read the individual lines into
+							Mstring* _line=owned_string(_getString("'"),owner);
+							if(NULL==_line){outputError("Failed to create a line buffer");return M_LL_INVALID;}
 							Mlistelement* listelement=NULL;
-							bool lineRead;
 							output("Will start reading text lines.\n");
 							long long linesLeftToRead=numberOfLines;
 							do{ // there are still additional lines
@@ -5362,15 +5367,33 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 								// reading the file failed afterwards (if the last list element is NULL)
 								// if storing the line text fails, listelement must be NULLed so that the
 								// entire list will be freed (and nothing is returned)
-								Mstring* _line=owned_string(_getString("'"),owner);
-								if(NULL==_line){outputError("Failed to create a line buffer");break;}
-								bool lineRead=(string_freadline(_line,file->_f)!=NULL);
-								if(lineRead){ // register this line
-									listelement=getAppendedListelement(_linesReadList,owner);
-									if(NULL==listelement){outputError("Failed to append a text line list element");break;}
-									assignValue(&listelement->_value,_getTextValue(string(_line)));
-								}else
+								if(linesLeftToRead>0)linesLeftToRead--; // one line left to read
+								long long copyAtEnd=string_freadline(_line,file->_f,linesLeftToRead==0);
+								/////output("Copy at end: %lld.\n",copyAtEnd);
+								if(copyAtEnd==M_LL_INVALID){
+									result=-result;
 									output("Failed to read a text line from '%s'.\n",M_ERROR_PREFIX,string(file->_name));
+									break;
+								}
+								if(report)
+									output("Line '%s' read.\n",string(_line));
+								// register this line
+								listelement=getAppendedListelement(linesReadList,owner_linesReadList);
+								if(NULL==listelement){outputError("Failed to append a text line list element");break;}
+								assignValue(&listelement->_value,_getTextValue(string(_line)));
+								result+=1; // another line read
+								// copy the part of the next line
+								if(copyAtEnd>0){
+									if(linesLeftToRead!=0){ // more lines to read
+										if(string_move_from_end(_line,copyAtEnd,1L)==M_LL_INVALID){
+											outputError("Failed to prepare for reading the next line");
+											break;
+										}
+										// change the length of the line to after the copied text
+										string_setlength(_line,1L+copyAtEnd);
+										/////output("Start of next line: '%s'.\n",string(_line));
+									}
+								}
 								/* replacing
 								eoln=false;
 								char* newbuffer;
@@ -5408,21 +5431,15 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 								// register this line
 								assignValue(&listelement->_value,_getTextValue(string(_line)));
 								*/
-								if(report)
-									output("Line '%s' read.\n",string(_line));
-								FREE_STRING(_line,owner);_line=NULL;
-								if(!lineRead)break;
-								if(linesLeftToRead>0){
-									linesLeftToRead--;
-									if(linesLeftToRead==0)break;
-								}
-							}while(!feof(file->_f));
+							}while(linesLeftToRead!=0&&!feof(file->_f));
+							FREE_STRING(_line,owner);
 							// if we have a listelement we succeeded, well mostly
 							/////if(listelement==NULL){FREE_LIST(_linesReadList,owner);return NULL;}
-						}else
-							output("%sFailed to create the list to hold the text lines from '%s'.",M_ERROR_PREFIX,string(file->_name));
+						}
+						/*}else
+							output("%sFailed to create the list to hold the text lines from '%s'.",M_ERROR_PREFIX,string(file->_name));*/
 					}else
-						output("%sNo text lines can be read from '%s' (mode: %s): end-of-file reached.\n",M_ERROR_PREFIX,string(file->_name),file->_mode);
+						output("%sNo text lines can be read from '%s' (mode: %s): end-of-file reached.\n",M_WARNING_PREFIX,string(file->_name),file->_mode);
 				}else
 					output("%sUnable to read text lines from '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->_mode);
 			}else
@@ -5434,7 +5451,7 @@ Mlist* fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,long 
 		outputError("No file to read from specified");
 	else
 		outputError("The number of lines to read is invalid");
-	return disowned_list(_linesReadList,owner);
+	return result;
 }
 
 /**
@@ -5595,22 +5612,27 @@ long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite)
  * @param file 
  * @return long long the current position in \p file
  */
-off_t fPosition(Mfile const * const file){
+long long fPosition(Mfile const * const file){
 	if(file!=NULL&&file->_f!=NULL){
 		off_t position=ftello(file->_f);
-		if(position>=0)return position;
-		switch(errno){
-			case EBADF:output("'The file descriptor is not valid'");break;
-			case EOVERFLOW:output("'The current file offset cannot be represented correctly in an object with the specified return type'");break;
-			case ESPIPE:output("'The file descriptor underlying stream is associated with a pipe or FIFO'");break;
-			default:output("Unknown error");break;
+		if(position<0){
+			switch(errno){
+				case EBADF:output("'The file descriptor is not valid'");break;
+				case EOVERFLOW:output("'The current file offset cannot be represented correctly in an object with the specified return type'");break;
+				case ESPIPE:output("'The file descriptor underlying stream is associated with a pipe or FIFO'");break;
+				default:output("Unknown error");break;
+			}
+			output(" reading the file position of file '%s'.\n",string(file->_name));
 		}
-		output(" reading the file position of file '%s'.\n",string(file->_name));
+		// in case off_t is a larger integer data type than long long!!!
+		if(position<=M_LL_MAX)return(long long)position;
+		outputError("File position too large!");
 	}
 	return M_LL_INVALID;
 }
-off_t fSetPosition(Mfile const * const file,off_t newposition){
-	off_t position=fPosition(file);
+long long fSetPosition(Mfile const * const file,long long newposition){
+	// TODO if we're going to get the current position anyway why not 
+	long long position=fPosition(file);
 	if(position>=0){ // the file is apparently open
 		// determine the absolute position to move to 
 		if(newposition>position){ // moving up
@@ -6209,13 +6231,14 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 // MDH@01OCT2020: how about allowing to read a number of lines in one go??????
 // MDH@27DEC2020: if the list returned ends with NULL we failed
 /**
- * @brief reads and returns at most \p numberOfLinesValue lines from \p fileValue
+ * @brief reads at most \p numberOfLinesValue lines from \p fileValue and appends them to the optional \p listValue
  * 
  * @param fileValue 
  * @param numberOfLinesValue 
- * @return Mvalue* a list containing all lines read from \p fileValue
+ * @param listValue
+ * @return Mvalue* the list \p listValue or a new list with the lines that were read from \p fileValue appended
  */
-Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
 	long long numberOfLines=(numberOfLinesValue!=NULL?getValueInteger(numberOfLinesValue):M_LL_INVALID);
 	Mvalue* result=NULL;
@@ -6237,19 +6260,41 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue){Mallocationown
 				if(_file->_f!=NULL){
 					if(!feof(_file->_f)){ // end-of-file not reached yet!!
 						output("Reading text lines from '%s'.\n",string(_file->_name));
-						fpos_t filepos=fPosition(_file); // MDH@08MAY2024: we'll need the current file position to know whether to close the file again or not
-						Mlist* _textLinesRead=owned_list(fReadLines(_file,numberOfLines,report),owner);
-						if(_textLinesRead!=NULL)result=_getValueOfList(disowned_list(_textLinesRead,owner));
-						// if we've reached the end of the file and we've read ALL lines, we close the file as a service to the user
-						if(fileValue->type==VT_FILE&&feof(_file->_f)){
-							if(filepos==0){
-								if(closeFile(_file))
-									output("File '%s' from which all text lines were read closed!\n",string(_file->_name));
-								else
-									output("%sFailed to close file '%s'!",M_ERROR_PREFIX,string(_file->_name));
+						long long filepos=fPosition(_file); // MDH@08MAY2024: we'll need the current file position to know whether to close the file again or not
+						if(filepos<0)outputWarning("Failed to obtain the current file position");
+						Mlist* textLinesReadBefore=NULL;
+						if(listValue!=NULL){
+							if(listValue->type!=VT_LIST){
+								outputValue("Third argument to fReadlines() (",listValue,") not a list.\n");
 							}else
-								output("%sFile '%s' not closed, although end-of-file reached.\n",M_WARNING_PREFIX,string(_file->_name));
+								textLinesReadBefore=listValue->value._list; 
 						}
+						Mlist* _textLinesRead=(textLinesReadBefore==NULL?owned_list(__list("fReadlines"),owner):textLinesReadBefore);
+						if(_textLinesRead!=NULL){
+							///long long linesReadBefore=_textLinesRead->numberOfElements;
+							long long numberOfLinesRead=fReadLines(_file,numberOfLines,_textLinesRead,(textLinesReadBefore!=NULL?getValueDataOwner():owner),report);
+							if(numberOfLinesRead>=0){
+								if(numberOfLines>=0&&numberOfLinesRead!=numberOfLines)
+									output("%sOnly %lld out of the requested %lld lines read from file '%s'.\n",M_WARNING_PREFIX,numberOfLinesRead,numberOfLines,string(_file->_name));
+								// either returning listValue or the new created list
+								result=_getValueOfList(textLinesReadBefore!=NULL?listValue:disowned_list(_textLinesRead,owner));
+								// if we've reached the end of the file and we've read ALL lines, we close the file as a service to the user
+								if(fileValue->type==VT_FILE&&feof(_file->_f)){
+									if(filepos==0){
+										if(closeFile(_file))
+											output("File '%s' from which all text lines were read closed!\n",string(_file->_name));
+										else
+											output("%sFailed to close file '%s'!",M_ERROR_PREFIX,string(_file->_name));
+									}else
+										output("%sFile '%s' not closed, although end-of-file reached.\n",M_WARNING_PREFIX,string(_file->_name));
+								}
+							}else{
+								// free the created list as it will not be returned
+								if(textLinesReadBefore==NULL)FREE_LIST(_textLinesRead,owner);
+								output("%sFailed to read lines from '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+							}
+						}else
+							outputError("Failed to create the list to store the lines read into");
 					}else
 						output("%sCan't read from file '%s': end-of-file reached.\n",M_ERROR_PREFIX,string(_file->_name));
 				}else

@@ -6,6 +6,7 @@
 //				TODO if blocks is zero failed to 
 extern unsigned long long M_MODULE_DEBUGGING;
 extern char* M_ERROR_PREFIX;
+extern long long M_LL_INVALID;
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_STRING,id};}
 
@@ -525,19 +526,24 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
  * 
  * @param str the Mstring to read into
  * @param file the file to read from
- * @return Mstring* \p str on success, NULL otherwise
+ * @param resetPosition whether or not to reset the position of the file cursor to the start of the next line (if any)
+ * @return long long the number of characters read but not processed (present at the end of the \p str )
  */
-Mstring* string_freadline(Mstring * const str,FILE* const file){
+long long string_freadline(Mstring * const str,FILE* const file, bool resetPosition){
 	if(str!=NULL&&str->_chars!=NULL){ // str is valid
 		if(file!=NULL&&!feof(file)){ // file is defined and there's stuff to read from it
 			// how many characters can we fit in the current block
 			size_t numberOfStrChars=str->length; // where we are in the block (we should overwrite the \0 at the end)
 			// if the current block is full, append a new block
-			if(numberOfStrChars>0&&((numberOfStrChars+1)%M_BLOCK_CHARACTERS)==0)if(!string_blockappended(str))return NULL; // failed to allocate a new block
+			if(numberOfStrChars>0&&((numberOfStrChars+1)%M_BLOCK_CHARACTERS)==0)if(!string_blockappended(str)){
+				outputError("Failed to allocate memory preparing to read a text line");
+				return M_LL_INVALID;
+			} // failed to allocate a new block
+			long long result=0;
 			size_t numberOfChars=getNumberOfChars(str); // the total number of characters we can store
-			size_t charsRead,leftInBlock=numberOfChars-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
-			//long int charsOnLine;
-			long int EOLNchars;
+			// NOTE when str is used to read multiple lines leftInBlock could well cover more than just a single block!!!!!!
+			//      unless somebody decides to actually resize str to have as little of blocks as possible
+			size_t EOLNchars,charsRead,leftInBlock=numberOfChars-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
 			/*
 			fpos_t fpos;
 			if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
@@ -546,7 +552,7 @@ Mstring* string_freadline(Mstring * const str,FILE* const file){
 			while(leftInBlock){
 				insertPosition=(str->_chars->chars+numberOfStrChars); // the address of where to insert new characters (the position of the NUL terminator)
 				charsRead=fread(insertPosition,1,leftInBlock,file); // read at most leftInBlock characters from file
-				if(charsRead<=0)break; // failure
+				if(!charsRead)break; // nothing read (could be on EOF)
 				// '\n' may appear at any of the positions in the block (insertPosition up until insertPosition+charsRead-1), or not
 				// locate the first end-of-line character i.e. the '\n' then we know we are done
 				/*
@@ -555,36 +561,57 @@ Mstring* string_freadline(Mstring * const str,FILE* const file){
 				charsOnLine=(eolnPosition-firstInsertPosition);
 				*/
 				EOLNchars=charsRead; // the number of characters left to search for '\n'
-				while(EOLNchars&&*insertPosition!='\n'){insertPosition++;EOLNchars--;}
-				if(EOLNchars>0){ // replacing: charsOnLine<charsRead){ // end-of-line found
+				while(EOLNchars&&*insertPosition!='\n'){insertPosition++;EOLNchars--;} // find the end-of-line
+				if(EOLNchars>0){ // end-of-line found
 					numberOfStrChars+=(charsRead-EOLNchars); // replacing: charsOnLine;
-					// essential to return to the start of the following line (of which part may have been read)
-					if(fseek(file,1L-EOLNchars/* replacing: (charsRead-charsOnLine)*/,SEEK_CUR))
-						output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars); // replacing: (charsRead-charsOnLine));
+					result=EOLNchars-1; // the number of characters at the end that we is cut off by setting the str->length below (and starts the next line)
+					if(resetPosition)	// essential to return to the start of the following line (of which part may have been read)
+						if(fseek(file,1L-EOLNchars/* replacing: (charsRead-charsOnLine)*/,SEEK_CUR))
+							output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars); // replacing: (charsRead-charsOnLine));
 					/*else{
 						output("Moved the file cursor %lld positions back.\n",EOLNchars);
 						if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
 					}*/
 					// is there a CR in front of it?
 					if(numberOfStrChars>1&&*(insertPosition-1)=='\r')numberOfStrChars--;
-					break;
+					break; // done with reading 'blocks'
 				}
-				// end-of-line character not found
+				// end-of-line character not found (yet), so all characters read belong to the line
 				numberOfStrChars+=charsRead;
-				// if the block is full, try to append another block
-				if(charsRead>=leftInBlock){
-					if(!string_blockappended(str))return NULL;
-					/////firstInvalidPosition+=M_BLOCK_CHARACTERS;
-					leftInBlock=M_BLOCK_CHARACTERS;
-				}else
-					leftInBlock-=charsRead;
+				// if NOT all requested characters were read we should assume that we've reached EOF or that there was some error
+				// NOTE we probably bumped into EOF before an EOLN was encountered, in which case there's nothing at the end of the block to copy since we're done
+				//      but since result is currently 0 (as initialized before the loop, we stick to returning that because it's not really an error bumping into EOF)
+				if(charsRead<leftInBlock)break;
+				// the block(s) is/are full, so we should allocate another block
+				// if we fail we have a serious problem and we can't trust the result, and should stop further reading
+				if(!string_blockappended(str)){result=M_LL_INVALID;outputError("Failed to allocate memory reading a text line");break;} // TODO should we return M_LL_INVALID here?????
+				leftInBlock=M_BLOCK_CHARACTERS;
 			}
-			str->length=numberOfStrChars;
+			str->length=numberOfStrChars; // NOTE __NOT__ writing the NUL character though!!!!
 			// we must be able to place the NUL character therefore if the string buffer is full a block should be appended for sure
-			if(numberOfStrChars<getNumberOfChars(str)||string_blockappended(str))return str;
+			if(numberOfStrChars<getNumberOfChars(str)||string_blockappended(str))return result;
 		}
 	}
-	return NULL;
+	return M_LL_INVALID;
+}
+/**
+ * @brief moves \p numberOfCharsAtEnd bytes at the end of \p str to position \p newPosition in \p str
+ * @details returns M_LL_INVALID on failure, \p numberOfCharsAtEnd otherwise
+ * @param str 
+ * @param numberOfCharsAtEnd 
+ * @param newPosition 
+ * @return long long the number of character bytes moved
+ */
+long long string_move_from_end(Mstring* str,size_t numberOfCharsAtEnd,size_t newPosition){
+	if(NULL==str||NULL==str->_chars)return M_LL_INVALID; // invalid input
+	if(numberOfCharsAtEnd){ // something to copy
+		size_t numberOfChars=getNumberOfChars(str); // the total number of characters we can store
+		if(numberOfChars<numberOfCharsAtEnd)return M_LL_INVALID; // if too many characters to copy, there's an error
+		size_t oldPosition=numberOfChars-numberOfCharsAtEnd; // the (offset) position of the first character to copy
+		if(newPosition!=oldPosition) // something to move
+			memmove(str->_chars->chars+newPosition,str->_chars->chars+oldPosition,sizeof(char)*numberOfCharsAtEnd);
+	}
+	return numberOfCharsAtEnd;
 }
 
 // MDH@12JUL2019: we can set a specific char which should only fail if pos is larger than the length
