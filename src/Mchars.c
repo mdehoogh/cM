@@ -65,7 +65,7 @@ Mchars* __chars(size_t size,long long count,signed char type){Mallocationowner o
  */
 Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,long long to_count,signed char type){
 	// MDH@19MAY2020: NOTE that _chars needs to be DISOWNED by the owner in order for REALLOC to allow changing ownership
-	if(!_chars)return NULL;
+	if(NULL==_chars)return NULL;
 	// obtain ownership, pass onto REALLOC to reallocate using foid as owner id, and return disowned
 	return(Mchars*)REALLOC(_chars,from_count,to_count,size,(type>0?-type:type));
 }

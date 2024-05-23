@@ -224,36 +224,38 @@ Mstring* string_setlength(Mstring* const str,size_t length){
 	//				nevertheless instead of a foid we could pass in the pointer of which it is a subclass
 	// if(!OWNED(str,owner))return NULL;
 	if(NULL==str)return NULL;
-	if(length>str->length){ // we're supposed to increment the length
-		// how many blocks do we need
-		size_t blocks=1+(length/M_BLOCK_CHARACTERS);
-		// if we do not have enough blocks ascertain to have enough...
-		if(blocks>str->blocks){
-			/////////printf("Realloc string_setlength().\n");
-			// MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
-			Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s'); // MDH@22MAY2020: by using -foid we disown it immediately
-			if(NULL==new_chars)return NULL; // failure
-			str->blocks=blocks;
-			str->_chars=new_chars; // MDH@05JUN2020 NO it is already subowned!!!! as soon as new_chars is stored in str->_chars which is a subpointer, we move the ownership to 0 i.e. it is safe if the containing pointer is
-			/* replacing:
-			char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
-			if (!new_str)return NULL; // failure!!
-			str->blocks=blocks;
-			str->chars=new_str;
-			*/
+	if(length!=str->length){
+		if(length>str->length){ // we're supposed to increment the length
+			// how many blocks do we need
+			size_t blocks=1+(length/M_BLOCK_CHARACTERS);
+			// if we do not have enough blocks ascertain to have enough...
+			if(blocks>str->blocks){
+				/////////printf("Realloc string_setlength().\n");
+				// MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
+				Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s'); // MDH@22MAY2020: by using -foid we disown it immediately
+				if(NULL==new_chars)return NULL; // failure
+				str->blocks=blocks;
+				str->_chars=new_chars; // MDH@05JUN2020 NO it is already subowned!!!! as soon as new_chars is stored in str->_chars which is a subpointer, we move the ownership to 0 i.e. it is safe if the containing pointer is
+				/* replacing:
+				char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
+				if (!new_str)return NULL; // failure!!
+				str->blocks=blocks;
+				str->chars=new_str;
+				*/
+			}
+			// fill with blanks??? for now that's OK
+			while(str->length<length){
+				str->_chars->chars[str->length]=' '; // MDH@17APR2020 replacing: str->chars[str->length]=' ';
+				str->length++;
+			}
+			// MDH@21JUN2019 removing: str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
+		}else{
+			// output("Shortening the length from %zu to %zu.\n",str->length,length);
+			str->length=length;
+			// MDH@21JUN2019 removing: str->chars[str->length]='\0';
 		}
-		// fill with blanks??? for now that's OK
-		while(str->length<length){
-			str->_chars->chars[str->length]=' '; // MDH@17APR2020 replacing: str->chars[str->length]=' ';
-			str->length++;
-		}
-		// MDH@21JUN2019 removing: str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
-	}else
-	if(length<str->length){
-		// output("Shortening the length from %zu to %zu.\n",str->length,length);
-		str->length=length;
-		// MDH@21JUN2019 removing: str->chars[str->length]='\0';
 	}
+	str->_chars->chars[str->length]='\0'; // MDH@22MAY2024: force placing the NUL character
 	return str;
 }
 
@@ -477,6 +479,7 @@ static bool string_blockappended(Mstring* const str){
 	////////printf("resized!\n");
 	++(str->blocks);
 	str->_chars=new_chars;
+	str->_chars->chars[str->blocks*M_BLOCK_SIZE]='\0';
 	return true;
 }
 
@@ -522,37 +525,46 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
 
 // MDH@05MAY2024: reading a text line directly into an Mstring
 /**
- * @brief appends the characters read from \p file up until the next end-of-line directly into \p str
+ * @brief appends the characters read from \p file to \p str
  * 
  * @param str the Mstring to read into
  * @param file the file to read from
- * @param resetPosition whether or not to reset the position of the file cursor to the start of the next line (if any)
- * @return long long the number of characters read but not processed (present at the end of the \p str )
+ * @param linefeedPosition the position of the first linefeed character
+ * @return long long the number of characters read from \p file
  */
-long long string_freadline(Mstring * const str,FILE* const file, bool resetPosition){
+long long string_freadline(Mstring * const str,FILE* const file, char const * * linefeedCharacterPosition){
+	*linefeedCharacterPosition=NULL;
 	if(str!=NULL&&str->_chars!=NULL){ // str is valid
 		if(file!=NULL&&!feof(file)){ // file is defined and there's stuff to read from it
+			// problem: the newline character could be present in the part at the beginning of the line in which case 
+			//          there is no need to actually read more from the file
 			// how many characters can we fit in the current block
 			size_t numberOfStrChars=str->length; // where we are in the block (we should overwrite the \0 at the end)
-			// if the current block is full, append a new block
-			if(numberOfStrChars>0&&((numberOfStrChars+1)%M_BLOCK_CHARACTERS)==0)if(!string_blockappended(str)){
+			size_t numberOfChars=getNumberOfChars(str); // the total number of characters we can store
+			// as long as we cannot put the NUL character in, append a new block
+			while(numberOfStrChars+1>=numberOfChars&&string_blockappended(str))numberOfChars+=M_BLOCK_CHARACTERS; // TODO should this be M_BLOCK_CHARACTERS?????
+			if(numberOfStrChars+1>=numberOfChars){
 				outputError("Failed to allocate memory preparing to read a text line");
 				return M_LL_INVALID;
 			} // failed to allocate a new block
-			long long result=0;
-			size_t numberOfChars=getNumberOfChars(str); // the total number of characters we can store
+			long long totalNumberOfCharsRead=0;
+			size_t /*EOLNchars,*/numberOfCharsRead,leftInBlock=numberOfChars-numberOfStrChars-1; // leftInBlock is what we may read
 			// NOTE when str is used to read multiple lines leftInBlock could well cover more than just a single block!!!!!!
 			//      unless somebody decides to actually resize str to have as little of blocks as possible
-			size_t EOLNchars,charsRead,leftInBlock=numberOfChars-numberOfStrChars; // NOTE where l is pointing is the NUL character which may be overwritten!!!
-			/*
-			fpos_t fpos;
-			if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
-			*/
 			char* insertPosition; // char *firstInvalidPosition=(str->_chars->chars+numberOfChars),*firstInsertPosition,*eolnPosition;
+			/////size_t lineChars; // the number of characters found on the line
 			while(leftInBlock){
 				insertPosition=(str->_chars->chars+numberOfStrChars); // the address of where to insert new characters (the position of the NUL terminator)
-				charsRead=fread(insertPosition,1,leftInBlock,file); // read at most leftInBlock characters from file
-				if(!charsRead)break; // nothing read (could be on EOF)
+				numberOfCharsRead=fread(insertPosition,sizeof(char),leftInBlock,file); // read at most leftInBlock characters from file
+				if(!numberOfCharsRead)break; // nothing read (could be on EOF)
+				numberOfStrChars+=numberOfCharsRead;
+				str->length=numberOfStrChars; // required otherwise strchr() [see below] will possibly run havoc
+				*(insertPosition+numberOfCharsRead)='\0'; // put a closing NUL character behind what we've read (we'll be needing this so we can use strchr() to find '\n')
+				if(numberOfCharsRead!=leftInBlock&&!feof(file))
+					output("%sOnly %llu out of %llu characters read from unfinished text file.\n",M_ERROR_PREFIX,numberOfCharsRead,leftInBlock);
+				//////output("\tRead from text file so far: '");string_outputchars(str,false);output("'\n");
+				totalNumberOfCharsRead+=numberOfCharsRead; // update the total number of characters read
+				if(numberOfCharsRead!=leftInBlock)totalNumberOfCharsRead=-totalNumberOfCharsRead;
 				// '\n' may appear at any of the positions in the block (insertPosition up until insertPosition+charsRead-1), or not
 				// locate the first end-of-line character i.e. the '\n' then we know we are done
 				/*
@@ -560,36 +572,56 @@ long long string_freadline(Mstring * const str,FILE* const file, bool resetPosit
 				while(eolnPosition!=firstInvalidPosition&&*eolnPosition!='\n')eolnPosition++;
 				charsOnLine=(eolnPosition-firstInsertPosition);
 				*/
+				// MDH@22MAY2024: using strchr() is preferred over using the outcommented lines
+				*linefeedCharacterPosition=strchr(insertPosition,'\n');
+				// we're no longer supposed to cut off the line here as we did earlier, we only need to return linefeedCharacterPosition!!!!
+				if(*linefeedCharacterPosition!=NULL)break;
+				/* replacing:
+				if(*linefeedCharacterPosition!=NULL){ // linefeed found
+					///////result=leftInBlock-lineChars; // the chars not in the current line in the last block
+					if(numberOfCharsRead!=leftInBlock)totalNumberOfCharsRead=-totalNumberOfCharsRead;
+					lineChars=*linefeedCharacterPosition-insertPosition; // the number of characters in the current line
+					if(lineChars>1&&*(linefeedCharacterPosition-1)=='\r')lineChars--;
+					numberOfStrChars+=lineChars;
+					break;
+				}
+				*/
+				/* replacing (NOTE there is an error in the outcommented code when there are CRs in the end-of-line characters):
 				EOLNchars=charsRead; // the number of characters left to search for '\n'
 				while(EOLNchars&&*insertPosition!='\n'){insertPosition++;EOLNchars--;} // find the end-of-line
 				if(EOLNchars>0){ // end-of-line found
 					numberOfStrChars+=(charsRead-EOLNchars); // replacing: charsOnLine;
 					result=EOLNchars-1; // the number of characters at the end that we is cut off by setting the str->length below (and starts the next line)
-					if(resetPosition)	// essential to return to the start of the following line (of which part may have been read)
-						if(fseek(file,1L-EOLNchars/* replacing: (charsRead-charsOnLine)*/,SEEK_CUR))
-							output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars); // replacing: (charsRead-charsOnLine));
-					/*else{
-						output("Moved the file cursor %lld positions back.\n",EOLNchars);
-						if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
-					}*/
+					/// MDH@22MAY2024: not doing this anymore, this is left to the calling method (typically fReadLine() and fReadLines() in Mvalue.c)
+					////if(resetPosition)	// essential to return to the start of the following line (of which part may have been read)
+					////	if(fseek(file,1L-EOLNchars,SEEK_CUR))
+					////		output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars); // replacing: (charsRead-charsOnLine));
+					///else{
+					///	output("Moved the file cursor %lld positions back.\n",EOLNchars);
+					///	if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
+					///}
 					// is there a CR in front of it?
 					if(numberOfStrChars>1&&*(insertPosition-1)=='\r')numberOfStrChars--;
 					break; // done with reading 'blocks'
 				}
+				*/
 				// end-of-line character not found (yet), so all characters read belong to the line
-				numberOfStrChars+=charsRead;
+				//// already did that!!! numberOfStrChars+=numberOfCharsRead;
 				// if NOT all requested characters were read we should assume that we've reached EOF or that there was some error
 				// NOTE we probably bumped into EOF before an EOLN was encountered, in which case there's nothing at the end of the block to copy since we're done
 				//      but since result is currently 0 (as initialized before the loop, we stick to returning that because it's not really an error bumping into EOF)
-				if(charsRead<leftInBlock)break;
+				//// already did that!!! if(numberOfCharsRead<leftInBlock){totalNumberOfCharsRead=-totalNumberOfCharsRead;break;}
 				// the block(s) is/are full, so we should allocate another block
 				// if we fail we have a serious problem and we can't trust the result, and should stop further reading
-				if(!string_blockappended(str)){result=M_LL_INVALID;outputError("Failed to allocate memory reading a text line");break;} // TODO should we return M_LL_INVALID here?????
+				if(!string_blockappended(str)){totalNumberOfCharsRead=M_LL_INVALID;outputError("Failed to allocate memory reading a text line");break;} // TODO should we return M_LL_INVALID here?????
 				leftInBlock=M_BLOCK_CHARACTERS;
 			}
+			//// already did that when we read from the file!!!! string_setlength(str,numberOfStrChars); // now does write the NUL character
+			/* replacing: 
 			str->length=numberOfStrChars; // NOTE __NOT__ writing the NUL character though!!!!
 			// we must be able to place the NUL character therefore if the string buffer is full a block should be appended for sure
-			if(numberOfStrChars<getNumberOfChars(str)||string_blockappended(str))return result;
+			if(numberOfStrChars<getNumberOfChars(str)||string_blockappended(str))*/
+			return totalNumberOfCharsRead;
 		}
 	}
 	return M_LL_INVALID;
@@ -602,18 +634,63 @@ long long string_freadline(Mstring * const str,FILE* const file, bool resetPosit
  * @param newPosition 
  * @return long long the number of character bytes moved
  */
-long long string_move_from_end(Mstring* str,size_t numberOfCharsAtEnd,size_t newPosition){
+long long string_move(Mstring* const str,size_t oldPosition,size_t newPosition){
 	if(NULL==str||NULL==str->_chars)return M_LL_INVALID; // invalid input
-	if(numberOfCharsAtEnd){ // something to copy
-		size_t numberOfChars=getNumberOfChars(str); // the total number of characters we can store
-		if(numberOfChars<numberOfCharsAtEnd)return M_LL_INVALID; // if too many characters to copy, there's an error
-		size_t oldPosition=numberOfChars-numberOfCharsAtEnd; // the (offset) position of the first character to copy
-		if(newPosition!=oldPosition) // something to move
-			memmove(str->_chars->chars+newPosition,str->_chars->chars+oldPosition,sizeof(char)*numberOfCharsAtEnd);
+	char* firstCharToMove=str->_chars->chars+oldPosition;
+	long long numberOfCharsMoved=0;
+	if(*firstCharToMove){
+		if(newPosition!=oldPosition){ // something to move
+			char* endPosition=strchr(firstCharToMove,'\0'); // there should always be a NUL character at the end of the characters to move!!!
+			numberOfCharsMoved=(endPosition-firstCharToMove+1); // move the closing NUL character as well!!!
+			memmove(str->_chars->chars+newPosition,firstCharToMove,sizeof(char)*numberOfCharsMoved);
+			// NOTE since we copied the closing NUL character we can safely set the length as well
+			str->length=newPosition+numberOfCharsMoved-1;
+		}
 	}
-	return numberOfCharsAtEnd;
+	return numberOfCharsMoved;
 }
-
+/**
+ * @brief outputs all characters in \p str
+ * 
+ * @param str 
+ */
+void string_outputchars(Mstring const * const str,bool extended){
+	// outputs all block characters representing '\0' by 
+	if(NULL==str)return;
+	char* firstChar=str->_chars->chars;
+	char* firstNotChar=firstChar+getNumberOfChars(str);
+	size_t charIndex=0;
+	while(firstChar!=firstNotChar){
+		if(charIndex==str->length)outputChar('[');
+		if(!extended){
+			if(*firstChar<14){
+				outputChar('\\');
+				switch(*firstChar){
+					case 0:
+					case 1:
+					case 2:
+					case 3:
+					case 4:
+					case 5:
+					case 6:
+					case 7:
+					case 8:outputChar(*firstChar+48);break;
+					case 9:outputChar('t');break;
+					case 10:outputChar('n');break;
+					case 11:outputChar('B');break;
+					case 12:outputChar('C');break;
+					case 13:outputChar('r');break;
+				}
+			}else
+				outputChar(*firstChar);
+		}else
+			output(" %c=%i",(*firstChar>=14&&*firstChar<=121?*firstChar:(*firstChar?'.':'_')),*firstChar);
+		firstChar++;
+		if(charIndex==str->length)outputChar(']');
+		charIndex++;
+		if(charIndex%M_BLOCK_CHARACTERS==0)outputChar('|');
+	}
+}
 // MDH@12JUL2019: we can set a specific char which should only fail if pos is larger than the length
 /**
  * @brief replaces the character at position \p pos of the Mstring pointed to by \p str by \p c
