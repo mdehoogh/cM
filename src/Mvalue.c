@@ -5248,7 +5248,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 								outputError("Failed to read the line directly");
 								FREE_STRING(_bytesRead,owner);_bytesRead=NULL;
 							}else{
-								output("Line after reading %lld characters: '",numberOfCharsRead);string_outputchars(_bytesRead,false);output("'\n");
+								///////output("Line after reading %lld characters: '",numberOfCharsRead);string_outputchars(_bytesRead,false);output("'\n");
 								// if an end-of-line character was found, there could be a remainder
 								if(linefeedCharacterPosition!=NULL){ // not everything read should be in the returned text line
 									size_t numberOfLineCharacters=(linefeedCharacterPosition-_bytesRead->_chars->chars); // including the single quote at the start
