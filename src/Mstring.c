@@ -526,7 +526,7 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
 // MDH@05MAY2024: reading a text line directly into an Mstring
 /**
  * @brief appends the characters read from \p file to \p str
- * 
+ * @details returns M_LL_INVALID when nothing was read from \p file so far, or the negated number of characters read when failing to allocate sufficient memory
  * @param str the Mstring to read into
  * @param file the file to read from
  * @param linefeedPosition the position of the first linefeed character
@@ -534,20 +534,24 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
  */
 long long string_freadline(Mstring * const str,FILE* const file, char const * * linefeedCharacterPosition){
 	*linefeedCharacterPosition=NULL;
-	if(str!=NULL&&str->_chars!=NULL){ // str is valid
-		if(file!=NULL&&!feof(file)){ // file is defined and there's stuff to read from it
+	long long totalNumberOfCharsRead=M_LL_INVALID; // assume parameters invalid
+	if(str!=NULL&&str->_chars!=NULL&&file!=NULL){ // str is valid and file is available
+		totalNumberOfCharsRead=0;
+		if(!feof(file)){ // file is defined and there's stuff to read from it
 			// problem: the newline character could be present in the part at the beginning of the line in which case 
 			//          there is no need to actually read more from the file
 			// how many characters can we fit in the current block
 			size_t numberOfStrChars=str->length; // where we are in the block (we should overwrite the \0 at the end)
 			size_t numberOfChars=getNumberOfChars(str); // the total number of characters we can store
 			// as long as we cannot put the NUL character in, append a new block
-			while(numberOfStrChars+1>=numberOfChars&&string_blockappended(str))numberOfChars+=M_BLOCK_CHARACTERS; // TODO should this be M_BLOCK_CHARACTERS?????
-			if(numberOfStrChars+1>=numberOfChars){
-				outputError("Failed to allocate memory preparing to read a text line");
-				return M_LL_INVALID;
+			while(numberOfStrChars+1>=numberOfChars){
+				if(!string_blockappended(str)){
+					outputError("Failed to allocate memory preparing to read a text line");
+					return M_LL_INVALID;
+				}
+				numberOfChars+=M_BLOCK_CHARACTERS; // TODO should this be M_BLOCK_CHARACTERS?????
 			} // failed to allocate a new block
-			long long totalNumberOfCharsRead=0;
+			// ASSERT numberOfStrChars+1<numberOfChars, which means leftInBlock will be positive!!!!
 			size_t /*EOLNchars,*/numberOfCharsRead,leftInBlock=numberOfChars-numberOfStrChars-1; // leftInBlock is what we may read
 			// NOTE when str is used to read multiple lines leftInBlock could well cover more than just a single block!!!!!!
 			//      unless somebody decides to actually resize str to have as little of blocks as possible
@@ -557,14 +561,11 @@ long long string_freadline(Mstring * const str,FILE* const file, char const * * 
 				insertPosition=(str->_chars->chars+numberOfStrChars); // the address of where to insert new characters (the position of the NUL terminator)
 				numberOfCharsRead=fread(insertPosition,sizeof(char),leftInBlock,file); // read at most leftInBlock characters from file
 				if(!numberOfCharsRead)break; // nothing read (could be on EOF)
+				totalNumberOfCharsRead+=numberOfCharsRead; // update the total number of characters read
 				numberOfStrChars+=numberOfCharsRead;
 				str->length=numberOfStrChars; // required otherwise strchr() [see below] will possibly run havoc
 				*(insertPosition+numberOfCharsRead)='\0'; // put a closing NUL character behind what we've read (we'll be needing this so we can use strchr() to find '\n')
-				if(numberOfCharsRead!=leftInBlock&&!feof(file))
-					output("%sOnly %llu out of %llu characters read from unfinished text file.\n",M_ERROR_PREFIX,numberOfCharsRead,leftInBlock);
 				//////output("\tRead from text file so far: '");string_outputchars(str,false);output("'\n");
-				totalNumberOfCharsRead+=numberOfCharsRead; // update the total number of characters read
-				if(numberOfCharsRead!=leftInBlock)totalNumberOfCharsRead=-totalNumberOfCharsRead;
 				// '\n' may appear at any of the positions in the block (insertPosition up until insertPosition+charsRead-1), or not
 				// locate the first end-of-line character i.e. the '\n' then we know we are done
 				/*
@@ -613,7 +614,15 @@ long long string_freadline(Mstring * const str,FILE* const file, char const * * 
 				//// already did that!!! if(numberOfCharsRead<leftInBlock){totalNumberOfCharsRead=-totalNumberOfCharsRead;break;}
 				// the block(s) is/are full, so we should allocate another block
 				// if we fail we have a serious problem and we can't trust the result, and should stop further reading
-				if(!string_blockappended(str)){totalNumberOfCharsRead=M_LL_INVALID;outputError("Failed to allocate memory reading a text line");break;} // TODO should we return M_LL_INVALID here?????
+				if(feof(file))break; // nothing left to read so no need to allocate memory because there's nothing left to read from the file
+				// less read that we could have, that's a weird error condition
+				if(numberOfCharsRead!=leftInBlock){
+					totalNumberOfCharsRead=-totalNumberOfCharsRead;
+					int fileError=ferror(file);
+					output("%sOnly %llu out of %llu characters read from unfinished text file (error code: %d).\n",M_ERROR_PREFIX,numberOfCharsRead,leftInBlock,fileError);
+					break;
+				}
+				if(!string_blockappended(str)){totalNumberOfCharsRead=-totalNumberOfCharsRead;outputError("Failed to allocate memory reading a text line");break;} // TODO should we return M_LL_INVALID here?????
 				leftInBlock=M_BLOCK_CHARACTERS;
 			}
 			//// already did that when we read from the file!!!! string_setlength(str,numberOfStrChars); // now does write the NUL character
@@ -621,10 +630,10 @@ long long string_freadline(Mstring * const str,FILE* const file, char const * * 
 			str->length=numberOfStrChars; // NOTE __NOT__ writing the NUL character though!!!!
 			// we must be able to place the NUL character therefore if the string buffer is full a block should be appended for sure
 			if(numberOfStrChars<getNumberOfChars(str)||string_blockappended(str))*/
-			return totalNumberOfCharsRead;
+			/////////return totalNumberOfCharsRead;
 		}
 	}
-	return M_LL_INVALID;
+	return totalNumberOfCharsRead;
 }
 /**
  * @brief moves \p numberOfCharsAtEnd bytes at the end of \p str to position \p newPosition in \p str
@@ -636,16 +645,21 @@ long long string_freadline(Mstring * const str,FILE* const file, char const * * 
  */
 long long string_move(Mstring* const str,size_t oldPosition,size_t newPosition){
 	if(NULL==str||NULL==str->_chars)return M_LL_INVALID; // invalid input
+	/////output("Moving from position %lld to %lld.\n",oldPosition,newPosition);
 	char* firstCharToMove=str->_chars->chars+oldPosition;
 	long long numberOfCharsMoved=0;
 	if(*firstCharToMove){
-		if(newPosition!=oldPosition){ // something to move
-			char* endPosition=strchr(firstCharToMove,'\0'); // there should always be a NUL character at the end of the characters to move!!!
+		char* endPosition=strchr(firstCharToMove,'\0'); // there should always be a NUL character at the end of the characters to move!!!
+		if(endPosition!=NULL){
 			numberOfCharsMoved=(endPosition-firstCharToMove+1); // move the closing NUL character as well!!!
-			memmove(str->_chars->chars+newPosition,firstCharToMove,sizeof(char)*numberOfCharsMoved);
-			// NOTE since we copied the closing NUL character we can safely set the length as well
-			str->length=newPosition+numberOfCharsMoved-1;
-		}
+			//////output("Number of characters to move: %lld.\n",numberOfCharsMoved);
+			if(newPosition!=oldPosition){ // something to move
+				memmove(str->_chars->chars+newPosition,firstCharToMove,sizeof(char)*numberOfCharsMoved);
+				// NOTE since we copied the closing NUL character we can safely set the length as well
+				str->length=newPosition+numberOfCharsMoved-1;
+			}
+		}else
+			outputError("No end position found!");
 	}
 	return numberOfCharsMoved;
 }
