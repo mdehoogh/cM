@@ -5459,11 +5459,11 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 											}
 											///output("Moving the remainder to the start.\n");
 											// ASSERT not at end-of-file and still lines to read so readButNotStored is completable
-											long long numberOfCharsMoved=string_move(_line,(startOfLine+1)-_line->_chars->chars,1);
+											long long numberOfCharsMoved=string_characters_moved(_line,(startOfLine+1)-_line->_chars->chars,1);
 											//////output("Number of characters moved: %lld.\n",numberOfCharsMoved);
-											if(numberOfCharsMoved!=readButNotStored+1){ // not all characters moved, which means something went wrong, and we have to abort and give the remainder back!!!
+											if(numberOfCharsMoved!=readButNotStored){ // not all characters moved, which means something went wrong, and we have to abort and give the remainder back!!!
 												result=-result;
-												output("%sOnly %lld out of %lld characters moved.\n",M_ERROR_PREFIX,numberOfCharsMoved-1,readButNotStored);
+												output("%sOnly %lld out of %lld characters moved.\n",M_ERROR_PREFIX,numberOfCharsMoved,readButNotStored);
 												break;
 											}
 											///////readButNotStored=0; // successfully moved, but since we're not breaking out of the loop yet, it doesn't matter

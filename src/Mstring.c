@@ -643,25 +643,28 @@ long long string_freadline(Mstring * const str,FILE* const file, char const * * 
  * @param newPosition 
  * @return long long the number of character bytes moved
  */
-long long string_move(Mstring* const str,size_t oldPosition,size_t newPosition){
-	if(NULL==str||NULL==str->_chars)return M_LL_INVALID; // invalid input
-	/////output("Moving from position %lld to %lld.\n",oldPosition,newPosition);
-	char* firstCharToMove=str->_chars->chars+oldPosition;
-	long long numberOfCharsMoved=0;
-	if(*firstCharToMove){
+long long string_characters_moved(Mstring* const str,size_t oldPosition,size_t newPosition){
+	// we need something to copy which also means that oldPosition and newPosition both need to be smaller than the number of characters i.e. inside the stored string characters
+	if(str!=NULL&&str->_chars!=NULL&&oldPosition<str->length&&newPosition<str->length){
+		str->_chars->chars[str->length]='\0'; // safety catch to ascertain that we can safely use strchr()
+		/////output("Moving from position %lld to %lld.\n",oldPosition,newPosition);
+		char* firstCharToMove=str->_chars->chars+oldPosition;
 		char* endPosition=strchr(firstCharToMove,'\0'); // there should always be a NUL character at the end of the characters to move!!!
 		if(endPosition!=NULL){
-			numberOfCharsMoved=(endPosition-firstCharToMove+1); // move the closing NUL character as well!!!
+			long long numberOfCharsToMove=endPosition-firstCharToMove; // move the closing NUL character as well!!!
 			//////output("Number of characters to move: %lld.\n",numberOfCharsMoved);
-			if(newPosition!=oldPosition){ // something to move
-				memmove(str->_chars->chars+newPosition,firstCharToMove,sizeof(char)*numberOfCharsMoved);
-				// NOTE since we copied the closing NUL character we can safely set the length as well
-				str->length=newPosition+numberOfCharsMoved-1;
+			if(numberOfCharsToMove>0&&newPosition!=oldPosition){ // something to move
+				memmove(str->_chars->chars+newPosition,firstCharToMove,sizeof(char)*numberOfCharsToMove);
+				// NOTE finish with the NUL character
+				str->length=newPosition+numberOfCharsToMove;
+				str->_chars->chars[str->length]='\0';
 			}
-		}else
-			outputError("No end position found!");
+			return numberOfCharsToMove;
+		}
+		// this is truely something that should never happen (and it won't given we ascertain that we force a NUL character at the end of the string)
+		outputBug("No end position found moving characters!");
 	}
-	return numberOfCharsMoved;
+	return M_LL_INVALID; // invalid input
 }
 /**
  * @brief outputs all characters in \p str

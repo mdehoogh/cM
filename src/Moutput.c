@@ -25,7 +25,7 @@ static bool echo_to_output_file=false;
  */
 size_t logToOutputFile(const char* fmt,...){
 	size_t result=0;
-	if(outputFile){
+	if(outputFile!=NULL){
 	  va_list args;
   	va_start(args,fmt);
   	result=vfprintf(outputFile,fmt,args); // MDH@13MAR2020: echo to the output file if the flag tells us to
