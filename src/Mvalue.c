@@ -5427,13 +5427,13 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 								}
 								*/
 								readButNotStored=0; // for safety, just in case some positive value was still around
-								///////output("Contents after reading %lld characters: '",numberOfCharsRead);string_outputchars(_line,false);output("'\n");
+								output("Contents after reading %lld characters: '",_line->length-1);string_outputchars(_line,false);output("'\n");
 								// TODO what should we do when numberOfCharsRead is negative?????
 								// DONE see before the end of the loop where we're breaking out of this loop when that happens
 								// PROCESS ALL TERMINATED LINES
 								// NOTE if we fail to store we should treat the not registered characters read as REMAINDER
 								char* lastStoredCharacterPosition=_line->_chars->chars; // the beginning of any line of characters read is where the single quote is located
-								if(NULL==linefeedCharacterPosition&&feof(file->_f))linefeedCharacterPosition=lastStoredCharacterPosition+_line->length; // consume all characters read as last line
+								if(NULL==linefeedCharacterPosition&&endOfFileReached)linefeedCharacterPosition=lastStoredCharacterPosition+_line->length; // consume all characters read as last line
 								while(linefeedCharacterPosition!=NULL){
 									// all characters from startOfLine to linefeedCharacterPosition belong to the line to register
 									// STEP 2. collect the text line
@@ -5447,13 +5447,25 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 										break;
 									}
 									// STEP 1. mark the end of the text line NOTE this won't change the actual length, but will ascertain that _getTextValue() copies the actual line
+									bool allCharactersProcessed=(*linefeedCharacterPosition=='\0');
 									if(*(linefeedCharacterPosition-1)=='\r')*(linefeedCharacterPosition-1)='\0';else *linefeedCharacterPosition='\0';
 									assignValue(&listelement->_value,_getTextValue(lastStoredCharacterPosition));
-									if(report)output("Line '%s' stored.\n",lastStoredCharacterPosition);
+									////if(report)
+										output("Line '%s' stored.\n",lastStoredCharacterPosition);
+									if(allCharactersProcessed){output("All characters processed.\n");break;}
+									/////////if(*linefeedCharacterPosition=='\0')break; // if this was adding the empty line at end-of-file (see below for how to force that), we allow doing that only once!!!
 									// STEP 3. replace the end-of-line character with a single quote (') so we can use it as the new start of line position
 									lastStoredCharacterPosition=linefeedCharacterPosition;
+									// before replacing the linefeed character by a single quote we can check whether it already is because when it is this is the empty line at end-of-file we just added
 									*lastStoredCharacterPosition='\''; // mark start of next line to process with a single quote
-									if(endOfFileReached)break; // all read text now processed
+									// MDH@28MAY2024: there's a special situation where we should not break this is when we reached end-of-file right after a newline character
+									//                in that situation we should add an empty line, this is when we now have ' followed by a NUL character
+									if(endOfFileReached){
+										// if we reached the end of the file, right behind a newline character (and nothing behind it), we force append a blank line once
+										if(*(lastStoredCharacterPosition+1)=='\0'){linefeedCharacterPosition=lastStoredCharacterPosition+1;continue;}
+										// OOPS you should never break on end-of-file as long as there are lines to process!!!!!!
+										////////////break; // all read text now processed
+									}
 									if(linesLeftToRead==0)break; // stop as soon as we do not want to read another line, or we've processed all
 									// find the next end-of-line character (if any), or bumping into the NUL character at the end in _line
 									linefeedCharacterPosition=strchr(lastStoredCharacterPosition+1,'\n');
@@ -5463,7 +5475,9 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 								// PROCESS THE REMAINDER
 								// NOTE which we know does not end with a newline character
 								//      which starts at startOfLine+1 up until where the line ends
-								readButNotStored=(endOfFileReached?0:(_line->_chars->chars+_line->length)-(lastStoredCharacterPosition+1));
+								// MDH@28MAY2024: endOfFileReached could be true because all remaining characters were read although we may not have processed all of them
+								//                therefore we should NOT set readButNotStored to 0 when endOfFileReached equals true
+								readButNotStored=/*endOfFileReached?0:*/(_line->_chars->chars+_line->length)-(lastStoredCharacterPosition+1)/*)*/;
 								if(result>=0){
 									if(readButNotStored>0){ // not all characters stored WHICH now also means that we haven't reached end-of-file
 										/////output("Read but not stored (yet): %lld.\n",readButNotStored);
