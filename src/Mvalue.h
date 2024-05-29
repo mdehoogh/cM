@@ -575,7 +575,7 @@ off_t fPosition(Mfile const * const file);
 off_t fSetPosition(Mfile const * const file,long long position);
 long long fPushPosition(Mfile * const file,Mallocationowner file_owner);
 long long fPopPosition(Mfile * const file,Mallocationowner file_owner);
-long long fJumpToStart(Mfile const * const file);
+long long fJumpToStart(Mfile * const file);
 long long fJumpToEnd(Mfile const * const file);
 
 // MDH@30APR2024: internal equivalents of the M interpreter file functions
@@ -590,7 +590,7 @@ long long fReadLines(Mfile const * const file,long long numberOfLines,Mlist* lis
 long long fWriteChars(Mfile const * const file,char const * const chars,bool writeEoln); // returns amount of chars not written
 long long fWriteText(Mfile const * const file,Mtext const * const towrite,bool writeEoln); // returns amount of bytes not written
 // long long fWriteLine(Mfile const * const file,Mstring * const towrite); // return amount of bytes not written
-long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite); // returns the number of lines not written
+long long fWriteLines(Mfile * const file,Mlist const * const linesToWrite); // returns the number of lines not written
 
 Mvalue* Mnewfile(Mvalue const * const filenameValue);
 Mvalue* Mfflush(Mvalue const * const fileValue);

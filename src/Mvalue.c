@@ -4625,16 +4625,17 @@ Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner own
 
 // Mfile support
 Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=getOwner(__LINE__);
-	if(_file!=NULL){
+	if(_file!=NULL&&_file->_name!=NULL){
 		Mmap* _fileStatMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
 		if(_fileStatMap!=NULL){
 			// MDH@11MAY2024: force updating the stats if _file->staterrno does not equal 0, if it equals to 0 we're assuming it's up to date, but trying again even if staterrno equals errno (when positive) just in case it changed!!!
 			if(_file->staterrno!=0)fUpdateStats(_file,false); // do NOT report here, because you'd get a circular reference that way!!
-			if(_file->staterrno>=0){ // the stats have been determined!!!
-				appendedToMap(_fileStatMap,owner,"exists",_getTextValue("'yes"));
+			if(_file->staterrno>0){
 				appendedToMap(_fileStatMap,owner,"errno",_getValueOfInteger(_getInteger(_file->staterrno))); // NOTE integer returned by _getInteger freed by _getValueOfInteger when failing to wrap it
-				if(_file->staterrno>0)
-					appendedToMap(_fileStatMap,owner,"error",_getValueOfText(_getSingleQuotedText(strerror(_file->staterrno))));
+				appendedToMap(_fileStatMap,owner,"error",_getValueOfText(_getSingleQuotedText(strerror(_file->staterrno))));
+			}
+			if(_file->staterrno==0){ // the stats have been determined!!!
+				appendedToMap(_fileStatMap,owner,"exists",_getTextValue("'yes"));
 				struct stat filestat=_file->stat; // MDH@02MAY2024
 				// File permissions
 				Mstring* _permissionsText=owned_string(_getFilePermissionsText(filestat.st_mode),owner);
@@ -5628,16 +5629,24 @@ long long fWriteChars(Mfile const * const file/*,Mallocationowner owner_file*/,c
 	long long result=M_LL_INVALID;
 	if(file!=NULL&&chars!=NULL){
 		if(file->_f!=NULL){
-			size_t towrite=strlen(chars); // the number of characters to write
-			size_t eolntowrite=(writeEoln?strlen(FILE_EOLN):0);
+			size_t charsToWrite=strlen(chars); // the number of characters to write
+			size_t eolnToWrite=(writeEoln?strlen(FILE_EOLN):0);
 			long long notwritten=0;
 			// if there's actually nothing to write we assume success (and notwritten will remain 0)
-			if(towrite>0){ // something left to write
+			if(charsToWrite||eolnToWrite){ // something left to write
 				////////////////if(NULL==file->_f)openFile(file,owner_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
 				if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(file->_mode[1]!='b'){ // text write (i.e. as characters)
+						// the end-of-line is to precede the text to write!!!!!
+						if(eolnToWrite){ // also some EOLN characters to write
+							///output("Writing the end-of-line characters to '%s'.\n",string(file->_name));
+							char* p=FILE_EOLN;
+							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
+							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
+							while(*p){notwritten++;p++;} // NOTE count what has not been written
+						}
 						// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
-						Mstring* _textToWrite=owned_string(_getStringOfChars(chars,'\0'),owner); // NOTE: replaces the _getStringOfText() call as used in fWriteText()
+						Mstring* _textToWrite=(charsToWrite>0&&notwritten==0?owned_string(_getStringOfChars(chars,'\0'),owner):NULL); // NOTE: replaces the _getStringOfText() call as used in fWriteText()
 						if(_textToWrite!=NULL){
 							///output("Writing '%s' to file '%s'.\n",string(_textToWrite),string(file->_name));
 							char* p=_textToWrite->_chars->chars;
@@ -5645,24 +5654,13 @@ long long fWriteChars(Mfile const * const file/*,Mallocationowner owner_file*/,c
 							while(*p){notwritten++;p++;} // count what has not been written
 							FREE_STRING(_textToWrite,owner); // MDH@29APR2024: BUG FIX should be here
 						}else
-							notwritten=towrite;
+							notwritten+=charsToWrite;
 					}else // binary write
-						notwritten=towrite-fwrite(chars,sizeof(char),towrite,file->_f);
-					// write end-of-line characters if required
-					if(eolntowrite){ // also some EOLN characters to write
-						if(notwritten==0){ // succeeded so far
-							///output("Writing the end-of-line characters to '%s'.\n",string(file->_name));
-							char* p=FILE_EOLN;
-							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
-							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
-							while(*p){notwritten++;p++;} // NOTE count what has not been written
-						}else
-							notwritten+=eolntowrite;
-					}
+						notwritten=charsToWrite-fwrite(chars,sizeof(char),charsToWrite,file->_f);
 				}
 			}
 			result=notwritten;
-			if(notwritten)output("%sFailed to write %lld characters to '%s': %d.\n",M_ERROR_PREFIX,string(file->_name),notwritten);
+			if(notwritten)output("%sFailed to write %lld characters to '%s': %lld.\n",M_ERROR_PREFIX,string(file->_name),notwritten);
 		}else
 			outputError("Can't write to an unopened file");
 	}
@@ -5727,7 +5725,7 @@ long long fWriteLine(Mfile const * const file,Mstring * const towrite){ // retur
 	return result;
 }
 */
-long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite){Mallocationowner owner=getOwner(__LINE__); // returns the number of lines not written
+long long fWriteLines(Mfile * const file,Mlist const * const linesToWrite){Mallocationowner owner=getOwner(__LINE__); // returns the number of lines not written
 	long long result=M_LL_INVALID;
 	if(file!=NULL){
 		if(linesToWrite!=NULL){
@@ -5741,16 +5739,15 @@ long long fWriteLines(Mfile const * const file,Mlist const * const linesToWrite)
 							// TODO what if the value to write is not text????
 							Mtext* _lineText=(lineListelement->_value->type==VT_TEXT?lineListelement->_value->value._text:NULL);
 							//// replacing: Mstring* _lineText=owned_string(_getValueText(lineListelement->_value,true,true),owner);
-							if(_lineText==NULL){
-								result=M_FALSE;
-								output("%sFailed to construct the line to write at list index %llu.",M_ERROR_PREFIX,lineListelement->index);
-							}else{
-								if(fWriteText(file,_lineText,true)!=M_TRUE){
+							if(_lineText!=NULL){
+								if(fWriteText(file,_lineText,file->linesWritten>0)!=M_TRUE){
+									file->linesWritten++; 
 									result=numberOfLinesToWrite;
 									break;
 								}
-								--numberOfLinesToWrite;
-							}
+								numberOfLinesToWrite--;
+							}else
+								output("%sFailed to construct the line to write at list index %llu.",M_ERROR_PREFIX,lineListelement->index);
 						}
 						lineListelement=lineListelement->_next;
 					}
@@ -5880,10 +5877,17 @@ long long fPopPosition(Mfile * const file,Mallocationowner file_owner){
  * @param file 
  * @return long long M_TRUE on success, M_FALSE on failure
  */
-long long fJumpToStart(Mfile const * const file){
+long long fJumpToStart(Mfile * const file){
 	if(file!=NULL&&file->_f!=NULL){
 		// TODO how about using rewind()
-		return(fseek(file->_f,0L,SEEK_SET)==0?M_TRUE:M_FALSE);
+		if(fseek(file->_f,0L,SEEK_SET)==0){
+			// reset the lines written count when the file is being written to
+			// TODO should we restart
+			if(file->_mode[0]=='w')
+				file->linesWritten=0;
+			return M_TRUE;
+		}
+		return M_FALSE;
 	}
 	return M_LL_INVALID;
 }
@@ -6639,8 +6643,13 @@ Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineToWriteValue){Mallocationowner
 				openFile(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),'w+',false);
 				if(NULL==_file->_f)outputError("Failed to open the file to write to");
 			}
-			if(_file->_f!=NULL)
-				result=(fWriteChars(_file,lineToWriteValue->value._text->_c,true)==0?M_TRUE:M_FALSE); // and write the end-of-line as well
+			if(_file->_f!=NULL){
+				// MDH@29MAY2024: prefix a newline when lines were written before
+				if(fWriteChars(_file,lineToWriteValue->value._text->_c,_file->linesWritten>0)==0)
+					result=++_file->linesWritten; // increment the number of lines written, and return it as result
+				else
+					result=M_FALSE;
+			}
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
 		}
 	}

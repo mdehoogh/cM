@@ -320,6 +320,7 @@ typedef struct Mfile{
 	FILE* _f; // the pointer to the opened file
 	off_t pos; // the current position in the file
 	// _mode when not NULL will point to the (unmanaged) heap allocation C string when opened successfully
+	size_t linesWritten; // the number of lines written so far
 	char* _mode; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
 	Mfileposition* _filepositionstack; // MDH@19MAY2024: keep a stack of remembered fpos_t file position
 	FILE* _messageStream; // MDH@25MAY2024: I'd have to see how to create a message stream to catch file reading and writing output messages
