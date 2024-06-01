@@ -685,15 +685,15 @@ Mvalue* Misnumeric(Mvalue* _value){
 	// MDH@04DEC2020: delegate to local helper function isnumeric 
 	return _getIntegerValue(isNumeric(_value));
 }/* VALIDATED */
+
 /**
  * @brief returns M_TRUE if \p _value wraps a list, M_FALSE or M_LL_INVALID otherwise
  * 
  * @param _value 
  * @return Mvalue* M_TRUE if \p _value wraps a list, M_FALSE or M_LL_INVALID otherwise
- */
 Mvalue* Misalist(Mvalue* _value){
 	return _getIntegerValue(_value?(_value->type==VT_LIST?M_TRUE:M_FALSE):M_LL_INVALID);
-}/* VALIDATED */
+}*//* VALIDATED */
 
 // TODO the length of a text is the number of characters in a text????
 // MDH@17OCT2019: the length of a list should now return the index of the last element (instead of the number of non-null values)

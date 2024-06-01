@@ -159,3 +159,18 @@ Mvalue* Mlocalesettings();
 
 // MDH@24JAN2024: why wasn't this here before?
 Mvalue* Mlock(Mvalue* variableNameValue);
+
+Mvalue* Misaninteger(Mvalue* value);
+Mvalue* Misabiginteger(Mvalue* value);
+Mvalue* Misareal(Mvalue* value);
+Mvalue* Misadecimal(Mvalue* value);
+Mvalue* Misarational(Mvalue* value);
+Mvalue* Misareference(Mvalue* value);
+Mvalue* Misafile(Mvalue* value);
+Mvalue* Misafunction(Mvalue* value);
+Mvalue* Misanenvironment(Mvalue* value);
+Mvalue* Misanarray(Mvalue* value);
+Mvalue* Misalist(Mvalue* value);
+Mvalue* Misamap(Mvalue* value);
+Mvalue* Misnull(Mvalue* value);
+Mvalue* Misnotnull(Mvalue* value);

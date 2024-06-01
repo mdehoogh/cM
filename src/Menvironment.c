@@ -2145,6 +2145,133 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 }
 
 /**
+ * @brief returns M_TRUE when \p value holds an integer, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds an integer, M_FALSE otherwise
+ */
+Mvalue* Misaninteger(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_INTEGER?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds a big integer, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds a big integer, M_FALSE otherwise
+ */
+Mvalue* Misabiginteger(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_BIGINTEGER?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds an real, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds an real, M_FALSE otherwise
+ */
+Mvalue* Misareal(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_FLOAT?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds a decimal, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds a decimal, M_FALSE otherwise
+ */
+Mvalue* Misadecimal(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_DECIMAL?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds a reference, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds a reference, M_FALSE otherwise
+ */
+Mvalue* Misareference(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_REFERENCE?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds a file, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds a file, M_FALSE otherwise
+ */
+Mvalue* Misafile(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_FILE?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds an environment, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds an environment, M_FALSE otherwise
+ */
+Mvalue* Misanenvironment(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_ENVIRONMENT?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds an array, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds an array, M_FALSE otherwise
+ */
+Mvalue* Misanarray(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_ARRAY?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds a list, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds a list, M_FALSE otherwise
+ */
+Mvalue* Misalist(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_LIST?M_TRUE:M_FALSE));
+}
+
+/**
+ * @brief returns M_TRUE when \p value holds a map, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds a map, M_FALSE otherwise
+ */
+Mvalue* Misamap(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_MAP?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds an function, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds an function, M_FALSE otherwise
+ */
+Mvalue* Misafunction(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_FUNCTION?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE when \p value holds an rational, M_FALSE otherwise
+ * @details returns M_LL_INVALID is \p value equals NULL
+ * @param value 
+ * @return Mvalue* M_TRUE when \p value holds an rational, M_FALSE otherwise
+ */
+Mvalue* Misarational(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_LL_INVALID:(value->type==VT_RATIONAL?M_TRUE:M_FALSE));
+}
+/**
+ * @brief returns M_TRUE is \p value equals NULL, M_FALSE otherwise
+ * 
+ * @param value 
+ * @return Mvalue* M_TRUE is \p value equals NULL, M_FALSE otherwise
+ */
+Mvalue* Misnull(Mvalue* value){
+	return _getIntegerValue(NULL==value?M_TRUE:M_FALSE);
+}
+/**
+ * @brief returns M_FALSE is \p value equals NULL, M_TRUE otherwise
+ * 
+ * @param value 
+ * @return Mvalue* M_FALSE is \p value equals NULL, M_TRUE otherwise
+ */
+Mvalue* Misnotnull(Mvalue* value){
+	return _getIntegerValue(value!=NULL?M_TRUE:M_FALSE);
+}
+/**
  * @brief returns the (text representation of) type and immutable flag of \p value
  * @param value the value of which to return the text representing the type and immutable flag
  * @return the (text representation of) type and immutable flag of \p value
@@ -2205,12 +2332,17 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		return(NULL==_map?NULL:_getValueOfMap(disowned_map(_map,owner)));
 	}
 
+	Mstring* _resultText=owned_string(_getString("\'?"),owner);
+	if(_resultText==NULL)return NULL;
+
 	// every value should have a type text, even if NULL
 	// MDH@03NOV2019: actually _value should be the name of a variable because it not we cannot determine whether or not
 	//				the variable is mutable, that's why settype() requires the name of the variable (as text)
-	char result[]="'\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
 	// MDH@04AUG2023: composite types and reference type already handled above
-	result[1]=getValueTypeCharacter(value->type,isValueImmutable(value));
+	string_setchar(_resultText,getValueTypeCharacter(value->type,isValueImmutable(value)),1);
+	if(value->type==VT_DECIMAL)appendll(_resultText,value->value._decimal->prec);
+	Mvalue* result=_getTextValue(string(_resultText));
+	FREE_STRING(_resultText,owner);
 	/* replacing:
 	char result[5]="'\0\0\0\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
 	if(value!=NULL){
@@ -2254,7 +2386,7 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
 	*/
-	return _getTextValue(result);
+	return result; /// replacing: _getTextValue(result);
 }
 // MDH@02OCT2023
 /**

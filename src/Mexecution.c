@@ -2274,9 +2274,9 @@ void free_file(Mfile* _file){
 		////if(_file->_stat!=NULL){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
 		if(_file->_name!=NULL){FREE_1(_file->_name,'S');_file->_name=NULL;}
 		if(_file->_mode!=NULL){
-			output("File mode '%s'",_file->_mode);
+			////output("File mode '%s'",_file->_mode);
 			FREE(_file->_mode,1+strlen(_file->_mode),-'"'); // _file->_mode was assigned using _strdup() which IS managed!!! so don't use free()
-			output(" freed!\n");
+			////output(" freed!\n");
 			_file->_mode=NULL;
 			if(_file->_filepositionstack!=NULL)free_fileposition(_file->_filepositionstack);
 		} // MDH@04MAY2024: _file->_mode is currently unmanaged!!
