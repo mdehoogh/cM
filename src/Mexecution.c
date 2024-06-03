@@ -1866,16 +1866,16 @@ Mstring* _getStringOfChars(char const * const chars,char quoteChar){Mallocationo
 						switch(c){
 							case 'a':p=string_append_char(p,0x07);break;
 							case 'b':p=string_append_char(p,0x08);break;
-							case 'e':p=string_append_char(p,0x1B);break;
-							case 'f':p=string_append_char(p,0x0C);break;
-							case 'n':p=string_append_char(p,0x0A);break;
-							case 'r':p=string_append_char(p,0x0D);break;
 							case 't':p=string_append_char(p,0x09);break;
+							case 'n':p=string_append_char(p,0x0A);break;
 							case 'v':p=string_append_char(p,0x0B);break;
-							case '\\':p=string_append_char(p,0x5C);break;
-							case '\'':p=string_append_char(p,0x27);break;
+							case 'f':p=string_append_char(p,0x0C);break;
+							case 'r':p=string_append_char(p,0x0D);break;
+							case 'e':p=string_append_char(p,0x1B);break;
 							case '"':p=string_append_char(p,0x22);break;
+							case '\'':p=string_append_char(p,0x27);break;
 							case '?':p=string_append_char(p,0x3F);break;
+							case '\\':p=string_append_char(p,0x5C);break;
 							case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
 								{ // octal representations can't have 8 or 9 in it
 									char oct=(c-48);
@@ -1942,16 +1942,16 @@ Mstring* _getStringOfText(Mtext const * const _text,bool dequoted){if(NULL==_tex
 							switch(c){
 								case 'a':p=string_append_char(p,0x07);break;
 								case 'b':p=string_append_char(p,0x08);break;
-								case 'e':p=string_append_char(p,0x1B);break;
-								case 'f':p=string_append_char(p,0x0C);break;
-								case 'n':p=string_append_char(p,0x0A);break;
-								case 'r':p=string_append_char(p,0x0D);break;
 								case 't':p=string_append_char(p,0x09);break;
+								case 'n':p=string_append_char(p,0x0A);break;
 								case 'v':p=string_append_char(p,0x0B);break;
-								case '\\':p=string_append_char(p,0x5C);break;
-								case '\'':p=string_append_char(p,0x27);break;
+								case 'f':p=string_append_char(p,0x0C);break;
+								case 'r':p=string_append_char(p,0x0D);break;
+								case 'e':p=string_append_char(p,0x1B);break;
 								case '"':p=string_append_char(p,0x22);break;
+								case '\'':p=string_append_char(p,0x27);break;
 								case '?':p=string_append_char(p,0x3F);break;
+								case '\\':p=string_append_char(p,0x5C);break;
 								case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
 									{ // octal representations can't have 8 or 9 in it
 										char oct=(c-48);
@@ -1980,8 +1980,12 @@ Mstring* _getStringOfText(Mtext const * const _text,bool dequoted){if(NULL==_tex
 				}
 			}else{
 				p=string_append_char(p,_text->presuffix);
+				if(_text->presuffix=='b')p=string_append_char(p,'\'');else
+				if(_text->presuffix=='B')p=string_append_char(p,'\'');
 				p=string_append(p,_text->_c);
-				p=string_append_char(p,_text->presuffix);
+				if(_text->presuffix=='b')p=string_append_char(p,'\'');else
+				if(_text->presuffix=='B')p=string_append_char(p,'\'');else
+					p=string_append_char(p,_text->presuffix);
 			}
 		}
 		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}

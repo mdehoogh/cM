@@ -70,7 +70,7 @@ Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE
 		if(ans->_chars!=NULL){
 			ans->length=l;
 			ans->blocks=blocks;
-			memcpy(ans->_chars->chars,s,ans->length); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
+			memcpy(ans->_chars->chars,s,ans->length*sizeof(unsigned char)); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
 		}else{ // failure
 			FREE_DISOWNED_1(ans,'S',owner);ans=NULL;
 		}
@@ -312,7 +312,7 @@ bool string_shorten(Mstring* const str,size_t length){
  * 
  * @return char the character in the Mstring pointed to by \str at position \pos, or '\0' if that character does not exist
  */
-char string_char(Mstring const * const str,size_t pos){
+unsigned char string_char(Mstring const * const str,size_t pos){
 	// MDH@17APR2020: inserting ->_chars
 	return(str!=NULL?(pos<str->length?str->_chars->chars[pos]:'\0'):'\0');
 }
@@ -323,7 +323,7 @@ char string_char(Mstring const * const str,size_t pos){
  * @param str the Mstring*
  * @return char the last character stored in the Mstring, or '\0' if \p str is NULL or of zero length
  */
-char string_last_char(Mstring const * const str){
+unsigned char string_last_char(Mstring const * const str){
 	// MDH@17APR2020: inserting ->_chars
 	return(str!=NULL&&str->_chars!=NULL?(str->length>0?str->_chars->chars[str->length-1]:'\0'):'\0');
 }
@@ -336,7 +336,7 @@ char string_last_char(Mstring const * const str){
  * @param c the character to search for
  * @return size_t the number of occurrences at the end of the Mstring equal to \p c
  */
-size_t string_last_char_count(const Mstring* const str,char c){
+size_t string_last_char_count(const Mstring* const str,unsigned char c){
 	size_t count=0;
 	if(str!=NULL&&str->_chars!=NULL){
 		size_t l=str->length;
@@ -355,8 +355,8 @@ size_t string_last_char_count(const Mstring* const str,char c){
  * @param pos the position of the character to remove
  * @return char the removed character
  */
-char string_removed_char(Mstring* const str,size_t pos){
-	char rc='\0';
+unsigned char string_removed_char(Mstring* const str,size_t pos){
+	unsigned char rc='\0';
 	if(str!=NULL&&str->_chars!=NULL){
 		size_t l=str->length;
 		if(l>0&&pos<l){
@@ -393,7 +393,7 @@ size_t string_removed(Mstring * const str,size_t pos,size_t length){ // MDH@03OC
 				////// no need to do this when using memmove!!!!! str->chars[l]='\0';
 				removed=length; // all suggested characters will be 'removed'
 				Mchars* strchars=str->_chars; // MDH@17APR2020: replacing str by strchars
-				memmove(strchars->chars+pos,strchars->chars+remainderpos,(sizeof(char))*(l-remainderpos)); // TODO sizeof(char) would be 1 always????
+				memmove(strchars->chars+pos,strchars->chars+remainderpos,(sizeof(unsigned char))*(l-remainderpos)); // TODO sizeof(char) would be 1 always????
 			}else // rest of string to remove i.e. l-pos characters
 					removed=l-pos; // l-pos elements will be 'removed'
 			str->length-=removed;
@@ -410,7 +410,7 @@ size_t string_removed(Mstring * const str,size_t pos,size_t length){ // MDH@03OC
  * @param c the character to insert
  * @return Mstring* \p str on success, NULL on failure
  */
-Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,size_t pos,char c){
+Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,size_t pos,unsigned char c){
 	if(str!=NULL&&str->_chars!=NULL){
 		size_t l=str->length+1; // the 'length' of the text plus 1
 		// pos should never be larger than l
@@ -459,9 +459,9 @@ Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,si
  */
 Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc){
 	if(str!=NULL&&pc!=NULL){
-		char c;
+		unsigned char c;
 		size_t index=0;
-		while((c=pc[index])){if(!string_setchar(str,c,pos))break;index++;pos++;} // increment index at the end is better than at the beginning TODO can we do even better?
+		while((c=pc[index])){if(!string_setchar(str,(unsigned char)c,pos))break;index++;pos++;} // increment index at the end is better than at the beginning TODO can we do even better?
 	}
 	return str;
 }
@@ -479,7 +479,7 @@ static bool string_blockappended(Mstring* const str){
 	////////printf("resized!\n");
 	++(str->blocks);
 	str->_chars=new_chars;
-	str->_chars->chars[str->blocks*M_BLOCK_SIZE]='\0';
+	//// TODO the following does not seem to be right!!!! str->_chars->chars[str->blocks*M_BLOCK_CHARACTERS]='\0';
 	return true;
 }
 
@@ -490,7 +490,7 @@ static bool string_blockappended(Mstring* const str){
  * @param c the character to append
  * @return \p str
  */
-Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,char c){
+Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,unsigned char c){
 	if(str!=NULL&&str->_chars!=NULL){
 		if(c){ // MDH@15NOV2019: appending '\0' makes no sense does it??????
 			size_t l=str->length+1;
@@ -532,7 +532,7 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
  * @param linefeedPosition the position of the first linefeed character
  * @return long long 0 on success, M_LL_INVALID when the input is invalid, 1=out of memory, 2=not all characters read without end-of-file condition, 3=last line read
  */
-long long string_freadline(Mstring * const str,FILE* const file, char const * * linefeedCharacterPosition){
+long long string_freadline(Mstring * const str,FILE* const file, unsigned char const * * linefeedCharacterPosition){
 	if(NULL==file||NULL==str||NULL==str->_chars/*||str->blocks==0*/)return M_LL_INVALID;
 	long long errorCode=0;
 	*linefeedCharacterPosition=NULL;
@@ -543,7 +543,7 @@ long long string_freadline(Mstring * const str,FILE* const file, char const * * 
 	// ASSERT numberOfStrChars+1<numberOfChars, which means leftInBlock will be positive!!!!
 	// NOTE when str is used to read multiple lines leftInBlock could well cover more than just a single block!!!!!!
 	//      unless somebody decides to actually resize str to have as little of blocks as possible
-	char* insertPosition; // char *firstInvalidPosition=(str->_chars->chars+numberOfChars),*firstInsertPosition,*eolnPosition;
+	unsigned char* insertPosition; // char *firstInvalidPosition=(str->_chars->chars+numberOfChars),*firstInsertPosition,*eolnPosition;
 	/////size_t lineChars; // the number of characters found on the line
 	// how many characters can we fit in the current block
 	// STEP 0. INITIALIZE numberOfStrChars (keeps track of the number of characters stored) AND numberOfChars (keeps track of the total number of characters we can store)
@@ -563,7 +563,7 @@ long long string_freadline(Mstring * const str,FILE* const file, char const * * 
 		///// assert(numberOfAvailableCharacterPositions>0);
 		// STEP 2. READ AS MANY CHARACTERS AS POSSIBLE
 		insertPosition=(str->_chars->chars+str->length); // the address of where to insert new characters (the position of the NUL terminator)
-		numberOfCharsRead=fread(insertPosition,sizeof(char),numberOfAvailableCharacterPositions,file); // read at most leftInBlock characters from file
+		numberOfCharsRead=fread(insertPosition,sizeof(unsigned char),numberOfAvailableCharacterPositions,file); // read at most leftInBlock characters from file
 		if(numberOfCharsRead>0){ // some characters read that may contain a linefeed character
 			// NOTE that when we find a newline character even when we didn't manage to read all numberOfAvailableCharacterPositions characters, we return 0 for success
 			// STEP 3. SYNC str BY INCREMENTING THE CURRENT LENGTH WITH numberOfCharsRead
@@ -651,13 +651,13 @@ long long string_characters_moved(Mstring* const str,size_t oldPosition,size_t n
 	if(str!=NULL&&str->_chars!=NULL&&oldPosition<str->length&&newPosition<str->length){
 		str->_chars->chars[str->length]='\0'; // safety catch to ascertain that we can safely use strchr()
 		/////output("Moving from position %lld to %lld.\n",oldPosition,newPosition);
-		char* firstCharToMove=str->_chars->chars+oldPosition;
-		char* endPosition=strchr(firstCharToMove,'\0'); // there should always be a NUL character at the end of the characters to move!!!
+		unsigned char* firstCharToMove=str->_chars->chars+oldPosition;
+		unsigned char* endPosition=strchr(firstCharToMove,'\0'); // there should always be a NUL character at the end of the characters to move!!!
 		if(endPosition!=NULL){
 			long long numberOfCharsToMove=endPosition-firstCharToMove; // move the closing NUL character as well!!!
 			//////output("Number of characters to move: %lld.\n",numberOfCharsMoved);
 			if(numberOfCharsToMove>0&&newPosition!=oldPosition){ // something to move
-				memmove(str->_chars->chars+newPosition,firstCharToMove,sizeof(char)*numberOfCharsToMove);
+				memmove(str->_chars->chars+newPosition,firstCharToMove,sizeof(unsigned char)*numberOfCharsToMove);
 				// NOTE finish with the NUL character
 				str->length=newPosition+numberOfCharsToMove;
 				str->_chars->chars[str->length]='\0';
@@ -677,8 +677,8 @@ long long string_characters_moved(Mstring* const str,size_t oldPosition,size_t n
 void string_outputchars(Mstring const * const str,bool extended){
 	// outputs all block characters representing '\0' by 
 	if(NULL==str)return;
-	char* firstChar=str->_chars->chars;
-	char* firstNotChar=firstChar+getNumberOfChars(str);
+	unsigned char* firstChar=str->_chars->chars;
+	unsigned char* firstNotChar=firstChar+getNumberOfChars(str);
 	size_t charIndex=0;
 	while(firstChar!=firstNotChar){
 		if(charIndex==str->length)outputChar('[');
@@ -686,19 +686,19 @@ void string_outputchars(Mstring const * const str,bool extended){
 			if(*firstChar<14){
 				outputChar('\\');
 				switch(*firstChar){
-					case 0:
-					case 1:
-					case 2:
-					case 3:
-					case 4:
-					case 5:
-					case 6:
-					case 7:
-					case 8:outputChar(*firstChar+48);break;
-					case 9:outputChar('t');break;
+					case  0:
+					case  1:
+					case  2:
+					case  3:
+					case  4:
+					case  5:
+					case  6:
+					case  8:outputChar(*firstChar+48);break;
+					case  7:outputChar('a');break;
+					case  9:outputChar('t');break;
 					case 10:outputChar('n');break;
-					case 11:outputChar('B');break;
-					case 12:outputChar('C');break;
+					case 11:outputChar('v');break;
+					case 12:outputChar('f');break;
 					case 13:outputChar('r');break;
 				}
 			}else
@@ -720,7 +720,7 @@ void string_outputchars(Mstring const * const str,bool extended){
  * @param pos the position
  * @return Mstring* \p str
  */
-Mstring* string_setchar(Mstring* const str,char c,size_t pos){
+Mstring* string_setchar(Mstring* const str,unsigned char c,size_t pos){
 	if(NULL==str||NULL==str->_chars)return NULL;
 	if(pos>=str->length)return NULL;
 	str->_chars->chars[pos]=c; // MDH@17APR2020 inserting ->_chars
@@ -760,7 +760,7 @@ Mstring* string_append_chars(Mstring* const str/*,Mallocationowner owner_str*/,c
 	if(str!=NULL&&pc!=NULL){ // something to append
 		char c;
 		size_t index=0;
-		while((c=pc[index++])){if(index>count)break;if(string_append_char(str,c)==NULL)return NULL;}
+		while((c=pc[index++])){if(index>count)break;if(string_append_char(str,(unsigned char)c)==NULL)return NULL;}
 		/////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 	}
 	return str;
@@ -778,7 +778,7 @@ Mstring* string_append(Mstring * const str/*,Mallocationowner owner_str*/,char c
 	if(str!=NULL&&pc!=NULL){ // something to append (to)
 		char c;
 		size_t index=0;
-		while((c=pc[index++])){if(!string_append_char(str,c))return NULL;/*output("***** %c appended! ******\n",c);*/}
+		while((c=pc[index++])){if(!string_append_char(str,(unsigned char)c))return NULL;/*output("***** %c appended! ******\n",c);*/}
 		/////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 	}
 	return str;
@@ -795,7 +795,7 @@ Mstring* string_prepend(Mstring* const str/*,Mallocationowner owner_str*/,char c
 	if(str!=NULL&&pc!=NULL){ // something to prepend (to)
 		char c;
 		size_t index=0;
-		while((c=pc[index])){if(!string_insert_char(str,index,c))return NULL;index++;} // increment index at the end is better than at the beginning TODO can we do even better?
+		while((c=pc[index])){if(!string_insert_char(str,index,(unsigned char)c))return NULL;index++;} // increment index at the end is better than at the beginning TODO can we do even better?
 		/////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 	}
 	return str;
@@ -809,7 +809,7 @@ Mstring* string_prepend(Mstring* const str/*,Mallocationowner owner_str*/,char c
  * @param firstpos the position of the first character
  * @return char* the C string on success, or NULL if firstpos exceeds the length of the Mstring
  */
-char* string_remainder(Mstring* const str,size_t firstpos){
+unsigned char* string_remainder(Mstring* const str,size_t firstpos){
 	if(NULL==str||NULL==str->_chars)return NULL;
 	if(!firstpos)return string(str);
 	if(firstpos>str->length)return NULL;
@@ -821,9 +821,9 @@ char* string_remainder(Mstring* const str,size_t firstpos){
  * @brief returns the C string representation of the Mstring pointed to by \p str
  * @details will sync the Mstring by placing a '\0' character at the length position of the C string held by the Mstring
  * @param str 
- * @return char* the C string pointer on success, or NULL on failure
+ * @return unsigned char* the C string pointer on success, or NULL on failure
  */
-char* string(Mstring* const str){
+unsigned char* string(Mstring* const str){
 	if(NULL==str||NULL==str->_chars)return NULL;
 	str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
 	return str->_chars->chars;
@@ -838,7 +838,7 @@ char* string(Mstring* const str){
  * @param pos the first position to investigate
  * @return long long the position of the character in the Mstring, or -1 when not found
  */
-long long string_find_char(const Mstring* const str,char c,size_t pos){
+long long string_find_char(const Mstring* const str,unsigned char c,size_t pos){
 	if(str!=NULL){
 		Mchars* strchars=str->_chars; // MDH@17APR2020: replacing str by strchars
 		if(strchars!=NULL){
@@ -869,7 +869,7 @@ void string_reverse(Mstring* const str){
 	l--;
 	long long halfway=(l>>1);
 	///////////printf("\nReversing: '%s'.",string(str));
-	char c;
+	unsigned char c;
 	while(halfway>=0){
 		c=strchars->chars[halfway];
 		strchars->chars[halfway]=strchars->chars[l-halfway];
@@ -890,9 +890,9 @@ void string_reverse(Mstring* const str){
  * @param pos the position of the character to replace
  * @return char the replaced character on success, or '\0' on failure
  */
-char string_replacedchar(Mstring * const str,char c,size_t pos){
+unsigned char string_replacedchar(Mstring * const str,unsigned char c,size_t pos){
 	if(NULL==str||NULL==str->_chars||pos>=str->length)return '\0'; // NOTE even though str->chars[str->length] might not be '\0' we're still returning '\0' in that case, as if it was there (otherwise we would have to write '\0' first as we do in string())
-	char replacedchar=str->_chars->chars[pos];
+	unsigned char replacedchar=str->_chars->chars[pos];
 	str->_chars->chars[pos]=c;
 	return replacedchar;
 }
@@ -909,7 +909,7 @@ size_t string_number_of_matching_chars(Mstring const * const str,char const * ch
 	size_t numberOfMatchingCharacters=0;
 	// if str and chars are used as value arguments so the pointers themselves shouldn't be constant
 	if(str!=NULL&&chars!=NULL){
-		char* strchars=str->_chars->chars;
+		unsigned char* strchars=str->_chars->chars;
 		if(strchars!=NULL){
 			strchars[str->length]='\0'; // perhaps important
 			// as long as the same and not end-of-line character increment
@@ -1084,8 +1084,9 @@ size_t string_trailing(Mstring* str,char c){
 		size_t i=l;
 		Mchars* strchars=str->_chars;
 		if(strchars!=NULL){
-			while(i>0&&strchars->chars[--i]==c);
-			if(strchars->chars[i]==c)return l; // all characters equaled c
+			unsigned char uc=(unsigned char)c;
+			while(i>0&&strchars->chars[--i]==uc);
+			if(strchars->chars[i]==uc)return l; // all characters equaled c
 			return(l-i-1u);
 		}
 	}
@@ -1106,7 +1107,7 @@ bool string_endswith(Mstring const * const str,char const * const pc){
 	if(pcl>0&&l>=pcl){ // something to compare, and enough characters to compare
 		Mchars* strchars=str->_chars;
 		if(NULL==strchars)return false;
-		while(pcl>0)if(pc[--pcl]!=strchars->chars[--l])return false;
+		while(pcl>0)if((unsigned char)pc[--pcl]!=strchars->chars[--l])return false;
 		return true;
 	}
 	return false;

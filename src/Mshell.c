@@ -14586,6 +14586,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!completedValueValueFunction(_Menvironment,owner,"fread",Mfread)
 				||!completedValueValueFunction(_Menvironment,owner,"fseek",Mfseek)
 				||!completedValueValueFunction(_Menvironment,owner,"fsetpos",Mfsetpos)
+				||!completedValueFunction(_Menvironment,owner,"fisbinary",Mfisbinary)
+				||!completedValueFunction(_Menvironment,owner,"fmode",Mfmode)
 				||!completedValueFunction(_Menvironment,owner,"fpos",Mfpos)
 				||!completedValueFunction(_Menvironment,owner,"fpushpos",Mfpushpos)
 				||!completedValueFunction(_Menvironment,owner,"fpoppos",Mfpoppos)

@@ -5032,6 +5032,9 @@ long long fIsWriteable(Mfile const * const _file,bool report){
 	*/
 	// a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
 }
+static long long fIsOpenedInBinaryMode(Mfile* file){
+	return(file!=NULL&&file->_f!=NULL&&file->_mode!=NULL?(strchr(file->_mode,'b')!=NULL?M_TRUE:M_FALSE):M_LL_INVALID);
+}
 
 // MDH@30APR2024: most of the M functions delegate to these internal functions that are easier to use directly, so we won't have to Mvalue wrap a lot of data
 /**
@@ -5200,11 +5203,12 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 		// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 		if(file->_f!=NULL){ // and opened
 			if(fIsReadable(file,false)){ // and readable
+				bool openedInBinaryMode=(fIsOpenedInBinaryMode(file)==M_TRUE);
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
 				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 				// if the file can be read from, we do
-				if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-					_bytesRead=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
+				///if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					_bytesRead=owned_string(_getString((openedInBinaryMode?"b":"'")),owner); // start the string with a single quote for create a Mtext from it
 					if(_bytesRead!=NULL){
 						// the file could be empty to start with
 						while(numberOfBytes>0&&!feof(file->_f)){
@@ -5212,14 +5216,15 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 							numberOfBytes--;
 						}
 						if(numberOfBytes>0)
-							output("%sFailed to read %d bytes.\n",M_ERROR_PREFIX,numberOfBytes);
+							output("%sFailed to read %d %s from file '%s'.\n",M_ERROR_PREFIX,numberOfBytes,(openedInBinaryMode?"bytes":"characters"),(file->_name));
 						// succeeded when all bytes were read or we bumped into end-of-file!!
 						if(numberOfBytes<=0||feof(file->_f))return disowned_string(_bytesRead,owner);
 						FREE_STRING(_bytesRead,owner);
-					}
-				}
+					}else
+						output("%sFailed to prepare for reading %s from file '%s'.\n",M_ERROR_PREFIX,(openedInBinaryMode?"bytes":"characters"),string(file->_name));
+				////}
 			}else
-				output("%sCan't read from '%s': it is not readable.\n",M_ERROR_PREFIX,string(file->_name));
+				output("%sCan't read from file '%s': it is not readable.\n",M_ERROR_PREFIX,string(file->_name));
 		}else
 			output("%sCan't read from file '%s': it is not open.\n",M_ERROR_PREFIX,string(file->_name));
 	}else
@@ -5259,13 +5264,14 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 	if(file!=NULL){
 		if(file->_f!=NULL){
 			if(fIsReadable(file,false)){
+				bool openedInBinaryMode=(fIsOpenedInBinaryMode(file)==M_TRUE);
 				// if the file is not binary and can be read from
-				if(file->_mode[1]!='b'&&(strlen(file->_mode)<3||file->_mode[2]!='b')){ // the mode is defined (i.e. unequal to it's initial value '\0')
+				////if(!openedInBinaryMode){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
-						_bytesRead=owned_string(_getString("'"),owner); // NO do NOT start the string with a single quote for create a Mtext from it
+						_bytesRead=owned_string(_getString((openedInBinaryMode?"b":"'")),owner); // NO do NOT start the string with a single quote for create a Mtext from it
 						if(_bytesRead!=NULL){
 							// string_freadline returns the number of characters (well bytes actually) read but not used (so those are the characters in the next line)
-							char* linefeedCharacterPosition=NULL;
+							unsigned char* linefeedCharacterPosition=NULL;
 							long long errorCode=string_freadline(_bytesRead,file->_f,&linefeedCharacterPosition);
 							if(errorCode!=0)reportFileReadErrorCode(file,errorCode);
 							// no matter what errorCode is if we found a line we have to process it (and return it)
@@ -5273,10 +5279,14 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 							if(NULL==linefeedCharacterPosition&&feof(file->_f))linefeedCharacterPosition=_bytesRead->_chars->chars+_bytesRead->length;
 							long long readButNotInLine;
 							if(linefeedCharacterPosition!=NULL){
-								size_t numberOfLineCharacters=(linefeedCharacterPosition-_bytesRead->_chars->chars); // including the single quote at the start
-								readButNotInLine=_bytesRead->length-numberOfLineCharacters-1; // any characters between the NUL character and the linefeed character?????
-								// adapt the length
-								if(*(linefeedCharacterPosition-1)=='\r')numberOfLineCharacters--;
+								// MDH@03JUN2024: when opened in binary mode, store the newline character in _bytesRead as well
+								size_t numberOfLineCharacters=((openedInBinaryMode?linefeedCharacterPosition+1:linefeedCharacterPosition)-_bytesRead->_chars->chars); // including the single quote at the start
+								// adapt the length NOTE only in binary mode would there be a read 
+								if(!openedInBinaryMode){
+									readButNotInLine=_bytesRead->length-numberOfLineCharacters-1; // any characters between the NUL character and the linefeed character?????
+									if(*(linefeedCharacterPosition-1)=='\r')numberOfLineCharacters--;
+								}else
+									readButNotInLine=_bytesRead->length-numberOfLineCharacters;
 								// put the end-of-line marker where the line read ends
 								_bytesRead->length=numberOfLineCharacters;*(_bytesRead->_chars->chars+numberOfLineCharacters)='\0';/////string_setlength(_bytesRead,numberOfLineCharacters);
 							}else // everything actually read will need to be thrown back
@@ -5348,8 +5358,8 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 							*/
 						}
 					}
-				}else
-					output("%sCan't read a line from file '%s' in binary mode.\n",M_ERROR_PREFIX,string(file->_name));
+				/*}else
+					output("%sCan't read a line from file '%s' in binary mode.\n",M_ERROR_PREFIX,string(file->_name));*/
 			}else
 				output("%sCan't read a line from file '%s': it is not readable.\n",M_ERROR_PREFIX,string(file->_name));
 		}else
@@ -5381,7 +5391,8 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
 				///////////if(NULL==file->_f)openFile(file,owner_file,"r+");
 				// if the file can be read from, we do
-				if(file->_mode[1]!='b'&&(strlen(file->_mode)<3||file->_mode[2]!='b')){ // the mode is defined (i.e. unequal to it's initial value '\0')
+				bool openedInBinaryMode=(fIsOpenedInBinaryMode(file)==M_TRUE);
+				///////if(file->_mode[1]!='b'&&(strlen(file->_mode)<3||file->_mode[2]!='b')){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					result=0; // keep track of the number of lines read
 					if(numberOfLines!=0){ // either all or some lines to read
 						output("About to read %lld lines from file '%s'.\n",numberOfLines,string(file->_name));
@@ -5395,13 +5406,13 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 							bool eoln;
 							*/
 							// we'll be using a single line to read the individual lines into
-							Mstring* _line=owned_string(_getString("'"),owner);
+							Mstring* _line=owned_string(_getString((openedInBinaryMode?"b":"'")),owner);
 							if(NULL==_line){outputError("Failed to create a line buffer");return M_LL_INVALID;}
 							Mlistelement* listelement=NULL;
 							/////output("Will start reading text lines.\n");
 							// MDH@27MAY2024: for an example of how to handle reading a single line see fReadline()
 							long long errorCode,readButNotStored,linesLeftToRead=numberOfLines;
-							char* linefeedCharacterPosition=NULL;
+							unsigned char* linefeedCharacterPosition=NULL;
 							bool endOfFileReached=feof(file->_f);
 							while(result>=0&&linesLeftToRead!=0&&!endOfFileReached){ // still text available and lines to read requested
 								// STEP 1. TRY TO READ A TEXT LINE
@@ -5433,8 +5444,9 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 								// DONE see before the end of the loop where we're breaking out of this loop when that happens
 								// PROCESS ALL TERMINATED LINES
 								// NOTE if we fail to store we should treat the not registered characters read as REMAINDER
-								char* lastStoredCharacterPosition=_line->_chars->chars; // the beginning of any line of characters read is where the single quote is located
+								unsigned char* lastStoredCharacterPosition=_line->_chars->chars; // the beginning of any line of characters read is where the single quote is located
 								if(NULL==linefeedCharacterPosition&&endOfFileReached)linefeedCharacterPosition=lastStoredCharacterPosition+_line->length; // consume all characters read as last line
+								unsigned char characterNulled='\0';
 								while(linefeedCharacterPosition!=NULL){
 									// all characters from startOfLine to linefeedCharacterPosition belong to the line to register
 									// STEP 2. collect the text line
@@ -5449,10 +5461,21 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 									}
 									// STEP 1. mark the end of the text line NOTE this won't change the actual length, but will ascertain that _getTextValue() copies the actual line
 									bool allCharactersProcessed=(*linefeedCharacterPosition=='\0');
-									if(*(linefeedCharacterPosition-1)=='\r')*(linefeedCharacterPosition-1)='\0';else *linefeedCharacterPosition='\0';
+									characterNulled='\0';
+									if(!openedInBinaryMode){
+										if(*(linefeedCharacterPosition-1)=='\r')*(linefeedCharacterPosition-1)='\0';else *linefeedCharacterPosition='\0';
+									}else{ // opened in binary mode, we'll be storing the end-of-line characters in the text as well
+										// remember the character we have to NULled
+										if(!allCharactersProcessed){
+											characterNulled=*(linefeedCharacterPosition+1);
+											if(characterNulled)*(linefeedCharacterPosition+1)='\0';
+										}
+									}
 									assignValue(&listelement->_value,_getTextValue(lastStoredCharacterPosition));
 									////if(report)
 										output("Line '%s' stored.\n",lastStoredCharacterPosition);
+									// if some character was nulled write it back
+									if(characterNulled)*(linefeedCharacterPosition+1)=characterNulled;
 									if(allCharactersProcessed){output("All characters processed.\n");break;}
 									/////////if(*linefeedCharacterPosition=='\0')break; // if this was adding the empty line at end-of-file (see below for how to force that), we allow doing that only once!!!
 									// STEP 3. replace the end-of-line character with a single quote (') so we can use it as the new start of line position
@@ -5469,7 +5492,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 									}
 									if(linesLeftToRead==0)break; // stop as soon as we do not want to read another line, or we've processed all
 									// find the next end-of-line character (if any), or bumping into the NUL character at the end in _line
-									linefeedCharacterPosition=strchr(lastStoredCharacterPosition+1,'\n');
+									linefeedCharacterPosition=(unsigned char*)strchr(lastStoredCharacterPosition+1,'\n');
 								}
 								//// ALWAYS PROCESS ANY REMAINDER!!!!! if(result<0)break; // some error in storing the line read in _linesReadList
 								// NOTE all full text lines in the characters read from the file processed
@@ -5604,8 +5627,8 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 							output("%sCan't read from file '%s': end-of-file reached.",M_ERROR_PREFIX,string(file->_name));
 					}else
 						output("%sNo text lines can be read from '%s' (mode: %s): end-of-file reached.\n",M_WARNING_PREFIX,string(file->_name),file->_mode);
-				}else
-					output("%sUnable to read text lines from '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->_mode);
+				/*}else
+					output("%sUnable to read text lines from '%s' (mode: %s).\n",M_ERROR_PREFIX,string(file->_name),file->_mode);*/
 			}else
 				output("%sCan't read text lines from file '%s': it is not readable.\n",M_ERROR_PREFIX,string(file->_name));
 		}else
@@ -6054,6 +6077,36 @@ Mvalue* Mftype(Mvalue const * const fileValue){Mallocationowner owner=getOwner(_
 			outputError("No file specified");
 	}
 	return NULL;
+}
+/**
+ * @brief returns the mode of \p fileValue
+ * 
+ * @param fileValue 
+ * @return Mvalue* the mode of \p fileValue
+ */
+Mvalue* Mfmode(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* result=NULL;
+	if(fileValue!=NULL&&fileValue->type==VT_FILE){
+		Mstring* _modeText=owned_string(_getString("'"),owner);
+		if(_modeText!=NULL){
+			if(string_append(_modeText,fileValue->value._file->_mode)!=NULL)result=_getTextValue(string(_modeText));
+			FREE_STRING(_modeText,owner);
+		}
+	}
+	return result;
+}
+/**
+ * @brief returns M_TRUE if \p fileValue is opened in binary file mode, M_FALSE or M_LL_INVALID otherwise
+ * @details returns M_LL_INVALID if \p fileValue does not denote a file
+ * @param fileValue 
+ * @return Mvalue* M_TRUE if \p fileValue is opened in binary file mode, M_FALSE or M_LL_INVALID otherwise
+ */
+Mvalue* Mfisbinary(Mvalue* fileValue){
+	long long result=M_LL_INVALID;
+	if(fileValue!=NULL&&fileValue->type==VT_FILE){
+		result=fIsOpenedInBinaryMode(fileValue->value._file);
+	}
+	return _getIntegerValue(result);
 }
 
 /**

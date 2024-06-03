@@ -80,7 +80,7 @@ Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,lo
 void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,size_t size,long long count,signed char type){
 	// typically the caller would need to tell us the current number of characters stored in _chars
 	// ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
-	if(!_chars){output("%sNo Mchars to free.\n",M_WARNING_PREFIX);return;}
+	if(NULL==_chars){output("%sNo Mchars to free.\n",M_WARNING_PREFIX);return;}
 	FREE(_chars,count,(type>0?-type:type)/*,owner_chars*/); // obtain ownership and free
 }
 
@@ -94,14 +94,14 @@ void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,siz
  * @param chars the pointer to the C string with characters to store
  * @return Mchars* the allocated pointer (or NULL on failure)
  */
-Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LINE__);
+Mchars* _getChars(unsigned char const * const chars){Mallocationowner owner=getOwner(__LINE__);
 	Mchars* _chars=NULL;
 	if(chars!=NULL){
-		long long l=strlen(chars)+1;
+		size_t l=1+strlen(chars);
 		// output("Allocating %zd characters for storing '%s'.\n",l,chars);
 		_chars=owned_chars(__chars(1,l,'\''),owner); // MDH@20MAY2020: obtain ownership of what _chars returns
 		if(_chars!=NULL){
-			memcpy(_chars->chars,chars,l);
+			memcpy(_chars->chars,chars,l*sizeof(unsigned char));
 			// if I'm the owner, I return a _chars disowned, otherwise I am returning as is because I never was the owner to start with
 			return disowned_chars(_chars,owner);
 		}
@@ -110,7 +110,7 @@ Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LI
 	return NULL;
 }
 
-Mchars* _getReversedChars(char const * const chars){Mallocationowner owner=getOwner(__LINE__);
+Mchars* _getReversedChars(unsigned char const * const chars){Mallocationowner owner=getOwner(__LINE__);
 	Mchars* _chars=NULL;
 	if(chars!=NULL){
 		long long l=strlen(chars);
@@ -138,6 +138,6 @@ Mchars* _getReversedChars(char const * const chars){Mallocationowner owner=getOw
  */
 void freeChars(Mchars const * const _chars/*,Mallocationowner owner_chars*/){
 	// if oid is not positive, assuming I was the owner to start with and use that as owner id
-	if(_chars)free_chars(_chars/*,owner_chars*/,1,strlen(_chars->chars)+1,'\'');
+	if(_chars!=NULL)free_chars(_chars/*,owner_chars*/,1,strlen(_chars->chars)+1,'\'');
 }
 

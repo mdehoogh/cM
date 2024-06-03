@@ -10,7 +10,7 @@ typedef struct {
 // #ifndef __PRODUCTION__
 //     t_count allocationIndex;
 // #endif
-    char chars[1];
+	unsigned char chars[1];
 }Mchars;
 
 Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars);
@@ -23,9 +23,9 @@ void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,siz
 Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,long long to_count,signed char type);
 
 // get Mchars* that contains exactly the characters in chars (nothing more), and the size is 1 (for single characters)
-Mchars* _getChars(char const * const chars);
+Mchars* _getChars(unsigned char const * const chars);
 void freeChars(Mchars const * const _chars/*,Mallocationowner owner*/); // to free what was created with _getChars()
 
-Mchars* _getReversedChars(char const * const chars);
+Mchars* _getReversedChars(unsigned char const * const chars);
 
 #define FREECHARS(_chars,owner_chars) freeChars(disowned_chars(_chars,owner_chars))

@@ -607,6 +607,8 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue);
 Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineTextValue);
 Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue);
 Mvalue* Mfpos(Mvalue const * const fileValue);
+Mvalue* Mfmode(Mvalue* fileValue);
+Mvalue* Mfisbinary(Mvalue* fileValue);
 Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue);
 Mvalue* Mfpushpos(Mvalue const * const fileValue);
 Mvalue* Mfpoppos(Mvalue const * const fileValue);

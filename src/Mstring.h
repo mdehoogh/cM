@@ -7,15 +7,15 @@
 
 #include "Mchars.h"
 
-// MDH@17APR2020: it's more convenient to define BLOCK_SIZE as the actual number of bytes we need for a specific number of characters
+// MDH@17APR2020: it's more convenient to define BLOCK_SIZE as the actual number of bytes we need for a specific number of unsigned characters
 #define M_BLOCK_CHARACTERS 16
-#define M_BLOCK_SIZE M_BLOCK_CHARACTERS*sizeof(char)
+#define M_BLOCK_SIZE M_BLOCK_CHARACTERS*sizeof(unsigned char)
 
 typedef struct{
 // #ifndef __PRODUCTION__
 //     t_count allocationIndex;
 // #endif
-    Mchars* _chars; // MDH@17APR2020: replacing char* chars by Mchars* _chars so we can keep track of where it is allocated
+    Mchars* _chars; // MDH@17APR2020: replacing unsigned char* unsigned chars by Mchars* _chars so we can keep track of where it is allocated
     size_t length;
     long long blocks; // the number of allocated blocks of BLOCK_SIZE bytes of memory for _chars
 }Mstring;
@@ -45,28 +45,28 @@ Mstring* string_synclength(Mstring * const str); // MDH@02JUN2019: check the len
 
 Mstring* string_declength(Mstring * const str); // MDH@13DEC2023: decrements the length of the string
 
-char string_char(Mstring const * const str,size_t pos);
-char string_last_char(Mstring const * const str);
+unsigned char string_char(Mstring const * const str,size_t pos);
+unsigned char string_last_char(Mstring const * const str);
 // MDH@13OCT2020: string_last_char_count() returns the number of times str ends with c
-size_t string_last_char_count(const Mstring* const str,char c);
-char* string_remainder(Mstring * const str,size_t pos);
-char* string(Mstring * const str);
+size_t string_last_char_count(const Mstring* const str,unsigned char c);
+unsigned char* string_remainder(Mstring * const str,size_t pos);
+unsigned char* string(Mstring * const str);
 
 char* _stringstart(Mstring const * const str,size_t length); // returns a copy of the first part of the string
 
 bool string_shorten(Mstring * const str,size_t length);
 
-long long string_find_char(Mstring const * const str,char c,size_t pos); // MDH@21OCT2020: renamed to string_find_char, and appending pos being the first position to consider, returning -1 on failure
+long long string_find_char(Mstring const * const str,unsigned char c,size_t pos); // MDH@21OCT2020: renamed to string_find_char, and appending pos being the first position to consider, returning -1 on failure
 
 // changing the string
-char string_removed_char(Mstring * const str,size_t pos);
+unsigned char string_removed_char(Mstring * const str,size_t pos);
 
-size_t string_removed(Mstring * const str,size_t pos,size_t length); // MDH@03OCT2019: remove length characters from str starting at position pos
+size_t string_removed(Mstring * const str,size_t pos,size_t length); // MDH@03OCT2019: remove length unsigned characters from str starting at position pos
 
-Mstring* string_insert_char(Mstring * const str,size_t pos,char c);
-Mstring* string_append_char(Mstring * const str,char c);
-Mstring* string_setchar(Mstring * const str,char c,size_t pos);
-Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc); // MDH@23APR2020: if we want to quickly replace a substring we can use string_setchars (does NOT change the length!!!)
+Mstring* string_insert_char(Mstring * const str,size_t pos,unsigned char c);
+Mstring* string_append_char(Mstring * const str,unsigned char c);
+Mstring* string_setchar(Mstring * const str,unsigned char c,size_t pos);
+Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc); // MDH@23APR2020: if we want to quickly replace a substring we can use string_setunsigned chars (does NOT change the length!!!)
 
 // MDH@26FEB2019: can we append a text as a whole???
 Mstring* string_append(Mstring * const str,char const * const pc);
@@ -74,10 +74,10 @@ Mstring* string_prepend(Mstring * const str,char const * const pc);
 
 void string_reverse(Mstring * const str);
 
-Mstring* string_append_chars(Mstring * const str,char const * pc,size_t count); // MDH@24SEP2019: we need to be able to append count characters from pc
-char string_replacedchar(Mstring * const str,char c,size_t pos); // returns the character at position pos replaced by c (but does not change the length ever)
+Mstring* string_append_chars(Mstring * const str,char const * pc,size_t count); // MDH@24SEP2019: we need to be able to append count unsigned characters from pc
+unsigned char string_replacedchar(Mstring * const str,unsigned char c,size_t pos); // returns the unsigned character at position pos replaced by c (but does not change the length ever)
 
-size_t string_number_of_matching_chars(Mstring const * const str,char const * chars); // the number of matching character at the start
+size_t string_number_of_matching_chars(Mstring const * const str,char const * chars); // the number of matching unsigned character at the start
 
 bool string_equal(Mstring const * const str1,Mstring const * const str2); // MDH@24OCT2019: whether or not two strings are considered equal
 
@@ -92,9 +92,9 @@ size_t string_trailing(Mstring* str,char c);
 
 bool string_endswith(Mstring const * const str,char const * const pc);
 
-// MDH@05MAY2024: reading a line of characters directly into an Mstring from an open file (similar to what getline() would)
-long long string_freadline(Mstring * const str,FILE* const file,char const * * linefeedCharacterPosition);
-// MDH@21MAY2024: string_freadline() may have unprocessed characters at the end that need to be moved up to begin the next line to return on the next call
+// MDH@05MAY2024: reading a line of unsigned characters directly into an Mstring from an open file (similar to what getline() would)
+long long string_freadline(Mstring * const str,FILE* const file,unsigned char const * * linefeedCharacterPosition);
+// MDH@21MAY2024: string_freadline() may have unprocessed unsigned characters at the end that need to be moved up to begin the next line to return on the next call
 long long string_characters_moved(Mstring* const str,size_t oldPosition,size_t newPosition);
 void string_outputchars(Mstring const * const str,bool extended);
 
