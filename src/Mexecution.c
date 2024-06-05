@@ -1913,6 +1913,44 @@ Mstring* _getStringOfChars(char const * const chars,char quoteChar){Mallocationo
 	return disowned_string(_stringText,owner);
 }
 
+static unsigned char HEX_CHARS[]="0123456789ABCDEF";
+/**
+ * @brief returns the escaped text representation of \p _text
+ * 
+ * @param _text 
+ * @return Mstring* 
+ */
+Mstring* _getEscapedStringOfText(Mtext const * const _text,bool dequoted){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _escapedString=(_text!=NULL?owned_string(__string(),owner):NULL);
+	if(_escapedString!=NULL){
+		/*
+		if(dequoted){
+
+		}else{*/
+			Mstring* p=_escapedString;
+			p=string_append_char(p,_text->presuffix);
+			if(_text->presuffix=='b')p=string_append_char(p,'\'');else
+			if(_text->presuffix=='B')p=string_append_char(p,'"');
+			unsigned char c;
+			size_t index=0;
+			// problem when _text->_c contains NUL characters somehow!!!! those should already be escaped with \0 NOT \x00
+			while((c=_text->_c[index++])){
+				if(c<=31||c==127){
+					p=string_append(p,"\\x");
+					p=string_append_char(p,HEX_CHARS[c>>4]);
+					p=string_append_char(p,HEX_CHARS[c&15]);
+				}else{ // escape backslashes
+					p=string_append_char(p,c);
+					if(c=='\'')p=string_append_char(p,c);
+				}
+			}
+			if(_text->presuffix=='B')p=string_append_char(p,'"');else 
+			if(_text->presuffix=='b')p=string_append_char(p,'\'');else p=string_append_char(p,_text->presuffix);
+			if(NULL==p){FREE_STRING(_escapedString,owner);return NULL;}
+		//}
+	}
+	return disowned_string(_escapedString,owner);
+}
 /**
  * @brief returns the pointer to a new M string containing the (dequoted) text pointed to by \p _text
  * 
@@ -1927,66 +1965,64 @@ Mstring* _getStringOfText(Mtext const * const _text,bool dequoted){if(NULL==_tex
 		/*
 		if(amVerboseDebugging())
 			p=string_append_char(p,'s');*/
-		if(p!=NULL){
-			// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
-			if(dequoted){
-				// TODO can we do the following using pointers somehow????
-				char c;
-				size_t lastindex=strlen(_text->_c);
-				if(lastindex>0){
-					lastindex--;
-					for(size_t index=0;index<=lastindex;index++){
-						c=_text->_c[index];
-						if(index<lastindex&&c=='\\'){
-							c=_text->_c[++index];
-							switch(c){
-								case 'a':p=string_append_char(p,0x07);break;
-								case 'b':p=string_append_char(p,0x08);break;
-								case 't':p=string_append_char(p,0x09);break;
-								case 'n':p=string_append_char(p,0x0A);break;
-								case 'v':p=string_append_char(p,0x0B);break;
-								case 'f':p=string_append_char(p,0x0C);break;
-								case 'r':p=string_append_char(p,0x0D);break;
-								case 'e':p=string_append_char(p,0x1B);break;
-								case '"':p=string_append_char(p,0x22);break;
-								case '\'':p=string_append_char(p,0x27);break;
-								case '?':p=string_append_char(p,0x3F);break;
-								case '\\':p=string_append_char(p,0x5C);break;
-								case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
-									{ // octal representations can't have 8 or 9 in it
-										char oct=(c-48);
-										// check successive characters if they are octal digits
-										while(index+1<=lastindex){
-											c=_text->_c[index+1];
-											if(c<48||c>55)break; // not an octal digit
-											oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
-											index++;
-										}
-										p=string_append_char(p,oct);
-										// replacing: _p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));
+		// MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
+		if(dequoted){
+			// TODO can we do the following using pointers somehow????
+			char c;
+			size_t lastindex=strlen(_text->_c);
+			if(lastindex>0){
+				lastindex--;
+				for(size_t index=0;index<=lastindex;index++){
+					c=_text->_c[index];
+					if(index<lastindex&&c=='\\'){
+						c=_text->_c[++index];
+						switch(c){
+							case 'a':p=string_append_char(p,0x07);break;
+							case 'b':p=string_append_char(p,0x08);break;
+							case 't':p=string_append_char(p,0x09);break;
+							case 'n':p=string_append_char(p,0x0A);break;
+							case 'v':p=string_append_char(p,0x0B);break;
+							case 'f':p=string_append_char(p,0x0C);break;
+							case 'r':p=string_append_char(p,0x0D);break;
+							case 'e':p=string_append_char(p,0x1B);break;
+							case '"':p=string_append_char(p,0x22);break;
+							case '\'':p=string_append_char(p,0x27);break;
+							case '?':p=string_append_char(p,0x3F);break;
+							case '\\':p=string_append_char(p,0x5C);break;
+							case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
+								{ // octal representations can't have 8 or 9 in it
+									char oct=(c-48);
+									// check successive characters if they are octal digits
+									while(index+1<=lastindex){
+										c=_text->_c[index+1];
+										if(c<48||c>55)break; // not an octal digit
+										oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
+										index++;
 									}
-									break; // assume octal
-								case 8:case 9:break; // this would be invalid
-								case 'x':case 'X':
-									{
-											if(index+2<=lastindex){p=string_append_char(p,(hexdigit(_text->_c[index+1])<<4)+hexdigit(_text->_c[index+2]));}
-											index+=2;
-									}
-									break; // TODO for now skip, so still left to do
-							}
-						}else
-							p=string_append_char(p,c);
-					}
+									p=string_append_char(p,oct);
+									// replacing: _p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));
+								}
+								break; // assume octal
+							case 8:case 9:break; // this would be invalid
+							case 'x':case 'X':
+								{
+										if(index+2<=lastindex){p=string_append_char(p,(hexdigit(_text->_c[index+1])<<4)+hexdigit(_text->_c[index+2]));}
+										index+=2;
+								}
+								break; // TODO for now skip, so still left to do
+						}
+					}else
+						p=string_append_char(p,c);
 				}
-			}else{
-				p=string_append_char(p,_text->presuffix);
-				if(_text->presuffix=='b')p=string_append_char(p,'\'');else
-				if(_text->presuffix=='B')p=string_append_char(p,'\'');
-				p=string_append(p,_text->_c);
-				if(_text->presuffix=='b')p=string_append_char(p,'\'');else
-				if(_text->presuffix=='B')p=string_append_char(p,'\'');else
-					p=string_append_char(p,_text->presuffix);
 			}
+		}else{
+			if(_text->presuffix=='b')p=string_append(p,"b'");else
+			if(_text->presuffix=='B')p=string_append(p,"b\"");else
+			p=string_append_char(p,_text->presuffix);
+			p=string_append(p,_text->_c);
+			if(_text->presuffix=='b')p=string_append_char(p,'\'');else
+			if(_text->presuffix=='B')p=string_append_char(p,'"');else
+			p=string_append_char(p,_text->presuffix);
 		}
 		if(NULL==p){FREE_STRING(_stringText,owner);return NULL;}
 		////else output("Unescaped text of '%c%s': '%s'.\n",_test->presuffix,_text->_c,string(_stringText));

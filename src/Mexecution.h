@@ -101,8 +101,8 @@ typedef struct Mtext{
 // #ifndef __PRODUCTION__
 //     t_count allocationIndex;
 // #endif
-    char presuffix;
-    char _c[]; // by using an array and not a pointer, it's easy to make one out of an Mtext* by strcpy from string(Mstring)
+	unsigned char presuffix;
+	unsigned char _c[]; // by using an array and not a pointer, it's easy to make one out of an Mtext* by strcpy from string(Mstring)
 }Mtext;
 
 // MDH@17JUN2019: if we want to know when a decimal contains repeating fractions we should be able to remember how many decimals repeat themselves
@@ -295,6 +295,8 @@ Mstring* _getFloatText(Mfloat const * const _real);
 Mstring* _getStringOfText(Mtext const * const _string,bool dequoted);
 
 Mstring* _getStringOfChars(char const * const chars,char quoteChar); // MDH@01MAY2024: either return chars enquoted, or decode by resolving the escape characters
+
+Mstring* _getEscapedStringOfText(Mtext const * const _text,bool dequoted);
 
 long long isBigintegerUndefined(Mbiginteger const * const biginteger);
 long long isTextUndefined(Mtext const * const text);

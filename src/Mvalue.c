@@ -2785,7 +2785,14 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted,bool showAll){M
   		case VT_DECIMAL:valueText=owned_string(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
 			case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
 			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
-			case VT_TEXT:valueText=owned_string(_getStringOfText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
+			case VT_TEXT:
+				{ // show 'binary' text escaped (because it may contain non-printable characters)
+					if(_value->value._text->presuffix=='b'||_value->value._text->presuffix=='B')
+						valueText=owned_string(_getEscapedStringOfText(_value->value._text,dequoted),owner);
+					else
+						valueText=owned_string(_getStringOfText(_value->value._text,dequoted),owner);
+				}
+				break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
 			case VT_ARRAY:valueText=owned_string(_getArrayText(_value->value._array,(showAll?LLONG_MAX:M_ARRAY_ELEMENTS_AT_START),(showAll?LLONG_MAX:M_ARRAY_ELEMENTS_AT_END)),owner);break;
 			case VT_LIST:valueText=owned_string(_getListText(_value->value._list,(showAll?LLONG_MAX:M_LIST_ELEMENTS_AT_START),(showAll?LLONG_MAX:M_LIST_ELEMENTS_AT_END)),owner);break;

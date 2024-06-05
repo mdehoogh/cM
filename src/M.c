@@ -5343,101 +5343,128 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 				*/
 			// TODO we force delete M.py here but we need to check whether the Python command file does not match M.py!!!!
 			// NOTE deleting python script file like this did result in it not to be written correctly, so we have to find a way to force open a script file even when it exists!!!
-			if(/*fDeleted(pythonScriptFile,owner)==M_TRUE&&*/fOpened(pythonScriptFile,owner,"w",true,false)==M_TRUE){
-				output("Python script file opened.\n");
-				// 1a. WRITE THE HEADER LINES
-				bool headerLinesWritten=(fWriteChars(pythonScriptFile,"import sys",true)==0);
-				if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"import atexit",true)==0);
-				if(headerLinesWritten){
-					// compose the line defining the exit handler
-					Mstring* _exitHandlerText=owned_string(_getString("def Matexit(): "),owner);
-					if(_exitHandlerText!=NULL){
-						Mstring* p=_exitHandlerText;
-						if(sysExitValue!=NULL){
-							p=string_append(p,"print(\"{0}\".format(");
-							if(sysExitValue->type!=VT_TEXT){
-								Mstring* _sysExitExpressionText=owned_string(_getValueText(sysExitValue,false,true),owner);
-								if(_sysExitExpressionText!=NULL){
-									///output("Writing result '%s' to the Python script file.\n",string(_sysExitExpressionText));
-									p=string_append(p,string(_sysExitExpressionText));
-									FREE_STRING(_sysExitExpressionText,owner);
-								}else
-									p=NULL;
-							}else // the text to write is already wrapped, so we're writing it as is (we're not going to use _getStringText to dequote it??????)
-								p=string_append(p,sysExitValue->value._text->_c);
-							p=string_append(p,")); ");
-						}
-						p=string_append(p,"sys.stdout.flush(); return"); // finish exit handler
-						headerLinesWritten=(p!=NULL?fWriteChars(pythonScriptFile,string(p),true)==0:false);
-						FREE_STRING(_exitHandlerText,owner);
-					}else
-						headerLinesWritten=false;
-				}
-				/* replaces:
-				if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"def Matexit(): ",false)==0);
-				if(sysExitValue!=NULL){
-					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"print(\"{0}\".format(",false)==0);
-					if(sysExitValue->type!=VT_TEXT){
-						Mstring* _sysExitExpressionText=owned_string(_getValueText(sysExitValue,false,true),owner);
-						if(_sysExitExpressionText!=NULL){
-							output("Writing result '%s' to the Python script file.\n",string(_sysExitExpressionText));
-							if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,_getTextValue(string(_sysExitExpressionText)),false)==0);
-							FREE_STRING(_sysExitExpressionText,owner);
-						}
-					}else{ // the text to write is already wrapped, so we're writing it as is (we're not going to use _getStringText to dequote it??????)
-						if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,sysExitValue->value._text->_c,false)==0);
+			// MDH@05JUN2024: determine whether or not we're actually supposed to execute the (default) Python script file
+			bool pythonScriptFileToExecute=false; // whether or not we're executing the python script file
+			Mfile* pythonCommandFile=(pythonCommandValue->type==VT_FILE?pythonCommandValue->value._file:NULL);
+			if(pythonCommandFile!=NULL){
+				fUpdateStats(pythonCommandFile,false);
+				fUpdateStats(pythonScriptFile,false);
+				if(pythonCommandFile->staterrno==0&&pythonScriptFile->staterrno==0){
+					if(pythonCommandFile->stat.st_dev==pythonScriptFile->stat.st_dev&&pythonCommandFile->stat.st_ino==pythonScriptFile->stat.st_ino)
+						pythonScriptFileToExecute=true;
+				}else
+					output("%sFailed to determine whether '%s' represents the default Python script file to execute (M.py).\n",M_ERROR_PREFIX,string(pythonCommandFile->_name));
+			}
+			if(pythonScriptFileToExecute||fOpened(pythonScriptFile,owner,"w",true,false)==M_TRUE){
+				bool headerLinesWritten=false;
+				if(!pythonScriptFileToExecute){
+					output("Python script file opened.\n");
+					// 1a. WRITE THE HEADER LINES
+					headerLinesWritten=(fWriteChars(pythonScriptFile,"import sys",true)==0);
+					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"import atexit",true)==0);
+					if(headerLinesWritten){
+						// compose the line defining the exit handler
+						Mstring* _exitHandlerText=owned_string(_getString("def Matexit(): "),owner);
+						if(_exitHandlerText!=NULL){
+							Mstring* p=_exitHandlerText;
+							if(sysExitValue!=NULL){
+								p=string_append(p,"print(\"{0}\".format(");
+								if(sysExitValue->type!=VT_TEXT){
+									Mstring* _sysExitExpressionText=owned_string(_getValueText(sysExitValue,false,true),owner);
+									if(_sysExitExpressionText!=NULL){
+										///output("Writing result '%s' to the Python script file.\n",string(_sysExitExpressionText));
+										p=string_append(p,string(_sysExitExpressionText));
+										FREE_STRING(_sysExitExpressionText,owner);
+									}else
+										p=NULL;
+								}else // the text to write is already wrapped, so we're writing it as is (we're not going to use _getStringText to dequote it??????)
+									p=string_append(p,sysExitValue->value._text->_c);
+								p=string_append(p,")); ");
+							}
+							p=string_append(p,"sys.stdout.flush(); return"); // finish exit handler
+							headerLinesWritten=(p!=NULL?fWriteChars(pythonScriptFile,string(p),true)==0:false);
+							FREE_STRING(_exitHandlerText,owner);
+						}else
+							headerLinesWritten=false;
 					}
-					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,")); ",false)==0);
+					/* replaces:
+					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"def Matexit(): ",false)==0);
+					if(sysExitValue!=NULL){
+						if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"print(\"{0}\".format(",false)==0);
+						if(sysExitValue->type!=VT_TEXT){
+							Mstring* _sysExitExpressionText=owned_string(_getValueText(sysExitValue,false,true),owner);
+							if(_sysExitExpressionText!=NULL){
+								output("Writing result '%s' to the Python script file.\n",string(_sysExitExpressionText));
+								if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,_getTextValue(string(_sysExitExpressionText)),false)==0);
+								FREE_STRING(_sysExitExpressionText,owner);
+							}
+						}else{ // the text to write is already wrapped, so we're writing it as is (we're not going to use _getStringText to dequote it??????)
+							if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,sysExitValue->value._text->_c,false)==0);
+						}
+						if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,")); ",false)==0);
+					}
+					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"sys.stdout.flush(); return",true)==0); // finish exit handler
+					*/
+					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"atexit.register(Matexit)",true)==0); // register exit handler
+					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"# end of header inserted by M, do ** NOT ** edit before this line!",true)==0); // M warning
 				}
-				if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"sys.stdout.flush(); return",true)==0); // finish exit handler
-				*/
-				if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"atexit.register(Matexit)",true)==0); // register exit handler
-				if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"# end of header inserted by M, do ** NOT ** edit before this line!",true)==0); // M warning
 				bool pythonScriptLinesWritten=false;
-				if(headerLinesWritten){ // the header was written successfully
+				if(pythonScriptFileToExecute||headerLinesWritten){ // the header was written successfully
 					output("Python header lines written.\n");
 					// 1b. WRITE THE LINES represented by pythonCommandValue
 					if(pythonCommandValue!=NULL){
 						if(pythonCommandValue->type==VT_FILE){
-							Mfile* pythonCommandFile=pythonCommandValue->value._file;
 							pythonScriptLinesWritten=true;
-							output("Copying the Python script lines from '%s' to the Python script file.\n",string(pythonCommandValue->value._file->_name));
-							// TODO should we close it before reading the lines from it????
-							unsigned long long lineIndex=0;
-							Mstring* _pythonSourceLine=fReadLine(pythonCommandFile);
-							while(_pythonSourceLine!=NULL){
-								lineIndex++;
-								// do not write any empty lines at the end
-								if(string_length(_pythonSourceLine)){
-									if(fWriteChars(pythonScriptFile,string(_pythonSourceLine),false)==0){ // the source line written successfully
-										// construct and write the comment telling what the source line was!
-										Mstring* _sourceLineTextComment=owned_string(_getString("' # source: "),owner);
-										Mstring* p=_sourceLineTextComment;
-										if(p!=NULL){
-											p=string_append(p,string(pythonCommandValue->value._file->_name)); // appending the name of the inserted file
-											p=string_append_char(p,':');
-											p=string_append_ull(p,lineIndex);
-											if(p!=NULL&&getValueInteger(Mfwrite(pythonScriptFile,_getTextValue(string(p))))!=0)
+							if(!pythonScriptFileToExecute){ // another Python file to execute
+								// how about opening the python command file if is currently closed
+								bool opened=false;
+								if(NULL==pythonCommandFile->_f)
+									if(fOpened(pythonCommandFile,getValueDataOwner(),"r",false,false)==M_TRUE)
+										opened=true;
+									else
+										output("%sFailed to open Python command file '%s' to execute.\n",M_ERROR_PREFIX,string(pythonCommandFile));
+								if(pythonCommandFile->_f!=NULL&&fIsReadable(pythonCommandFile,false)){ // the file is opened and can be read
+									output("Copying the Python script lines from '%s' to the Python script file.\n",string(pythonCommandValue->value._file->_name));
+									// TODO should we close it before reading the lines from it????
+									unsigned long long lineIndex=0;
+									Mstring* _pythonSourceLine=fReadLine(pythonCommandFile);
+									while(_pythonSourceLine!=NULL){
+										lineIndex++;
+										// do not write any empty lines at the end
+										if(string_length(_pythonSourceLine)){
+											if(fWriteChars(pythonScriptFile,string(_pythonSourceLine),false)==0){ // the source line written successfully
+												// construct and write the comment telling what the source line was!
+												Mstring* _sourceLineTextComment=owned_string(_getString("' # source: "),owner);
+												Mstring* p=_sourceLineTextComment;
+												if(p!=NULL){
+													p=string_append(p,string(pythonCommandValue->value._file->_name)); // appending the name of the inserted file
+													p=string_append_char(p,':');
+													p=string_append_ull(p,lineIndex);
+													if(p!=NULL&&getValueInteger(Mfwrite(pythonScriptFile,_getTextValue(string(p))))!=0)
+														pythonScriptLinesWritten=false;
+													if(_sourceLineTextComment!=NULL)FREE_STRING(_sourceLineTextComment,owner);
+												}
+											}else
 												pythonScriptLinesWritten=false;
-											if(_sourceLineTextComment!=NULL)FREE_STRING(_sourceLineTextComment,owner);
 										}
-									}else
-										pythonScriptLinesWritten=false;
-								}
-								// always write EOLN
-								if(pythonScriptLinesWritten&&fWriteChars(pythonScriptFile,"'",true)!=0)
+										// always write EOLN
+										if(pythonScriptLinesWritten&&fWriteChars(pythonScriptFile,"'",true)!=0)
+											pythonScriptLinesWritten=false;
+										if(!pythonScriptLinesWritten){
+											output("%sFailed to write '%s' to the Python script file.\n",M_ERROR_PREFIX,string(_pythonSourceLine));
+											break;
+										}
+										FREE_STRING(_pythonSourceLine,owner);
+										///////output("Reading the next line!\n");
+										_pythonSourceLine=fReadLine(pythonCommandFile);
+									}
+									output("Number of Python source lines written: %u.\n",lineIndex);
+									if(opened)
+										if(fClosed(pythonCommandFile,getValueDataOwner())!=M_TRUE)
+											outputError("Failed to close the Python source file");
+								}else
 									pythonScriptLinesWritten=false;
-								if(!pythonScriptLinesWritten){
-									output("%sFailed to write '%s' to the Python script file.\n",M_ERROR_PREFIX,string(_pythonSourceLine));
-									break;
-								}
-								FREE_STRING(_pythonSourceLine,owner);
-								///////output("Reading the next line!\n");
-								_pythonSourceLine=fReadLine(pythonCommandFile);
 							}
-							output("Number of Python source lines written: %u.\n",lineIndex);
-							if(fClosed(pythonCommandFile,getValueDataOwner())!=M_TRUE)
-								outputError("Failed to close the Python source file");
 						}else
 						if(pythonCommandValue->type==VT_TEXT){
 							if(fWriteChars(pythonScriptFile,pythonCommandValue->value._text->_c,true)==0)
