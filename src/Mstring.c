@@ -52,6 +52,38 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
 }
 
 /**
+ * @brief returns a new Mstring* with \p blocks allocated blocks, or NULL on failure
+ * 
+ * @param blocks 
+ * @return Mstring* a new Mstring* with \p blocks allocated blocks, or NULL on failure
+ */
+static Mstring* _getStringWithBlocks(size_t blocks){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _str=owned_string(__string(),owner);
+	if(NULL==_str)return NULL;
+	if(blocks>_str->blocks){
+		Mchars* new_chars=_resized(_str->_chars,M_BLOCK_SIZE,_str->blocks,blocks,'s');
+		if(NULL==new_chars){FREE_STRING(_str,owner);return NULL;}
+		////////printf("resized!\n");
+		_str->blocks=blocks;
+		_str->_chars=new_chars;
+	}
+	return disowned_string(_str,owner);
+}
+
+/**
+ * @brief return a new Mstring* that can host a string of length \p length without new block allocations
+ * 
+ * @param length 
+ * @return Mstring* a new Mstring* that can host a string of length \p length without new block allocations
+ */
+Mstring* _getStringOfLength(size_t length){Mallocationowner owner=getOwner(__LINE__);
+	// to get a string of length, we need length+1 characters
+	Mstring* _str=owned_string(_getStringWithBlocks(1+(length/M_BLOCK_CHARACTERS)),owner);
+	if(NULL==_str)return NULL;
+	return disowned_string(_str,owner);
+}
+
+/**
  * @brief creates and returns an Mstring* initialized using C string \p s
  * 
  * @param s the C string to initialize the Mstring with

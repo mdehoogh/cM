@@ -1914,6 +1914,56 @@ Mstring* _getStringOfChars(char const * const chars,char quoteChar){Mallocationo
 }
 
 static unsigned char HEX_CHARS[]="0123456789ABCDEF";
+
+/**
+ * @brief returns the escaped string representation of Mstring* \p str
+ * 
+ * @param str 
+ * @return Mstring* the escaped string representation of Mstring* \p str
+ */
+Mstring* _getPrintableString(Mstring const * const str){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==str||NULL==str->_chars)return NULL;
+	// it would be convenient to create a string with the same length as str
+	size_t strlength=string_length(str);
+	Mstring* _printableString=owned_string(_getStringOfLength(strlength),owner);
+	if(_printableString!=NULL){
+		if(strlength){
+			Mstring* p=_printableString;
+			char* chars=str->_chars->chars;
+			char c;
+			do{
+				c=*chars++; // TODO hopefully this works as intended, c=*chars then *chars++
+				if(c<=31||c==127){
+					p=string_append_char(p,'\\');
+					switch(*chars){
+						case 0x07:p=string_append_char(p,'a');break;
+						case 0x08:p=string_append_char(p,'b');break;
+						case 0x09:p=string_append_char(p,'t');break;
+						case 0x0A:p=string_append_char(p,'n');break;
+						case 0x0B:p=string_append_char(p,'v');break;
+						case 0x0C:p=string_append_char(p,'f');break;
+						case 0x0D:p=string_append_char(p,'r');break;
+						case 0x1B:p=string_append_char(p,'e');break;
+						default:{
+							p=string_append_char(p,'x');
+							p=string_append_char(p,HEX_CHARS[c>>4]);
+							p=string_append_char(p,HEX_CHARS[c&15]);
+						}
+						break;
+					}
+				}else{
+					if(c=='\\')p=string_append_char(p,'\\');
+					p=string_append_char(p,c);
+				}
+				if(NULL==p)break;
+				strlength--;
+			}while(strlength);
+			if(p==NULL){outputError("Failed to create a readable bytes representation");FREE_STRING(_printableString,owner);return NULL;}
+		}
+	}
+	return disowned_string(_printableString,owner);
+}
+
 /**
  * @brief returns the escaped text representation of \p _text
  * 

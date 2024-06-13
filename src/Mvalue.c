@@ -561,6 +561,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
 			case VT_RATIONAL:if(_value->value._rational){FREE_RATIONAL(_value->value._rational,owner_value_data);_value->value._rational=NULL;}break;
 			case VT_FLOAT:if(_value->value._float){FREE_FLOAT(_value->value._float,owner_value_data);_value->value._float=NULL;}break;
 			case VT_TEXT:if(_value->value._text){FREE_TEXT(_value->value._text,owner_value_data);_value->value._text=NULL;}break;
+			case VT_BYTES:if(_value->value._string){FREE_STRING(_value->value._string,owner_value_data);_value->value._string=NULL;}break; // MDH@13JUN2024
 			case VT_ARRAY:if(_value->value._array){FREE_ARRAY(_value->value._array,owner_value_data);_value->value._array=NULL;}break;
 			case VT_LIST:if(_value->value._list){FREE_LIST(_value->value._list,owner_value_data);_value->value._list=NULL;}break;
 //			case VT_MATRIX:if(_value->value._matrix){FREE_MATRIX(_value->value._matrix,owner_value_data);_value->value._matrix=NULL;}break;
@@ -859,6 +860,7 @@ Mvalue* _getIntegerValue(long long ll){Mallocationowner owner=getOwner(__LINE__)
 	_integerValue->value._integer=owned_integer(disowned_integer(_integer,owner),owner_value_data);
 	return _integerValue;
 }/* VALIDATED */
+
 // MDH@25MAY2020: s is a constant character array that does not need change ownership (because it is supposed to be owned elsewhere or not owned)
 /**
  * @brief returns a new M value wrapping the M text wrapping C string \p s
@@ -876,6 +878,55 @@ Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){Mallocationow
 	_textValue->value._text=owned_text(disowned_text(_text,owner),owner_value_data);
 	return _textValue;
 }/* VALIDATED */
+
+/**
+ * @brief returns an Mvalue* wrapping Mstring* \p str
+ * @details typically used to store a (mutable) byte array read from a binary file (which may contain NUL characters so we need the length field to know how many bytes we have)
+ * @param str 
+ * @return Mvalue* an Mvalue* wrapping Mstring* \p str
+ */
+Mvalue* _getStringValue(Mstring const * const str){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==str)return NULL;
+	bool disowned_string=Misdisowned(str); // determine if str is disowned, if it is we can free it when failing to wrap it!!
+	Mvalue* _stringValue=__value("string");
+	if(NULL==_stringValue){if(disowned_string)free_string(str);return NULL;}
+	_stringValue->type=VT_BYTES;
+	_stringValue->value._string=(disowned_string?owned_string(str,owner_value_data):str);
+	return _stringValue;
+}
+
+/**
+ * @brief returns an M value wrapping the text in \p str
+ * @details as opposed to _getTextValue() the text to wrap may contain NUL characters that are escaped
+ * @param str the text to wrap
+ * @return Mvalue* an M value wrapping the text in \p str
+ */
+Mvalue* _getStringTextValue(Mstring const * const str){Mallocationowner owner=getOwner(__LINE__);
+	// if we bump into a NUL character before the end of str is reached, we should be escaping it to prevent from not getting the entire string
+	char* s=string(str); // will also 'finish' str (i.e. write a NUL character where the length points to)
+	if(NULL==s)return NULL;
+	unsigned char* NULpos=(unsigned char*)strchr(str->_chars->chars,'\0');
+	if(NULL==NULpos){outputBug("Missing NUL character!");return NULL;}
+	// if there's a NUL character found, we need to do more!!!
+	size_t l=str->length;
+	if(l>=NULpos-str->_chars->chars)return _getTextValue(s);
+	// we need to compose the result string that does not contain NUL characters anymore but can't contain single backslashes as well
+	Mstring* _escapedText=owned_string(__string(),owner);
+	if(NULL==_escapedText)return NULL;
+	Mvalue* result=NULL;
+	Mstring* p=_escapedText;
+	char c;
+	for(size_t i=0;i<l;i++){
+		c=s[i];
+		if(c=='\0'){p=string_append_char(p,'\\');c='0';}else
+		if(c=='\\')p=string_append_char(p,'\\');
+		p=string_append_char(p,c);
+	}
+	if(p!=NULL)result=_getTextValue(string(_escapedText));
+	FREE_STRING(_escapedText,owner);
+	return result;
+}
+
 /**
  * @brief returns a new M value wrapping a M text wrapping the C string of character \p c
  * 
@@ -2786,13 +2837,18 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted,bool showAll){M
 			case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
 			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
 			case VT_TEXT:
-				{ // show 'binary' text escaped (because it may contain non-printable characters)
+				{ // show 'binary' text escaped (because it may contain non-printable characters), NOTE binary text is now stored in a VT_BYTES Mvalue
 					if(_value->value._text->presuffix=='b'||_value->value._text->presuffix=='B')
 						valueText=owned_string(_getEscapedStringOfText(_value->value._text,dequoted),owner);
 					else
 						valueText=owned_string(_getStringOfText(_value->value._text,dequoted),owner);
 				}
 				break; // TODO don't dequote the text!!
+			case VT_BYTES: // MDH@13JUN2024: a binary string requires escaping it, and writing it without a textprefix (as VT_TEXT uses)
+			  {
+					valueText=owned_string(_getPrintableString(_value->value._string),owner);
+				}
+				break;
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
 			case VT_ARRAY:valueText=owned_string(_getArrayText(_value->value._array,(showAll?LLONG_MAX:M_ARRAY_ELEMENTS_AT_START),(showAll?LLONG_MAX:M_ARRAY_ELEMENTS_AT_END)),owner);break;
 			case VT_LIST:valueText=owned_string(_getListText(_value->value._list,(showAll?LLONG_MAX:M_LIST_ELEMENTS_AT_START),(showAll?LLONG_MAX:M_LIST_ELEMENTS_AT_END)),owner);break;
@@ -5478,6 +5534,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 											if(characterNulled)*(linefeedCharacterPosition+1)='\0';
 										}
 									}
+									// here we have the problem of NUL characters in the read text line
 									assignValue(&listelement->_value,_getTextValue(lastStoredCharacterPosition));
 									////if(report)
 										output("Line '%s' stored.\n",lastStoredCharacterPosition);
@@ -6424,7 +6481,7 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 					// get the result of reading at most numberOfBytes bytes
 					Mstring* _bytesRead=owned_string(fRead(_file,numberOfBytes),owner); // do not forget to take over the ownership
 					if(_bytesRead!=NULL){ // a single quoted text!!!
-						result=_getTextValue(string(_bytesRead)); // TODO this would copy what was read again, can we speed this up????
+						result=_getStringTextValue(_bytesRead); // _getStringTextValue() escapes NUL characters!!!!! TODO this would copy what was read again, can we speed this up????
 						FREE_STRING(_bytesRead,owner);
 					}else
 						output("%sCan't read from file '%s': not enough memory available!\n",M_ERROR_PREFIX,string(_file->_name));
@@ -6466,7 +6523,7 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 					Mstring* _textLineRead=owned_string(fReadLine(_file),owner);
 					if(_textLineRead!=NULL){ // a single quoted string
 						///output("Line read: '%s'.\n",string(_textLineRead));
-						result=_getTextValue(string(_textLineRead)); // an immutable version of the bytes obtained
+						result=_getStringTextValue(_textLineRead); // an immutable version of the bytes obtained
 						FREE_STRING(_textLineRead,owner);
 					}else
 						output("%sFailed to obtain memory to read a text line from '%s' into.\n",M_ERROR_PREFIX,string(_file->_name));

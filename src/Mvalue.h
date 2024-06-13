@@ -21,6 +21,7 @@ typedef union Mvalueunion{
 	Mrational* _rational;
 	Mfloat* _float;
 	Mtext* _text;
+	Mstring* _string; // MDH@13JUN2024: convenient to use Mstring as array to store a mutable sequence of bytes (e.g. when reading binary data from files)
 	struct Mlist* _list;
 	struct Marray* _array;
 //		struct Mmatrix* _matrix;
@@ -276,6 +277,8 @@ Mvalue* _getCharTextValue(char c,char quote);
 // MDH@28MAY2020 TODO shouldn't we rename these to _getValueOfReference etc.
 Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char const * const text);
+Mvalue* _getStringValue(Mstring const * const str); // MDH@13JUN2024: convenient to be able to directly wrap a sequence of bytes (typically read from a binary file) directly inside a Mvalue
+Mvalue* _getStringTextValue(Mstring const * const str); // call this one and not _getTextValue() if str may contain NUL characters
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,char const * const source); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
