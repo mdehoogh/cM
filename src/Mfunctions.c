@@ -725,6 +725,7 @@ Mvalue* Mlen(Mvalue* _value){
 			case VT_LIST:result=_value->value._list->numberOfElements;break; //(_value->value._list->_last?_value->value._list->_last->index:0);break;
 			case VT_MAP:result=_value->value._map->numberOfElements;break;
 			case VT_TEXT:result=strlen(_value->value._text->_c);break;
+			case VT_BYTES:result=string_length(_value->value._string);break;
 			default:break;
 		}
 	}
@@ -810,6 +811,12 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 							}
 						}
 					};break;
+				case VT_BYTES:
+					if(_value->value._string!=NULL){
+						if(NULL==string_setlength(_value->value._string,newlength))outputError("Failed to change the length of a bytes sequence");
+						result=string_length(_value->value._string);
+					}
+					break;
 				case VT_TEXT:
 					{
 						unsigned long long length=strlen(_value->value._text->_c);

@@ -1312,6 +1312,11 @@ Mvalue* Mcreate(Mvalue* newVariablesValue){Mallocationowner owner=getOwner(__LIN
 					if(addVariable(environment,getValueDataOwner(),newVariablesValue->value._text->_c,VT_UNDEFINED,false))
 						result=1;
 					break;
+				case VT_BYTES:
+					// TODO only considers the bytes in front of the first NUL byte in the bytes sequence
+					if(addVariable(environment,getValueDataOwner(),string(newVariablesValue->value._string),VT_UNDEFINED,false))
+						result=1;
+					break;
 			}
 		}else
 			outputBug("Current environment vanished");
@@ -3986,6 +3991,42 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 char* _getIntegerCharacters(long long ll){//Mallocationowner owner=getOwner(__LINE__);
 	char str[41];sprintf(str,"%lld",ll);return _strdup(str); // MDH@25NOV2020: for 128-bits 40 characters should do (39 if not signed)
 }
+/**
+ * @brief returns a M map wrapper containing the octets of the bytes in the binary text stored in \p str
+ * 
+ * @param str 
+ * @param ascendingindex 
+ * @return Mvalue* 
+ */
+Mvalue* getStringDecimalMapValue(Mstring* str,bool ascendingindex){Mallocationowner owner=getOwner(__LINE__);
+	if(NULL==str)return NULL;
+	Mmap* _dmap=owned_map(_getMapOfType(VT_INTEGER),owner);
+	if(NULL==_dmap)return NULL;
+	size_t l=str->length;
+	unsigned char* characters=string(str);
+	long long index=0;
+	char* _indexCharacters;
+	if(ascendingindex){
+		while(index<l){
+			_indexCharacters=OWNED(_getIntegerCharacters(++index),owner);
+			if(NULL==_indexCharacters)break; // TODO or else?
+			appendedToMap(_dmap,owner,_indexCharacters,_getIntegerValue(*characters));
+			FREE_DISOWNED(_indexCharacters,strlen(_indexCharacters)+1,-'"',owner);
+			characters++; // OOPS pretty essential
+		}
+	}else{
+		// go to the end
+		while(index<l){index++;characters++;}
+		while(index){
+			_indexCharacters=OWNED(_getIntegerCharacters(index--),owner); // TODO not owned??
+			if(NULL==_indexCharacters)break; // TODO or else?
+			characters--;
+			appendedToMap(_dmap,owner,_indexCharacters,_getIntegerValue(*characters));
+			FREE_DISOWNED(_indexCharacters,strlen(_indexCharacters)+1,-'"',owner);
+		}
+	}
+	return _getValueOfMap(disowned_map(_dmap,owner));
+}
 /** TODO who uses this function?
  * @brief returns a M map wrapper containing the octets of the characters in the text stored in \p text
  * 
@@ -4311,6 +4352,7 @@ Mvalue* Mo(Mvalue* value){ // little-endian representation list to return
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,true);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
+			case VT_BYTES:return getStringDecimalMapValue(value->value._string,true);
 			default:break;
 		}
 	}
@@ -4331,6 +4373,7 @@ Mvalue* MO(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endi
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,false);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
+			case VT_BYTES:return getStringDecimalMapValue(value->value._string,false);
 			default:break;
 		}
 	}
@@ -4585,6 +4628,7 @@ Mvalue* Mf(Mvalue* value){
 		case VT_DECIMAL:ld=getDecimalLongDouble(value->value._decimal);break;
 		case VT_RATIONAL:ld=getRationalLongDouble(value->value._rational);break;
 		case VT_TEXT:ld=_strtold(value->value._text->_c,getNAR());break;
+		case VT_BYTES:
 		default:return NAF_value; // if NAF_value is returned, we do NOT disown it as we would with _floatValue being created here!!!
 	}
 	return(isLongDoubleUndefined(ld)==M_FALSE?_getFloatValue(ld):NULL);

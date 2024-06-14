@@ -2679,6 +2679,10 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);
 				written+=outputValue(NULL,_value,NULL);
 				break;
+			case VT_BYTES:
+				outputTokenTypeColor(TT_SQSTRING);
+				written+=outputValue(NULL,_value,NULL);
+				break;
 			case VT_ARRAY:
 				{
 					// MDH@0.1.7.14+25JUN2023: too bad it doesn't use _getValueText() here, so we need to change ( and ) into [ and ] here as well

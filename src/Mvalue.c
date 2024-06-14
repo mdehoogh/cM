@@ -3033,6 +3033,8 @@ long long getValueInteger(const Mvalue* const _value){Mallocationowner owner=get
 					if(ll!=0)return ll; // valid if non-zero
 				}
 				break;
+			case VT_BYTES:
+				break;
 			case VT_TOKEN:
 				{
 					Mstring* tokenText=_value->value._token->text;
@@ -3679,7 +3681,7 @@ long long isValueNegative(Mvalue* value){
  * @return long long M_TRUE or M_FALSE
  */
 long long isValueScalar(Mvalue* value){
-	if(value!=NULL)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_FLOAT:case VT_TEXT:case VT_TOKEN:return M_TRUE;default:return M_FALSE;}
+	if(value!=NULL)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_FLOAT:case VT_TEXT:case VT_BYTES:case VT_TOKEN:return M_TRUE;default:return M_FALSE;}
 	return M_LL_INVALID; // MDH@15MAR2023: better to return M_LL_INVALID if \p value is NULL
 }/* VALIDATED */
 
@@ -3711,6 +3713,7 @@ long long isValueNull(Mvalue* value){
 		case VT_RATIONAL:result=(value->value._rational!=NULL?M_FALSE:M_TRUE);break;
 		case VT_FLOAT:result=(value->value._float!=NULL?M_FALSE:M_TRUE);break;
 		case VT_TEXT:result=(value->value._text!=NULL?M_FALSE:M_TRUE);break;
+		case VT_BYTES:result=(value->value._string!=NULL?M_FALSE:M_TRUE);break;
 		case VT_ARRAY:result=(value->value._array!=NULL?M_FALSE:M_TRUE);break;
 		case VT_LIST:result=(value->value._list!=NULL?M_FALSE:M_TRUE);break;
 //		case VT_MATRIX:result=(value->value._matrix!=NULL?M_FALSE:M_TRUE);break;
@@ -3770,6 +3773,7 @@ long long isValueUndefined(Mvalue* value){
 		case VT_DECIMAL:result=isDecimalUndefined(value->value._decimal);break; // replacing: mpd_isnan((mpd_t*)value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
 		case VT_RATIONAL:result=isRationalUndefined(value->value._rational);break;
 		case VT_TEXT:result=isTextUndefined(value->value._text);break; ////strlen(_value->value._text->_c)==0;
+		case VT_BYTES:result=isStringUndefined(value->value._string);break;
 		case VT_ARRAY:result=isArrayUndefined(value->value._array);break; ////Mlen(_value)==0;
 		case VT_LIST:result=isListUndefined(value->value._list);break; ////Mlen(_value)==0;
 //		case VT_MATRIX:result=isMatrixUndefined(value->value._matrix);break;
@@ -4288,6 +4292,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
 		case VT_FLOAT:return(areFloatsEqual(value1->value._float,value2->value._float)); // MDH@25OCT2019: replacing ldEqual() with a call to areFloatsEqual()
 		case VT_BIGINTEGER:return(mp_cmp(MP_INT_POINTER(value1->value._biginteger),MP_INT_POINTER(value2->value._biginteger))==MP_EQ);
 		case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
+		case VT_BYTES:return string_equal(value1->value._string,value2->value._string); // MDH@14JUN2024
 		case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
 //		case VT_MATRIX:break;
 		case VT_ARRAY:case VT_LIST:case VT_MAP:break;
@@ -5331,7 +5336,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 				// if the file is not binary and can be read from
 				////if(!openedInBinaryMode){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
-						_bytesRead=owned_string(_getString((openedInBinaryMode?"b":"'")),owner); // NO do NOT start the string with a single quote for create a Mtext from it
+						_bytesRead=owned_string((openedInBinaryMode?__string():_getString("'")),owner); // NO do NOT start the string with a single quote for create a Mtext from it
 						if(_bytesRead!=NULL){
 							// string_freadline returns the number of characters (well bytes actually) read but not used (so those are the characters in the next line)
 							unsigned char* linefeedCharacterPosition=NULL;
@@ -5469,14 +5474,15 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 							bool eoln;
 							*/
 							// we'll be using a single line to read the individual lines into
-							Mstring* _line=owned_string(_getString((openedInBinaryMode?"b":"'")),owner);
+							// NOTE when reading in binary mode, we can't actually reuse the line we use because we're actually storing the Mstring explicitly
+							Mstring* _line=owned_string((openedInBinaryMode?__string():_getString("'")),owner);
 							if(NULL==_line){outputError("Failed to create a line buffer");return M_LL_INVALID;}
 							Mlistelement* listelement=NULL;
 							/////output("Will start reading text lines.\n");
 							// MDH@27MAY2024: for an example of how to handle reading a single line see fReadline()
 							long long errorCode,readButNotStored,linesLeftToRead=numberOfLines;
 							unsigned char* linefeedCharacterPosition=NULL;
-							bool endOfFileReached=feof(file->_f);
+							bool endOfFileReached=false;
 							while(result>=0&&linesLeftToRead!=0&&!endOfFileReached){ // still text available and lines to read requested
 								// STEP 1. TRY TO READ A TEXT LINE
 								errorCode=string_freadline(_line,file->_f,&linefeedCharacterPosition);
@@ -5509,182 +5515,203 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 								// NOTE if we fail to store we should treat the not registered characters read as REMAINDER
 								unsigned char* lastStoredCharacterPosition=_line->_chars->chars; // the beginning of any line of characters read is where the single quote is located
 								if(NULL==linefeedCharacterPosition&&endOfFileReached)linefeedCharacterPosition=lastStoredCharacterPosition+_line->length; // consume all characters read as last line
-								unsigned char characterNulled='\0';
-								while(linefeedCharacterPosition!=NULL){
-									// all characters from startOfLine to linefeedCharacterPosition belong to the line to register
-									// STEP 2. collect the text line
-									if(linesLeftToRead>0)linesLeftToRead--; // one line less left to read
-									result++; // another line read
-									// register this line
+								if(openedInBinaryMode){ // opened in binary mode
+									// we'll be storing __line as a whole, and 'return' the remainder read to the open file since the remainder may contain NUL characters, so we can't rely on moving the remainder
+									// throw back what we're not going to store
+									long long lineLength=linefeedCharacterPosition-lastStoredCharacterPosition;
+									if(lineLength<_line->length)fseeko(file->_f,lineLength-_line->length,SEEK_CUR);
+									_line->length=lineLength;
 									listelement=getAppendedListelement(linesReadList,owner_linesReadList);
 									if(NULL==listelement){
 										result=-result;
-										outputError("Failed to store the text line read");
+										outputError("Failed to store the binary line read");
 										break;
 									}
-									// STEP 1. mark the end of the text line NOTE this won't change the actual length, but will ascertain that _getTextValue() copies the actual line
-									bool allCharactersProcessed=(*linefeedCharacterPosition=='\0');
-									characterNulled='\0';
-									if(!openedInBinaryMode){
-										if(*(linefeedCharacterPosition-1)=='\r')*(linefeedCharacterPosition-1)='\0';else *linefeedCharacterPosition='\0';
-									}else{ // opened in binary mode, we'll be storing the end-of-line characters in the text as well
-										// remember the character we have to NULled
-										if(!allCharactersProcessed){
-											characterNulled=*(linefeedCharacterPosition+1);
-											if(characterNulled)*(linefeedCharacterPosition+1)='\0';
+									assignValue(listelement->_value,_getStringValue(disowned_string(_line,owner)));
+									if(NULL==listelement->_value){outputError("Failed to store a binary line read!");break;}
+									// ASSERT _line is now bound in listelement->_value
+									_line=owned_string(__string(),owner);
+									if(NULL==_line){outputError("Failed to create a new binary buffer");break;}
+								}else{ // opened in text mode
+										// consume ALL text lines read
+									unsigned char characterNulled='\0';
+									while(linefeedCharacterPosition!=NULL){
+										// all characters from startOfLine to linefeedCharacterPosition belong to the line to register
+										// STEP 2. collect the text line
+										if(linesLeftToRead>0)linesLeftToRead--; // one line less left to read
+										result++; // another line read
+										// register this line
+										listelement=getAppendedListelement(linesReadList,owner_linesReadList);
+										if(NULL==listelement){
+											result=-result;
+											outputError("Failed to store the text line read");
+											break;
+										}
+										// STEP 1. mark the end of the text line NOTE this won't change the actual length, but will ascertain that _getTextValue() copies the actual line
+										bool allCharactersProcessed=(*linefeedCharacterPosition=='\0');
+										characterNulled='\0';
+										if(openedInBinaryMode){ // opened in binary mode, we'll be storing the end-of-line characters in the text as well
+											// remember the character we have to NULled
+											if(!allCharactersProcessed){
+												characterNulled=*(linefeedCharacterPosition+1);
+												if(characterNulled)*(linefeedCharacterPosition+1)='\0';
+											}
+										}else
+											if(*(linefeedCharacterPosition-1)=='\r')*(linefeedCharacterPosition-1)='\0';else *linefeedCharacterPosition='\0';
+										// here we have the problem of NUL characters in the read text line
+										assignValue(&listelement->_value,_getTextValue(lastStoredCharacterPosition));
+										////if(report)
+											output("Line '%s' stored.\n",lastStoredCharacterPosition);
+										// if some character was nulled write it back
+										if(characterNulled)*(linefeedCharacterPosition+1)=characterNulled;
+										if(allCharactersProcessed){output("All characters processed.\n");break;}
+										/////////if(*linefeedCharacterPosition=='\0')break; // if this was adding the empty line at end-of-file (see below for how to force that), we allow doing that only once!!!
+										// STEP 3. replace the end-of-line character with a single quote (') so we can use it as the new start of line position
+										lastStoredCharacterPosition=linefeedCharacterPosition;
+										// before replacing the linefeed character by a single quote we can check whether it already is because when it is this is the empty line at end-of-file we just added
+										*lastStoredCharacterPosition='\''; // mark start of next line to process with a single quote
+										// MDH@28MAY2024: there's a special situation where we should not break this is when we reached end-of-file right after a newline character
+										//                in that situation we should add an empty line, this is when we now have ' followed by a NUL character
+										if(endOfFileReached){
+											// if we reached the end of the file, right behind a newline character (and nothing behind it), we force append a blank line once
+											if(*(lastStoredCharacterPosition+1)=='\0'){linefeedCharacterPosition=lastStoredCharacterPosition+1;continue;}
+											// OOPS you should never break on end-of-file as long as there are lines to process!!!!!!
+											////////////break; // all read text now processed
+										}
+										if(linesLeftToRead==0)break; // stop as soon as we do not want to read another line, or we've processed all
+										// find the next end-of-line character (if any), or bumping into the NUL character at the end in _line
+										linefeedCharacterPosition=(unsigned char*)strchr(lastStoredCharacterPosition+1,'\n');
+									}
+									//// ALWAYS PROCESS ANY REMAINDER!!!!! if(result<0)break; // some error in storing the line read in _linesReadList
+									// NOTE all full text lines in the characters read from the file processed
+									// PROCESS THE REMAINDER
+									// NOTE which we know does not end with a newline character
+									//      which starts at startOfLine+1 up until where the line ends
+									// MDH@28MAY2024: endOfFileReached could be true because all remaining characters were read although we may not have processed all of them
+									//                therefore we should NOT set readButNotStored to 0 when endOfFileReached equals true
+									readButNotStored=/*endOfFileReached?0:*/(_line->_chars->chars+_line->length)-(lastStoredCharacterPosition+1)/*)*/;
+									if(result>=0){
+										if(readButNotStored>0){ // not all characters stored WHICH now also means that we haven't reached end-of-file
+											/////output("Read but not stored (yet): %lld.\n",readButNotStored);
+											///////output("Read but not in line: %lld.\n",readButNotStoredYet);
+											// if we stop reading now we have to give it back to the file, unless we're at end-of-file
+											// no, we still have to give it back if we're currently at end-of-file if we can't store it
+											if(linesLeftToRead!=0){ // NOT DONE we want to read more, so the remainder could still be completed
+												///output("Trying to consume remainder.\n");
+												/* MDH@27MAY2024: we've handled end-of-file
+												// it is possible that there's nothing more to read from the file in which case we can simply attempt to store what we have
+												if(feof(file->_f)){ // DONE but we can't because there's nothing left to read
+													///output("End-of-file reached.\n");
+													result++;
+													listelement=getAppendedListelement(linesReadList,owner_linesReadList);
+													if(NULL==listelement){
+														result=-result;
+														outputError("Failed to store the last text line");
+													}else{
+														assignValue(&listelement->_value,_getTextValue(string(startOfLine)));
+														readButNotStored=0; // stored, so no need to actually return which means we're staying at end-of-file
+														if(report)output("Line '%s' stored.\n",string(_line));
+													}
+													break; // we would be breaking anyway
+												}
+												*/
+												///output("Moving the remainder to the start.\n");
+												// ASSERT not at end-of-file and still lines to read so readButNotStored is completable
+												long long numberOfCharsMoved=string_characters_moved(_line,(lastStoredCharacterPosition+1)-_line->_chars->chars,1);
+												//////output("Number of characters moved: %lld.\n",numberOfCharsMoved);
+												if(numberOfCharsMoved!=readButNotStored){ // not all characters moved, which means something went wrong, and we have to abort and give the remainder back!!!
+													result=-result;
+													output("%sOnly %lld out of %lld characters moved.\n",M_ERROR_PREFIX,numberOfCharsMoved,readButNotStored);
+													break;
+												}
+												///////readButNotStored=0; // successfully moved, but since we're not breaking out of the loop yet, it doesn't matter
+											}
+										}else{
+											_line->length=1;_line->_chars->chars[1]='\0';
 										}
 									}
-									// here we have the problem of NUL characters in the read text line
-									assignValue(&listelement->_value,_getTextValue(lastStoredCharacterPosition));
-									////if(report)
-										output("Line '%s' stored.\n",lastStoredCharacterPosition);
-									// if some character was nulled write it back
-									if(characterNulled)*(linefeedCharacterPosition+1)=characterNulled;
-									if(allCharactersProcessed){output("All characters processed.\n");break;}
-									/////////if(*linefeedCharacterPosition=='\0')break; // if this was adding the empty line at end-of-file (see below for how to force that), we allow doing that only once!!!
-									// STEP 3. replace the end-of-line character with a single quote (') so we can use it as the new start of line position
-									lastStoredCharacterPosition=linefeedCharacterPosition;
-									// before replacing the linefeed character by a single quote we can check whether it already is because when it is this is the empty line at end-of-file we just added
-									*lastStoredCharacterPosition='\''; // mark start of next line to process with a single quote
-									// MDH@28MAY2024: there's a special situation where we should not break this is when we reached end-of-file right after a newline character
-									//                in that situation we should add an empty line, this is when we now have ' followed by a NUL character
-									if(endOfFileReached){
-										// if we reached the end of the file, right behind a newline character (and nothing behind it), we force append a blank line once
-										if(*(lastStoredCharacterPosition+1)=='\0'){linefeedCharacterPosition=lastStoredCharacterPosition+1;continue;}
-										// OOPS you should never break on end-of-file as long as there are lines to process!!!!!!
-										////////////break; // all read text now processed
-									}
-									if(linesLeftToRead==0)break; // stop as soon as we do not want to read another line, or we've processed all
-									// find the next end-of-line character (if any), or bumping into the NUL character at the end in _line
-									linefeedCharacterPosition=(unsigned char*)strchr(lastStoredCharacterPosition+1,'\n');
-								}
-								//// ALWAYS PROCESS ANY REMAINDER!!!!! if(result<0)break; // some error in storing the line read in _linesReadList
-								// NOTE all full text lines in the characters read from the file processed
-								// PROCESS THE REMAINDER
-								// NOTE which we know does not end with a newline character
-								//      which starts at startOfLine+1 up until where the line ends
-								// MDH@28MAY2024: endOfFileReached could be true because all remaining characters were read although we may not have processed all of them
-								//                therefore we should NOT set readButNotStored to 0 when endOfFileReached equals true
-								readButNotStored=/*endOfFileReached?0:*/(_line->_chars->chars+_line->length)-(lastStoredCharacterPosition+1)/*)*/;
-								if(result>=0){
-									if(readButNotStored>0){ // not all characters stored WHICH now also means that we haven't reached end-of-file
-										/////output("Read but not stored (yet): %lld.\n",readButNotStored);
-										///////output("Read but not in line: %lld.\n",readButNotStoredYet);
-										// if we stop reading now we have to give it back to the file, unless we're at end-of-file
-										// no, we still have to give it back if we're currently at end-of-file if we can't store it
-										if(linesLeftToRead!=0){ // NOT DONE we want to read more, so the remainder could still be completed
-											///output("Trying to consume remainder.\n");
-											/* MDH@27MAY2024: we've handled end-of-file
-											// it is possible that there's nothing more to read from the file in which case we can simply attempt to store what we have
-											if(feof(file->_f)){ // DONE but we can't because there's nothing left to read
-												///output("End-of-file reached.\n");
+									/* replacing:
+									if(linesLeftToRead!=0){ // not done yet
+										if(readButNotStored>0){
+											long long numberOfCharsMoved=string_move(_line,(startOfLine+1)-_line->_chars->chars,1L);
+											if(numberOfCharsMoved==M_LL_INVALID){
+												if(result>0)result=-result;
+												outputError("Failed to prepare for reading the next line(s)");
+												break;
+											}
+											if(feof(file->_f)){ // nothing to read left from the file
+												////output("Last line: '%s'.\n",string(_line));
+												// augment the current remainder as well as the last line in the file which we haven't added yet
+												// register this line
+												/////// breaking anyway!!!! if(linesLeftToRead>0)linesLeftToRead--;
 												result++;
 												listelement=getAppendedListelement(linesReadList,owner_linesReadList);
 												if(NULL==listelement){
-													result=-result;
-													outputError("Failed to store the last text line");
+													if(result>0)result=-result;
+													outputError("Failed to append a text line list element");
 												}else{
-													assignValue(&listelement->_value,_getTextValue(string(startOfLine)));
-													readButNotStored=0; // stored, so no need to actually return which means we're staying at end-of-file
+													readButNotStored=0; // do NOT allow the cursor to be reset
+													assignValue(&listelement->_value,_getTextValue(string(_line)));
 													if(report)output("Line '%s' stored.\n",string(_line));
 												}
-												break; // we would be breaking anyway
-											}
-											*/
-											///output("Moving the remainder to the start.\n");
-											// ASSERT not at end-of-file and still lines to read so readButNotStored is completable
-											long long numberOfCharsMoved=string_characters_moved(_line,(lastStoredCharacterPosition+1)-_line->_chars->chars,1);
-											//////output("Number of characters moved: %lld.\n",numberOfCharsMoved);
-											if(numberOfCharsMoved!=readButNotStored){ // not all characters moved, which means something went wrong, and we have to abort and give the remainder back!!!
-												result=-result;
-												output("%sOnly %lld out of %lld characters moved.\n",M_ERROR_PREFIX,numberOfCharsMoved,readButNotStored);
 												break;
 											}
-											///////readButNotStored=0; // successfully moved, but since we're not breaking out of the loop yet, it doesn't matter
+										}else{
+											_line->length=1;_line->_chars->chars[1]='\0';
 										}
-									}else{
-										_line->length=1;_line->_chars->chars[1]='\0';
 									}
-								}
-								/* replacing:
-								if(linesLeftToRead!=0){ // not done yet
-									if(readButNotStored>0){
-										long long numberOfCharsMoved=string_move(_line,(startOfLine+1)-_line->_chars->chars,1L);
-										if(numberOfCharsMoved==M_LL_INVALID){
-											if(result>0)result=-result;
-											outputError("Failed to prepare for reading the next line(s)");
-											break;
-										}
-										if(feof(file->_f)){ // nothing to read left from the file
-											////output("Last line: '%s'.\n",string(_line));
-											// augment the current remainder as well as the last line in the file which we haven't added yet
-											// register this line
-											/////// breaking anyway!!!! if(linesLeftToRead>0)linesLeftToRead--;
-											result++;
-											listelement=getAppendedListelement(linesReadList,owner_linesReadList);
-											if(NULL==listelement){
-												if(result>0)result=-result;
-												outputError("Failed to append a text line list element");
-											}else{
-												readButNotStored=0; // do NOT allow the cursor to be reset
-												assignValue(&listelement->_value,_getTextValue(string(_line)));
-												if(report)output("Line '%s' stored.\n",string(_line));
-											}
-											break;
-										}
-									}else{
-										_line->length=1;_line->_chars->chars[1]='\0';
-									}
-								}
-								*/
-								////////output("\tAfter update: '");string_outputchars(_line,false);output("'\n");
-								///////if(report)output("Line '%s' read.\n",string(_line));
-								// copy the part of the next line
-								/* replacing
-								eoln=false;
-								char* newbuffer;
-								// keep reading until all of the line is read (or some error occurs)
-								do{
-									buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
-									newbuffer=fgets(buffer,256,file->_f);
-									// detect read error
-									if(NULL==newbuffer&&!feof(file->_f)){
-										FREE_STRING(_line,owner);
-										_line=NULL;
-										output("%sSome error reading text from '%s'.\n",M_ERROR_PREFIX,string(file->_name));
-									}else{
-										// the problem is that buffer might not end with a new line
-										buffer_length=strlen(buffer);
-										if(buffer_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
-										buffer_length--;
-										if(buffer[buffer_length]=='\n'){ // eoln
-											buffer[buffer_length]='\0';
-											eoln=true;
-										}
-										if(NULL==newbuffer)eoln=true; // we do want to add the last buffer
-										if(NULL==string_append(_line,buffer)){ // error appending the buffer
+									*/
+									////////output("\tAfter update: '");string_outputchars(_line,false);output("'\n");
+									///////if(report)output("Line '%s' read.\n",string(_line));
+									// copy the part of the next line
+									/* replacing
+									eoln=false;
+									char* newbuffer;
+									// keep reading until all of the line is read (or some error occurs)
+									do{
+										buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
+										newbuffer=fgets(buffer,256,file->_f);
+										// detect read error
+										if(NULL==newbuffer&&!feof(file->_f)){
 											FREE_STRING(_line,owner);
 											_line=NULL;
+											output("%sSome error reading text from '%s'.\n",M_ERROR_PREFIX,string(file->_name));
 										}else{
-											if(report)
-												output("Buffer '%s' appended to '%s'.\n",buffer,string(_line));
-											// if eoln the current line should be considered complete
-											if(eoln)break;
+											// the problem is that buffer might not end with a new line
+											buffer_length=strlen(buffer);
+											if(buffer_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
+											buffer_length--;
+											if(buffer[buffer_length]=='\n'){ // eoln
+												buffer[buffer_length]='\0';
+												eoln=true;
+											}
+											if(NULL==newbuffer)eoln=true; // we do want to add the last buffer
+											if(NULL==string_append(_line,buffer)){ // error appending the buffer
+												FREE_STRING(_line,owner);
+												_line=NULL;
+											}else{
+												if(report)
+													output("Buffer '%s' appended to '%s'.\n",buffer,string(_line));
+												// if eoln the current line should be considered complete
+												if(eoln)break;
+											}
 										}
-									}
-								}while(_line!=NULL&&newbuffer!=NULL&&--numberOfLines>0); // MDH@30APR2024: testing for numberOfLines still not equal to zero!!!
-								if(NULL==_line)break;
-								// register this line
-								assignValue(&listelement->_value,_getTextValue(string(_line)));
-								*/
+									}while(_line!=NULL&&newbuffer!=NULL&&--numberOfLines>0); // MDH@30APR2024: testing for numberOfLines still not equal to zero!!!
+									if(NULL==_line)break;
+									// register this line
+									assignValue(&listelement->_value,_getTextValue(string(_line)));
+									*/
+								}
 								if(errorCode>0){if(result>0)result=-result;outputError("Some error occurred");break;}
 							}
 							// the part that was read but somehow not stored needs to be available for successive reading!!!
-							if(readButNotStored>0){
-								output("Moving the file cursor %lld positions back.\n",readButNotStored);
-								fseeko(file->_f,-readButNotStored,SEEK_CUR);
+							if(!openedInBinaryMode){
+								if(readButNotStored>0){
+									output("Moving the file cursor %lld positions back.\n",readButNotStored);
+									fseeko(file->_f,-readButNotStored,SEEK_CUR);
+								}
+								FREE_STRING(_line,owner);
 							}
-							FREE_STRING(_line,owner);
 							// if we have a listelement we succeeded, well mostly
 							/////if(listelement==NULL){FREE_LIST(_linesReadList,owner);return NULL;}
 						}else
@@ -6522,9 +6549,12 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 					/////output("Reading a line from '%s'.\n",string(_file->_name));
 					Mstring* _textLineRead=owned_string(fReadLine(_file),owner);
 					if(_textLineRead!=NULL){ // a single quoted string
-						///output("Line read: '%s'.\n",string(_textLineRead));
-						result=_getStringTextValue(_textLineRead); // an immutable version of the bytes obtained
-						FREE_STRING(_textLineRead,owner);
+						output("Line read: '%s'.\n",string(_textLineRead));
+						if(fIsOpenedInBinaryMode(_file)!=M_TRUE){
+							result=_getStringTextValue(_textLineRead);
+							FREE_STRING(_textLineRead,owner);
+						}else
+							result=_getStringValue(disowned_string(_textLineRead,owner)); // an immutable version of the bytes obtained
 					}else
 						output("%sFailed to obtain memory to read a text line from '%s' into.\n",M_ERROR_PREFIX,string(_file->_name));
 				}else
@@ -7077,6 +7107,9 @@ Mrational* _getValueRational(Mvalue const * const value){Mallocationowner owner=
 				break;
 			case VT_TEXT:
 				_rational=owned_rational(_getDecimalTextRational(value->value._text->_c),owner);
+				break;
+			case VT_BYTES:
+				// TODO convert all stored bytes to rationals, and store them in an array
 				break;
 			case VT_RATIONAL:
 				_rational=owned_rational(_getRationalCopy(value->value._rational),owner); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)

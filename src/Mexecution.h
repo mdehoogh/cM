@@ -303,6 +303,7 @@ Mstring* _getEscapedStringOfText(Mtext const * const _text,bool dequoted);
 
 long long isBigintegerUndefined(Mbiginteger const * const biginteger);
 long long isTextUndefined(Mtext const * const text);
+long long isStringUndefined(Mstring const * const str);
 long long isTokenUndefined(Mtoken const * const token);
 
 size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix);

@@ -2491,6 +2491,7 @@ Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
 		case VT_DECIMAL:ld=getDecimalLongDouble(_value->value._decimal);break;
 		case VT_RATIONAL:ld=getRationalLongDouble(_value->value._rational);break;
 		case VT_TEXT:ld=_strtold(_value->value._text->_c,getNAR());break;
+		case VT_BYTES:ld=_strtold(string(_value->value._string),getNAR());break; // TODO only considers everything up to the first NUL character!!!!
 		default:return NAF_value; // if NAF_value is returned, we do NOT disown it as we would with _floatValue being created here!!!
 	}
 	return(isLongDoubleUndefined(ld)?_getFloatValue(ld):NULL);
