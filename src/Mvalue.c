@@ -2845,8 +2845,8 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted,bool showAll){M
 				}
 				break; // TODO don't dequote the text!!
 			case VT_BYTES: // MDH@13JUN2024: a binary string requires escaping it, and writing it without a textprefix (as VT_TEXT uses)
-			  {
-					valueText=owned_string(_getPrintableString(_value->value._string),owner);
+			  { // prefix with b, surround by single quotes
+					valueText=owned_string(_getPrintableString(_value->value._string,'\'','b'),owner);
 				}
 				break;
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;

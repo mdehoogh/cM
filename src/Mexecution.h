@@ -297,7 +297,7 @@ Mstring* _getStringOfText(Mtext const * const _string,bool dequoted);
 
 Mstring* _getStringOfChars(char const * const chars,char quoteChar); // MDH@01MAY2024: either return chars enquoted, or decode by resolving the escape characters
 
-Mstring* _getPrintableString(Mstring const * const str); // MDH@13JUN2024: escapes binary sequences stored in Mstring*s
+Mstring* _getPrintableString(Mstring const * const str,char quoteChar,char quoteTypeChar); // MDH@13JUN2024: escapes binary sequences stored in Mstring*s
 
 Mstring* _getEscapedStringOfText(Mtext const * const _text,bool dequoted);
 

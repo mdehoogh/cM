@@ -1928,21 +1928,23 @@ static unsigned char HEX_CHARS[]="0123456789ABCDEF";
  * @param str 
  * @return Mstring* the escaped string representation of Mstring* \p str
  */
-Mstring* _getPrintableString(Mstring const * const str){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getPrintableString(Mstring const * const str,char quoteChar,char quoteTypeChar){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==str||NULL==str->_chars)return NULL;
 	// it would be convenient to create a string with the same length as str
 	size_t strlength=string_length(str);
 	Mstring* _printableString=owned_string(_getStringOfLength(strlength),owner);
 	if(_printableString!=NULL){
+		Mstring* p=_printableString;
+		if(quoteTypeChar)p=string_append_char(p,quoteTypeChar);
+		if(quoteChar)p=string_append_char(p,quoteChar);
 		if(strlength){
-			Mstring* p=_printableString;
 			char* chars=str->_chars->chars;
 			char c;
 			do{
 				c=*chars++; // TODO hopefully this works as intended, c=*chars then *chars++
 				if(c<=31||c>=127){
 					p=string_append_char(p,'\\');
-					switch(*chars){
+					switch(c){
 						case 7:p=string_append_char(p,'a');break;
 						case 8:p=string_append_char(p,'b');break;
 						case 9:p=string_append_char(p,'t');break;
@@ -1965,8 +1967,9 @@ Mstring* _getPrintableString(Mstring const * const str){Mallocationowner owner=g
 				if(NULL==p)break;
 				strlength--;
 			}while(strlength);
-			if(p==NULL){outputError("Failed to create a readable bytes representation");FREE_STRING(_printableString,owner);return NULL;}
 		}
+		if(quoteChar)p=string_append_char(p,quoteChar);
+		if(p==NULL){outputError("Failed to create a readable bytes representation");FREE_STRING(_printableString,owner);return NULL;}
 		return disowned_string(_printableString,owner);
 	}
 }
