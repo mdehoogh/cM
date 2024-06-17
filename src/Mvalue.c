@@ -889,7 +889,11 @@ Mvalue* _getStringValue(Mstring const * const str){Mallocationowner owner=getOwn
 	if(NULL==str)return NULL;
 	bool disowned_string=Misdisowned(str); // determine if str is disowned, if it is we can free it when failing to wrap it!!
 	Mvalue* _stringValue=__value("string");
-	if(NULL==_stringValue){if(disowned_string)free_string(str);return NULL;}
+	if(NULL==_stringValue){
+		if(disowned_string)free_string(str);
+		outputError("Failed to create a bytes value");
+		return NULL;
+	}
 	_stringValue->type=VT_BYTES;
 	_stringValue->value._string=(disowned_string?owned_string(str,owner_value_data):str);
 	return _stringValue;
@@ -5463,7 +5467,12 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 				///////if(file->_mode[1]!='b'&&(strlen(file->_mode)<3||file->_mode[2]!='b')){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					result=0; // keep track of the number of lines read
 					if(numberOfLines!=0){ // either all or some lines to read
-						output("About to read %lld lines from file '%s'.\n",numberOfLines,string(file->_name));
+						/* see Mfreadlines which should do the communication with the user
+						if(numberOfLines!=M_LL_INVALID)
+							output("About to read %lld lines from file '%s'.\n",numberOfLines,string(file->_name));
+						else
+							output("About to read all lines from file '%s'.\n",string(file->_name));
+						*/
 						if(!feof(file->_f)){ // MDH@27DEC2020 appended: to ascertain that NULL is returned
 							/*
 							_linesReadList=owned_list(_getListOfType(VT_TEXT),owner);
@@ -5486,7 +5495,10 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 							while(result>=0&&linesLeftToRead!=0&&!endOfFileReached){ // still text available and lines to read requested
 								// STEP 1. TRY TO READ A TEXT LINE
 								errorCode=string_freadline(_line,file->_f,&linefeedCharacterPosition);
-								if(errorCode!=0)reportFileReadErrorCode(file,errorCode);
+								if(errorCode!=0)
+									reportFileReadErrorCode(file,errorCode);
+								/*else
+									output("\tLine '%s' read successfully.\n",string(_line));*/
 								endOfFileReached=feof(file->_f); // remember whether end-of-file was reached
 								// MDH@27DEC2020: 
 								// by appending a list element (with value NULL) we can tell whether
@@ -5507,8 +5519,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 									break;
 								}
 								*/
-								readButNotStored=0; // for safety, just in case some positive value was still around
-								output("Contents after reading %lld characters: '",_line->length-1);string_outputchars(_line,false);output("'\n");
+								///output("Contents after reading %lld characters: '",_line->length-1);string_outputchars(_line,false);output("'\n");
 								// TODO what should we do when numberOfCharsRead is negative?????
 								// DONE see before the end of the loop where we're breaking out of this loop when that happens
 								// PROCESS ALL TERMINATED LINES
@@ -5518,8 +5529,18 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 								if(openedInBinaryMode){ // opened in binary mode
 									// we'll be storing __line as a whole, and 'return' the remainder read to the open file since the remainder may contain NUL characters, so we can't rely on moving the remainder
 									// throw back what we're not going to store
-									long long lineLength=linefeedCharacterPosition-lastStoredCharacterPosition;
-									if(lineLength<_line->length)fseeko(file->_f,lineLength-_line->length,SEEK_CUR);
+									if(NULL==linefeedCharacterPosition){
+										outputError("Failed to read a line");
+										break;
+									}
+									long long lineLength=(linefeedCharacterPosition-lastStoredCharacterPosition+1);
+									output("Length of line read: %lld.\n",lineLength);
+									if(!endOfFileReached){ // only when the end of file is not yet reached do we reset the file cursor
+										if(lineLength<_line->length){
+											fseeko(file->_f,lineLength-_line->length,SEEK_CUR);
+											output("File cursor moved back %lld positions.\n",_line->length-lineLength);
+										}
+									}
 									_line->length=lineLength;
 									listelement=getAppendedListelement(linesReadList,owner_linesReadList);
 									if(NULL==listelement){
@@ -5527,12 +5548,13 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 										outputError("Failed to store the binary line read");
 										break;
 									}
-									assignValue(listelement->_value,_getStringValue(disowned_string(_line,owner)));
+									assignValue(&listelement->_value,_getStringValue(disowned_string(_line,owner)));
 									if(NULL==listelement->_value){outputError("Failed to store a binary line read!");break;}
 									// ASSERT _line is now bound in listelement->_value
 									_line=owned_string(__string(),owner);
 									if(NULL==_line){outputError("Failed to create a new binary buffer");break;}
 								}else{ // opened in text mode
+									readButNotStored=0; // for safety, just in case some positive value was still around
 										// consume ALL text lines read
 									unsigned char characterNulled='\0';
 									while(linefeedCharacterPosition!=NULL){
@@ -5550,13 +5572,14 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 										// STEP 1. mark the end of the text line NOTE this won't change the actual length, but will ascertain that _getTextValue() copies the actual line
 										bool allCharactersProcessed=(*linefeedCharacterPosition=='\0');
 										characterNulled='\0';
+										/*
 										if(openedInBinaryMode){ // opened in binary mode, we'll be storing the end-of-line characters in the text as well
 											// remember the character we have to NULled
 											if(!allCharactersProcessed){
 												characterNulled=*(linefeedCharacterPosition+1);
 												if(characterNulled)*(linefeedCharacterPosition+1)='\0';
 											}
-										}else
+										}else*/
 											if(*(linefeedCharacterPosition-1)=='\r')*(linefeedCharacterPosition-1)='\0';else *linefeedCharacterPosition='\0';
 										// here we have the problem of NUL characters in the read text line
 										assignValue(&listelement->_value,_getTextValue(lastStoredCharacterPosition));
@@ -6596,7 +6619,10 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
 				}
 				if(_file->_f!=NULL){
 					if(!feof(_file->_f)){ // end-of-file not reached yet!!
-						output("Reading text lines from '%s'.\n",string(_file->_name));
+						if(numberOfLines==M_LL_INVALID)
+							output("About to read all lines from file '%s'.\n",string(_file->_name));
+						else
+							output("About to read %lld lines from file '%s'.\n",numberOfLines,string(_file->_name));
 						long long filepos=fPosition(_file); // MDH@08MAY2024: we'll need the current file position to know whether to close the file again or not
 						if(filepos<0)outputWarning("Failed to obtain the current file position");
 						Mlist* textLinesReadBefore=NULL;
