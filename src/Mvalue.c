@@ -5275,25 +5275,55 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 		// it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
 		if(file->_f!=NULL){ // and opened
 			if(fIsReadable(file,false)){ // and readable
-				bool openedInBinaryMode=(fIsOpenedInBinaryMode(file)==M_TRUE);
-				// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
-				////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
-				// if the file can be read from, we do
-				///if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
-					_bytesRead=owned_string(_getString((openedInBinaryMode?"b":"'")),owner); // start the string with a single quote for create a Mtext from it
+				if(!feof(file->_f)){
+					bool openedInBinaryMode=(fIsOpenedInBinaryMode(file)==M_TRUE);
+					// if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
+					////////////if(NULL==file->_f)openFile(file,owner_file,"r+");
+					// if the file can be read from, we do
+					///if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+					// let's read in blocks of 1024 bytes
+					size_t numberOfBytesToReadAtOnce=(numberOfBytes<0?1024:numberOfBytes);
+					if(openedInBinaryMode)
+						_bytesRead=owned_string((numberOfBytes>0?_getStringOfLength(numberOfBytes):__string()),owner);
+					else
+						_bytesRead=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
 					if(_bytesRead!=NULL){
-						// the file could be empty to start with
-						while(numberOfBytes>0&&!feof(file->_f)){
-							if(NULL==string_append_char(_bytesRead,fgetc(file->_f)))break;
-							numberOfBytes--;
-						}
-						if(numberOfBytes>0)
-							output("%sFailed to read %d %s from file '%s'.\n",M_ERROR_PREFIX,numberOfBytes,(openedInBinaryMode?"bytes":"characters"),(file->_name));
-						// succeeded when all bytes were read or we bumped into end-of-file!!
-						if(numberOfBytes<=0||feof(file->_f))return disowned_string(_bytesRead,owner);
-						FREE_STRING(_bytesRead,owner);
+						if(numberOfBytesToReadAtOnce>0){ // there are bytes requested to read
+							// keep reading until we're done reading all requested bytes
+							size_t l;
+							while(numberOfBytes!=0){
+								l=string_length(_bytesRead);
+								// we have to ascertain to have sufficient room to store what we read
+								output("Changing the string length from %llu to %llu.\n",l,l+numberOfBytesToReadAtOnce);
+								if(NULL==string_setlength(_bytesRead,l+numberOfBytesToReadAtOnce)){
+									output("%sFailed to allocate sufficient memory to read the bytes from file '%s' to.\n",M_ERROR_PREFIX,string(file->_name));
+									break;
+								}
+								output("Length set to %llu.\n",_bytesRead->length);
+								output("Reading %lld bytes from file '%s'.\n",numberOfBytesToReadAtOnce,string(file->_name));
+								size_t numberOfBytesRead=fread(_bytesRead->_chars->chars+l,sizeof(unsigned char),numberOfBytesToReadAtOnce,file->_f);
+								string_setlength(_bytesRead,l+numberOfBytesRead);
+								if(numberOfBytesRead==0)break;
+								if(feof(file->_f))break;
+								if(numberOfBytes>0)numberOfBytes-=numberOfBytesRead;
+							}
+							/* replacing:
+							// the file could be empty to start with
+							while(numberOfBytes>0&&!feof(file->_f)){
+								if(NULL==string_append_char(_bytesRead,fgetc(file->_f)))break;
+								numberOfBytes--;
+							}
+							*/
+							if(numberOfBytes>0)
+								output("%sFailed to read %d %s from file '%s'.\n",M_ERROR_PREFIX,numberOfBytes,(openedInBinaryMode?"bytes":"characters"),string(file->_name));
+							// succeeded when all bytes were read or we bumped into end-of-file!!
+							if(numberOfBytes<=0||feof(file->_f))return disowned_string(_bytesRead,owner);
+							FREE_STRING(_bytesRead,owner);
+							}
 					}else
 						output("%sFailed to prepare for reading %s from file '%s'.\n",M_ERROR_PREFIX,(openedInBinaryMode?"bytes":"characters"),string(file->_name));
+				}else
+					output("%sCannot read from '%s': end-of-file reached.\n",M_ERROR_PREFIX,string(file->_name));
 				////}
 			}else
 				output("%sCan't read from file '%s': it is not readable.\n",M_ERROR_PREFIX,string(file->_name));
@@ -6515,8 +6545,8 @@ static long long getOpenedFile(Mfile* file,char* mode){
  */
 Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* result=NULL;
-	long long numberOfBytes=(numberOfBytesValue!=NULL?getValueInteger(numberOfBytesValue):M_LL_MAX); // the default is to read as much bytes as possible
-	if(numberOfBytes>=0){ // only non-negative values are considered valid
+	long long numberOfBytes=(numberOfBytesValue!=NULL?getValueInteger(numberOfBytesValue):M_LL_INVALID); // the default is to read as much bytes as possible
+	if(numberOfBytes>=0||numberOfBytes==M_LL_INVALID){ // only non-negative values are considered valid
 		Mfile* _file=(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL));
 		if(_file!=NULL){
 			bool opened=false;
@@ -6531,8 +6561,12 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 					// get the result of reading at most numberOfBytes bytes
 					Mstring* _bytesRead=owned_string(fRead(_file,numberOfBytes),owner); // do not forget to take over the ownership
 					if(_bytesRead!=NULL){ // a single quoted text!!!
-						result=_getStringTextValue(_bytesRead); // _getStringTextValue() escapes NUL characters!!!!! TODO this would copy what was read again, can we speed this up????
-						FREE_STRING(_bytesRead,owner);
+						output("Number of bytes read: %lld.\n",string_length(_bytesRead));
+						if(!fIsOpenedInBinaryMode(_file)){ // opened in 'text' mode
+							result=_getStringTextValue(_bytesRead); // _getStringTextValue() escapes NUL characters!!!!! TODO this would copy what was read again, can we speed this up????
+							FREE_STRING(_bytesRead,owner);
+						}else // opened in binary mode
+							result=_getStringValue(disowned_string(_bytesRead,owner));
 					}else
 						output("%sCan't read from file '%s': not enough memory available!\n",M_ERROR_PREFIX,string(_file->_name));
 				}else

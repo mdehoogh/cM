@@ -264,6 +264,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
 			if(blocks>str->blocks){
 				/////////printf("Realloc string_setlength().\n");
 				// MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
+				output("Allocating %lld blocks of %lld bytes!\n",blocks,M_BLOCK_SIZE);
 				Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s'); // MDH@22MAY2020: by using -foid we disown it immediately
 				if(NULL==new_chars)return NULL; // failure
 				str->blocks=blocks;
@@ -276,10 +277,8 @@ Mstring* string_setlength(Mstring* const str,size_t length){
 				*/
 			}
 			// fill with blanks??? for now that's OK
-			while(str->length<length){
-				str->_chars->chars[str->length]=' '; // MDH@17APR2020 replacing: str->chars[str->length]=' ';
-				str->length++;
-			}
+			while(str->length<length)
+				str->_chars->chars[str->length++]=' '; // MDH@17APR2020 replacing: str->chars[str->length]=' ';
 			// MDH@21JUN2019 removing: str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
 		}else{
 			// output("Shortening the length from %zu to %zu.\n",str->length,length);
@@ -454,6 +453,7 @@ Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,si
 					/////////printf("Realloc string_insert_char().\n");
 					// MDH@17APR2020: reallocating _chars (instead of str->chars)
 					// size_t sizeOfChars=getSizeOfChars(str);
+					// output("Allocating %lld blocks of %lld bytes!\n",blocks,M_BLOCK_SIZE);
 					Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
 					if(!new_chars)return NULL;
 					++(str->blocks);
