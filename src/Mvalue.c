@@ -29,6 +29,7 @@ static bool DEBUGGING=true;
 extern unsigned long long M_MODULE_DEBUGGING;
 
 static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MI_VALUE,id};}
+#define OWNER(id) {MI_VALUE,(id)}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO,M_ARRAY_ELEMENTS_AT_START,M_ARRAY_ELEMENTS_AT_END,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
@@ -5104,7 +5105,7 @@ long long fIsWriteable(Mfile const * const _file,bool report){
 	*/
 	// a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
 }
-static long long fIsOpenedInBinaryMode(Mfile* file){
+static long long fIsOpenedInBinaryMode(Mfile const * const file){
 	return(file!=NULL&&file->_f!=NULL&&file->_mode!=NULL?(strchr(file->_mode,'b')!=NULL?M_TRUE:M_FALSE):M_LL_INVALID);
 }
 
@@ -5786,6 +5787,22 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 }
 
 /**
+ * @brief writes \p str to file \p file 
+ * 
+ * @param file 
+ * @param str 
+ * @return long long the number of characters not written
+ */
+static long long fWriteString(FILE * const file,Mstring const * const str){
+	long long result=M_LL_INVALID;
+	if(file!=NULL&&str!=NULL){
+		result=str->length; // the number of characters to write
+		if(result>0)
+			result-=fwrite(string(str),sizeof(unsigned char),result,file); // subtract from result what was actually written to the file
+	}
+	return result;
+}
+/**
  * @brief writes the C string in \p chars to file \p file
  * 
  * @param file 
@@ -5805,21 +5822,17 @@ long long fWriteChars(Mfile const * const file/*,Mallocationowner owner_file*/,c
 				if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(file->_mode[1]!='b'){ // text write (i.e. as characters)
 						// the end-of-line is to precede the text to write!!!!!
-						if(eolnToWrite){ // also some EOLN characters to write
-							///output("Writing the end-of-line characters to '%s'.\n",string(file->_name));
-							char* p=FILE_EOLN;
-							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
-							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
-							while(*p){notwritten++;p++;} // NOTE count what has not been written
-						}
 						if(charsToWrite){
 							// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
 							Mstring* _textToWrite=(notwritten==0?owned_string(_getStringOfChars(chars,'\0'),owner):NULL); // NOTE: replaces the _getStringOfText() call as used in fWriteText()
 							if(_textToWrite!=NULL){
+								notwritten=fWriteString(file->_f,_textToWrite);
+								/* replacing:
 								////////output("Writing '%s' to file '%s'.\n",string(_textToWrite),string(file->_name));
 								char* p=string(_textToWrite); // replacing in order to get the NUL character written in _textToWrite!!!: _textToWrite->_chars->chars;
 								while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
 								while(*p){notwritten++;p++;} // count what has not been written
+								*/
 								FREE_STRING(_textToWrite,owner); // MDH@29APR2024: BUG FIX should be here
 							}else{
 								if(!notwritten){
@@ -5828,6 +5841,13 @@ long long fWriteChars(Mfile const * const file/*,Mallocationowner owner_file*/,c
 								}else
 									notwritten+=charsToWrite;
 							}
+						}
+						if(eolnToWrite){ // also some EOLN characters to write
+							///output("Writing the end-of-line characters to '%s'.\n",string(file->_name));
+							char* p=FILE_EOLN;
+							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
+							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
+							while(*p){notwritten++;p++;} // NOTE count what has not been written
 						}
 					}else // binary write
 						notwritten=charsToWrite-fwrite(chars,sizeof(char),charsToWrite,file->_f);
@@ -5860,17 +5880,16 @@ long long fWriteBytes(Mfile const * const file,Mstring const * const str,bool wr
 				if(file->_mode[1]=='+'||file->_mode[0]=='a'||file->_mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(file->_mode[1]!='b'){ // text write (i.e. as chars)
 						// the end-of-line is to precede the text to write!!!!!
+						if(bytesToWrite){
+							result=bytesToWrite;
+							result-=fwrite(str->_chars->chars,sizeof(unsigned char),result,file->_f);
+						}
 						if(eolnToWrite){ // also some EOLN characters to write
 							///output("Writing the end-of-line characters to '%s'.\n",string(file->_name));
 							char* p=FILE_EOLN;
 							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
 							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
 							while(*p){result++;p++;} // NOTE count what has not been written
-						}
-						if(bytesToWrite){
-							result+=bytesToWrite;
-							size_t bytesWritten=fwrite(str->_chars->chars,sizeof(unsigned char),bytesToWrite,file->_f);
-							result-=bytesWritten;
 						}
 					}else // binary write
 						result=bytesToWrite-fwrite(str->_chars->chars,sizeof(unsigned char),bytesToWrite,file->_f);
@@ -5904,21 +5923,17 @@ long long fWriteText(Mfile const * const file,Mtext const * const textToWrite,bo
 				if(file->_mode[1]=='+'||file->_mode[2]=='+'||file->_mode[0]=='a'||file->_mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
 					if(file->_mode[1]!='b'){ // text write (i.e. as characters)
 						// the end-of-line is to precede the text to write!!!!!
-						if(eolnToWrite){ // also some EOLN characters to write
-							///output("Writing the end-of-line characters to '%s'.\n",string(file->_name));
-							char* p=FILE_EOLN;
-							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
-							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
-							while(*p){notwritten++;p++;} // NOTE count what has not been written
-						}
 						// in case there are escape sequences in the text, we need to resolve these which _getStringOfText() does
 						if(charsToWrite){
 							Mstring* _textToWrite=(notwritten==0?owned_string(_getStringOfText(textToWrite,true),owner):NULL);
 							if(_textToWrite!=NULL){
+								notwritten=fWriteString(file->_f,_textToWrite);
+								/* replacing:
 								////////output("Writing '%s' to file '%s'.\n",string(_textToWrite),string(file->_name));
 								char* p=string(_textToWrite); // replacing: _textToWrite->_chars->chars; // TODO not certain about this DONE damn right because apparently the \0 is not written at the end (which we found out by writing the previous line!!!)
 								while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
 								while(*p){notwritten++;p++;} // NOTE that's one way of dealing with it
+								*/
 								FREE_STRING(_textToWrite,owner); // MDH@29APR2024: BUG FIX should be here
 							}else{
 								if(!notwritten){
@@ -5927,6 +5942,13 @@ long long fWriteText(Mfile const * const file,Mtext const * const textToWrite,bo
 								}else
 									notwritten+=charsToWrite;
 							}
+						}
+						if(eolnToWrite){ // also some EOLN characters to write
+							///output("Writing the end-of-line characters to '%s'.\n",string(file->_name));
+							char* p=FILE_EOLN;
+							// if we're supposed to write an end of line we increment notwritten all the same if we have to break!!!
+							while(*p){if(fputc(*p,file->_f)==EOF)break;p++;}
+							while(*p){notwritten++;p++;} // NOTE count what has not been written
 						}
 					}else // binary write
 						notwritten=charsToWrite-fwrite(p,sizeof(char),charsToWrite,file->_f);
@@ -5991,6 +6013,14 @@ long long fWriteLines(Mfile * const file,Mlist const * const linesToWrite){Mallo
 								output("%sFailed to write line #%lld of bytes.\n",M_ERROR_PREFIX,(result>0?result:-result));
 							}else
 								file->linesWritten++;
+						}else{
+							Mstring* _lineToWrite=owned_string(_getValueText(lineListelement->_value,false,true),owner);
+							if(_lineToWrite!=NULL){
+								if(fWriteString(file,_lineToWrite)!=0){
+									if(result>0)result=-result;
+								}
+								FREE_STRING(_lineToWrite,owner);
+							}
 						}
 					}
 					lineListelement=lineListelement->_next;
@@ -6885,6 +6915,86 @@ static void openFileForWriting(Mfile* _file){
 		if(_file->_f)if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
 	}
 }*/
+
+/**
+ * @brief writes \p valueToWrite to file \p file 
+ * 
+ * @param file the handle of the file to write to
+ * @param valueToWrite the value to write 
+ * @param binary whether or not the file is opened in binary (write) mode
+ * @return the number of bytes not written to the output file, or M_LL_INVALID when the input is incorrect
+ */
+long long fWriteValueToBinaryFile(FILE* file,Mvalue* valueToWrite){static Mallocationowner owner=OWNER(__LINE__); // saves creating the same owner on every occasion
+	long long result=M_LL_INVALID;
+	if(file!=NULL&&valueToWrite!=NULL){
+		// the special cases 
+		if(valueToWrite->type==VT_LIST){
+			result=0;
+			Mlist* listToWrite=valueToWrite->value._list;
+			if(listToWrite!=NULL){
+				Mlistelement* listelementToWrite=listToWrite->_first;
+				while(listelementToWrite!=NULL){
+					if(listelementToWrite->_value!=NULL)
+						result+=fWriteValueToBinaryFile(file,listelementToWrite->_value);
+					listelementToWrite=listelementToWrite->_next;
+				}
+			}
+		}else
+		if(valueToWrite->type==VT_ARRAY){
+			result=0;
+			Marray* array=valueToWrite->value._array;
+			if(array!=NULL){
+				Mvalue** values=array->values;
+				long long numberOfWrites=array->numberOfElements;
+				///////output("Number of array elements to write: %llu.\n",numberOfWrites);
+				while(numberOfWrites>0){
+					if(*values!=NULL)
+						result+=fWriteValueToBinaryFile(file,*values);
+					/* replacing:
+					if(result>=0)result++;else result--;
+					if(arrayelementToWrite->type==VT_TEXT){
+						result+=fWriteChars(_file,arrayelementToWrite->value._text->_c,false)!=0);
+					}else
+					if(arrayelementToWrite->type==VT_BYTES){
+						result+=fWriteBytes(_file,arrayelementToWrite->value._string,false)!=0)if(result>0)result=-result;
+					}
+					*/
+					++values;
+					--numberOfWrites;
+				}
+			}
+		}else
+		if(valueToWrite->type==VT_TEXT){
+			result=strlen(valueToWrite->value._text->_c);
+			result-=fwrite(valueToWrite->value._text->_c,sizeof(unsigned char),result,file);
+			// replacing:	result=(fWriteChars(_file,valueToWrite->value._text->_c,false)==0?M_TRUE:M_FALSE); // not to write an end-of-line
+		}else
+		if(valueToWrite->type==VT_BYTES){
+			result=fWriteString(file,valueToWrite->value._string);
+			// replacing: result=(fWriteBytes(_file,valueToWrite->value._string,false)==0?M_TRUE:M_FALSE); // not to write an end-of-line
+		}else{
+			Mstring* _valueToWriteText=owned_string(_getValueText(valueToWrite,false,true),owner);
+			result=fWriteString(file,_valueToWriteText);
+			FREE_STRING(_valueToWriteText,owner);
+		}
+		/*
+		if(binary){
+			// lists and arrays need to be written in succession
+
+		}else{
+			// we need to write the text representation of value to the output file
+			Mstring* valueText=owned_string(_getValueText(valueToWrite,false,false));
+			if(_valueText!=NULL){
+
+			}
+		}
+		*/
+	}else
+	if(NULL==valueToWrite)
+		outputError("No value to write!");
+	return result;
+}
+
 /**
  * @brief writes the text hosted in \p writeValue to the M file hosted in \p fileValue
  * 
@@ -6900,12 +7010,23 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 		if(_file!=NULL){
 			bool opened=false;
 			if(NULL==_file->_f){
-				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a",false,false)==M_TRUE)
+				// always opening in binary append mode (Mfwriteline would open in text append mode)
+				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"ab+",false,false)==M_TRUE)
 					opened=true;
 				else
-					output("%sFailed to open file '%s' to append to.\n",M_ERROR_PREFIX,string(_file->_name));
+					output("%sFailed to open file '%s' in binary append mode.\n",M_ERROR_PREFIX,string(_file->_name));
 			}
 			if(_file->_f!=NULL){
+				if(fIsOpenedInBinaryMode(_file)!=M_TRUE){ // opened as text file, so we should write the text representation
+					Mstring* _writeValueText=owned_string(_getValueText(writeValue,false,true),owner);
+					if(_writeValueText!=NULL){
+						result=fWriteString(_file->_f,_writeValueText);
+						FREE_STRING(_writeValueText,owner);
+					}else
+						output("%sFailed to create the text to write to file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+				}else
+					result=fWriteValueToBinaryFile(_file->_f,writeValue);
+				/* replacing:
 				if(writeValue->type==VT_TEXT||writeValue->type==VT_BYTES){
 					if(writeValue->type==VT_TEXT)
 						result=(fWriteChars(_file,writeValue->value._text->_c,false)==0?M_TRUE:M_FALSE); // not to write an end-of-line
@@ -6963,6 +7084,7 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 						--numberOfWrites;
 					}
 				}
+				*/
 				if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else
 				if(opened&&_file->_f!=NULL&&!closeFile(_file))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 			}else
@@ -6982,31 +7104,43 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
  * @param lineToWriteValue the text to write
  * @return Mvalue* M_TRUE on success, M_FALSE on failure and M_LL_INVALID when \p fileValue is undefined or not a file or \p lineToWriteValue is undefined or not a text
  */
-Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineToWriteValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=getOwner(__LINE__);
 	long long result=M_LL_INVALID;
-	if(lineToWriteValue!=NULL&&(lineToWriteValue->type==VT_TEXT||lineToWriteValue->type==VT_BYTES)){
+	if(writeValue!=NULL){
 		Mfile* _file=(fileValue!=NULL?(fileValue->type==VT_FILE?fileValue->value._file:(fileValue->type==VT_TEXT?owned_file(_getFile(fileValue->value._text->_c),owner):NULL)):NULL);
 		if(_file!=NULL){
 			bool opened=false;
 			if(NULL==_file->_f){
-				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a",false,false)==M_TRUE)
+				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a+",false,false)==M_TRUE)
 					opened=true;
 				else
 					output("%sFailed to open file '%s' to append to.\n",M_ERROR_PREFIX,string(_file->_name));
 			}
 			if(_file->_f!=NULL){
 				// MDH@29MAY2024: prefix a newline when lines were written before
-				if(lineToWriteValue->type==VT_TEXT){
+				if(writeValue->type==VT_TEXT){
+					result=fWriteChars(_file,writeValue->value._text->_c,true);
+					/* replacing:
 					if(fWriteChars(_file,lineToWriteValue->value._text->_c,_file->linesWritten>0)==0)
 						result=++_file->linesWritten; // increment the number of lines written, and return it as result
 					else
 						result=M_FALSE;
+					*/
 				}else
-				if(lineToWriteValue->type==VT_BYTES){
+				if(writeValue->type==VT_BYTES){
+					result=fWriteBytes(_file,writeValue->value._string,true);
+					/* replacing:
 					if(fWriteBytes(_file,lineToWriteValue->value._string,_file->linesWritten>0)==0)
 						result=++_file->linesWritten; // increment the number of lines written, and return it as result
 					else
 						result=M_FALSE;
+						*/
+				}else{
+					Mstring* _writeValueText=owned_string(_getValueText(writeValue,false,true),owner);
+					if(_writeValueText!=NULL){
+						result=fWriteString(_file->_f,_writeValueText);
+						FREE_STRING(_writeValueText,owner);
+					}
 				}
 			}
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else
@@ -7034,7 +7168,7 @@ Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue){Mallocationown
 		if(_file!=NULL){
 			bool opened=false;
 			if(NULL==_file->_f){
-				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a",false,false)==M_TRUE)
+				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a+",false,false)==M_TRUE)
 					opened=true;
 				else
 					output("%sFailed to open file '%s' to append to.\n",M_ERROR_PREFIX,string(_file->_name));
@@ -7046,26 +7180,39 @@ Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue){Mallocationown
 				if(linesToWriteValue->type==VT_ARRAY){
 					result=0; // assume all lines will be written
 					Mvalue** values=linesToWriteValue->value._array->values;
-					Mvalue* valueToWrite=values[0];
+					////////Mvalue* valueToWrite=values[0];
 					long long numberOfLinesToWrite=linesToWriteValue->value._array->numberOfElements;
 					while(numberOfLinesToWrite>0){
-						if(result>=0)result++;else result--;
-						if(valueToWrite->type==VT_TEXT){
-							if(fWriteChars(_file,valueToWrite->value._text->_c,_file->linesWritten>0)==0)
-								_file->linesWritten++; // increment the number of lines written, and return it as result
-							else
-								if(result>0)result=-result;
-						}else
-						if(valueToWrite->type==VT_BYTES){
-							if(fWriteBytes(_file,valueToWrite->value._string,_file->linesWritten>0)==0)
-								_file->linesWritten++; // increment the number of lines written, and return it as result
-							else
-								if(result>0)result=-result;
+						//////if(result>=0)result++;else result--;
+						Mvalue* valueToWrite=*values;
+						if(valueToWrite!=NULL){
+							if(valueToWrite->type==VT_TEXT){
+								result+=fWriteChars(_file,valueToWrite->value._text->_c,true);
+								/* replacing:
+								if(fWriteChars(_file,valueToWrite->value._text->_c,_file->linesWritten>0)==0)
+									_file->linesWritten++; // increment the number of lines written, and return it as result
+								else
+									if(result>0)result=-result;*/
+							}else
+							if(valueToWrite->type==VT_BYTES){
+								result+=fWriteBytes(_file,valueToWrite->value._string,true);
+								/* replacing:
+								if(fWriteBytes(_file,valueToWrite->value._string,_file->linesWritten>0)==0)
+									_file->linesWritten++; // increment the number of lines written, and return it as result
+								else
+									if(result>0)result=-result;*/
+							}else{
+								Mstring* _valueToWriteText=owned_string(_getValueText(valueToWrite,false,true),owner);
+								if(_valueToWriteText!=NULL){
+									result+=fWriteString(_file->_f,_valueToWriteText);
+									FREE_STRING(_valueToWriteText,owner);
+								}
+							}
 						}
 						/* replacing:
 						if(Mfwriteline(_file,valueToWrite)!=M_TRUE){result=numberOfLinesToWrite;break;} // delegate to Mfwriteline() to write the single value text as a line (followed by an end-of-line)
 						*/
-						++valueToWrite;
+						++values;
 						--numberOfLinesToWrite;
 					}
 				}else

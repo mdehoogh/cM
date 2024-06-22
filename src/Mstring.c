@@ -264,7 +264,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
 			if(blocks>str->blocks){
 				/////////printf("Realloc string_setlength().\n");
 				// MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
-				output("Allocating %lld blocks of %lld bytes!\n",blocks,M_BLOCK_SIZE);
+				/////output("Allocating %lld blocks of %lld bytes!\n",blocks,M_BLOCK_SIZE);
 				Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s'); // MDH@22MAY2020: by using -foid we disown it immediately
 				if(NULL==new_chars)return NULL; // failure
 				str->blocks=blocks;

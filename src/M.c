@@ -5820,7 +5820,7 @@ void clear_shellCommand(){
 void executeShellCommand(){
 	output(""); // get a new line before we see the result of executing this command!!
 	int result=execute_shellCommandText(string(_shellCommand));
-	if(result)output("Shell command return code: %d.\n",result); // non-zero result
+	if(result)output("Shell command return code: %d.\n",result);else output("\n"); // non-zero result
 	clear_shellCommand(); // ready for the next execution
 }
 
