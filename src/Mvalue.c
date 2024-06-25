@@ -7259,13 +7259,17 @@ Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue){Mallocationown
 						long long numberOfLinesToWrite=linesToWrite->numberOfElements;
 						if(numberOfLinesToWrite>0)output("Number of lines to write: %lld.\n",numberOfLinesToWrite);
 						Mlistelement* lineListelement=linesToWrite->_first;
+						Mvalue* lineListelementValue;
 						while(lineListelement!=NULL){
-							if(lineListelement->_value!=NULL){
-								result=fWriteValue(_file->_f,lineListelement->_value,openedInBinaryMode);
-								if(result==0)if(!opened||lineListelement->_next!=NULL)result=fWriteChars(_file->_f,FILE_EOLN);
-								if(result!=0)break;
-							}
+							lineListelementValue=lineListelement->_value;
 							lineListelement=lineListelement->_next;
+							if(lineListelementValue!=NULL){
+								result=fWriteValue(_file->_f,lineListelementValue,openedInBinaryMode);
+								if(result!=0){output(M_ERROR_PREFIX);outputValue("Failed to write '",lineListelementValue,"'.\n");break;}
+								if(NULL==lineListelement)break;
+								result=fWriteChars(_file->_f,FILE_EOLN);
+								if(result!=0){outputError("Failed to write end-of-line");break;}
+							}
 						}
 					}else
 						outputError("No list to write");
@@ -7281,11 +7285,14 @@ Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue){Mallocationown
 							--numberOfLinesToWrite;
 							//////if(result>=0)result++;else result--;
 							Mvalue* valueToWrite=*values;
+							++values;
 							if(valueToWrite!=NULL){
 								result=fWriteValue(_file->_f,valueToWrite,openedInBinaryMode);
+								if(result!=0){output(M_ERROR_PREFIX);outputValue("Failed to write '",valueToWrite,"'.\n");break;}
 								// always write an end-of-line unless this is the last line to write in a file opened here
-								if(result==0)if(numberOfLinesToWrite||!opened)result=fWriteChars(_file->_f,FILE_EOLN);
-								if(result!=0)break;
+								if(numberOfLinesToWrite==0)break;
+								result=fWriteChars(_file->_f,FILE_EOLN);
+								if(result!=0){outputError("Failed to write a newline");break;}
 								/* replacing:
 								if(valueToWrite->type==VT_TEXT){
 									result=fWriteCharsToFile(_file,valueToWrite->value._text->_c,true);
@@ -7304,7 +7311,6 @@ Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue){Mallocationown
 							/* replacing:
 							if(Mfwriteline(_file,valueToWrite)!=M_TRUE){result=numberOfLinesToWrite;break;} // delegate to Mfwriteline() to write the single value text as a line (followed by an end-of-line)
 							*/
-							++values;
 						}
 					}else
 						output("%sNo array to write to file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
