@@ -590,10 +590,10 @@ long long fClosed(Mfile * const file,Mallocationowner owner_file);
 Mstring* fRead(Mfile const * const file,long long numberOfBytes);
 Mstring* fReadLine(Mfile const * const file);
 long long fReadLines(Mfile const * const file,long long numberOfLines,Mlist* list,Mallocationowner owner_list,bool report);
-long long fWriteChars(Mfile const * const file,char const * const chars,bool writeEoln); // returns amount of chars not written
-long long fWriteText(Mfile const * const file,Mtext const * const towrite,bool writeEoln); // returns amount of bytes not written
+long long fWriteCharsToFile(Mfile const * const file,char const * const chars,bool writeEoln); // returns amount of chars not written
+long long fWriteTextToFile(Mfile const * const file,Mtext const * const towrite,bool writeEoln); // returns amount of bytes not written
 // long long fWriteLine(Mfile const * const file,Mstring * const towrite); // return amount of bytes not written
-long long fWriteLines(Mfile * const file,Mlist const * const linesToWrite); // returns the number of lines not written
+////long long fWriteLines(Mfile * const file,Mlist const * const linesToWrite); // returns the number of lines not written
 
 Mvalue* Mnewfile(Mvalue const * const filenameValue);
 Mvalue* Mfflush(Mvalue const * const fileValue);

@@ -5364,8 +5364,8 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 				if(!pythonScriptFileToExecute){
 					output("Python script file opened.\n");
 					// 1a. WRITE THE HEADER LINES
-					headerLinesWritten=(fWriteChars(pythonScriptFile,"import sys",true)==0);
-					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"import atexit",true)==0);
+					headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,"import sys",true)==0);
+					if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,"import atexit",true)==0);
 					if(headerLinesWritten){
 						// compose the line defining the exit handler
 						Mstring* _exitHandlerText=owned_string(_getString("def Matexit(): "),owner);
@@ -5386,31 +5386,31 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 								p=string_append(p,")); ");
 							}
 							p=string_append(p,"sys.stdout.flush(); return"); // finish exit handler
-							headerLinesWritten=(p!=NULL?fWriteChars(pythonScriptFile,string(p),true)==0:false);
+							headerLinesWritten=(p!=NULL?fWriteCharsToFile(pythonScriptFile,string(p),true)==0:false);
 							FREE_STRING(_exitHandlerText,owner);
 						}else
 							headerLinesWritten=false;
 					}
 					/* replaces:
-					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"def Matexit(): ",false)==0);
+					if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,"def Matexit(): ",false)==0);
 					if(sysExitValue!=NULL){
-						if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"print(\"{0}\".format(",false)==0);
+						if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,"print(\"{0}\".format(",false)==0);
 						if(sysExitValue->type!=VT_TEXT){
 							Mstring* _sysExitExpressionText=owned_string(_getValueText(sysExitValue,false,true),owner);
 							if(_sysExitExpressionText!=NULL){
 								output("Writing result '%s' to the Python script file.\n",string(_sysExitExpressionText));
-								if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,_getTextValue(string(_sysExitExpressionText)),false)==0);
+								if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,_getTextValue(string(_sysExitExpressionText)),false)==0);
 								FREE_STRING(_sysExitExpressionText,owner);
 							}
 						}else{ // the text to write is already wrapped, so we're writing it as is (we're not going to use _getStringText to dequote it??????)
-							if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,sysExitValue->value._text->_c,false)==0);
+							if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,sysExitValue->value._text->_c,false)==0);
 						}
-						if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,")); ",false)==0);
+						if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,")); ",false)==0);
 					}
-					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"sys.stdout.flush(); return",true)==0); // finish exit handler
+					if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,"sys.stdout.flush(); return",true)==0); // finish exit handler
 					*/
-					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"atexit.register(Matexit)",true)==0); // register exit handler
-					if(headerLinesWritten)headerLinesWritten=(fWriteChars(pythonScriptFile,"# end of header inserted by M, do ** NOT ** edit before this line!",true)==0); // M warning
+					if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,"atexit.register(Matexit)",true)==0); // register exit handler
+					if(headerLinesWritten)headerLinesWritten=(fWriteCharsToFile(pythonScriptFile,"# end of header inserted by M, do ** NOT ** edit before this line!",true)==0); // M warning
 				}
 				bool pythonScriptLinesWritten=false;
 				if(pythonScriptFileToExecute||headerLinesWritten){ // the header was written successfully
@@ -5436,7 +5436,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 										lineIndex++;
 										// do not write any empty lines at the end
 										if(string_length(_pythonSourceLine)){
-											if(fWriteChars(pythonScriptFile,string(_pythonSourceLine),false)==0){ // the source line written successfully
+											if(fWriteCharsToFile(pythonScriptFile,string(_pythonSourceLine),false)==0){ // the source line written successfully
 												// construct and write the comment telling what the source line was!
 												Mstring* _sourceLineTextComment=owned_string(_getString("' # source: "),owner);
 												Mstring* p=_sourceLineTextComment;
@@ -5452,7 +5452,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 												pythonScriptLinesWritten=false;
 										}
 										// always write EOLN
-										if(pythonScriptLinesWritten&&fWriteChars(pythonScriptFile,"'",true)!=0)
+										if(pythonScriptLinesWritten&&fWriteCharsToFile(pythonScriptFile,"'",true)!=0)
 											pythonScriptLinesWritten=false;
 										if(!pythonScriptLinesWritten){
 											output("%sFailed to write '%s' to the Python script file.\n",M_ERROR_PREFIX,string(_pythonSourceLine));
@@ -5471,7 +5471,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 							}
 						}else
 						if(pythonCommandValue->type==VT_TEXT){
-							if(fWriteChars(pythonScriptFile,pythonCommandValue->value._text->_c,true)==0)
+							if(fWriteCharsToFile(pythonScriptFile,pythonCommandValue->value._text->_c,true)==0)
 								pythonScriptLinesWritten=true;
 							else
 								outputError("Failed to write the Python command text");
@@ -5479,7 +5479,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 							Mstring* _pythonCommandText=owned_string(_getStringOfText(pythonCommandValue->value._text,true),owner);
 							if(_pythonCommandText!=NULL){
 								if(string_prepend(_pythonCommandText,"'")!=NULL&&
-										fWriteText(pythonScriptFile,_getTextValue(string(_pythonCommandText)),true)==0)
+										fWriteTextToFile(pythonScriptFile,_getTextValue(string(_pythonCommandText)),true)==0)
 									pythonScriptLinesWritten=true;
 								else
 									outputError("Failed to write the Python command text");
@@ -5500,7 +5500,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									Mstring* _pythonCommandText=owned_string(_getStringOfText(arrayElementValue->value._text,true),owner);
 									if(_pythonCommandText!=NULL){
 										if(NULL==string_prepend(_pythonCommandText,"'")||
-												fWriteText(pythonScriptFile,_getTextValue(string(_pythonCommandText)),true)!=0)
+												fWriteTextToFile(pythonScriptFile,_getTextValue(string(_pythonCommandText)),true)!=0)
 											pythonScriptLinesWritten=false;
 										FREE_STRING(_pythonCommandText,owner);
 									}else
@@ -5522,7 +5522,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									if(_pythonCommandText!=NULL){
 										// ascertain to add a FILE_EOLN to write to the Python script file as well
 										if(NULL==string_prepend(_pythonCommandText,"'")||
-												fWriteText(pythonScriptFile,_getTextValue(string(_pythonCommandText)),true)!=0)
+												fWriteTextToFile(pythonScriptFile,_getTextValue(string(_pythonCommandText)),true)!=0)
 											pythonScriptLinesWritten=false;
 										FREE_STRING(_pythonCommandText,owner);
 									}else
