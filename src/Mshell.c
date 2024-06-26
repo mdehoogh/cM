@@ -14633,6 +14633,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!completedValueFunction(_Menvironment,owner,"fisbinary",Mfisbinary)
 				||!completedValueFunction(_Menvironment,owner,"fmode",Mfmode)
 				||!completedValueFunction(_Menvironment,owner,"fpos",Mfpos)
+				||!completedValueFunction(_Menvironment,owner,"fnewline",Mfnewline)
 				||!completedValueFunction(_Menvironment,owner,"fpushpos",Mfpushpos)
 				||!completedValueFunction(_Menvironment,owner,"fpoppos",Mfpoppos)
 				||!completedValueFunction(_Menvironment,owner,"ftostart",Mftostart)

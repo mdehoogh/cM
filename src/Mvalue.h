@@ -608,8 +608,9 @@ Mvalue* Mfreadline(Mvalue* fileValue); // reads all bytes until a new line chara
 Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listValue); // reads all bytes until a new line character is encountered 
 Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue);
 Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* lineTextValue);
-Mvalue* Mfwritelines(Mvalue* fileValue,Mvalue* linesToWriteValue);
+Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesToWriteValue);
 Mvalue* Mfpos(Mvalue const * const fileValue);
+Mvalue* Mfnewline(Mvalue const * const fileValue);
 Mvalue* Mfmode(Mvalue* fileValue);
 Mvalue* Mfisbinary(Mvalue* fileValue);
 Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue);
