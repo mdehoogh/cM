@@ -6103,6 +6103,7 @@ long long fPosition(Mfile const * const file){
 	if(file!=NULL&&file->_f!=NULL){
 		off_t position=ftello(file->_f);
 		if(position<0){
+			output(M_ERROR_PREFIX);
 			switch(errno){
 				case EBADF:output("'The file descriptor is not valid'");break;
 				case EOVERFLOW:output("'The current file offset cannot be represented correctly in an object with the specified return type'");break;
@@ -6205,18 +6206,21 @@ long long fPopPosition(Mfile * const file,Mallocationowner file_owner){
  * @return long long M_TRUE on success, M_FALSE on failure
  */
 long long fJumpToStart(Mfile * const file){
-	if(file!=NULL&&file->_f!=NULL){
+	if(file!=NULL&&file->_f!=NULL){ // an open file
 		// TODO how about using rewind()
 		// DONE using rewind() now which will reset the file error (which fseeko() would not)
 		//      no, rewind() is void and so we cannot know whether we succeeded
 		if(fseeko(file->_f,0L,SEEK_SET)==0){
+			/*
 			// reset the lines written count when the file is being written to
 			// TODO should we restart
 			if(file->_mode[0]=='w')
 				file->linesWritten=0;
-			return M_TRUE;
-		}
-		return M_FALSE;
+			*/
+			// replacing: return M_TRUE;
+		}else
+			outputError("Failed to move the file cursor to the start of the file");
+		return fPosition(file); // replacing: return M_FALSE;
 	}
 	return M_LL_INVALID;
 }
@@ -6228,7 +6232,9 @@ long long fJumpToStart(Mfile * const file){
  */
 long long fJumpToEnd(Mfile const * const file){
 	if(file!=NULL&&file->_f!=NULL){
-		return(fseeko(file->_f,0L,SEEK_END)==0?M_TRUE:M_FALSE);
+		if(fseeko(file->_f,0L,SEEK_END)!=0)
+			outputError("Failed to move the file cursor to the end of the file");
+		return fPosition(file);
 	}
 	return M_LL_INVALID;
 }
