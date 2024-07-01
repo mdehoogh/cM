@@ -4198,6 +4198,14 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 		}
 	}else
 	if(inputChar==')'){
+		// MDH@01JUL2024: TODO the problem here is that we could be closing an call before having entered all arguments in which case we've got a couple of commas in the expected character stack
+		//                     in front of the closing parenthesis, that we should get rid of first
+		while(string_last_char(_expectedCharacterStack==',')){
+			if(NULL==string_declength(_expectedCharacterStack)){
+				inputError("Failed to remove expected character ','.");
+				return -3;
+			}
+		}
 		if(string_last_char(_expectedCharacterStack)==')'){
 			if(NULL==string_declength(_expectedCharacterStack)){
 				inputError("Failed to remove expected character ')'.");
@@ -5464,7 +5472,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									}
 									output("Number of Python source lines written: %u.\n",lineIndex);
 									if(opened)
-										if(fClosed(pythonCommandFile,getValueDataOwner())!=M_TRUE)
+										if(fClosed(pythonCommandFile,getValueDataOwner(),true)!=M_TRUE)
 											outputError("Failed to close the Python source file");
 								}else
 									pythonScriptLinesWritten=false;

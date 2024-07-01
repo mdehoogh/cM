@@ -5256,10 +5256,21 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * op
  * @param file the file to close
  * @return long long M_TRUE on success, M_FALSE on failure, or M_LL_INVALID when \p file equals NULL
  */
-long long fClosed(Mfile * const file,Mallocationowner owner_file){
+long long fClosed(Mfile * const file,Mallocationowner owner_file,bool report){
+	if(file!=NULL&&file->_name!=NULL){
+		if(file->_f!=NULL){
+			///delegated now to closeFile!!! if(report)output("Closing file '%s'.\n",string(file->_name));
+			if(!closeFile(file,report))return M_FALSE;
+		}else
+			output("%sFile '%s' already closed!",M_WARNING_PREFIX,string(file->_name));
+		return M_TRUE;
+	}
+	return M_LL_INVALID;
+	/* replacing:
 	long long result=(file!=NULL?(closeFile(file)?M_TRUE:M_FALSE):M_LL_INVALID);
 	// closeFile() already takes care of clearing file->_f!!!! if(result==M_TRUE){FREE_DISOWNED_1(file->_f,'f',owner);file->_f=NULL;}
 	return result;
+	*/
 }
 
 /**
@@ -6632,7 +6643,7 @@ Mvalue* Mfsize(Mvalue const * const fileValue){
 							}else
 								outputError("Failed to move to the end of the file");
 						}
-						if(filepos!=M_LL_INVALID)if(!fileisopen)if(fClosed(file,getValueDataOwner())!=M_TRUE)outputError("Failed to close a temporarily opened file");
+						if(filepos!=M_LL_INVALID)if(!fileisopen)if(fClosed(file,getValueDataOwner(),false)!=M_TRUE)outputError("Failed to close a temporarily opened file");
 #else
 						if(file->staterrno==0)
 							result=file->stat.st_size; // easiest way to get the size of the file
@@ -6712,9 +6723,11 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 						output("%sCan't read from file '%s': not enough memory available!\n",M_ERROR_PREFIX,string(_file->_name));
 				}else
 					output("%sCan't read from file '%s': end-of-file reached!\n",M_ERROR_PREFIX,string(_file->_name));
+				// close the file if opened here
+				if(opened)closeFile(_file,true);
 			}
-			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else 
-			if(opened&&_file->_f!=NULL&&!closeFile(_file))output("%sFailed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
+			///////else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))output("%sFailed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 		}else
 			outputError("Either a file or a file name required as first argument");
 	}else
@@ -6755,12 +6768,13 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 							result=_getStringValue(disowned_string(_textLineRead,owner)); // an immutable version of the bytes obtained
 					}else
 						output("%sFailed to obtain memory to read a text line from '%s' into.\n",M_ERROR_PREFIX,string(_file->_name));
+					if(opened)closeFile(_file,true);
 				}else
 					output("%sCan't read a text line from '%s': end-of-file reached.\n",M_ERROR_PREFIX,string(_file->_name));
 			}
 			// free the file when it was created
-			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else
-			if(opened&&_file->_f!=NULL&&!closeFile(_file))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
+			//else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 		}else
 			outputError("Either a file or a file name required as first argument");
 	}else
@@ -6819,9 +6833,10 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
 								// if we've reached the end of the file and we've read ALL lines, we close the file as a service to the user
 								if(fileValue->type==VT_FILE&&feof(_file->_f)){
 									if(filepos==0){
-										if(closeFile(_file))
+										if(closeFile(_file,false)){
+											opened=false;
 											output("File '%s' from which all text lines were read closed!\n",string(_file->_name));
-										else
+										}else
 											output("%sFailed to close file '%s'!",M_ERROR_PREFIX,string(_file->_name));
 									}else
 										output("%sFile '%s' not closed, although end-of-file reached.\n",M_WARNING_PREFIX,string(_file->_name));
@@ -6835,10 +6850,11 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
 							outputError("Failed to create the list to store the lines read into");
 					}else
 						output("%sCan't read from file '%s': end-of-file reached.\n",M_ERROR_PREFIX,string(_file->_name));
+					if(opened)closeFile(_file,true);
 				}else
 					output("%sCan't read from unopened file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
-				if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else // opened by name, freeing should also take care of closing it
-				if(opened&&_file->_f!=NULL&&!closeFile(_file))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+				if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
+				/////// else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 			}else
 				outputError("Either a file or a file name required as first argument");
 		}else
@@ -6856,7 +6872,7 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
  */
 Mvalue* Mfclose(Mvalue* fileValue){
 	Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-	return _getIntegerValue(fClosed(_file,getValueDataOwner())); // NOTE in the future we might not need to pass the owner to fClosed anymore
+	return _getIntegerValue(fClosed(_file,getValueDataOwner(),false)); // NOTE in the future we might not need to pass the owner to fClosed anymore
 }
 
 /**
@@ -7092,6 +7108,7 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 			}
 			if(_file->_f!=NULL){
 				result=fWriteValue(_file->_f,writeValue,fIsOpenedInBinaryMode(_file)==M_TRUE);
+				if(opened)closeFile(_file,true);
 				/* replacing:
 				if(fIsOpenedInBinaryMode(_file)!=M_TRUE){ // opened as text file, so we should write the text representation
 					Mstring* _writeValueText=owned_string(_getValueText(writeValue,false,true),owner);
@@ -7167,8 +7184,8 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 				outputError("No file or file name specified to write to");
 			else
 				outputError("No file to write to");
-			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else
-			if(opened&&_file->_f!=NULL&&!closeFile(_file))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
+			//else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 		}
 	}else
 		outputError("No or invalid text to write");
@@ -7209,6 +7226,7 @@ Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner
 				*/
 				// if written successfully write the EOLN
 				if(result==0)result=fWriteChars(_file->_f,FILE_EOLN);
+				if(opened)closeFile(_file,true);
 				/* replacing:
 				// MDH@29MAY2024: prefix a newline when lines were written before
 				if(writeValue->type==VT_TEXT){
@@ -7226,8 +7244,8 @@ Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner
 				*/
 			}else
 				outputError("Can't write (a line) to an unopened file");
-			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else
-			if(opened&&_file->_f!=NULL&&!closeFile(_file))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
+			///////else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 		}else
 		if(fileValue!=NULL)
 			outputError("No file or file name specified to write a line to");
@@ -7255,7 +7273,10 @@ Mvalue* Mfnewline(Mvalue const * const fileValue){Mallocationowner owner=getOwne
 			else
 				output("%sFailed to open file '%s' to append an end-of-line to.\n",M_ERROR_PREFIX,string(_file->_name));
 		}
-		if(_file->_f!=NULL)result=fWriteChars(_file->_f,FILE_EOLN);
+		if(_file->_f!=NULL){
+			result=fWriteChars(_file->_f,FILE_EOLN);
+			if(opened)closeFile(_file,true);
+		}
 	}else
 		outputError("No file to write an end-of-line to");
 	return _getIntegerValue(result);
@@ -7364,9 +7385,10 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 					output("%sNo array of list specified to write to '%s'. Will write a single line.\n",M_WARNING_PREFIX,string(_file->_name));
 					result=(fWriteValue(_file->_f,linesToWriteValue,openedInBinaryMode)==0&&fWriteChars(_file->_f,FILE_EOLN)==0?0:1);
 				}
+				if(opened)closeFile(_file,true);
 			}
-			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);else // will also close the file when open!!!
-			if(opened&&_file->_f!=NULL&&!closeFile(_file))output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
+			//else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)output("Failed to close file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
 		}else
 		if(fileValue!=NULL)
 			outputError("No file or file name specified to write lines to");

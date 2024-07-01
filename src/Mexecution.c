@@ -2333,8 +2333,8 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
  * @return true on success
  * @return false on failure
  */
-bool closeFile(Mfile* _file){
-	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
+bool closeFile(Mfile* const _file,bool report){
+	/////////bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
 	if(NULL==_file){outputWarning("No file to close");return false;} // nothing to close
 	if(NULL==_file->_name){outputWarning("File has no name");return true;} // must be closed
 	//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
@@ -2343,7 +2343,7 @@ bool closeFile(Mfile* _file){
 		return true;
 	} // already closed
 	if(report)
-		output("Closing '%s'.\n",string(_file->_name));
+		output("Closing file '%s'.\n",string(_file->_name));
 	if(fclose(_file->_f)==0){ // success
 		_file->_f=NULL;
 		if(report)
@@ -2370,7 +2370,7 @@ static void free_fileposition(Mfileposition*  _fileposition){
  */
 void free_file(Mfile* _file){
 	if(_file!=NULL){
-		if(_file->_f!=NULL)closeFile(_file); // I suppose this is typically what we have to do to not have pending resources
+		if(_file->_f!=NULL)closeFile(_file,false); // I suppose this is typically what we have to do to not have pending resources
 		////if(_file->_stat!=NULL){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
 		if(_file->_name!=NULL){FREE_1(_file->_name,'S');_file->_name=NULL;}
 		if(_file->_mode!=NULL){

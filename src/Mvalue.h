@@ -585,7 +585,7 @@ long long fJumpToEnd(Mfile const * const file);
 // use _getFile() instead!!! Mfile* __file(char const * const filename);
 long long fDeleted(Mfile * const file,Mallocationowner owner_file);
 long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * openmodeSpec,bool allowExistingWrite,bool report);
-long long fClosed(Mfile * const file,Mallocationowner owner_file);
+long long fClosed(Mfile * const file,Mallocationowner owner_file,bool report);
 //////// now static!!! fpos_t fPosition(Mfile const * const file); // returns the current position in the file
 Mstring* fRead(Mfile const * const file,long long numberOfBytes);
 Mstring* fReadLine(Mfile const * const file);

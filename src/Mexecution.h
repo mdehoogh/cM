@@ -335,7 +335,7 @@ Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* __file();
 void fUpdateStats(Mfile * const file,bool report); // MDH@02MAY2024
-bool closeFile(Mfile* _file);
+bool closeFile(Mfile * const file,bool report);
 void free_file(Mfile* _file);
 #define FREE_FILE(_file,owner_file) free_file(disowned_file(_file,owner_file))
 void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report);
