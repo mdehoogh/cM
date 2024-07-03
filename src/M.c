@@ -4150,32 +4150,42 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 	if(inputChar=='('){
 		// if this starts a function call argument list we're going to need to append comma's for each
 		// argument and a final closing parenthesis, but always the closing parenthesis is expected
-		if(string_append_char(_expectedCharacterStack,')')!=NULL){
-			Mtoken* prevToken=currentToken->prev;
-			if(currentToken->type==TT_FUNCTION_CALL){
-				char* functionName=_getSignificantTokenCharacters(prevToken);
-				long long numberOfFunctionParameters=getNumberOfFunctionParameters(functionName);
-				if(numberOfFunctionParameters>=0){
-					///////inputInfo("Number of arguments in function '%s': %lld",function,numberOfFunctionParameters);
-					while(--numberOfFunctionParameters>0)if(string_append_char(_expectedCharacterStack,',')==NULL){
-						inputError("Failed to register ',' as expected character.");
-						return -2;
-					}
-				}else{
-					inputError("Unknown function '%s'.",functionName);
-					return -2;
-				}
-			}/*else{
-				if(prevToken!=NULL)
-					inputInfo("Previous token of type %s.",TOKENTYPE_STRING[prevToken->type]);
-				else
-					inputInfo("Not a function call");
-				return 1;
-			}*/
-		}else{
+		if(NULL==string_append_char(_expectedCharacterStack,')')){
 			inputError("Failed to register ')' as expected character.");
 			return -2;
 		}
+		// MDH@03JUL2024: appending the expected commas as well is a nice feature BUT
+		//                BUT it is seriously interfering with updating the feed forward because
+		//                when a user does NOT enter these arguments but closes the function call with )
+		//                beforehand these expected characters will still remain on the expected character stack
+		//                and we really do not want that, 
+		//                now instead of keeping the commas in, for now, we just do NOT add them 
+		//                it's not that hard to enter a , so as feed forward not that immportant!!!!
+		/*
+		Mtoken* prevToken=currentToken->prev;
+		if(currentToken->type==TT_FUNCTION_CALL){
+			char* _functionName=_getSignificantTokenCharacters(prevToken);
+			long long numberOfFunctionParameters=getNumberOfFunctionParameters(functionName);
+			free(_functionName);
+			if(numberOfFunctionParameters>=0){
+				///////inputInfo("Number of arguments in function '%s': %lld",function,numberOfFunctionParameters);
+				while(--numberOfFunctionParameters>0)if(string_append_char(_expectedCharacterStack,',')==NULL){
+					inputError("Failed to register ',' as expected character.");
+					return -2;
+				}
+			}else{
+				inputError("Unknown function '%s'.",_functionName);
+				return -2;
+			}
+		}
+		////else{
+		///	if(prevToken!=NULL)
+		///		inputInfo("Previous token of type %s.",TOKENTYPE_STRING[prevToken->type]);
+		///	else
+		///		inputInfo("Not a function call");
+		///	return 1;
+		///}
+		*/
 	}else
 	if(inputChar=='['){
 		if(string_append_char(_expectedCharacterStack,']')==NULL){
