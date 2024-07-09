@@ -6944,9 +6944,17 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 		outputError("Failed to create a list to store the integer range");
 	return disowned_list(_scalarRangeList,owner);
 }
-// MDH@18OCT2019: we can get the range of integers between two values
+// MDH@18OCT2019: we can get the range of integers between two values using step _value3, but when _value3 is defined, we actually start at _value1!!
+
+/**
+ * @brief returns the range of integers in the closed interval starting at \p _value1 and ending at \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* 
+ */
 Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
+	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_MAP||_value2->type==VT_MAP)return NULL; // neither operand can be a map for sure
 	if(_value1->type==VT_REFERENCE||_value2->type==VT_REFERENCE)return NULL; // neither operand can be a reference for sure
 	if(_value1->type==VT_FUNCTION||_value2->type==VT_FUNCTION)return NULL; // neither operand can be a function for sure
@@ -7093,7 +7101,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));break;
 			case '!' :result=unequalto(_value1,_value2);break;
 			case '=' :result=equalto(_value1,_value2);break;
-			case ':' :result=Mrange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
+			case ':' :result=Mrange(_value1,_value2,NULL);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:output("%sUnknown binary operator '%s'.\n",M_ERROR_PREFIX,operator);
 		}
 		if(amVerboseDebugging())
@@ -7742,6 +7750,10 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			}
 			if(!completedValueValueFunction(_getFunction(_Menvironment,owner,"range"),"range",Mrange)){
 				outputError("Failed to register the range function");
+				return NULL;
+			}
+			if(!completedValueValueValueFunction(_getFunction(_Menvironment,owner,"rangevalues"),"rangevalues",Mrangevalues)){
+				outputError("Failed to register the range values function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))

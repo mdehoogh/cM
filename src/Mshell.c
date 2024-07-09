@@ -254,7 +254,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {""	,""    ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,"RLEN",""	  ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","` ;  DS (        ?      {   ~"}, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
 {""	,""    ,"=",""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,"LEN" ,"."    ,",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,"" ,"}","","" ,"" ,""   ,"C","`R;! DS%()&*+-  >?:     {  e~"}, /* NEW_VARIABLE (variable that does not exist yet) */ \
 {""	,""	   ,"=",""  ,"!" ,"&*" ,">","-+%e" ,"" ,""    ,""    ,""	  ,"RLEN.",",",""   ,""    ,"" ,"" ,"" ,"" ,"[","]","" ,":","}","","" ,")",""   ,"C","` ;  DS (		  	 ?      {   ~"}, /* PROPERTY (identifier starting with the property separator) */ \
-{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,"" ,"?"  ,"C","` ; c  % )&*	  > :      }=e "}, /* LIST ELEMENT (similar to expression) */ \
+{"(","!-+~","" ,""  ,""  ,""   ,"" ,""     ,"" ,"R"   ,"LE"  ,""	  ,""     ,",","N"  ,"."   ,"D","S","" ,"" ,"[","]","{","" ,"" ,"","" ,")","?"  ,"C","` ; c  %  &*	  > :      }=e "}, /* LIST ELEMENT (similar to expression) */ \
 {";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",","N"  ,"."   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS (		     ? L  [ {   ~"}, /* INTEGER: (signless) list of digits */ \
 {";",""    ,"" ,":" ,"!=","&*" ,">","-+%eE","" ,""    ,""    ,""	  ,""     ,",",""   ,"N"   ,"" ,"" ,"" ,"" ,"" ,"]","" ,":","}","","" ,")",""   ,"C","`R   DS (	     . ? L  [ {   ~"}, /* REAL: part behind a decimal period */ \
 {""	,""    ,"" ,""  ,""  ,""   ,"" ,""     ,"" ,""    ,""    ,""	  ,""     ,"" ,""   ,""    ,"" ,"" ,"D","" ,"" ,"" ,"" ,"" ,"" ,"","" ,"" ,""   ,"" ,""}, /* DQSTRING: double quoted string */ \
@@ -4092,61 +4092,63 @@ Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mal
  * @return Mvalue* a M list wrapper representating whatever is wrapped in \p value
  */
 Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	if(value!=NULL){
-		if(value->type==VT_LIST)return value;
+	///if(value!=NULL){
+		if(value!=NULL&&value->type==VT_LIST)return value;
 		// we'll be needing a return list
 		Mlist* _list=owned_list(__list("Ml"),owner);
 		if(_list!=NULL){
-			if(value->type==VT_ARRAY){
-				Marray* array=value->value._array;
-				if(array!=NULL){
-					_list->valuetype=array->valuetype;
-					unsigned long long arraylength=array->numberOfElements;
-					if(arraylength>0){
-						Mvalue** valueholder=array->values;
-						do{
-							if(appendedToList(_list,owner,*valueholder,M_LL_INVALID)<=0)
-							{output(M_ERROR_PREFIX);outputValue("Failed to append '",*valueholder,"' to the list.\n");}
-							valueholder++;
-						}while(--arraylength);
-					}
-				}
-			}else
-			if(value->type==VT_MAP){
-				Mmap* map=value->value._map;
-				if(map!=NULL){
-					unsigned long long maplength=map->numberOfElements;
-					if(maplength>0){ // something to copy over
-						Mmapelement* mapelement=map->_first;
-						Mvariable* mapvariable;
-						while(mapelement!=NULL){
-							mapvariable=mapelement->_variable;
-							if(mapvariable!=NULL){
-								Mstring* _mapvariablename=owned_string(_getString("'"),owner);
-								if(_mapvariablename!=NULL){
-									if(string_append(_mapvariablename,mapvariable->_name->chars)){
-										if(appendedToList(_list,owner,_getTextValue(string(_mapvariablename)),M_LL_INVALID)<=0
-											||appendedToList(_list,owner,mapvariable->_value,M_LL_INVALID)<=0)
-											outputError("Failed to either store a map key or value in the list");
-									}else
-										outputError("Failed to create the text to store the key in");
-									FREE_STRING(_mapvariablename,owner);
-								}
-							}
-							if(--maplength==0)break; // precaution to prevent writing beyond the end of the array (when the number of elements registered with the map would be incorrect)
-							mapelement=mapelement->_next;
+			if(value!=NULL){
+				if(value->type==VT_ARRAY){
+					Marray* array=value->value._array;
+					if(array!=NULL){
+						_list->valuetype=array->valuetype;
+						unsigned long long arraylength=array->numberOfElements;
+						if(arraylength>0){
+							Mvalue** valueholder=array->values;
+							do{
+								if(appendedToList(_list,owner,*valueholder,M_LL_INVALID)<=0)
+								{output(M_ERROR_PREFIX);outputValue("Failed to append '",*valueholder,"' to the list.\n");}
+								valueholder++;
+							}while(--arraylength);
 						}
 					}
 				}else
-					outputBug("Value map missing!");
-			}else{ // a single value, to be wrapped in a list
-				if(appendedToList(_list,owner,value,M_LL_INVALID)<=0)
-				{output(M_ERROR_PREFIX);outputValue("Failed to wrap '",value,"' in a list.\n");}
+				if(value->type==VT_MAP){
+					Mmap* map=value->value._map;
+					if(map!=NULL){
+						unsigned long long maplength=map->numberOfElements;
+						if(maplength>0){ // something to copy over
+							Mmapelement* mapelement=map->_first;
+							Mvariable* mapvariable;
+							while(mapelement!=NULL){
+								mapvariable=mapelement->_variable;
+								if(mapvariable!=NULL){
+									Mstring* _mapvariablename=owned_string(_getString("'"),owner);
+									if(_mapvariablename!=NULL){
+										if(string_append(_mapvariablename,mapvariable->_name->chars)){
+											if(appendedToList(_list,owner,_getTextValue(string(_mapvariablename)),M_LL_INVALID)<=0
+												||appendedToList(_list,owner,mapvariable->_value,M_LL_INVALID)<=0)
+												outputError("Failed to either store a map key or value in the list");
+										}else
+											outputError("Failed to create the text to store the key in");
+										FREE_STRING(_mapvariablename,owner);
+									}
+								}
+								if(--maplength==0)break; // precaution to prevent writing beyond the end of the array (when the number of elements registered with the map would be incorrect)
+								mapelement=mapelement->_next;
+							}
+						}
+					}else
+						outputBug("Value map missing!");
+				}else{ // a single value, to be wrapped in a list
+					if(appendedToList(_list,owner,value,M_LL_INVALID)<=0)
+					{output(M_ERROR_PREFIX);outputValue("Failed to wrap '",value,"' in a list.\n");}
+				}
 			}
 			return _getValueOfList(disowned_list(_list,owner));
-		}else
-			outputError("Failed to create the list");
-	}
+		}
+		outputError("Failed to create the list");
+	///}
 	return NULL;
 }
 /**
@@ -9744,6 +9746,71 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 	return(_scalarRangeArray?disowned_array(_scalarRangeArray,owner):NULL);
 }
 
+// MDH@09JUL2024: we'd like to be able to get a range of values with a fixed distance between successive values
+/**
+ * @brief returns a list containing values starting at \p _value1 incremented by \p _value3 but at most equal to \p _value2
+ * @details if \p _value3 is defined, the first element will always equal \p _value1 and every next element is \p _value3 larger as long as \p value2 has not been exceeded
+ *          but if \p _value1 or \p _value2 represents a list \p _value3 is ignored
+ * @param _value1 the lowest possible value
+ * @param _value2 the highest possible value
+ * @param _value3 the increment value
+ * @return Mvalue* the list containing the integers between \p _value1 and \p _value2 inclusive with increments of \p _value3
+ */
+Mvalue* Mrangevalues(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationowner owner=getOwner(__LINE__);
+	// at least a fromValue decimal value is required
+	Mvalue *stepDecimalValue=Md(stepValue,NULL);
+	if(NULL==stepDecimalValue&&stepValue!=NULL){outputError("Increment not numeric");return NULL;}
+	Mdecimal* stepDecimal=(stepDecimalValue!=NULL?stepDecimalValue->value._decimal:NULL);
+	long long stepDecimalSign=M_LL_INVALID;
+	if(stepDecimal!=NULL){ // check the sign to be either positive or negative!!
+		stepDecimalSign=getDecimalSign(stepDecimal);
+		if(stepDecimalSign==M_ZERO){outputError("Zero increment to rangevalues()");return NULL;}
+	}
+	Mvalue *fromDecimalValue=Md(fromValue,NULL),*toDecimalValue=Md(toValue,NULL);
+	// if we do not have a step decimal value (which might be the case if stepValue is NULL)
+	if(NULL==fromDecimalValue||NULL==toDecimalValue){outputError("Missing or incomplete arguments to rangevalues()");return NULL;}
+	Mdecimal *toDecimal=toDecimalValue->value._decimal,*fromDecimal=fromDecimalValue->value._decimal;
+	Mdecimal *_rangeDecimal=owned_decimal(_getDecimalDifference(toDecimal,fromDecimal),owner);
+	if(NULL==_rangeDecimal){outputError("Failed to compute the range");return NULL;}
+	// check the sign
+	long long rangeSign=getDecimalSign(_rangeDecimal);
+	FREE_DECIMAL(_rangeDecimal,owner);
+	if(stepDecimalSign!=M_LL_INVALID&&rangeSign!=M_ZERO)if(rangeSign!=stepDecimalSign){outputError("Increment has the wrong sign");return NULL;}
+	Mlist* _rangeList=owned_list(_getListOfType(VT_DECIMAL),owner);
+	if(NULL==_rangeList){outputError("Failed to create range list");return NULL;}
+	// add fromDecimal to start with
+	if(appendedToList(_rangeList,owner,fromDecimalValue,M_LL_INVALID)<0){FREE_LIST(_rangeList,owner);outputError("Failed to initialize the list of range values");return NULL;}
+	if(rangeSign==M_POSITIVE||rangeSign==M_NEGATIVE){
+		Mdecimal* _stepDecimal=stepDecimal; // the step decimal to use that we create if stepDecimal is NULL
+		if(NULL==_stepDecimal){
+			_stepDecimal=_getDecimal(__mpd(get_default_mpd_context(),1),M_DP,0,true);
+			if(_stepDecimal!=NULL)if(rangeSign==M_NEGATIVE)mpd_set_negative(_stepDecimal->mpd);
+		}
+		if(_stepDecimal!=NULL){
+			Mdecimal* lastRangeDecimal=fromDecimal;
+			while(1){
+				Mdecimal* _nextRangeDecimal=owned_decimal(_getDecimalSum(lastRangeDecimal,_stepDecimal),owner);
+				if(NULL==_nextRangeDecimal){outputError("Failed to complete the range of values");break;}
+				// if _nextRangeDecimal is above (or below) toDecimal we do NOT add it
+				Mdecimal* _deltaDecimal=owned_decimal(_getDecimalDifference(_nextRangeDecimal,toDecimal),owner);
+				if(NULL==_deltaDecimal){outputError("Failed to check a new range value");break;}
+				long long deltaSign=getDecimalSign(_deltaDecimal);
+				FREE_DECIMAL(_deltaDecimal,owner);
+				if(deltaSign==rangeSign||appendedToList(_rangeList,owner,_getValueOfDecimal(disowned_decimal(_nextRangeDecimal,owner)),M_LL_INVALID)<0){
+					FREE_DECIMAL(_nextRangeDecimal,owner);
+					if(deltaSign!=rangeSign)outputError("Failed to complete the list of range values");
+					break;
+				}
+				lastRangeDecimal=_nextRangeDecimal;
+			}
+			// free _stepDecimal if we created it here
+			if(stepDecimal==NULL)FREE_DECIMAL(_stepDecimal,owner);
+		}else
+			outputError("Failed to initialize the unit increment");
+	}
+	return _getValueOfList(disowned_list(_rangeList,owner));
+}
+
 // MDH@18OCT2019: we can get the range of integers between two values
 /**
  * @brief returns the range of integer values from \p _value1 to \p _value2
@@ -9877,6 +9944,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	// replacing: return _getValueOfList(_getScalarRangeList(_value1,_value2,&up));
 	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
 }
+
 /**
  * @brief returns the result of applying binary operator \p operator to \p _value1 and \p _value2
  * @param operator
@@ -14459,6 +14527,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 			if(!completedValueValueFunction(_Menvironment,owner,"range",Mrange)){
 				outputError("Failed to register the range function");
+				return NULL;
+			}
+			if(!completedValueValueValueFunction(_Menvironment,owner,"rangevalues",Mrangevalues)){
+				outputError("Failed to register the rangevalues function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
