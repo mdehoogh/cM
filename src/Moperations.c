@@ -439,13 +439,13 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
  * @param _value2 
  * @return Mvalue* the sum of \p _value1 and \p _value2
  */
-Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL; // MDH@24OCT2019: propagate NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
-	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,add,true);
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add,true);
-	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,add,true);
-	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add,true);
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Madd,true);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Madd,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,Madd,true);
+	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,Madd,true);
 	// MDH@24OCT2019: isValueZero() can now also return M_LL_INVALID and we do NOT want the value to be considered a 'true' zero when that happens!!!!!
 	if(isValueZero(_value1)==M_TRUE)return _value2;
 	if(isValueZero(_value2)==M_TRUE)return _value1;
@@ -589,14 +589,14 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
  * @param _value2 
  * @return Mvalue* \p _value1 minus \p _value2
  */
-Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL;
 	if(amVerboseDebugging())
 	{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
-	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,subtract,true);
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract,true);
-	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,subtract,true);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract,true);
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msubtract,true);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msubtract,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,Msubtract,true);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msubtract,true);
 	// if either is zero, result is easy to determine
 	if(isValueZero(_value1)==M_TRUE)return Mneg(_value2);
 	if(isValueZero(_value2)==M_TRUE)return _value1;

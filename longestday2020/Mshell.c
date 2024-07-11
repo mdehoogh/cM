@@ -2526,7 +2526,7 @@ Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)ret
 	}
 	return _result;
 }
-Mvalue* add(Mvalue* _value1,Mvalue* _value2);
+Mvalue* Madd(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
     if(_value){
 		if(amVerbose())outputValue("Computing the sum of '",_value,"'.\n");
@@ -2539,7 +2539,7 @@ Mvalue* Msum(Mvalue* _value){
 				if(listelement){
 					// how about adding as decimals????
 					assignValue(&_sumValue,listelement->_value); // TODO I suppose we can do this????
-					while(listelement->_next){listelement=listelement->_next;_sumValue=add(_sumValue,listelement->_value);}
+					while(listelement->_next){listelement=listelement->_next;_sumValue=Madd(_sumValue,listelement->_value);}
 				}
 			}
 			return _sumValue;
@@ -4682,7 +4682,7 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 // rational number addition
 // generic addition
 ///// MDH@18NOV2019 is now defined elsewhere!!: Mdecimal* getValueDecimal(Mvalue* _value);
-Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL; // MDH@24OCT2019: propagate NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);
@@ -4822,8 +4822,14 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 	*/
 	return NULL;
 }
-
-Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns the difference of \p _value1 and \p _value2
+ * 
+ * @param _value1 
+ * @param _value2 
+ * @return Mvalue* the difference between \p _value1 and \p _value2
+ */
+Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(amVerboseDebugging())
 		{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
@@ -4922,7 +4928,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	return NULL;
 }
 
-Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
@@ -7101,7 +7107,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));break;
 			case '!' :result=unequalto(_value1,_value2);break;
 			case '=' :result=equalto(_value1,_value2);break;
-			case ':' :result=Mrange(_value1,_value2,NULL);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
+			case ':' :result=Mirange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:output("%sUnknown binary operator '%s'.\n",M_ERROR_PREFIX,operator);
 		}
 		if(amVerboseDebugging())

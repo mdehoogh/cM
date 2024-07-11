@@ -298,7 +298,7 @@ static Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner own
 							output(" and ");
 							outputValue(NULL,array2->values[elementIndex]->value._array->values[colIndex],NULL);
 							outputValue(" to ",sumproductValue,".\n");
-							sumproductValue=add(sumproductValue,multiply(rowArrayValues[elementIndex],array2->values[elementIndex]->value._array->values[colIndex]));
+							sumproductValue=Madd(sumproductValue,Mmultiply(rowArrayValues[elementIndex],array2->values[elementIndex]->value._array->values[colIndex]));
 						}
 						output("Product value at cell (%lld,%lld)",rowIndex,colIndex);
 						outputValue(": ",sumproductValue,".\n");
@@ -411,25 +411,25 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
 						for(long long rowIndex=0;rowIndex<numberOfArrayRows;rowIndex++){
 							output("\tRow=%lld.\n",rowIndex);
 							if(colIndex!=rowIndex){
-								Mvalue* tempValue=divide(
+								Mvalue* tempValue=Mdivide(
 													arrayRows[rowIndex]->value._array->values[colIndex],
 													arrayRows[colIndex]->value._array->values[colIndex]);
 								outputValue("\t\tTemp value: ",tempValue,"\n");
 								for(long long elementIndex=0;elementIndex<numberOfArrayRows;elementIndex++){
 									assignValue(
 										&arrayRows[rowIndex]->value._array->values[elementIndex],
-										subtract(
+										Msubtract(
 											arrayRows[rowIndex]->value._array->values[elementIndex],
-											multiply(arrayRows[colIndex]->value._array->values[elementIndex],tempValue)
+											Mmultiply(arrayRows[colIndex]->value._array->values[elementIndex],tempValue)
 										)
 									);
 									// also for the unity matrix
 									outputValue("\t\tTemp value: ",tempValue,"\n");
 									assignValue(
 										&unityMatrixRows[rowIndex]->value._array->values[elementIndex],
-										subtract(
+										Msubtract(
 											unityMatrixRows[rowIndex]->value._array->values[elementIndex],
-											multiply(unityMatrixRows[colIndex]->value._array->values[elementIndex],tempValue)
+											Mmultiply(unityMatrixRows[colIndex]->value._array->values[elementIndex],tempValue)
 										)
 									);
 									outputValue("\t\tTemp value: ",tempValue,"\n");
@@ -453,14 +453,14 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
 						for(long long colIndex=0;colIndex<numberOfArrayRows;colIndex++){
 							assignValue(
 								&arrayRows[rowIndex]->value._array->values[colIndex],
-								divide(
+								Mdivide(
 									arrayRows[rowIndex]->value._array->values[colIndex],
 									tempValue
 								)
 							);
 							assignValue(
 								&unityMatrixRows[rowIndex]->value._array->values[colIndex],
-								divide(
+								Mdivide(
 									unityMatrixRows[rowIndex]->value._array->values[colIndex],
 									tempValue
 								)
@@ -501,7 +501,7 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
  * @param _value2 
  * @return Mvalue* the product of \p _value1 and \p _value2
  */
-Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL;
 	/* MDH@25APR2023: decided NOT to do this and instead create a separate matrix multiplication
 	// two-dimensional numeric matrices should be matrix multiplied
@@ -509,10 +509,10 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		if(isANumericMatrix(_value1->value._array)==M_TRUE&&isANumericMatrix(_value2->value._array)==M_TRUE)
 			return _getValueOfArray(matrixproduct(_value1->value._array,_value2->value._array));
 	*/
-	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,multiply,true);
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply,true);
-	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,multiply,true);
-	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply,true);
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mmultiply,true);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mmultiply,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,Mmultiply,true);
+	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,Mmultiply,true);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
@@ -625,17 +625,17 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
  * @param _value2 
  * @return Mvalue* the quotient of \p value1 and \p value2
  */
-Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL;
 	/*
 	if(_value1->type==VT_ARRAY&&_value2->type==VT_ARRAY)
 		if(isANumericMatrix(_value1->value._array)==M_TRUE&&isANumericMatrix(_value2->value._array)==M_TRUE)
 			return _getValueOfArray(matrixproduct(_value1->value._array,matrixinverse(_value2->value._array)));
 			*/
-	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,divide,false);
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,divide,false);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide,false);
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mdivide,false);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mdivide,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mdivide,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mdivide,false);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO shouldn't we return infinity?????
 	// MDH@26OCT2019: dealing with any integer conform as we did in the other binary operators
@@ -875,7 +875,7 @@ Mvalue* Mmatrixtrace(Mvalue* _value){
 				Mvalue** arrayRows=array->values;
 				Mvalue* traceValue=getValueZeroOfType(getMatrixElementValuetype(array));
 				while(--numberOfRows>=0)
-					assignValue(&traceValue,add(traceValue,arrayRows[numberOfRows]->value._array->values[numberOfRows]));
+					assignValue(&traceValue,Madd(traceValue,arrayRows[numberOfRows]->value._array->values[numberOfRows]));
 				return traceValue;
 			}else
 				outputError("Argument to the transpose function not a square matrix");
@@ -915,7 +915,7 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 					assignValue(cumproduct,arrayRows[0]->value._array->values[0]);
 					for(long long rowIndex=1;rowIndex<numberOfRows;rowIndex++)
 						assignValue(cumproduct+rowIndex,
-							multiply(cumproduct[rowIndex-1],arrayRows[rowIndex]->value._array->values[rowIndex]));
+							Mmultiply(cumproduct[rowIndex-1],arrayRows[rowIndex]->value._array->values[rowIndex]));
 					assignValue(&determinantValue,cumproduct[numberOfRows-1]);
 					/////////outputValue("Initial value determinant: ",determinantValue,"\n");
 					if(determinantValue!=NULL){
@@ -950,15 +950,15 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 								}
 								for(;swapi<numberOfRows;swapi++)
 									assignValue(cumproduct+swapi,
-										multiply(cumproduct[swapi-1],arrayRows[permutation[swapi]]->value._array->values[swapi]));
+										Mmultiply(cumproduct[swapi-1],arrayRows[permutation[swapi]]->value._array->values[swapi]));
 								//outputValue("Cum product: ",cumproduct[numberOfRows-1],"\n");
 								// increment the determinant with the new cumulative product
 								if(neg){ // toggle to false
 									neg=false;
-									assignValue(&determinantValue,add(determinantValue,cumproduct[numberOfRows-1]));
+									assignValue(&determinantValue,Madd(determinantValue,cumproduct[numberOfRows-1]));
 								}else{ // toggle to true
 									neg=true;
-									assignValue(&determinantValue,subtract(determinantValue,cumproduct[numberOfRows-1]));
+									assignValue(&determinantValue,Msubtract(determinantValue,cumproduct[numberOfRows-1]));
 								}
 								c[i]++;
 								i=0;

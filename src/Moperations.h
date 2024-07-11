@@ -18,7 +18,7 @@ Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binar
 Mvalue* Mneg(Mvalue* value);
 
 // binary operator functions
-Mvalue* add(Mvalue* value1,Mvalue* value2);
+Mvalue* Madd(Mvalue* value1,Mvalue* value2);
 //////Mvalue* multiply(Mvalue* value1,Mvalue* value2);
-Mvalue* subtract(Mvalue* value1,Mvalue* value2);
+Mvalue* Msubtract(Mvalue* value1,Mvalue* value2);
 //////Mvalue* divide(Mvalue* value1,Mvalue* value2);

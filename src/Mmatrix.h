@@ -13,8 +13,8 @@ long long isANumericMatrix(Marray* array,bool update);
 mpd_context_t* get_default_mpd_context();
 
 long long smallerthan(Mvalue* _value1,Mvalue* _value2);
-Mvalue* multiply(Mvalue* _value1,Mvalue* _value2);
-Mvalue* divide(Mvalue* _value1,Mvalue* _value2);
+Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2);
+Mvalue* Mdivide(Mvalue* _value1,Mvalue* _value2);
 Mvalue* getValueOneOfType(Mvaluetype valuetype);
 Mvalue* getValueZeroOfType(Mvaluetype valuetype);
 

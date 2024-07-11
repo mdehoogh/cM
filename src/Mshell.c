@@ -4676,7 +4676,7 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(format!=NULL&&format->type!=VT_INTEG
 	return _result;
 }
 
-Mvalue* add(Mvalue* _value1,Mvalue* _value2);
+Mvalue* Madd(Mvalue* _value1,Mvalue* _value2);
 /**
  * @brief returns the sum of the elements of the list or array wrapped in \p value
  * 
@@ -4697,7 +4697,7 @@ Mvalue* Msum(Mvalue* value){
 					assignValue(&_sumValue,listelement->_value);
 					while(listelement->_next!=NULL){
 						listelement=listelement->_next;
-						assignValue(&_sumValue,add(_sumValue,listelement->_value));
+						assignValue(&_sumValue,Madd(_sumValue,listelement->_value));
 					}
 				}
 			}
@@ -4710,7 +4710,7 @@ Mvalue* Msum(Mvalue* value){
 				// TODO how about skipping all NULL values??????
 				assignValue(&_sumValue,array->values[0]);
 				while(arrayindex<array->numberOfElements)
-					assignValue(&_sumValue,add(_sumValue,array->values[arrayindex++]));
+					assignValue(&_sumValue,Madd(_sumValue,array->values[arrayindex++]));
 				// outputValue("Sum: ",_sumValue,".\n");
 			}
 		}else // if not something that can be summed, returning the original value
@@ -8215,7 +8215,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 								// now apply the multiplier if need be
 								//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
 								if(_multiplierValue!=NULL){ // have to multiply
-									_rootValue=multiply(_multiplierValue,_rootValue);
+									_rootValue=Mmultiply(_multiplierValue,_rootValue);
 									outputValue("Rational exponent root equals the product of multiplier ",_multiplierValue," and ");
 									outputBiginteger("the ",exponentDenominator,"th ");
 									outputValue("root of ",rootArgumentValue," ");
@@ -8244,7 +8244,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 					if(!floatIsUndefinedOrZero(_exponentRational->delta)) // a defined delta
 						// multiply the result with base to the power of delta
 						// TODO the base should determine what the type of the power computation should be???????
-						_returnValue=multiply(_rootValue,_getFloatValue(getFloatValuePower(_value1,getReal(_exponentRational->delta))));
+						_returnValue=Mmultiply(_rootValue,_getFloatValue(getFloatValuePower(_value1,getReal(_exponentRational->delta))));
 					else
 						_returnValue=_rootValue;
 					if(neg){
@@ -8317,7 +8317,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	// we can still use the shortcuts
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // NOTE if the power is zero, the multiplication factor will be 1
-	return multiply(_value1,power(_getIntegerValue(10),_value2)); // TODO check whether _getIntegerValue(10) actually gets freed by the 'gc'
+	return Mmultiply(_value1,power(_getIntegerValue(10),_value2)); // TODO check whether _getIntegerValue(10) actually gets freed by the 'gc'
 	/* replacing:
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
 
@@ -8361,7 +8361,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 				return _getValueOfRational(_rational,true);
 			}
 		}
-		return multiply(_value1,power(_getIntegerValue(10),_value2)); // temp. value like the power result and _getIntegerValue(10) will be garbage collected if not bound somewhere!!!
+		return Mmultiply(_value1,power(_getIntegerValue(10),_value2)); // temp. value like the power result and _getIntegerValue(10) will be garbage collected if not bound somewhere!!!
 		// replacing: return _getFloatValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld))));
 	}
 	*/
@@ -8604,7 +8604,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		Mbiginteger* _rationalInteger=owned_biginteger(_getRationalInteger(_quotientRational,true,true),owner);
 		FREE_RATIONAL(_quotientRational,owner); // only used for temporary storage of the division rational
 		if(NULL==_rationalInteger)return NULL;
-		return subtract(_value1,multiply(_value2,_getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner)))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
+		return Msubtract(_value1,Mmultiply(_value2,_getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner)))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
@@ -8617,7 +8617,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		Mdecimal* _decimalInteger=owned_decimal(_getDecimalInteger(_divideDecimal,true,true),owner);
 		FREE_DECIMAL(_divideDecimal,owner); // only used for temporary storage of the division result
 		if(NULL==_decimalInteger)return NULL;
-		return subtract(_value1,multiply(_value2,_getValueOfDecimal(disowned_decimal(_decimalInteger,owner))));
+		return Msubtract(_value1,Mmultiply(_value2,_getValueOfDecimal(disowned_decimal(_decimalInteger,owner))));
 	}
 	// MDH@28OCT2019: if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
@@ -8993,12 +8993,12 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
  * @param _value2 
  * @return Mvalue* \p _value1 shifted right \p _value2
  */
-Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL;
-	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,shiftright,false);
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright,false);
-	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,shiftright,false);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright,false);
+	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Mshiftright,false);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mshiftright,false);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Mshiftright,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mshiftright,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@26OCT2019: if either value is zero return _value1
 	// ASSERT neither value is zero
 	// do NOT allow shifting by anything that cannot be converted to an integer
@@ -9746,7 +9746,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 	return(_scalarRangeArray?disowned_array(_scalarRangeArray,owner):NULL);
 }
 
-// MDH@09JUL2024: we'd like to be able to get a range of values with a fixed distance between successive values
+// MDH@11JUL2024: similar to Mdrange() but more generic, not translating to decimals
 /**
  * @brief returns a list containing values starting at \p _value1 incremented by \p _value3 but at most equal to \p _value2
  * @details if \p _value3 is defined, the first element will always equal \p _value1 and every next element is \p _value3 larger as long as \p value2 has not been exceeded
@@ -9755,8 +9755,67 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
  * @param _value2 the highest possible value
  * @param _value3 the increment value
  * @return Mvalue* the list containing the integers between \p _value1 and \p _value2 inclusive with increments of \p _value3
+*/
+Mvalue* Mrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationowner owner=getOwner(__LINE__);
+	// at least a fromValue decimal value is required
+	Mvalue *stepDecimalValue=Md(stepValue,NULL);
+	if(NULL==stepDecimalValue&&stepValue!=NULL){outputError("Increment not numeric");return NULL;}
+	Mdecimal* stepDecimal=(stepDecimalValue!=NULL?stepDecimalValue->value._decimal:NULL);
+	long long stepDecimalSign=M_LL_INVALID;
+	if(stepDecimal!=NULL){ // check the sign to be either positive or negative!!
+		stepDecimalSign=getDecimalSign(stepDecimal);
+		if(stepDecimalSign==M_ZERO){outputError("Zero increment to range()");return NULL;}
+	}
+	Mvalue *fromDecimalValue=Md(fromValue,NULL),*toDecimalValue=Md(toValue,NULL);
+	// if we do not have a step decimal value (which might be the case if stepValue is NULL)
+	if(NULL==fromDecimalValue||NULL==toDecimalValue){outputError("Missing or incomplete arguments to range()");return NULL;}
+	Mdecimal *toDecimal=toDecimalValue->value._decimal,*fromDecimal=fromDecimalValue->value._decimal;
+	Mdecimal *_rangeDecimal=owned_decimal(_getDecimalDifference(toDecimal,fromDecimal),owner);
+	if(NULL==_rangeDecimal){outputError("Failed to compute the range");return NULL;}
+	// check the sign
+	long long rangeSign=getDecimalSign(_rangeDecimal);
+	FREE_DECIMAL(_rangeDecimal,owner);
+	if(stepDecimalSign!=M_LL_INVALID&&rangeSign!=M_ZERO)if(rangeSign!=stepDecimalSign){outputError("Increment has the wrong sign");return NULL;}
+	Mlist* _rangeList=owned_list(_getListOfType(VT_UNDEFINED),owner);
+	if(NULL==_rangeList){outputError("Failed to create range list");return NULL;}
+	// add fromDecimal to start with
+	if(appendedToList(_rangeList,owner,fromValue,M_LL_INVALID)<0){FREE_LIST(_rangeList,owner);outputError("Failed to initialize the list of range values");return NULL;}
+	if(rangeSign==M_POSITIVE||rangeSign==M_NEGATIVE){
+		// instead of a step decimal (see Mdrange) we need a step value
+		// and it makes sense to make it have the same type
+		if(NULL==stepValue)stepValue=getValueOneOfType(fromValue->type);
+		if(stepValue!=NULL){
+			Mvalue* lastRangeValue=fromValue;
+			while(1){
+				Mvalue* nextRangeValue=Madd(lastRangeValue,stepValue);
+				if(NULL==nextRangeValue){outputError("Failed to complete the range of values");break;}
+				// if _nextRangeDecimal is above (or below) toDecimal we do NOT add it
+				Mvalue* deltaValue=Msubtract(nextRangeValue,toValue);
+				if(NULL==deltaValue){outputError("Failed to check a new range value");break;}
+				long long deltaSign=getValueInteger(Msign(deltaValue));
+				if(deltaSign==rangeSign||appendedToList(_rangeList,owner,nextRangeValue,M_LL_INVALID)<0){
+					if(deltaSign!=rangeSign)outputError("Failed to complete the list of range values");
+					break;
+				}
+				lastRangeValue=nextRangeValue;
+			}
+		}else
+			outputError("Failed to initialize the unit increment");
+	}
+	return _getValueOfList(disowned_list(_rangeList,owner));
+}
+
+// MDH@09JUL2024: we'd like to be able to get a range of values with a fixed distance between successive values
+/**
+ * @brief returns a list containing decimal values starting at \p _value1 incremented by \p _value3 but at most equal to \p _value2
+ * @details if \p _value3 is defined, the first element will always equal \p _value1 and every next element is \p _value3 larger as long as \p value2 has not been exceeded
+ *          but if \p _value1 or \p _value2 represents a list \p _value3 is ignored
+ * @param _value1 the lowest possible value
+ * @param _value2 the highest possible value
+ * @param _value3 the increment value
+ * @return Mvalue* the list containing the decimals between \p _value1 and \p _value2 inclusive with increments of \p _value3
  */
-Mvalue* Mrangevalues(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mdrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationowner owner=getOwner(__LINE__);
 	// at least a fromValue decimal value is required
 	Mvalue *stepDecimalValue=Md(stepValue,NULL);
 	if(NULL==stepDecimalValue&&stepValue!=NULL){outputError("Increment not numeric");return NULL;}
@@ -9819,7 +9878,7 @@ Mvalue* Mrangevalues(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Malloc
  * @param _value2 
  * @return Mvalue* the range of integer values from \p _value1 to \p _value2
  */
-Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mirange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL;
 	if(_value1->type==VT_MAP||_value2->type==VT_MAP)return NULL; // neither operand can be a map for sure
 	if(_value1->type==VT_REFERENCE||_value2->type==VT_REFERENCE)return NULL; // neither operand can be a reference for sure
@@ -9830,7 +9889,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	//				I suppose we can stick to the original approach if there are less than 2 elements in the list
 	bool up;
 	if(_value1->type==VT_LIST){
-		if(NULL==_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange,false);
+		if(NULL==_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mirange,false);
 
 		// with at least two elements in the list we could use the second argument as the count if it is not a list, this would give us additional functionality
 		// because normally we would expect value2 to be an end point somehow and therefore a list
@@ -9848,12 +9907,12 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		if(amVerboseDebugging())
 			outputList("First scalar range: ",_integerRangeList,".\n");
 
-		Mvalue* rangeValue=subtract(endIntegerRangeValue,startIntegerRangeValue); // the total range in the first dimension
+		Mvalue* rangeValue=Msubtract(endIntegerRangeValue,startIntegerRangeValue); // the total range in the first dimension
 		// the first integer range list tells us how many elements we need to create for successive elements
 		Mvalue *firstIntegerRangeValue=_integerRangeList->_first->_value
 					,*lastIntegerRangeValue=_integerRangeList->_last->_value;
-		Mvalue *startDeltaValue=subtract(firstIntegerRangeValue,startIntegerRangeValue)
-					,*endDeltaValue=subtract(endIntegerRangeValue,lastIntegerRangeValue);
+		Mvalue *startDeltaValue=Msubtract(firstIntegerRangeValue,startIntegerRangeValue)
+					,*endDeltaValue=Msubtract(endIntegerRangeValue,lastIntegerRangeValue);
 
 		// so we either have rangeValue=startDeltaValue+1+...+1+endDelta when up is true or rangeValue=endDelta+-1+...+-1+startDelta when up is false
 
@@ -9874,7 +9933,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 				if(endIntegerRangeListelement!=NULL)endIntegerRangeValue=endIntegerRangeListelement->_value;
 			}
 			// we need to compute the delta (step) 
-			Mvalue* deltaRangeValue=divide(subtract(endIntegerRangeValue,startIntegerRangeValue),rangeValue);
+			Mvalue* deltaRangeValue=Mdivide(Msubtract(endIntegerRangeValue,startIntegerRangeValue),rangeValue);
 			if(NULL==deltaRangeValue)continue;
 			if(appendedToList(_multFactorList,owner,deltaRangeValue,M_LL_INVALID)<=0){
 				FREE_LIST(_multFactorList,owner);
@@ -9916,7 +9975,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 							*/
 							// with startIntegerRangeValue and endIntegerRangeValue we should be able to compute the value to add (which also depends on the index count)
 							// outputValue("First range value ",firstRangeValue,".\n");
-							rangeValue=add(startIntegerRangeValue,multiply(multFactorListelement->_value,firstRangeValue));
+							rangeValue=Madd(startIntegerRangeValue,Mmultiply(multFactorListelement->_value,firstRangeValue));
 							// outputValue("Range value: ",rangeValue,".\n");
 							if(appendedToList(_pointList,owner,rangeValue,M_LL_INVALID)<=0)
 							{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
@@ -9927,7 +9986,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 						if(appendedToList(_resultList,owner,_getValueOfList(disowned_list(_pointList,owner)),M_LL_INVALID)<=0)
 						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						_integerRangeListelement=_integerRangeListelement->_next;
-						firstRangeValue=add(firstRangeValue,incrementValue); // increment the first range value (which is the X offset so to speak from the first dimension)
+						firstRangeValue=Madd(firstRangeValue,incrementValue); // increment the first range value (which is the X offset so to speak from the first dimension)
 					}
 				}
 				FREE_LIST(_integerRangeList,owner);
@@ -9938,7 +9997,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		return _getValueOfList(disowned_list(_resultList,owner));
 		// replacing: return _appliedToList(_value1->value._list,_value2,Mrange);
 	}
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mirange,false);
 	// now we're dealing with scalars
 	return _getValueOfArray(_getScalarRangeArray(_value1,_value2,&up));
 	// replacing: return _getValueOfList(_getScalarRangeList(_value1,_value2,&up));
@@ -9959,11 +10018,11 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 		{outputValue("Computing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.\n");}
 		switch(operator[0]){
 			// real arithmetic
-			case '+' :result=add(_value1,_value2);break;
-			case '-' :result=subtract(_value1,_value2);break;
-			case '*' :result=(strlen(operator)-1?power(_value1,_value2):multiply(_value1,_value2));break;
+			case '+' :result=Madd(_value1,_value2);break;
+			case '-' :result=Msubtract(_value1,_value2);break;
+			case '*' :result=(strlen(operator)-1?power(_value1,_value2):Mmultiply(_value1,_value2));break;
 			case 'e' :result=epower(_value1,_value2);break;
-			case '/' :result=(strlen(operator)-1?integerdivide(_value1,_value2):divide(_value1,_value2));break;
+			case '/' :result=(strlen(operator)-1?integerdivide(_value1,_value2):Mdivide(_value1,_value2));break;
 			case '\\':result=integerdivide(_value1,_value2);break;
 			case '%' :result=divideremainder(_value1,_value2);break;
 			// integer arithmetic
@@ -9972,10 +10031,10 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '|' :result=(strlen(operator)-1?logicalor(_value1,_value2):bitwiseor(_value1,_value2));break;
 			// comparison operators
 			case '<' :result=(strlen(operator)-1?(operator[1]=='<'?Mshiftleft(_value1,_value2):Msmallerthanorequalto(_value1,_value2)):Msmallerthan(_value1,_value2));break;
-			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):Mlargerthanorequalto(_value1,_value2)):Mlargerthan(_value1,_value2));break;
+			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?Mshiftright(_value1,_value2):Mlargerthanorequalto(_value1,_value2)):Mlargerthan(_value1,_value2));break;
 			case '!' :result=Munequalto(_value1,_value2);break;
 			case '=' :result=Mequalto(_value1,_value2);break;
-			case ':' :result=Mrange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
+			case ':' :result=Mirange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:output("%sUnknown binary operator '%s'.\n",M_ERROR_PREFIX,operator);
 		}
 		if(amVerboseDebugging())
@@ -10862,10 +10921,10 @@ static Mmap* _getSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 			// output(" - value='",value,"'\n"); // DEBUG
 			if(value!=NULL){
 				if(getValueInteger(Misnumeric(value))==M_TRUE){
-					squarevalue=multiply(value,value);
+					squarevalue=Mmultiply(value,value);
 					if(count>0){
-						sum=add(sum,value);
-						sumofsquares=add(sumofsquares,squarevalue);
+						sum=Madd(sum,value);
+						sumofsquares=Madd(sumofsquares,squarevalue);
 						if(smallerthan(value,minimum)==M_TRUE){minimum=value;minimumindex=index;}
 						if(largerthan(value,maximum)==M_TRUE){maximum=value;maximumindex=index;}
 					}else{ // no sum yet
@@ -10924,16 +10983,16 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 					if(index1==index2){
 						value1=iter_next(&iterator1);
 						value2=iter_next(&iterator2);
-						prod12=multiply(value1,value2);
-						prod1=multiply(value1,value1);
-						prod2=multiply(value2,value2);
+						prod12=Mmultiply(value1,value2);
+						prod1=Mmultiply(value1,value1);
+						prod2=Mmultiply(value2,value2);
 						if(isNumeric(prod1)==M_TRUE&&isNumeric(prod2)==M_TRUE&&isNumeric(prod12)==M_TRUE){
 							if(count){
-								ssq1=add(ssq1,prod1);
-								ssq2=add(ssq2,prod2);
-								sum1=add(sum1,value1);
-								sum2=add(sum2,value2);
-								sum12=add(sum12,prod12);
+								ssq1=Madd(ssq1,prod1);
+								ssq2=Madd(ssq2,prod2);
+								sum1=Madd(sum1,value1);
+								sum2=Madd(sum2,value2);
+								sum12=Madd(sum12,prod12);
 							}else{ // initialize
 								ssq1=prod1;
 								ssq2=prod2;
@@ -10956,9 +11015,9 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 							output(" | Y:");outputValue(" sum=",sum2,NULL);outputValue(" - ssq=",ssq2,NULL);
 							outputValue(" | X*Y: sum=",sum12,".\n");
 						}
-						Mvalue* numerator=subtract(sum12,divide(multiply(sum1,sum2),countValue));
-						Mvalue* denominator=Msqrt(multiply(subtract(ssq1,divide(multiply(sum1,sum1),countValue)),subtract(ssq2,divide(multiply(sum2,sum2),countValue))));
-						return divide(numerator,denominator);
+						Mvalue* numerator=Msubtract(sum12,Mdivide(Mmultiply(sum1,sum2),countValue));
+						Mvalue* denominator=Msqrt(Mmultiply(Msubtract(ssq1,Mdivide(Mmultiply(sum1,sum1),countValue)),Msubtract(ssq2,Mdivide(Mmultiply(sum2,sum2),countValue))));
+						return Mdivide(numerator,denominator);
 					}else
 						outputError("Failed to wrap the sample count in computing a correlation coefficient");
 				}
@@ -14525,12 +14584,16 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return NULL;
 			}
-			if(!completedValueValueFunction(_Menvironment,owner,"range",Mrange)){
-				outputError("Failed to register the range function");
+			if(!completedValueValueFunction(_Menvironment,owner,"irange",Mirange)){
+				outputError("Failed to register the irange() function");
 				return NULL;
 			}
-			if(!completedValueValueValueFunction(_Menvironment,owner,"rangevalues",Mrangevalues)){
-				outputError("Failed to register the rangevalues function");
+			if(!completedValueValueValueFunction(_Menvironment,owner,"drange",Mdrange)){
+				outputError("Failed to register the drange() function");
+				return NULL;
+			}
+			if(!completedValueValueValueFunction(_Menvironment,owner,"range",Mrange)){
+				outputError("Failed to register the range() function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
