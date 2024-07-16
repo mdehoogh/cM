@@ -1379,16 +1379,16 @@ char getUserInputCommandImmediateFeedforwardCharacter(){
 		case TT_FUNCTION:return '('; // start the function call
 		case TT_SQSTRING:return '\''; // end a single quoted string literal
 		default:{
+			/* MDH@16JUL2024: comma's are easy to insert, and get in the way of closing a function call prematurely
 			// MDH@20DEC2022: can we deal with adding the end function call argument character? either , or ) here??????
 			if(token->expr!=NULL&&token->expr->type==TT_FUNCTION_CALL&&token->type!=TT_END_OF_FUNCTION_CALL&&token->expr->argument<=-4){ 
 				// we need to know more, if all the arguments are given we need to predict ), otherwise a , unless the current argument is not yet valid
 				//if(!isTokenUnfinished(token)){ // the token may be considered finished
 				// MDH@12JUL2023: I think we should not return ')' in any case because ')' is probably already appended
 				if(token->expr->argument!=-4)return ',';
-				/* replacing:
-				return(token->expr->argument==-4?')':',');
-				*/
+				/// replacing:return(token->expr->argument==-4?')':',');
 			}
+			*/
 			break;
 		}
 	}
@@ -3825,12 +3825,12 @@ void showSuggestedText(){
 		
 		outputIdentifierContinuationTextCharacters(&cursormovement);
 	
-		outputImmediateFeedforwardCharacters(&cursormovement);
+		// MDH@17JUL2024: if there is no identifier continuation text we allow immediate feedforward characters
+		if(cursormovement.written==0)outputImmediateFeedforwardCharacters(&cursormovement);
 
 		// MDH@27DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
 		// MDH@17JAN2024: for now we show all
-		if(cursormovement.written==0)
-			outputExpectedCharacters(&cursormovement);
+		if(cursormovement.written==0)outputExpectedCharacters(&cursormovement);
 
 	}else
 		outputManualFeedforwardCharacters(&cursormovement);

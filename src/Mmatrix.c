@@ -515,6 +515,42 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,Mmultiply,true);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
+	if(_value1->type==VT_TEXT){
+		long long multiplier=getValueInteger(_value2);
+		if(multiplier<0)return NULL;
+		Mstring* resultString=owned_string(__string(),owner);
+		Mvalue* resultValue=NULL;
+		if(resultString!=NULL){
+			if(string_append_char(resultString,_value1->value._text->presuffix)!=NULL){
+				while(--multiplier>=0){
+					if(NULL==string_append(resultString,_value1->value._text->_c)){outputError("Failed to replicate text");break;}
+				}
+				resultValue=_getValueOfText(_getText(string(resultString)));
+			}else
+				outputError("Failed to initialize result text");
+			FREE_STRING(resultString,owner);
+		}else
+			outputError("Failed to create the result text");
+		return resultValue;
+	}else
+	if(_value2->type==VT_TEXT){
+		long long multiplier=getValueInteger(_value1);
+		if(multiplier<0)return NULL;
+		Mstring* resultString=owned_string(_getString(_value2->value._text->presuffix),owner);
+		Mvalue* resultValue=NULL;
+		if(resultString!=NULL){
+			if(string_append_char(resultString,_value2->value._text->presuffix)!=NULL){
+				while(--multiplier>=0){
+					if(NULL==string_append(resultString,_value2->value._text->_c)){outputError("Failed to replicate text");break;}
+				}
+				resultValue=_getValueOfText(_getText(string(resultString)));
+			}else
+				outputError("Failed to initialize result text");
+			FREE_STRING(resultString,owner);
+		}else
+			outputError("Failed to create the result text");
+		return resultValue;
+	}
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _productBiginteger=NULL;
