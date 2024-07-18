@@ -2090,7 +2090,10 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 bool characterContinuesToken(Mtoken const * const token,char inputChar,char inputCharacterType){
 	if(NULL==token)return false;
 	// MDH@11JUL2023: a comment no longer is automatically continued (since a newline character finishes it now)
-	if(token->type==TT_ERROR/*||token->type==TT_COMMENT*/)return true;
+	if(token->type==TT_ERROR/*||token->type==TT_COMMENT*/){
+		output("%s'%c' always continues error token.\n",M_WARNING_PREFIX,inputChar);
+		return true;
+	}
 	// ASSERT token is not NULL and not an error // replacing: neither a error or a comment
 	correctInputCharacterType(token,inputChar,&inputCharacterType);
 	///////output("(%i)",inputCharacterType);
@@ -2099,6 +2102,7 @@ bool characterContinuesToken(Mtoken const * const token,char inputChar,char inpu
 	int8_t tokenType;
 	int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 	if(tokenType==TT_EXPRESSION)return false; // any non-whitespace characters ends an expression
+	////////if(newTokenType==TT_ERROR)return true; // MDH@18JUL2024: should prevent ?????
 	if(newTokenType<0)return true;
 	if(isTokenFinished(token))return false;
 	return(tokenType==newTokenType);

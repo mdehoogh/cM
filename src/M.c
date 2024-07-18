@@ -922,6 +922,7 @@ void updateAutoCompletionText(){
 Mstring* _enders=NULL;
 Mallocationowner owner_enders=(Mallocationowner){MI_MAIN,__LINE__,1};
 */
+/**
 static char getTokenTypeFeedforwardCloser(TokenType tokenType){
 	switch(tokenType){
 		case TT_DQSTRING:return '"'; 
@@ -934,7 +935,7 @@ static char getTokenTypeFeedforwardCloser(TokenType tokenType){
 	}
 	return '\0';
 }
-
+*/
 // MDH@25MAY2023: we can use it again
 // MDH@20DEC2022: apparently not getting called anywhere anymore
 static char getTokenTypeFeedforwardCharacter(TokenType tokenType){
@@ -4121,6 +4122,7 @@ bool updateNumberOfLineCharacters(){
  */
 int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * const currentToken){
 	if(NULL==_expectedCharacterStack)return 0;
+	if(currentToken!=NULL&&currentToken->type==TT_ERROR)return 0; // MDH@18JUN2024: when in an error do not append!!
 	// if the last expected character indicates we're in a string literal inputChar is considered part of that string literal
 	char lastExpectedCharacter=string_last_char(_expectedCharacterStack);
 	if(lastExpectedCharacter=='"'||lastExpectedCharacter=='\''){
@@ -5309,6 +5311,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 			*/
 		///////}
 		///////else // MDH@22OCT2021: I think if we're consuming a suggested character there's no need to append the last token auto completion text (as it would already be there)
+		
 		updateLastTokenAutoCompletionText(/*acceptedFirstSuggestedCharacterDeleted*/false); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
 		
 		// MDH@13DEC2023 TODO how to respond appropriately to some error???????
@@ -6561,7 +6564,14 @@ void showSeparatorLine(){
 	// output("Separator expanded!");
 	output("%.*s",3*columns,string(_separator)); // ASCII 196 is the character that spans an entire column in the middle (better then the underscore)
 }
-
+/**
+ * @brief returns the last token type
+ * 
+ * @return TokenType the last token type
+ */
+TokenType getLastTokenType(){
+	return(_userInputCommand!=NULL&&_userInputCommand->_lastToken!=NULL?_userInputCommand->_lastToken->type:TT_ERROR);
+}
 /**
  * @brief returns the suggested character accepted as input
  * 
@@ -6587,8 +6597,18 @@ char getAcceptedSuggestedCharacter(char suggestedCharacter,char * const inputCha
 			//string_removed_char(_suggestedText,0); // TEST
 			*inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
 			if(*inputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
-			updateLastTokenAutoCompletionText(true); // MDH@16NOV2021: WILL THIS HELP????? yes, but sometimes we get too many		
-			acceptedSuggestedCharacter=suggestedCharacter;
+
+			// MDH@18JUL2024: the following helps in preventing adding characters to consume over and over again
+			//                TODO this is not an optimal solution!!!
+			TokenType lastTokenType=getLastTokenType();
+			if(lastTokenType!=TT_ERROR){
+				// MDH@18JUL2024: the following is an problem when it keeps adding the same character over and over again
+				//                like a closing single quote, and when tabbing it should not again append it
+				updateLastTokenAutoCompletionText(true); // MDH@16NOV2021: WILL THIS HELP????? yes, but sometimes we get too many		
+				// MDH@18JUL2024: it helps blocking further processing of suggested characters (due to a Tab)
+				//                preventing this when the token type is error
+				acceptedSuggestedCharacter=suggestedCharacter;
+			}///else clearAutocompletionText();
 			// MDH@22OCT2021: the consumed suggested character has already been removed by commandCharacterAccepted(), so no need to do that here anymore
 			//				BUT we do need to adapt _suggestedText unless it's redetermined from the adapted constituent parts
 			/*
@@ -7000,7 +7020,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 				////outputChar('A');
 				if(/*!_manualFeedforwardText||*/string_length(_manualFeedforwardText)==0)
-					updateUserInputCommandImmediateFeedforwardText();
+					if(getLastTokenType()!=TT_ERROR)
+						updateUserInputCommandImmediateFeedforwardText();
 				////outputChar('B');
 				// MDH@03OCT2019: some feed forward texts are also current token specific, therefore we need to sync the feed forward texts
 				//				TODO perhaps we should distinguish between feed forward and auto completion (as with the brackets)
@@ -7284,6 +7305,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// MDH@20JAN2024: we can now replace the original code by a series of calls to rightArrowProcessed()
 					//                until the token changes, that way a Tab simply performs a number of successive right arrows
 					//                and will therefore be consistently the same
+					// MDH@18JUL2024: BUG when in an error, tabbing a closing quote will keep on adding it indefinitely
+					//                FIX ascertain that the suggested character is NOT accepted, so only a single character
+					//                    is accepted
 					char newInputChar;
 					Mtoken* token=NULL;
 					do{

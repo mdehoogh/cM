@@ -513,8 +513,6 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mmultiply,true);
 	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,Mmultiply,true);
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,Mmultiply,true);
-	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
-	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
 	if(_value1->type==VT_TEXT){
 		long long multiplier=getValueInteger(_value2);
 		if(multiplier<0)return NULL;
@@ -551,6 +549,8 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			outputError("Failed to create the result text");
 		return resultValue;
 	}
+	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
+	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _productBiginteger=NULL;
