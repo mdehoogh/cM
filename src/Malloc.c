@@ -843,6 +843,21 @@ size_t nulledAllocationsRemoved(bool verbose){
 }
 
 /**
+ * @brief returns the number of allocations
+ * 
+ * @return size_t the number of allocations
+ */
+size_t getNumberOfAllocations(){
+	return allocations.l;
+}
+/**
+ * @brief outputs the number of allocations
+ * 
+ */
+void reportNumberOfAllocations(char const * const prefix){
+	printf("(%s) Number of allocations: %zu.\n",prefix,allocations.l);
+}
+/**
  * @brief reports the allocations by type
  * 
  * @param title the title text

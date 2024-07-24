@@ -6156,7 +6156,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			output("%sFailed to register function %s.",M_ERROR_PREFIX,MFUNCTION_NAME);
 		}else
 		if(amVerbose())
-			output("Function %s registered.\n",MFUNCTION_NAME);
+			output("Function '%s' registered.\n",MFUNCTION_NAME);
 	}
 
 	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables)){

@@ -14256,6 +14256,8 @@ bool settingApplied(char settingCharacter){
  */
 bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
 
+	//reportNumberOfAllocations("shellInitialized 1");
+
 	M_MODULE_DEBUGGING=moduleDebugging; // MDH@05DEC2020
 
 	// MDH@07DEC2020: if locale is not NULL try to set the current (overall) locale to it
@@ -14268,12 +14270,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			output("%sProposed locale '%s' not accepted. Still using '%s' as locale.\n",M_ERROR_PREFIX,locale,newlocale);
 	}
 
+	//reportNumberOfAllocations("shellInitialized 2");
+
 	// initialize the random generator
 	long long randomSeedGeneratorInitializationResult=getValueInteger(Msrand(NULL));
 	if(randomSeedGeneratorInitializationResult!=M_TRUE)outputWarning("Failed to initialize the random seed generator");else outputInfo("Random generator initialized.");
 
+	//reportNumberOfAllocations("shellInitialized 3");
+
 	size_t numberOfSettingCharacters=(settingCharacters?strlen(settingCharacters):0);
 	while(numberOfSettingCharacters>0)settingApplied(settingCharacters[--numberOfSettingCharacters]);
+
+	//reportNumberOfAllocations("shellInitialized 4");
 
 	// register the callbacks
 	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else outputWarning("No input character read function defined!");
@@ -14284,6 +14292,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(!_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
 	if(!_outputCommandInfoFunction)outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
 
+	//reportNumberOfAllocations("shellInitialized 5");
+
 	if(!inputInfoFunction)outputWarning("No input info function!");else outputInfo("Input info function set!");
 	if(!inputErrorFunction)outputWarning("No input error function!");else outputInfo("Input error function set!");
 	if(!inputCharReadFunction)outputWarning("No input char read function!");else outputInfo("Input char read function set!");
@@ -14292,9 +14302,13 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(!updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");else outputInfo("Update last token auto completion text function set!");
 	if(!outputCommandInfoFunction)outputWarning("No output command info function!");else outputInfo("Output command info function set!");
 
+	//reportNumberOfAllocations("shellInitialized 6");
+
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return NULL; // let's force starting with a default decimal context
 	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
+
+	//reportNumberOfAllocations("shellInitialized 7");
 
 	NAF_value=_getFloatValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
@@ -14303,12 +14317,16 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	UNDEFINED_value=__value("undefined");
 	if(NULL==UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
 
+	//reportNumberOfAllocations("shellInitialized 8");
+
 	TYPES_value=_getMapValue(VT_TEXT,false,NULL);
 	Mmap* TYPES_map=NULL;
 	if(TYPES_value!=NULL)
 		TYPES_map=TYPES_value->value._map;
 	else
 		outputError("Failed to initialize the TYPES constant");
+
+	//reportNumberOfAllocations("shellInitialized 9");
 
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
 	//				therefore it shouldn't be a token value 
@@ -14333,13 +14351,22 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 		output("Creating the root M environment.\n"); // DEBUG
 	Menvironment* _Menvironment=owned_environment(_getNewEnvironment(),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment!=NULL){
+
+		//reportNumberOfAllocations("shellInitialized 10");
+
 		//if(amVerbose())
 			output("M environment created.\n");
 		_Menvironment->_name=owned_chars(_getChars("M"),Msubowner(owner,1)); // TODO why make a dynamic copy???
 		//if(amVerbose())
 			output("M environment named.\n");
+
+		//reportNumberOfAllocations("shellInitialized 11");
+		
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC_1(sizeof(Mfunctionmap),'W',Msubowner(owner,1));
+
+		//reportNumberOfAllocations("shellInitialized 12");
+		
 		if(environmentFunctionMap!=NULL){
 
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
@@ -14391,6 +14418,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				Mlock(TYPES_value); // to lock the map itself (locking the variable does NOT suffice)
 			}else
 				outputError("Failed to initialize the TYPES map");
+
+			//reportNumberOfAllocations("shellInitialized 13");
+		
 
 			/* MDH@13JUN2019: allow user to change the decimal precision
 			if(!DP_value||!addVariable(_Menvironment,"$decimalprecision",VT_INTEGER,false)||!setValue(_Menvironment,"$decimalprecision",DP_value)){
@@ -14472,6 +14502,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
+			//reportNumberOfAllocations("shellInitialized 14");
+		
+
 			// MDH@05DEC2020: obtain the current LC_ALL locale, and save it to the LOCALE variable
 			// MDH@07DEC2020: we're going to use a map to store both the current locale setting (in property '') as well as all the fields
 			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
@@ -14486,6 +14519,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				output("%sFailed to initialize '%s'.\n",M_ERROR_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 15");
+
 
 			// MDH@30SEP2020: let's add a CWD variable to contain the current working directory (if any) to makes things a little easier
 			if(!addVariable(_Menvironment,owner,"CWD",VT_TEXT,true)){
@@ -14504,6 +14540,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to initialize CWD");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 16");
+
 
 			/*
 			// we're going to store all commands in a list called M
@@ -14562,6 +14601,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register all internal functions");
 				return NULL;
 			}
+
+
+			//reportNumberOfAllocations("shellInitialized 17");
+		
+
 			/* MDH@14NOV2019: replaced by the M variable and M function
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
 			if(_resultListValue&&!completedIntegerFunction(_Menvironment,"M"),"M",getResult)){
@@ -14581,6 +14625,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the setdp, getdc and getdp functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 18");
+		
 			// pi() functions (decimal and rational)
 			if(!completedIntegerFunction(_Menvironment,owner,"pi$q",pi_q)
 					||!completedIntegerFunction(_Menvironment,owner,"pi$ql",pi_ql)
@@ -14617,6 +14664,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register value type conversion functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 19");
+
 			/* MDH@04NOV2019: moved over to Menvironment.h/c
 			if(!completedValueFunction(_Menvironment,"type"),"type",Mtype)){
 				outputError("Failed to register the type function");
@@ -14627,12 +14677,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the keys function");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 20");
+
 			if(!completedValueFunction(_Menvironment,owner,"neg",Mneg)
 					||!completedValueFunction(_Menvironment,owner,"bnot",Mbnot)
 					||!completedValueFunction(_Menvironment,owner,"not",Mnot)){
 				outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 21");
+
 			if(!completedValueFunction(_Menvironment,owner,"vexists",Mvexists)
 					||!completedValueFunction(_Menvironment,owner,"numeric",Misnumeric)
 					||!completedValueFunction(_Menvironment,owner,"isaninteger",Misaninteger)
@@ -14642,9 +14698,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!completedValueFunction(_Menvironment,owner,"isarational",Misarational)
 					||!completedValueFunction(_Menvironment,owner,"isareference",Misareference)
 					||!completedValueFunction(_Menvironment,owner,"isafile",Misafile)
-					||!completedValueFunction(_Menvironment,owner,"isalist",Misafunction)
-					||!completedValueFunction(_Menvironment,owner,"isanarray",Misanarray)
 					||!completedValueFunction(_Menvironment,owner,"isalist",Misalist)
+					||!completedValueFunction(_Menvironment,owner,"isanarray",Misanarray)
+					||!completedValueFunction(_Menvironment,owner,"isafunction",Misafunction)
 					||!completedValueFunction(_Menvironment,owner,"isamap",Misamap)
 					||!completedValueFunction(_Menvironment,owner,"isnull",Misnull)
 					||!completedValueFunction(_Menvironment,owner,"isnotnull",Misnotnull)
@@ -14655,16 +14711,25 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the exists, scalar, null and undefined functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 21");
+
 			if(!completedValueFunction(_Menvironment,owner,"sign",Msign)){
 				outputError("Failed to register the sign function");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 22");
+
 			if(!completedValueFunction(_Menvironment,owner,"zero",Mzero)
 					||!completedValueFunction(_Menvironment,owner,"positive",Mpositive)
 					||!completedValueFunction(_Menvironment,owner,"negative",Mnegative)){
 				outputError("Failed to register the zero, positive and negative functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 23");
+
 			// MDH@06JAN2021: adding the split function!!
 			if(!completedValueFunction(_Menvironment,owner,"sum",Msum)
 					||!completedValueIntegerFunction(_Menvironment,owner,"setlength",Msetlen)
@@ -14674,11 +14739,17 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the split function and the sum, length and setlength list functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 24");
+
 			// MDH@01NOV2019: I have some generic list functions implemented
 			if(!completedValueFunction(_Menvironment,owner,"empty",Mempty)||!completedValueFunction(_Menvironment,owner,"clear",Mclear)){
 				outputError("Failed to register the empty and clear function");
 				return false;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 25");
+
 			if(!completedListFunction(_Menvironment,owner,"statistics",Mstats)
 					||!completedValueValueFunction(_Menvironment,owner,"corr",Mcorr) // MDH@05JAN2021: for those only interested in the correlation coefficient (and not simple sample statistics) 
 					||!completedListFunction(_Menvironment,owner,"first",Mfirst)
@@ -14688,12 +14759,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
+			//reportNumberOfAllocations("shellInitialized 26");
+
+
 			if(!completedIntegerValueFunction(_Menvironment,owner,"array",marray)
 					||!completedValueValueFunction(_Menvironment,owner,"fill",mfill)
 			){
 				outputError("Failed to register the array and fill array functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 27");
+
 
 			if(!completedListIndexFunction(_Menvironment,owner,"removed",Mremoved)
 					||!completedListValueFunction(_Menvironment,owner,"push",Mpush)
@@ -14709,10 +14786,16 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 28");
+
 			if(!completedListValueIntegerFunction(_Menvironment,owner,"find",Mfind)){
 				outputError("Failed to register the find function");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 29");
+
 			// MDH@29OCT2020: can't do without them
 			if(!completedListFunctionValueFunction(_Menvironment,owner,"reduce",Mlreduce)
 					||!completedListFunctionFunction(_Menvironment,owner,"map",Mlmap)
@@ -14724,24 +14807,39 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
+			//reportNumberOfAllocations("shellInitialized 30");
+
+
 			if(!completedValueFunction(_Menvironment,owner,"tl",Mtl)){
 				outputError("Failed to register the tl text function");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 31");
+
 			if(!completedValueFunction(_Menvironment,owner,"fac",Mfac)
 					||!completedValueFunction(_Menvironment,owner,"facd",Mfacd)){
 				outputError("Failed to register the fac and facd function");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 32");
+
 			if(!completedValueFunction(_Menvironment,owner,"reciprocal",Mreciprocal)
 					||!completedValueFunction(_Menvironment,owner,"fibonacci",Mfibonacci)){ // MDH@10OCT2019
 				outputError("Failed to register the reciprocal and fibonacci function");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 33");
+
 			if(!completedValueValueFunction(_Menvironment,owner,"concat",Mconcat)){
 				outputError("Failed to register the concat function");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 34");
+
 			// register list conversions
 			if(!completedListFunction(_Menvironment,owner,"l2m",l2m)
 					||!completedListFunction(_Menvironment,owner,"l2ml",l2ml)
@@ -14750,12 +14848,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register list conversion functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 35");
+
 			// register map conversions
 			if(!completedListFunction(_Menvironment,owner,"m2ml",m2ml)
 					||!completedListFunction(_Menvironment,owner,"m2l",m2l)){
 				outputError("Failed to register map conversion functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 36");
+
 			// MDH@28SEP2020: register file functions
 			if(!completedValueFunction(_Menvironment,owner,"file",Mnewfile)
 				||!completedValueFunction(_Menvironment,owner,"fdelete",Mfdelete)
@@ -14793,6 +14897,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 37");
+
 			// MDH@10DEC2020: register system function(s)
 			if(!registerNoArgumentFunction(_Menvironment,owner,"systemvariables",Msystemvariables)
 				||!registerNoArgumentFunction(_Menvironment,owner,"clearenv",Mclearenv)
@@ -14804,6 +14911,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the system environment functions");
 				return NULL;				
 			}
+
+			//reportNumberOfAllocations("shellInitialized 38");
+
 			// MDH@08DEC2020: register time functions
 			if(!registerNoArgumentFunction(_Menvironment,owner,"now",Mnow)
 				||!registerNoArgumentFunction(_Menvironment,owner,"gettimezone",Mgettimezone)
@@ -14813,6 +14923,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the time functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 39");
+
 			// MDH@01MAY2023: register matrix functions
 			if(!completedValueValueValueFunction(_Menvironment,owner,"matrix",Mmatrix)
 					||!completedValueFunction(_Menvironment,owner,"diag",Mmatrixdiagonal)
@@ -14824,8 +14937,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				outputError("Failed to register the matrix functions");
 				return NULL;
 			}
+
+			//reportNumberOfAllocations("shellInitialized 40");
+
 		}
 	}
+
+	//reportNumberOfAllocations("shellInitialized 100");
+		
 
 	// if we successfully push _Menvironment (to become the current execution environment we succeeded)
 
