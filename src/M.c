@@ -5117,8 +5117,8 @@ const uint8_t NO_USER_INPUT_ERROR=128;
  * @param aSuggestedCharacter whether or not this is a consumed (suggested) character
  * @return uint8_t 
  */
-uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
-	logToOutputFile("Accepting input character '%c'.",inputChar);
+uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){Mallocationowner owner=getOwner(__LINE__);
+	logToOutputFile("Accepting input character '%c'.\n",inputChar);
 	// MDH@11JUL2023: now I have to ascertain that M_NEWLINE_CHARACTER on a comment is accepted instead of rejected
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
@@ -5328,6 +5328,49 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		// debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
 		//////////if(!initializationsChanged)outputStatus(inputChar,*inputCharacterType);
 		/////if(amVerboseDebugging())inputInfo("O");
+
+		// MDH@30JUL2024: a want to embed the name of the expected argument if this is a function call or list element token
+		if(result&NEW_TOKEN_CHARACTER){
+			size_t argumentIndex=0;
+			Mtoken* functionToken=NULL;
+			if(newLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){
+				functionToken=newLastCommandToEvaluateToken->prev;
+				argumentIndex=1;
+			}else
+			if(newLastCommandToEvaluateToken->type==TT_LISTELEMENT){
+				Mtoken* startListToken=newLastCommandToEvaluateToken->expr;
+				functionToken=(startListToken!=NULL&&startListToken->type==TT_FUNCTION_CALL?startListToken->prev:NULL);
+				// can we get the actual argument index?????
+				if(functionToken!=NULL)argumentIndex=1+startListToken->argument-newLastCommandToEvaluateToken->argument;
+			}
+			if(functionToken!=NULL){
+				Mstring* _functionNameText=owned_string(_getSignificantTokenText(functionToken),owner);
+				Mfunction* function=getFunction(NULL,string(_functionNameText));
+				FREE_STRING(_functionNameText,owner);
+				char* parameterName=(function!=NULL?getMapKey(function->_parameterMap,argumentIndex):NULL);
+				if(parameterName!=NULL){
+					Mstring* _argumentPromptText=owned_string(_getString(parameterName),owner);
+					if(_argumentPromptText!=NULL){
+						if(string_append_char(_argumentPromptText,':')!=NULL){
+							finishToken(newLastCommandToEvaluateToken);
+							char* argumentPrompt=string(_argumentPromptText);
+							if(string_append(newLastCommandToEvaluateToken->text,argumentPrompt)!=NULL){
+								setColor(getInfoColor());
+								while(*argumentPrompt){
+									outputChar(*argumentPrompt);
+									numberOfLineCommandCharacters++;
+									if(numberOfLineCharacters>0&&numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters)
+										newCommandLine(false);
+									++argumentPrompt;
+								}
+							}
+						}
+						FREE_STRING(_argumentPromptText,owner);
+					}
+				}
+			}
+		}
+
 	}
 	/////if(amVerboseDebugging())inputInfo("P");
 	/////inputInfo("%i",result);

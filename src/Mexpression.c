@@ -75,7 +75,10 @@ bool isTokenFinished(Mtoken const * const token){
 	return false;
 }
 void finishToken(Mtoken * const token){
-	if(token!=NULL)token->significantCharacterCount=string_length(token->text);
+	if(token!=NULL){
+		token->significantCharacterCount=string_length(token->text);
+		logToOutputFile("Token '%s' finished!",string(token->text));
+	}
 	else output("%sCan't finish an undefined token.",M_BUG_PREFIX);
 }
 void unfinishToken(Mtoken * const token){

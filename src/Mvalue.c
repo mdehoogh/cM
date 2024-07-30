@@ -1152,6 +1152,25 @@ Mvalue* getFirstScalarValue(Mvalue* value){
 }
 
 /**
+ * @brief returns the key at index \p mapIndex of \p map
+ * 
+ * @param map 
+ * @param mapIndex 
+ * @return char* the key at index \p mapIndex of \p map
+ */
+char* getMapKey(Mmap const * const map,size_t mapIndex){ // MDH@30JUL2024
+	if(map!=NULL&&mapIndex>0){
+		Mmapelement* mapelement=map->_first;
+		while(mapelement!=NULL){
+			if(--mapIndex==0)
+				return mapelement->_variable->_name->chars;
+			mapelement=mapelement->_next;
+		}
+	}
+	return NULL;
+}
+
+/**
  * @brief returns a new M list with the attributes of M map \p map
  * 
  * @param map 

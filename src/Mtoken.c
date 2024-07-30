@@ -149,7 +149,10 @@ bool isTokenFinished(Mtoken const * const token){
  * @param token the pointer to the M token
  */
 void finishToken(Mtoken * const token){
-	if(token)token->significantCharacterCount=string_length(token->text);
+	if(token!=NULL){
+		token->significantCharacterCount=string_length(token->text);
+		logToOutputFile("Finishing token '%s'!\n",string(token->text));
+	}
 	else output("%sCan't finish an undefined token.",M_BUG_PREFIX);
 }
 /**

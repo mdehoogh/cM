@@ -249,6 +249,7 @@ Mmap* _getThreeArgumentMap(char const * const name1,char const * const name2,cha
 Mmap* _getStringStringMap(char* name1,char* name2);
 Mmap* _getFloatFloatMap(char* name1,char* name2);
 Mlist* _getMapAttributes(Mmap const * const _map);
+char* getMapKey(Mmap const * const map,size_t mapIndex); // MDH@30JUL2024
 long long isMapUndefined(Mmap* map);
 bool isMapProperty(Mmap* map,char* propertyName); // MDH@25FEB2021: check if a property exists in a map!
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);

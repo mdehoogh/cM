@@ -2326,8 +2326,8 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 				}
 			}
 			/////if(amDebugging())(*inputInfoFunction)("E");
-			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
-			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
+			// MDH@23JUL2019: _getNewToken() will now also use newTokenType to set the (initial) type of the new token
+			// MDH@23SEP2019: replacing _getNewToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
 			// MDH@26OCT2020 TODO: shouldn't I be owning the new command token?????
 			// MDH@11JUL2023: since lastCommandToken is the last SIGNIFICANT command token (in front of any comments), we need now to pass command->_lastToken instead of lastCommandToken
 			// MDH@18JUL2023: with owner_command now added to the parameters, we can immediately take ownership of a new last command token
@@ -2342,7 +2342,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 			if(NULL==lastCommandToken)return NULL;
 
 			/* replacing:
-			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,newTokenType);
+			_userInputCommand->_lastToken=_getNewToken(_userInputCommand->_lastToken,newTokenType);
 			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyUserInputCommand()!)
 			setLastTokenType(newTokenType,endOfInput);
 			*/
@@ -2411,7 +2411,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 					_userInputCommand->_lastToken->type=TT_ERROR;
 				}
 			}
-			// taken over in _getToken()
+			// taken over in _getNewToken()
 			_userInputCommand->_lastToken->type=newTokenType;
 			*/
 
@@ -2504,11 +2504,12 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 			finishToken(lastCommandToken);
 		if(inputChar==' ')inputChar=M_WHITESPACE_CHARACTER; // MDH@31OCT2019: so we can make the blanks visible!!
 	}
-	/////if(amDebugging())(*inputInfoFunction)("I");
-	logToOutputFile("Appending input character '%c'.",inputChar);
+
 	// append the typed character at getUserInputLength() minus current token offset in _userInputCommand->_lastToken->text
 	string_append_char(lastCommandToken->text,inputChar);
 	/////if(amDebugging())(*inputInfoFunction)("J");
+	/////if(amDebugging())(*inputInfoFunction)("I");
+	logToOutputFile("Input character '%c' appended to token of type '%d'.",inputChar,newTokenType);
 
 	if(newTokenType<0)finishToken(lastCommandToken);
 
@@ -3114,7 +3115,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
  * @param newTokenType 
  * @return Mtoken* a new token following \p prevToken of type \p newTokenType
  */
-static Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType,bool onInput){Mallocationowner owner=getOwner(__LINE__);
+static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInput){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* _token=owned_token(__token(),owner);
 	if(_token!=NULL){
 		_token->text=owned_string(__string(),Msubowner(owner,1));
@@ -3182,7 +3183,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool on
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//				but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=owned_token(_getToken(lastCommandToken,tokenType,onInput),owner);
+	Mtoken* _newCommandToken=owned_token(_getNewToken(lastCommandToken,tokenType,onInput),owner);
 	// MDH@10APR2024 TODO: the following is weird because _getToken could change the type of _newCommandToken to TT_ERROR which would be overwritten again by the following 
 	if(_newCommandToken!=NULL){
 		if(tokenType!=TT_ERROR&&_newCommandToken->type==TT_ERROR){
@@ -14331,7 +14332,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
 	//				therefore it shouldn't be a token value 
 	/*
-	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
+	NULL_value=_getValueOfToken(_getNewToken(NULL,TT_SQSTRING),true);
 	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputBug("Failed to create NULL value!");
 	*/
 
@@ -15268,11 +15269,11 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 						// TODO should we force embed either '[' when L or '(' when A? 
 						switch(_block->subcommandBlockType){
 							case 'a':case 'A':
-								prevPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_EXPRESSION,false),ownerToken);
+								prevPlaceholderToken=owned_token(_getNewToken(prevPlaceholderToken,TT_EXPRESSION,false),ownerToken);
 								if(prevPlaceholderToken!=NULL){
 									string_append_char(prevPlaceholderToken->text,'(');
 									prevPlaceholderToken->significantCharacterCount=1;
-									nextPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL,false),ownerToken);
+									nextPlaceholderToken=owned_token(_getNewToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL,false),ownerToken);
 									if(nextPlaceholderToken!=NULL){
 										string_append_char(nextPlaceholderToken->text,')');
 										nextPlaceholderToken->significantCharacterCount=1;
@@ -15283,11 +15284,11 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 									outputError("Failed to embed (");
 								break;
 							case 'l':case 'L':
-								prevPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_LIST,false),ownerToken);
+								prevPlaceholderToken=owned_token(_getNewToken(prevPlaceholderToken,TT_LIST,false),ownerToken);
 								if(prevPlaceholderToken!=NULL){
 									string_append_char(prevPlaceholderToken->text,'[');
 									prevPlaceholderToken->significantCharacterCount=1;
-									nextPlaceholderToken=owned_token(_getToken(prevPlaceholderToken,TT_END_OF_LIST,false),ownerToken);
+									nextPlaceholderToken=owned_token(_getNewToken(prevPlaceholderToken,TT_END_OF_LIST,false),ownerToken);
 									if(nextPlaceholderToken!=NULL){
 										string_append_char(nextPlaceholderToken->text,']');
 										nextPlaceholderToken->significantCharacterCount=1;
@@ -15359,19 +15360,19 @@ Mblock* endBlock(){
 		if(environmentValue!=NULL){
 			///switch(blockEnvironment->subcommandBlockType){
 			///	case 'a':case 'A':
-			///		prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_FUNCTION_CALL);
+			///		prevPlaceholderToken=_getNewToken(prevPlaceholderToken,TT_FUNCTION_CALL);
 			///		string_append_char(prevPlaceholderToken->text,'(');
 			///		prevPlaceholderToken->significantCharacterCount=1;
-			///		nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL);
+			///		nextPlaceholderToken=_getNewToken(prevPlaceholderToken,TT_END_OF_FUNCTION_CALL);
 			///		string_append_char(nextPlaceholderToken->text,')');
 			///		nextPlaceholderToken->significantCharacterCount=1;
 			///		nextPlaceholderToken->next=placeholderToken->next;
 			///		break;
 			///	case 'l':case 'L':
-			///		prevPlaceholderToken=_getToken(prevPlaceholderToken,TT_LIST);
+			///		prevPlaceholderToken=_getNewToken(prevPlaceholderToken,TT_LIST);
 			///		string_append_char(prevPlaceholderToken->text,'[');
 			///		prevPlaceholderToken->significantCharacterCount=1;
-			///		nextPlaceholderToken=_getToken(prevPlaceholderToken,TT_END_OF_LIST);
+			///		nextPlaceholderToken=_getNewToken(prevPlaceholderToken,TT_END_OF_LIST);
 			///		string_append_char(nextPlaceholderToken->text,']');
 			///		nextPlaceholderToken->significantCharacterCount=1;
 			///		nextPlaceholderToken->next=placeholderToken->next;
