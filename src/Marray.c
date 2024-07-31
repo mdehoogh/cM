@@ -69,7 +69,7 @@ Miterator getArrayiterator(Marray* array){
  * @param fill_value 
  * @return Mvalue* a wrapper containing an M array constructed from the input
  */
-Mvalue* marray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner owner=getOwner(__LINE__);
 	// how about allowing length_value to be a list or array to fill the array with 
 	// returns an array that can store length_value values (if possible)
 	// MDH@09APR2023: now also allowing length_value to contain an array of dimension thus indicating that this will be a multi-dimensional array (instead of a flat array)
@@ -183,7 +183,7 @@ Mvalue* marray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner owner=g
  * @param value 
  * @return Mvalue* \p array_value with all elements set to \p value
  */
-Mvalue* mfill(Mvalue* array_value,Mvalue* value){
+Mvalue* Mfillarray(Mvalue* array_value,Mvalue* value){
 	Marray* array=(array_value&&array_value->type==VT_ARRAY?array_value->value._array:NULL);
 	if(array!=NULL){
 		unsigned long long l=array->numberOfElements;

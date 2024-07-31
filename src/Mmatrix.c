@@ -746,7 +746,7 @@ Mvalue* Mdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
  * @param fillValue the value to put in every matrix element
  * @return Mvalue* 
  */
-Mvalue* Mmatrix(Mvalue* fillValue,Mvalue* rowsValue,Mvalue* colsValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue){Mallocationowner owner=getOwner(__LINE__);
 	long long numberOfRows=(NULL==rowsValue?0:getValueInteger(rowsValue));
 	long long numberOfCols=(NULL==colsValue?0:getValueInteger(colsValue));
 	// rowsValue can be NULL or a positive integer

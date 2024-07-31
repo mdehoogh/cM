@@ -14657,18 +14657,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
 			if(!registerFunction(_Menvironment,owner,"i",Mi,1,(char*[]){"(number)"},NULL)
-					||!completedValueFunction(_Menvironment,owner,"l",Ml) // MDH@25NOV2020: conversion to a list
-					||!completedValueFunction(_Menvironment,owner,"a",Ma) // MDH@25NOV2020: conversion to an array
-					||!completedValueFunction(_Menvironment,owner,"m",Mm) // MDH@25NOV2020: conversion to a map
-					||!completedValueFunction(_Menvironment,owner,"b",Mb)
-					||!completedValueValueFunction(_Menvironment,owner,"t",Mt)
-					||!completedValueFunction(_Menvironment,owner,"f",Mf)
-					||!completedValueFunction(_Menvironment,owner,"q",Mq)
-					||!completedValueFunction(_Menvironment,owner,"Q",MQ)
-					||!completedValueValueFunction(_Menvironment,owner,"d",Md)
-					||!completedValueFunction(_Menvironment,owner,"precision",Mprecision)
-					||!completedValueFunction(_Menvironment,owner,"o",Mo)
-					||!completedValueFunction(_Menvironment,owner,"O",MO)){
+					||!registerFunction(_Menvironment,owner,"l",Ml,1,(char*[]){"(array|map)"},NULL) // MDH@25NOV2020: conversion to a list
+					||!registerFunction(_Menvironment,owner,"a",Ma,1,(char*[]){"(list|map)"},NULL) // MDH@25NOV2020: conversion to an array
+					||!registerFunction(_Menvironment,owner,"m",Mm,1,(char*[]){"(list|array)"},NULL) // MDH@25NOV2020: conversion to a map
+					||!registerFunction(_Menvironment,owner,"b",Mb,1,(char*[]){"(number)"},NULL)
+					||!registerFunction(_Menvironment,owner,"t",Mt,2,(char*[]){"(number)","(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"f",Mf,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"q",Mq,1,(char*[]){"(number)"},NULL)
+					||!registerFunction(_Menvironment,owner,"Q",MQ,1,(char*[]){"(number)"},NULL)
+					||!registerFunction(_Menvironment,owner,"d",Md,2,(char*[]){"(any)","(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"precision",Mprecision,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"o",Mo,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"O",MO,1,(char*[]){"(any)"},NULL)){
 				outputError("Failed to register value type conversion functions");
 				return NULL;
 			}
@@ -14681,57 +14681,57 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return false;
 			}
 			*/
-			if(!completedValueFunction(_Menvironment,owner,"keys",Mkeys)){
+			if(!registerFunction(_Menvironment,owner,"keys",Mkeys,1,(char*[]){"(map)"},NULL)){
 				outputError("Failed to register the keys function");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 20");
 
-			if(!completedValueFunction(_Menvironment,owner,"neg",Mneg)
-					||!completedValueFunction(_Menvironment,owner,"bnot",Mbnot)
-					||!completedValueFunction(_Menvironment,owner,"not",Mnot)){
+			if(!registerFunction(_Menvironment,owner,"neg",Mneg,1,(char*[]){"(number)"},NULL)
+					||!registerFunction(_Menvironment,owner,"bnot",Mbnot,1,(char*[]){"(number)"},NULL)
+					||!registerFunction(_Menvironment,owner,"not",Mnot,1,(char*[]){"(number)"},NULL)){
 				outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 21");
 
-			if(!completedValueFunction(_Menvironment,owner,"vexists",Mvexists)
-					||!completedValueFunction(_Menvironment,owner,"numeric",Misnumeric)
-					||!completedValueFunction(_Menvironment,owner,"isaninteger",Misaninteger)
-					||!completedValueFunction(_Menvironment,owner,"isabiginteger",Misabiginteger)
-					||!completedValueFunction(_Menvironment,owner,"isareal",Misareal)
-					||!completedValueFunction(_Menvironment,owner,"isadecimal",Misadecimal)
-					||!completedValueFunction(_Menvironment,owner,"isarational",Misarational)
-					||!completedValueFunction(_Menvironment,owner,"isareference",Misareference)
-					||!completedValueFunction(_Menvironment,owner,"isafile",Misafile)
-					||!completedValueFunction(_Menvironment,owner,"isalist",Misalist)
-					||!completedValueFunction(_Menvironment,owner,"isanarray",Misanarray)
-					||!completedValueFunction(_Menvironment,owner,"isafunction",Misafunction)
-					||!completedValueFunction(_Menvironment,owner,"isamap",Misamap)
-					||!completedValueFunction(_Menvironment,owner,"isnull",Misnull)
-					||!completedValueFunction(_Menvironment,owner,"isnotnull",Misnotnull)
-					||!completedValueFunction(_Menvironment,owner,"isanenvironment",Misanenvironment)
-					||!completedValueFunction(_Menvironment,owner,"scalar",Mscalar)
-					||!completedValueFunction(_Menvironment,owner,"null",Mnull)
-					||!completedValueFunction(_Menvironment,owner,"undefined",Mundefined)){
+			if(!registerFunction(_Menvironment,owner,"vexists",Mvexists,1,(char*[]){"(text)"},NULL)
+					||!registerFunction(_Menvironment,owner,"numeric",Misnumeric,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isaninteger",Misaninteger,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isabiginteger",Misabiginteger,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isareal",Misareal,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isadecimal",Misadecimal,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isarational",Misarational,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isareference",Misareference,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isafile",Misafile,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isalist",Misalist,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isanarray",Misanarray,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isafunction",Misafunction,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isamap",Misamap,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isnull",Misnull,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isnotnull",Misnotnull,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"isanenvironment",Misanenvironment,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"scalar",Mscalar,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"null",Mnull,1,(char*[]){"(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"undefined",Mundefined,1,(char*[]){"(any)"},NULL)){
 				outputError("Failed to register the exists, scalar, null and undefined functions");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 21");
 
-			if(!completedValueFunction(_Menvironment,owner,"sign",Msign)){
+			if(!registerFunction(_Menvironment,owner,"sign",Msign,1,(char*[]){"(number)"},NULL)){
 				outputError("Failed to register the sign function");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 22");
 
-			if(!completedValueFunction(_Menvironment,owner,"zero",Mzero)
-					||!completedValueFunction(_Menvironment,owner,"positive",Mpositive)
-					||!completedValueFunction(_Menvironment,owner,"negative",Mnegative)){
+			if(!registerFunction(_Menvironment,owner,"zero",Mzero,1,(char*[]){"(number)"},NULL)
+					||!registerFunction(_Menvironment,owner,"positive",Mpositive,1,(char*[]){"(number)"},NULL)
+					||!registerFunction(_Menvironment,owner,"negative",Mnegative,1,(char*[]){"(number)"},NULL)){
 				outputError("Failed to register the zero, positive and negative functions");
 				return NULL;
 			}
@@ -14739,10 +14739,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 23");
 
 			// MDH@06JAN2021: adding the split function!!
-			if(!completedValueFunction(_Menvironment,owner,"sum",Msum)
+			if(!registerFunction(_Menvironment,owner,"sum",Msum,1,(char*[]){"(list|array)"},NULL)
 					||!completedValueIntegerFunction(_Menvironment,owner,"setlength",Msetlen)
-					||!completedValueValueValueFunction(_Menvironment,owner,"split",Msplit)
-					||!completedValueFunction(_Menvironment,owner,"length",Mlen)
+					||!registerFunction(_Menvironment,owner,"split",Msplit,2,(char*[]){"text","separator"},NULL)
+					||!registerFunction(_Menvironment,owner,"length",Mlen,1,(char*[]){"(list|array|text)"},NULL)
 			){
 				outputError("Failed to register the split function and the sum, length and setlength list functions");
 				return NULL;
@@ -14751,7 +14751,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 24");
 
 			// MDH@01NOV2019: I have some generic list functions implemented
-			if(!completedValueFunction(_Menvironment,owner,"empty",Mempty)||!completedValueFunction(_Menvironment,owner,"clear",Mclear)){
+			if(!registerFunction(_Menvironment,owner,"empty",Mempty,1,(char*[]){"(any)"},NULL)
+			||!registerFunction(_Menvironment,owner,"clear",Mclear,1,(char*[]){"(any)"},NULL)){
 				outputError("Failed to register the empty and clear function");
 				return false;
 			}
@@ -14759,9 +14760,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 25");
 
 			if(!completedListFunction(_Menvironment,owner,"statistics",Mstats)
-					||!completedValueValueFunction(_Menvironment,owner,"corr",Mcorr) // MDH@05JAN2021: for those only interested in the correlation coefficient (and not simple sample statistics) 
-					||!completedListFunction(_Menvironment,owner,"first",Mfirst)
-					||!completedListFunction(_Menvironment,owner,"last",Mlast)
+					||!registerFunction(_Menvironment,owner,"corr",Mcorr,2,(char*[]){"(list)","(list)"},NULL) // MDH@05JAN2021: for those only interested in the correlation coefficient (and not simple sample statistics) 
+					||!registerFunction(_Menvironment,owner,"first",Mfirst,1,(char*[]){"(list)"},NULL)
+					||!registerFunction(_Menvironment,owner,"last",Mlast,1,(char*[]){"(list)"},NULL)
 				){
 				outputError("Failed to register the statistics, first and last list functions");
 				return NULL;
@@ -14770,8 +14771,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 26");
 
 
-			if(!completedIntegerValueFunction(_Menvironment,owner,"array",marray)
-					||!completedValueValueFunction(_Menvironment,owner,"fill",mfill)
+			if(!registerFunction(_Menvironment,owner,"array",Mcreatearray,2,(char*[]){"length(integer)","fill"},NULL)
+					||!registerFunction(_Menvironment,owner,"fill",Mfillarray,2,(char*[]){"(array)",NULL},NULL)
 			){
 				outputError("Failed to register the array and fill array functions");
 				return NULL;
@@ -14818,30 +14819,30 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 30");
 
 
-			if(!completedValueFunction(_Menvironment,owner,"tl",Mtl)){
+			if(!registerFunction(_Menvironment,owner,"tl",Mtl,1,(char*[]){"(any)"},NULL)){
 				outputError("Failed to register the tl text function");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 31");
 
-			if(!completedValueFunction(_Menvironment,owner,"fac",Mfac)
-					||!completedValueFunction(_Menvironment,owner,"facd",Mfacd)){
+			if(!registerFunction(_Menvironment,owner,"fac",Mfac,1,(char*[]){"(integer)"},NULL)
+				||!registerFunction(_Menvironment,owner,"facd",Mfacd,1,(char*[]){"(integer)"},NULL)){
 				outputError("Failed to register the fac and facd function");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 32");
 
-			if(!completedValueFunction(_Menvironment,owner,"reciprocal",Mreciprocal)
-					||!completedValueFunction(_Menvironment,owner,"fibonacci",Mfibonacci)){ // MDH@10OCT2019
+			if(!registerFunction(_Menvironment,owner,"reciprocal",Mreciprocal,1,(char*[]){"(number)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fibonacci",Mfibonacci,1,(char*[]){"index(integer)"},NULL)){ // MDH@10OCT2019
 				outputError("Failed to register the reciprocal and fibonacci function");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 33");
 
-			if(!completedValueValueFunction(_Menvironment,owner,"concat",Mconcat)){
+			if(!registerFunction(_Menvironment,owner,"concat",Mconcat,2,(char*[]){"(text)","(text)"},NULL)){
 				outputError("Failed to register the concat function");
 				return NULL;
 			}
@@ -14849,10 +14850,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 34");
 
 			// register list conversions
-			if(!completedListFunction(_Menvironment,owner,"l2m",l2m)
-					||!completedListFunction(_Menvironment,owner,"l2ml",l2ml)
-					||!completedListFunction(_Menvironment,owner,"ml2l",ml2l)
-					||!completedListFunction(_Menvironment,owner,"ml2m",ml2m)){
+			if(!registerFunction(_Menvironment,owner,"l2m",l2m,1,(char*[]){"(list)"},NULL)
+					||!registerFunction(_Menvironment,owner,"l2ml",l2ml,1,(char*[]){"(list)"},NULL)
+					||!registerFunction(_Menvironment,owner,"ml2l",ml2l,1,(char*[]){"(list)"},NULL)
+					||!registerFunction(_Menvironment,owner,"ml2m",ml2m,1,(char*[]){"(list)"},NULL)){
 				outputError("Failed to register list conversion functions");
 				return NULL;
 			}
@@ -14869,39 +14870,39 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 36");
 
 			// MDH@28SEP2020: register file functions
-			if(!completedValueFunction(_Menvironment,owner,"file",Mnewfile)
-				||!completedValueFunction(_Menvironment,owner,"fdelete",Mfdelete)
-				||!completedValueFunction(_Menvironment,owner,"files",Mfiles)
-				||!completedValueFunction(_Menvironment,owner,"fflush",Mfflush)
-				||!completedValueFunction(_Menvironment,owner,"exists",Mexists)
-				||!completedValueFunction(_Menvironment,owner,"fexists",Mfexists)
-				||!completedValueValueFunction(_Menvironment,owner,"open",Mopen)
-				||!completedValueValueFunction(_Menvironment,owner,"fopen",Mfopen)
-				||!completedValueFunction(_Menvironment,owner,"fclose",Mfclose)
-				||!completedValueValueFunction(_Menvironment,owner,"fread",Mfread)
-				||!completedValueValueFunction(_Menvironment,owner,"fseek",Mfseek)
-				||!completedValueValueFunction(_Menvironment,owner,"fsetpos",Mfsetpos)
-				||!completedValueFunction(_Menvironment,owner,"fisbinary",Mfisbinary)
-				||!completedValueFunction(_Menvironment,owner,"fmode",Mfmode)
-				||!completedValueFunction(_Menvironment,owner,"fpos",Mfpos)
-				||!completedValueFunction(_Menvironment,owner,"fnewline",Mfnewline)
-				||!completedValueFunction(_Menvironment,owner,"fpushpos",Mfpushpos)
-				||!completedValueFunction(_Menvironment,owner,"fpoppos",Mfpoppos)
-				||!completedValueFunction(_Menvironment,owner,"ftostart",Mftostart)
-				||!completedValueFunction(_Menvironment,owner,"ftoend",Mftoend)
-				||!completedValueFunction(_Menvironment,owner,"ftype",Mftype)
-				||!completedValueFunction(_Menvironment,owner,"feof",Mfeof)
-				||!completedValueFunction(_Menvironment,owner,"fsize",Mfsize)
-				||!completedValueFunction(_Menvironment,owner,"fisopen",Mfisopen)
-				||!completedValueFunction(_Menvironment,owner,"fisdir",Mfisdir)
-				||!completedValueFunction(_Menvironment,owner,"isdir",Misdir)
-				||!completedValueFunction(_Menvironment,owner,"fisfile",Mfisfile)
-				||!completedValueFunction(_Menvironment,owner,"fstat",Mfstat)
-				||!completedValueFunction(_Menvironment,owner,"freadline",Mfreadline)
-				||!completedValueValueValueFunction(_Menvironment,owner,"freadlines",Mfreadlines)
-				||!completedValueValueFunction(_Menvironment,owner,"fwrite",Mfwrite)
-				||!completedValueValueFunction(_Menvironment,owner,"fwriteline",Mfwriteline)
-				||!completedValueValueFunction(_Menvironment,owner,"fwritelines",Mfwritelines)){
+			if(!registerFunction(_Menvironment,owner,"file",Mnewfile,1,(char*[]){"filename(text)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fdelete",Mfdelete,1,(char*[]){"file(file|text)"},NULL)
+				||!registerFunction(_Menvironment,owner,"files",Mfiles,1,(char*[]){"directory(text)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fflush",Mfflush,1,(char*[]){"(file)"},NULL)
+				||!registerFunction(_Menvironment,owner,"exists",Mexists,1,(char*[]){"file(name)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fexists",Mfexists,1,(char*[]){"file(name)"},NULL)
+				||!registerFunction(_Menvironment,owner,"open",Mopen,2,(char*[]){"file(name)","mode(text)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fopen",Mfopen,2,(char*[]){"file(name)","mode(text)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fclose",Mfclose,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fread",Mfread,2,(char*[]){"file(name)","bytes(integer)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fseek",Mfseek,2,(char*[]){"file","position(integer)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fsetpos",Mfsetpos,2,(char*[]){"file","position(integer)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fisbinary",Mfisbinary,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fmode",Mfmode,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fpos",Mfpos,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fnewline",Mfnewline,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fpushpos",Mfpushpos,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fpoppos",Mfpoppos,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"ftostart",Mftostart,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"ftoend",Mftoend,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"ftype",Mftype,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"feof",Mfeof,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fsize",Mfsize,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fisopen",Mfisopen,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fisdir",Mfisdir,1,(char*[]){"file(name)"},NULL)
+				||!registerFunction(_Menvironment,owner,"isdir",Misdir,1,(char*[]){"file(name)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fisfile",Mfisfile,1,(char*[]){"any"},NULL)
+				||!registerFunction(_Menvironment,owner,"fstat",Mfstat,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"freadline",Mfreadline,1,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"freadlines",Mfreadlines,2,(char*[]){"file(name)","lines(integer)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fwrite",Mfwrite,2,(char*[]){"file"},NULL)
+				||!registerFunction(_Menvironment,owner,"fwriteline",Mfwriteline,2,(char*[]){"file(name)","line(text)"},NULL)
+				||!registerFunction(_Menvironment,owner,"fwritelines",Mfwritelines,1,(char*[]){"file","lines(array|list)"},NULL)){
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}
@@ -14911,10 +14912,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@10DEC2020: register system function(s)
 			if(!registerNoArgumentFunction(_Menvironment,owner,"systemvariables",Msystemvariables)
 				||!registerNoArgumentFunction(_Menvironment,owner,"clearenv",Mclearenv)
-				||!completedValueFunction(_Menvironment,owner,"getenv",Mgetenv)
-				||!completedValueFunction(_Menvironment,owner,"unsetenv",Munsetenv)
-				||!completedValueValueFunction(_Menvironment,owner,"setenv",Msetenv)
-				||!completedValueValueFunction(_Menvironment,owner,"putenv",Mputenv)
+				||!registerFunction(_Menvironment,owner,"getenv",Mgetenv,1,(char*[]){""},NULL)
+				||!registerFunction(_Menvironment,owner,"unsetenv",Munsetenv,1,(char*[]){""},NULL)
+				||!registerFunction(_Menvironment,owner,"setenv",Msetenv,1,(char*[]){""},NULL)
+				||!registerFunction(_Menvironment,owner,"putenv",Mputenv,1,(char*[]){""},NULL)
 			){
 				outputError("Failed to register the system environment functions");
 				return NULL;				
@@ -14925,9 +14926,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@08DEC2020: register time functions
 			if(!registerNoArgumentFunction(_Menvironment,owner,"now",Mnow)
 				||!registerNoArgumentFunction(_Menvironment,owner,"gettimezone",Mgettimezone)
-				||!completedValueFunction(_Menvironment,owner,"settimezone",Msettimezone)
-				||!completedValueValueFunction(_Menvironment,owner,"calendartime",Mcalendartime)
-				||!completedValueValueFunction(_Menvironment,owner,"time",Mparsetime)){
+				||!registerFunction(_Menvironment,owner,"settimezone",Msettimezone,1,(char*[]){"timezone(text)"},NULL)
+				||!registerFunction(_Menvironment,owner,"calendartime",Mcalendartime,1,(char*[]){"time(integer)"},NULL)
+				||!registerFunction(_Menvironment,owner,"time",Mparsetime,1,(char*[]){"calendar time"},NULL)){
 				outputError("Failed to register the time functions");
 				return NULL;
 			}
@@ -14935,13 +14936,13 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 39");
 
 			// MDH@01MAY2023: register matrix functions
-			if(!completedValueValueValueFunction(_Menvironment,owner,"matrix",Mmatrix)
-					||!completedValueFunction(_Menvironment,owner,"diag",Mmatrixdiagonal)
-					||!completedValueValueFunction(_Menvironment,owner,"mult",Mmatrixproduct)
-					||!completedValueFunction(_Menvironment,owner,"inv",Mmatrixinverse)
-					||!completedValueFunction(_Menvironment,owner,"transpose",Mmatrixtranspose)
-					||!completedValueFunction(_Menvironment,owner,"det",Mmatrixdeterminant)
-					||!completedValueFunction(_Menvironment,owner,"trace",Mmatrixtrace)){
+			if(!registerFunction(_Menvironment,owner,"matrix",Mmatrix,3,(char*[]){"rows(integers)","columns(integer)","fill value"},NULL)
+					||!registerFunction(_Menvironment,owner,"diag",Mmatrixdiagonal,1,(char*[]){"(matrix)"},NULL)
+					||!registerFunction(_Menvironment,owner,"mult",Mmatrixproduct,2,(char*[]){"(matrix)","(matrix)"},NULL)
+					||!registerFunction(_Menvironment,owner,"inv",Mmatrixinverse,1,(char*[]){"matrix"},NULL)
+					||!registerFunction(_Menvironment,owner,"transpose",Mmatrixtranspose,1,(char*[]){"matrix"},NULL)
+					||!registerFunction(_Menvironment,owner,"det",Mmatrixdeterminant,1,(char*[]){"matrix"},NULL)
+					||!registerFunction(_Menvironment,owner,"trace",Mmatrixtrace,1,(char*[]){"matrix"},NULL)){
 				outputError("Failed to register the matrix functions");
 				return NULL;
 			}

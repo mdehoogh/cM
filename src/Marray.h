@@ -3,6 +3,6 @@
 // iterator support
 Miterator getArrayiterator(Marray* array);
 
-Mvalue* marray(Mvalue* length_value,Mvalue* fill_value);
-Mvalue* mfill(Mvalue* _array,Mvalue* _value);
+Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value);
+Mvalue* Mfillarray(Mvalue* _array,Mvalue* _value);
 
