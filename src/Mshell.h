@@ -9,10 +9,10 @@
 // Decimal support
 long long getDP();
 
-Mvalue* getdc(Mvalue* value);
+Mvalue* Mgetdc(Mvalue* value);
 
-Mvalue* getdp(Mvalue* value);
-Mvalue* setdp(Mvalue* value);
+Mvalue* Mgetdp(Mvalue* value);
+Mvalue* Msetdp(Mvalue* value);
 
 // end Decimal stuff
 Mvalue* Mevalfunction(Mvalue* value);

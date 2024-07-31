@@ -3574,8 +3574,9 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 						/////////DEBUGGING outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
 						_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 						_mapelement->_next=NULL; // TODO do we need this?????
-						_mapelement->_variable=_getVariableWithName(argumentNames[argumentIndex],defaultValues[argumentIndex]!=NULL?defaultValues[argumentIndex]->type:VT_UNDEFINED,true,Msubowner(owner,2));
-						if(defaultValues[argumentIndex]!=NULL)assignValue(&_mapelement->_variable->_value,defaultValues[argumentIndex]);
+						_mapelement->_variable=_getVariableWithName(argumentNames[argumentIndex],defaultValues!=NULL&&defaultValues[argumentIndex]!=NULL?defaultValues[argumentIndex]->type:VT_UNDEFINED,true,Msubowner(owner,2));
+						if(defaultValues!=NULL&&defaultValues[argumentIndex]!=NULL)
+							assignValue(&_mapelement->_variable->_value,defaultValues[argumentIndex]);
 						if(NULL==_prevmapelement)
 							_argumentMap->_first=owned_mapelement(disowned_mapelement(_mapelement,owner),Msubowner(owner,3)); // BUG FIX owner_environment changed to (the actual) owner
 						else

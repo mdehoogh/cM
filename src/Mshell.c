@@ -727,8 +727,8 @@ long long getDP(){
  * @param value 
  * @return Mvalue* the decimal context information of the decimal wrapped in \p value
  */
-Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	if(value&&value->type==VT_DECIMAL){
+Mvalue* Mgetdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(value!=NULL&&value->type==VT_DECIMAL){
 		Mdecimalcontext* decimalcontext=getDecimalcontext(value->value._decimal->prec);
 		mpd_context_t* mpd_context=(decimalcontext!=NULL?decimalcontext->mpd_context:NULL);
 		if(mpd_context!=NULL){
@@ -755,8 +755,8 @@ Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
  * @param value 
  * @return Mvalue* 
  */
-Mvalue* getdp(Mvalue* value){
-	return(value&&value->type==VT_DECIMAL?_getIntegerValue(value->value._decimal->prec):NULL);
+Mvalue* Mgetdp(Mvalue* value){
+	return(value!=NULL&&value->type==VT_DECIMAL?_getIntegerValue(value->value._decimal->prec):NULL);
 }
 /**
  * @brief sets the current decimal precision to the integer wrapped in \p value
@@ -764,26 +764,33 @@ Mvalue* getdp(Mvalue* value){
  * @param value 
  * @return Mvalue* 
  */
-Mvalue* setdp(Mvalue* value){
+Mvalue* Msetdp(Mvalue* value){
 	// how about returning the current value, no matter what the argument is????
+	if(NULL==value)return NULL;
 	long long olddecimalprecision=getDP();
 	// ignore if NO value specified...
-	if(value!=NULL&&value->type==VT_INTEGER){
-		long long decimalprecision=value->value._integer->ll;
-		if(decimalprecision!=M_LL_INVALID){ // if not the default!!!
-			if(decimalprecision>=6){
-				// if I fail to create the associated decimal context, no go
-				Mdecimalcontext* _newDecimalContext=getDecimalcontext(decimalprecision);
-				if(_newDecimalContext!=NULL){
-					M_DECIMALCONTEXT=_newDecimalContext;
-					M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
-					////DP_value->value._integer->ll=_decimalContext->prec;
-				}else
-					output("%sActive decimal context not replaced: failed to create a decimal context with precision %llu.\n",M_ERROR_PREFIX,decimalprecision);
-			}else
-				output("%sRequested decimal precision (%llu) not activated: it should at least be 6.\n",M_ERROR_PREFIX,decimalprecision);
-		}
+	long long decimalprecision=M_LL_INVALID;
+	if(value->type==VT_INTEGER)
+		decimalprecision=value->value._integer->ll;
+	else
+	if(value->type==VT_BIGINTEGER)
+		decimalprecision=biginteger2long(value->value._biginteger);
+	if(decimalprecision==M_LL_INVALID){
+		outputError("Requested decimal precision not an integer");
+		return NULL;
 	}
+	if(decimalprecision<6){
+		output("%sRequested decimal precision (%llu) not activated: it should at least be 6.\n",M_ERROR_PREFIX,decimalprecision);
+		return NULL;
+	}
+	// if I fail to create the associated decimal context, no go
+	Mdecimalcontext* _newDecimalContext=getDecimalcontext(decimalprecision);
+	if(_newDecimalContext!=NULL){
+		M_DECIMALCONTEXT=_newDecimalContext;
+		M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
+		////DP_value->value._integer->ll=_decimalContext->prec;
+	}else
+		output("%sActive decimal context not replaced: failed to create a decimal context with precision %llu.\n",M_ERROR_PREFIX,decimalprecision);
 	return _getIntegerValue(olddecimalprecision);
 }
 
@@ -14620,9 +14627,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return false;
 			}
 			*/
-			if(!completedIntegerFunction(_Menvironment,owner,"setdp",setdp)
-				||!completedIntegerFunction(_Menvironment,owner,"getdc",getdc)
-				||!completedIntegerFunction(_Menvironment,owner,"getdp",getdp)){
+			if(!registerFunction(_Menvironment,owner,"Msetdp",Msetdp,1,(char*[]){"decimal precision(integer)"},(Mvalue*[]){NULL})
+				||!registerFunction(_Menvironment,owner,"Mgetdc",Mgetdc,1,(char*[]){"a decimal"},(Mvalue*[]){NULL})
+				||!registerFunction(_Menvironment,owner,"Mgetdp",Mgetdp,1,(char*[]){"a decimal"},(Mvalue*[]){NULL})){
 				outputError("Failed to register the setdp, getdc and getdp functions");
 				return NULL;
 			}
@@ -14630,26 +14637,26 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 18");
 		
 			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(_Menvironment,owner,"pi$q",pi_q)
-					||!completedIntegerFunction(_Menvironment,owner,"pi$ql",pi_ql)
-					||!completedIntegerBooleanFunction(_Menvironment,owner,"pi",Mpi)){
+			if(!registerFunction(_Menvironment,owner,"pi$q",pi_q,1,(char*[]){"sequence index(integer)"},NULL)
+					||!registerFunction(_Menvironment,owner,"pi$ql",pi_ql,1,(char*[]){"sequence index(integer)"},NULL)
+					||!registerFunction(_Menvironment,owner,"pi",Mpi,2,(char*[]){"decimal precision(integer)","compute (co)sines(boolean)"},(Mvalue*[]){NULL,_getIntegerValue(M_FALSE)})){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return NULL;
 			}
-			if(!completedValueValueFunction(_Menvironment,owner,"irange",Mirange)){
+			if(!registerFunction(_Menvironment,owner,"irange",Mirange,2,(char*[]){"from(integer)","through(integer)"},NULL)){
 				outputError("Failed to register the irange() function");
 				return NULL;
 			}
-			if(!completedValueValueValueFunction(_Menvironment,owner,"drange",Mdrange)){
+			if(!registerFunction(_Menvironment,owner,"drange",Mdrange,3,(char*[]){"from(number)","through(number)","step(number)"},NULL)){
 				outputError("Failed to register the drange() function");
 				return NULL;
 			}
-			if(!completedValueValueValueFunction(_Menvironment,owner,"range",Mrange)){
+			if(!registerFunction(_Menvironment,owner,"range",Mrange,3,(char*[]){"from(number)","through(number)","step(number)"},NULL)){
 				outputError("Failed to register the range() function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
-			if(!completedValueFunction(_Menvironment,owner,"i",Mi)
+			if(!registerFunction(_Menvironment,owner,"i",Mi,1,(char*[]){"(number)"},NULL)
 					||!completedValueFunction(_Menvironment,owner,"l",Ml) // MDH@25NOV2020: conversion to a list
 					||!completedValueFunction(_Menvironment,owner,"a",Ma) // MDH@25NOV2020: conversion to an array
 					||!completedValueFunction(_Menvironment,owner,"m",Mm) // MDH@25NOV2020: conversion to a map
