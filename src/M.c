@@ -5064,7 +5064,32 @@ bool removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 	inputError("%s","The user input command vanished.");
 	return false;
 }
-
+/**
+ * @brief returns true if we're currently positioned behind an argument prompt, false otherwise
+ * 
+ * @return true 
+ * @return false 
+ */
+bool atArgumentPrompt(){
+	Mtoken* lastToken=(_userInputCommand!=NULL?_userInputCommand->_lastToken:NULL);
+	if(lastToken!=NULL){
+		if(lastToken->type==TT_FUNCTION_CALL||lastToken->type==TT_LISTELEMENT){
+			if(lastToken->significantCharacterCount>0&&string_last_char(lastToken->text)==':')
+				return true;
+		}
+	}
+	return false;
+}
+bool argumentPromptRemoved(){
+	Mtoken* lastToken=_userInputCommand->_lastToken;
+	size_t numberOfCharactersToRemove=string_length(lastToken->text)-lastToken->significantCharacterCount;
+	while(numberOfCharactersToRemove){
+		if(!removePreviousTokenCharacter())return false;
+		numberOfCharactersToRemove--;
+	}
+	unfinishToken(lastToken); // TODO is this really necessary???
+	return true;
+}
 // MDH@09JUL2019: count the number of list elements in front of the current token
 /**
  * @brief returns and counts the number of list elements in front of the last token
@@ -5359,8 +5384,10 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 								while(*argumentPrompt){
 									outputChar(*argumentPrompt);
 									numberOfLineCommandCharacters++;
-									if(numberOfLineCharacters>0&&numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters)
+									if(numberOfLineCharacters>0&&numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters){
 										newCommandLine(false);
+										setColor(getInfoColor());
+									}
 									++argumentPrompt;
 								}
 							}
@@ -7287,6 +7314,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					///////debugWrite("BACKSPACE");
 					// something to remove?
 					if(getUserInputLength()){ // TODO _userInputCommand->_firstToken should be NULL at the same time getCommandLength() becomes 0!!!
+						// MDH@31JUL2024: if we're right behind an argument prompt string, we remove that
+						if(atArgumentPrompt()){
+							if(!argumentPromptRemoved())
+								switchToControlMode("Failed to remove the previous argument prompt. Possible cause: out of memory.");
+						}else // TODO should we only remove the argument prompt, or the previous token character as well?
 						if(!removePreviousTokenCharacter())
 							switchToControlMode("Failed to remove the previous token character. Possible cause: out of memory.");
 					}else // nothing to remove
@@ -7619,84 +7651,89 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								}else
 								if(inputChar==68){ // left arrow
 									if(getUserInputLength()){
-										// TODO apparently _userInputCommand->_firstToken will still be NULL when we're scrolling through the list of previous commands...
-										// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyUserInputCommand() itself does not seem to do that!!!)
-										if(commandIndex){commandIndex=0;copyUserInputCommand();} // will also set getCommandLength()!!!
-										// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into feedforwardText
-										// MDH@20SEP2019: we do NOT want the character removed to disappear when the token it came from disappears, therefore the addition to the feed forward text should be anonymous
-										// MDH@25SEP2019: because we're going to prepend c to the feed forward text, we have to determine the associated token i.e. the token that generated c
-										//				i.e. if the character being moved would have been auto-generated we want to know the associated token
-										//				the problem now is that removedTokenCharacter() will already remove the token when its a single-character token
-										//				TODO something is not correct because if removedTokenCharacter() takes care of removing the token which check again below????????
-										//				it's easiest to check whether the token will be removed: this will be the case if there's only one character in the token
-										//				in which case that will be the originating token but only in the situation where c matches the feed forward character of that expression
-										///////Mtoken* startOfExpressionToken=(string_length(_userInputCommand->_lastToken->text)==1?_userInputCommand->_lastToken->expr:NULL); // MDH@25SEP2019: remember what the start of expression token associated with the current last command token is
-										char c=removedTokenCharacter(true); // passing true will force removedTokenCharacter() to actually check an identifier token type
-										// MDH@19OCT2020: now, if we consume a nonvisible character (like what we currently use for newline character (.i.e. '\n' instead of '\\' we did before we actually consume it))
-										if(c>=32&&c!=127){ // removing the character behind the cursor succeeded
-											// debugWrite("Character '%c' removed.",c);
-											// MDH@01OCT2019 removed as now done by removedTokenCharacter(): moveCursorLeft(1); // MDH@01OCT2019: TODO will this be sufficient when the identifier token type changed????? probably
-											/* MDH@01OCT2019: no need to perform a tokenChecked... here anymore as we moved that functionality over to removedTokenCharacter(true)
-											// TODO is the following necessary at all? given that removedTokenCharacter should/could have done so??????
-											// TODO doing the following is better moved over to removedTokenCharacter() because if 
-											if(string_length(_userInputCommand->_lastToken->text)>0)
-												tokenCheckedForBeingAFunction(true);
-											*/
-											/*
-											else // nothing left in current token // MDH@23SEP2019: it seems better to call removeLastUserInputCommandToken() here as removeLastUserInputCommandToken() will also remove the token's feed forward text
-												removeLastUserInputCommandToken();
-											*/
-											// MDH@30SEP2019: this is the only call to getAutoCompletionTextOfCharacterPrepended() therefore we can simply adjust that function to check whether this character matches a consumed character!!!
-											//				but I guess failing to do so is not that terrible that we should switch to control mode
-											// MDH@01OCT2019: if this character also starts the new identifier continuation, it should not be anonymously prepended 
-											//				let's construct the identifier continuation text that we would get 
-											//				CORRECTION checking against the first identifier continuation text suffices (instead of comparing with the entire new identifier continuation)
-											// MDH@04OCT2019: there was so much going wrong doing the following that I simply replaced it by prepending the consumed character to the feed forward texts and leaving it
-											//				to the input loop part to deal with identifier continuations that match the start of the feed forward text(s)
-											// MDH@07OCT2019: I've introduced a new feed forward element (manualFeedforwardText) to contain the part of the text
-											//				that the user took out of the (tokenized) command to e.g. correct a command
-											if(!manualFeedforwardCharacterPrepended(c)) // replacing: if(!getAutoCompletionTextOfCharacterPrepended(c,true))
-												inputCharType=switchToControlMode("Failed to accept the removed command character as suggested text.");
-											/* this would be else when we succeeded!!!!!!
-											else
-											if(amVerbose())
-											inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
-											*/
-											/* replacing:
-											updateUserInputCommandIdentifierContinuation();
-											///outputChar('1');
-											// prepend only anonymously when not matching the identifier continuation character!!
-											if(!_identifierContinuationCharacters||_identifierContinuationCharacters[0]!=c)
-											if(!getAutoCompletionTextOfCharacterPrepended(c,false))
-											inputError("Failed to accept the removed command character as suggested text.");
-											///outputChar('2');
-											updateLastTokenAutoCompletionText(); // if we haven't updated the identifier continuation text do it again	
-											///outputChar('3');
-											*/
-											////////writeSuggestedText(false);
-											/* replacing:
-											bool removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter=false;
-											Mstring* identifierContinuationText=NULL;
-											if(_userInputCommand->_lastToken->type==TT_FUNCTION||_userInputCommand->_lastToken->type==TT_VARIABLE||_userInputCommand->_lastToken->type==TT_NEW_VARIABLE){
-												identifierContinuationText=__string();
-												if(identifierContinuationText){
-													string_append_char(identifierContinuationText,c);
-													if(_identifierContinuationCharacters)string_append(identifierContinuationText,_identifierContinuationCharacters);
-													updateUserInputCommandIdentifierContinuation(); // determine the new identifier continuation
-													if(_identifierContinuationCharacters&&strcmp(_identifierContinuationCharacters,string(identifierContinuationText))==0)
-														removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter=true;
+										if(atArgumentPrompt()){
+											if(!argumentPromptRemoved())
+												switchToControlMode("Failed to remove the argument prompt!");
+										}else{ // regular token character removal
+											// TODO apparently _userInputCommand->_firstToken will still be NULL when we're scrolling through the list of previous commands...
+											// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyUserInputCommand() itself does not seem to do that!!!)
+											if(commandIndex){commandIndex=0;copyUserInputCommand();} // will also set getCommandLength()!!!
+											// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into feedforwardText
+											// MDH@20SEP2019: we do NOT want the character removed to disappear when the token it came from disappears, therefore the addition to the feed forward text should be anonymous
+											// MDH@25SEP2019: because we're going to prepend c to the feed forward text, we have to determine the associated token i.e. the token that generated c
+											//				i.e. if the character being moved would have been auto-generated we want to know the associated token
+											//				the problem now is that removedTokenCharacter() will already remove the token when its a single-character token
+											//				TODO something is not correct because if removedTokenCharacter() takes care of removing the token which check again below????????
+											//				it's easiest to check whether the token will be removed: this will be the case if there's only one character in the token
+											//				in which case that will be the originating token but only in the situation where c matches the feed forward character of that expression
+											///////Mtoken* startOfExpressionToken=(string_length(_userInputCommand->_lastToken->text)==1?_userInputCommand->_lastToken->expr:NULL); // MDH@25SEP2019: remember what the start of expression token associated with the current last command token is
+											char c=removedTokenCharacter(true); // passing true will force removedTokenCharacter() to actually check an identifier token type
+											// MDH@19OCT2020: now, if we consume a nonvisible character (like what we currently use for newline character (.i.e. '\n' instead of '\\' we did before we actually consume it))
+											if(c>=32&&c!=127){ // removing the character behind the cursor succeeded
+												// debugWrite("Character '%c' removed.",c);
+												// MDH@01OCT2019 removed as now done by removedTokenCharacter(): moveCursorLeft(1); // MDH@01OCT2019: TODO will this be sufficient when the identifier token type changed????? probably
+												/* MDH@01OCT2019: no need to perform a tokenChecked... here anymore as we moved that functionality over to removedTokenCharacter(true)
+												// TODO is the following necessary at all? given that removedTokenCharacter should/could have done so??????
+												// TODO doing the following is better moved over to removedTokenCharacter() because if 
+												if(string_length(_userInputCommand->_lastToken->text)>0)
+													tokenCheckedForBeingAFunction(true);
+												*/
+												/*
+												else // nothing left in current token // MDH@23SEP2019: it seems better to call removeLastUserInputCommandToken() here as removeLastUserInputCommandToken() will also remove the token's feed forward text
+													removeLastUserInputCommandToken();
+												*/
+												// MDH@30SEP2019: this is the only call to getAutoCompletionTextOfCharacterPrepended() therefore we can simply adjust that function to check whether this character matches a consumed character!!!
+												//				but I guess failing to do so is not that terrible that we should switch to control mode
+												// MDH@01OCT2019: if this character also starts the new identifier continuation, it should not be anonymously prepended 
+												//				let's construct the identifier continuation text that we would get 
+												//				CORRECTION checking against the first identifier continuation text suffices (instead of comparing with the entire new identifier continuation)
+												// MDH@04OCT2019: there was so much going wrong doing the following that I simply replaced it by prepending the consumed character to the feed forward texts and leaving it
+												//				to the input loop part to deal with identifier continuations that match the start of the feed forward text(s)
+												// MDH@07OCT2019: I've introduced a new feed forward element (manualFeedforwardText) to contain the part of the text
+												//				that the user took out of the (tokenized) command to e.g. correct a command
+												if(!manualFeedforwardCharacterPrepended(c)) // replacing: if(!getAutoCompletionTextOfCharacterPrepended(c,true))
+													inputCharType=switchToControlMode("Failed to accept the removed command character as suggested text.");
+												/* this would be else when we succeeded!!!!!!
+												else
+												if(amVerbose())
+												inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
+												*/
+												/* replacing:
+												updateUserInputCommandIdentifierContinuation();
+												///outputChar('1');
+												// prepend only anonymously when not matching the identifier continuation character!!
+												if(!_identifierContinuationCharacters||_identifierContinuationCharacters[0]!=c)
+												if(!getAutoCompletionTextOfCharacterPrepended(c,false))
+												inputError("Failed to accept the removed command character as suggested text.");
+												///outputChar('2');
+												updateLastTokenAutoCompletionText(); // if we haven't updated the identifier continuation text do it again	
+												///outputChar('3');
+												*/
+												////////writeSuggestedText(false);
+												/* replacing:
+												bool removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter=false;
+												Mstring* identifierContinuationText=NULL;
+												if(_userInputCommand->_lastToken->type==TT_FUNCTION||_userInputCommand->_lastToken->type==TT_VARIABLE||_userInputCommand->_lastToken->type==TT_NEW_VARIABLE){
+													identifierContinuationText=__string();
+													if(identifierContinuationText){
+														string_append_char(identifierContinuationText,c);
+														if(_identifierContinuationCharacters)string_append(identifierContinuationText,_identifierContinuationCharacters);
+														updateUserInputCommandIdentifierContinuation(); // determine the new identifier continuation
+														if(_identifierContinuationCharacters&&strcmp(_identifierContinuationCharacters,string(identifierContinuationText))==0)
+															removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter=true;
+													}
 												}
-											}
-											if(!removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter)
-											if(!getAutoCompletionTextOfCharacterPrepended(c))
-											inputError("Failed to accept the removed command character as suggested text.");
-											updateLastTokenAutoCompletionText(identifierContinuationText==NULL); // if we haven't updated the identifier continuation text do it again	
-											writeSuggestedText(false);
-											if(identifierContinuationText)FREE_STRING(identifierContinuationText);
-											*/
-										}else
-										if(!c)
-											inputCharType=switchToControlMode("Failed to remove the last command character.");
+												if(!removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter)
+												if(!getAutoCompletionTextOfCharacterPrepended(c))
+												inputError("Failed to accept the removed command character as suggested text.");
+												updateLastTokenAutoCompletionText(identifierContinuationText==NULL); // if we haven't updated the identifier continuation text do it again	
+												writeSuggestedText(false);
+												if(identifierContinuationText)FREE_STRING(identifierContinuationText);
+												*/
+											}else
+											if(!c)
+												inputCharType=switchToControlMode("Failed to remove the last command character.");
+										}
 									}else
 										beep();
 								}else
