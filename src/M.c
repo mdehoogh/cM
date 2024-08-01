@@ -5380,13 +5380,13 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 							finishToken(newLastCommandToEvaluateToken);
 							char* argumentPrompt=string(_argumentPromptText);
 							if(string_append(newLastCommandToEvaluateToken->text,argumentPrompt)!=NULL){
-								setColor(getInfoColor());
+								setColor(getCommentColor());
 								while(*argumentPrompt){
 									outputChar(*argumentPrompt);
 									numberOfLineCommandCharacters++;
 									if(numberOfLineCharacters>0&&numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters){
 										newCommandLine(false);
-										setColor(getInfoColor());
+										setColor(getCommentColor());
 									}
 									++argumentPrompt;
 								}
@@ -6221,7 +6221,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
 	if(M_value!=NULL){
-		if(!completedValueFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME,MM)){
+		if(!registerFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME,MM,1,(char*[]){"index(integer)"},NULL)){
 			errorflags|=8;
 			output("%sFailed to register function %s.",M_ERROR_PREFIX,MFUNCTION_NAME);
 		}else
@@ -6229,35 +6229,35 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			output("Function '%s' registered.\n",MFUNCTION_NAME);
 	}
 
-	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables)){
+	if(!registerFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables,1,(char*[]){"(environment)"},NULL)){
 		errorflags|=16;
 		outputWarning("Failed to register the variables() function");
 	}
-	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"values",Mvalues)){
+	if(!registerFunction(_Menvironment,owner_executionenvironment,"values",Mvalues,1,(char*[]){"variables(list)"},NULL)){
 		errorflags|=32;
 		outputWarning("Failed to register the values() function");
 	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
-	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"in",Min)){
+	if(!registerFunction(_Menvironment,owner_executionenvironment,"in",Min,1,(char*[]){"prompt(text)"},NULL)){
 		errorflags|=64;
 		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
 	}
-	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"os",MexecuteOSCommand)){
+	if(!registerFunction(_Menvironment,owner_executionenvironment,"os",MexecuteOSCommand,1,(char*[]){"os command(text)"},NULL)){
 		errorflags|=128;
 		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	// color functions
-	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"bc",Mbc)){
+	if(!registerFunction(_Menvironment,owner_executionenvironment,"bc",Mbc,1,(char*[]){"background color(integer)"},NULL)){
 		errorflags|=256;
 		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
 	}
-	if(!completedValueFunction(_Menvironment,owner_executionenvironment,"tc",Mtc)){
+	if(!registerFunction(_Menvironment,owner_executionenvironment,"tc",Mtc,1,(char*[]){"text color(integer)"},NULL)){
 		errorflags|=512;
 		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
 	}
-	if(!completedValueValueFunction(_Menvironment,owner_executionenvironment,"python",Mpython)){
+	if(!registerFunction(_Menvironment,owner_executionenvironment,"python",Mpython,2,(char*[]){"python code(file|text)","output variable(text)"},NULL)){
 		errorflags|=1024;
 		outputWarning("Failed to register the python function"); // moved out of registerInternalFunctions!!!!
 	}

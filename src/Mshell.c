@@ -14740,7 +14740,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			// MDH@06JAN2021: adding the split function!!
 			if(!registerFunction(_Menvironment,owner,"sum",Msum,1,(char*[]){"(list|array)"},NULL)
-					||!completedValueIntegerFunction(_Menvironment,owner,"setlength",Msetlen)
+					||!registerFunction(_Menvironment,owner,"setlength",Msetlen,2,(char*[]){"(array|list)","length(integer)"},NULL)
 					||!registerFunction(_Menvironment,owner,"split",Msplit,2,(char*[]){"text","separator"},NULL)
 					||!registerFunction(_Menvironment,owner,"length",Mlen,1,(char*[]){"(list|array|text)"},NULL)
 			){
@@ -14759,7 +14759,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			//reportNumberOfAllocations("shellInitialized 25");
 
-			if(!completedListFunction(_Menvironment,owner,"statistics",Mstats)
+			if(!registerFunction(_Menvironment,owner,"statistics",Mstats,1,(char*[]){"(list)"},NULL)
 					||!registerFunction(_Menvironment,owner,"corr",Mcorr,2,(char*[]){"(list)","(list)"},NULL) // MDH@05JAN2021: for those only interested in the correlation coefficient (and not simple sample statistics) 
 					||!registerFunction(_Menvironment,owner,"first",Mfirst,1,(char*[]){"(list)"},NULL)
 					||!registerFunction(_Menvironment,owner,"last",Mlast,1,(char*[]){"(list)"},NULL)
@@ -14781,16 +14781,16 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 27");
 
 
-			if(!completedListIndexFunction(_Menvironment,owner,"removed",Mremoved)
-					||!completedListValueFunction(_Menvironment,owner,"push",Mpush)
-					||!completedListValueFunction(_Menvironment,owner,"append",Mpush)
-					||!completedListValueFunction(_Menvironment,owner,"shove",Mshove)
-					||!completedListValueFunction(_Menvironment,owner,"prepend",Mshove)
-					||!completedListValueIndexFunction(_Menvironment,owner,"insert",Minsert)
-					||!completedListTextFunction(_Menvironment,owner,"sort",Msort)
-					||!completedListTextFunction(_Menvironment,owner,"sorted",Msorted)
-					||!completedListFunction(_Menvironment,owner,"runpoints",Mrunpoints)
-					||!completedListFunction(_Menvironment,owner,"pop",Mpop)
+			if(!registerFunction(_Menvironment,owner,"removed",Mremoved,2,(char*[]){"(list)","index(integer)"},NULL)
+					||!registerFunction(_Menvironment,owner,"push",Mpush,2,(char*[]){"(list)","index(integer)"},NULL)
+					||!registerFunction(_Menvironment,owner,"append",Mpush,2,(char*[]){"(list)",NULL},NULL)
+					||!registerFunction(_Menvironment,owner,"shove",Mshove,2,(char*[]){"(list)",NULL},NULL)
+					||!registerFunction(_Menvironment,owner,"prepend",Mshove,2,(char*[]){"(list)",NULL},NULL)
+					||!registerFunction(_Menvironment,owner,"insert",Minsert,3,(char*[]){"(list)",NULL,"index(integer)"},NULL)
+					||!registerFunction(_Menvironment,owner,"sort",Msort,2,(char*[]){"(list)","order('a'|'d')"},NULL)
+					||!registerFunction(_Menvironment,owner,"sorted",Msorted,2,(char*[]){"(list)","order('a'|'d')"},NULL)
+					||!registerFunction(_Menvironment,owner,"runpoints",Mrunpoints,1,(char*[]){"(list)"},NULL)
+					||!registerFunction(_Menvironment,owner,"pop",Mpop,1,(char*[]){"(list)"},NULL)
 				){
 				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");
 				return NULL;
@@ -14798,7 +14798,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			//reportNumberOfAllocations("shellInitialized 28");
 
-			if(!completedListValueIntegerFunction(_Menvironment,owner,"find",Mfind)){
+			if(!registerFunction(_Menvironment,owner,"find",Mfind,3,(char*[]){"(list)",NULL,"index(integer)"},NULL)){
 				outputError("Failed to register the find function");
 				return NULL;
 			}
@@ -14806,11 +14806,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 29");
 
 			// MDH@29OCT2020: can't do without them
-			if(!completedListFunctionValueFunction(_Menvironment,owner,"reduce",Mlreduce)
-					||!completedListFunctionFunction(_Menvironment,owner,"map",Mlmap)
-					||!completedListFunctionFunction(_Menvironment,owner,"filter",Mlfilter)
-					||!completedListFunctionFunction(_Menvironment,owner,"foreach",Mlforeach)
-					||!completedListFunctionFunction(_Menvironment,owner,"group",Mlgroup)
+			if(!registerFunction(_Menvironment,owner,"reduce",Mlreduce,3,(char*[]){"(list)","(function)",NULL},NULL)
+					||!registerFunction(_Menvironment,owner,"map",Mlmap,2,(char*[]){"(list)","(function)"},NULL)
+					||!registerFunction(_Menvironment,owner,"filter",Mlfilter,2,(char*[]){"(list)","(function)"},NULL)
+					||!registerFunction(_Menvironment,owner,"foreach",Mlforeach,2,(char*[]){"(list)","(function)"},NULL)
+					||!registerFunction(_Menvironment,owner,"group",Mlgroup,2,(char*[]){"(list)","(function)"},NULL)
 					){
 				outputError("Failed to register the infamous reduce, map, filter and foreach list functions");
 				return NULL;
@@ -14861,8 +14861,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//reportNumberOfAllocations("shellInitialized 35");
 
 			// register map conversions
-			if(!completedListFunction(_Menvironment,owner,"m2ml",m2ml)
-					||!completedListFunction(_Menvironment,owner,"m2l",m2l)){
+			if(!registerFunction(_Menvironment,owner,"m2ml",m2ml,1,(char*[]){"(map)"},NULL)
+					||!registerFunction(_Menvironment,owner,"m2l",m2l,1,(char*[]){"(map)"},NULL)){
 				outputError("Failed to register map conversion functions");
 				return NULL;
 			}

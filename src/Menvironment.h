@@ -107,6 +107,7 @@ Mstring* _getFunctionText(Mfunction const * const function,char const * const fu
 bool registerFunction(Menvironment* const _environment,Mallocationowner owner_environment,char const * const functionName,Function function,size_t numberOfArguments,char const * const * const argumentNames,Mvalue const * const * const defaultValues);
 
 bool registerNoArgumentFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,NoArgumentFunction noArgumentFunction);
+/* MDH@01AUG2024
 // TODO the folling 'completed... functions will become obsolete soon
 bool completedValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction);
@@ -142,7 +143,7 @@ bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mall
 bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction);
 
 bool completedTokenTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FiveArgumentFunction fiveArgumentFunction);
-
+*/
 // MDH@28OCT2020 moved over to Mshell.h/c: Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
 
 //                the return function returns its value as result of the function it is executing

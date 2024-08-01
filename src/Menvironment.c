@@ -2748,6 +2748,8 @@ bool registerNoArgumentFunction(Menvironment* const _environment,Mallocationowne
 	return false;
 	*/
 }/* VALIDATED */
+
+/* MDH@01AUG2024: now obsolete function registration functions
 // MDH@03JUN2020: if we assume that _function (in all following methods) is disowned, we can simply take over ownership
 // MDH@24JAN2023: the parameter map is hosted by the function and should be a subowner of the function
 /**
@@ -2759,7 +2761,7 @@ bool registerNoArgumentFunction(Menvironment* const _environment,Mallocationowne
  * @param oneArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -2775,7 +2777,7 @@ bool completedValueFunction(Menvironment* const _environment,Mallocationowner ow
 		output("%sFailed to register single value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering one (float) argument function \p oneArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -2786,7 +2788,7 @@ bool completedValueFunction(Menvironment* const _environment,Mallocationowner ow
  * @param oneArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
@@ -2801,7 +2803,7 @@ bool completedFloatFunction(Menvironment* const _environment,Mallocationowner ow
 		output("%sFailed to register single real argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 /**
  * @brief returns true, when successfully registering one (integer) argument function \p oneArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -2811,7 +2813,7 @@ bool completedFloatFunction(Menvironment* const _environment,Mallocationowner ow
  * @param oneArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
@@ -2827,7 +2829,7 @@ bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner 
 		output("%sFailed to register single integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering one (list) argument function \p oneArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -2838,7 +2840,7 @@ bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner 
  * @param oneArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -2854,7 +2856,7 @@ bool completedListFunction(Menvironment* const _environment,Mallocationowner own
 		output("%sFailed to register single list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering one (map) argument function \p oneArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -2865,7 +2867,7 @@ bool completedListFunction(Menvironment* const _environment,Mallocationowner own
  * @param oneArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedMapFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -2881,7 +2883,7 @@ bool completedMapFunction(Menvironment* const _environment,Mallocationowner owne
 		output("%sFailed to register single map argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering two (list and text) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -2892,7 +2894,7 @@ bool completedMapFunction(Menvironment* const _environment,Mallocationowner owne
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListTextFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){////////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -2908,7 +2910,8 @@ bool completedListTextFunction(Menvironment* const _environment,Mallocationowner
 		output("%sFailed to register sort list|map function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (token and list) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -2918,7 +2921,7 @@ bool completedListTextFunction(Menvironment* const _environment,Mallocationowner
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedTokenListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,OneArgumentFunction oneArgumentFunction){////////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -2935,7 +2938,8 @@ bool completedTokenListFunction(Menvironment* const _environment,Mallocationowne
 		output("%sFailed to register single token list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (integer and boolean) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -2945,7 +2949,7 @@ bool completedTokenListFunction(Menvironment* const _environment,Mallocationowne
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedIntegerBooleanFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
@@ -2961,7 +2965,8 @@ bool completedIntegerBooleanFunction(Menvironment* const _environment,Mallocatio
 		output("%sFailed to register integer boolean argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* NOT VALIDATED */
+}// NOT VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (list and function) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -2971,7 +2976,7 @@ bool completedIntegerBooleanFunction(Menvironment* const _environment,Mallocatio
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListFunctionFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -2987,7 +2992,7 @@ bool completedListFunctionFunction(Menvironment* const _environment,Mallocationo
 		output("%sFailed to register integer boolean argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* NOT VALIDATED */
+}// NOT VALIDATED
 
 /**
  * @brief returns true, when successfully registering two (strings) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -2998,7 +3003,7 @@ bool completedListFunctionFunction(Menvironment* const _environment,Mallocationo
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedStringStringFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
@@ -3013,7 +3018,8 @@ bool completedStringStringFunction(Menvironment* const _environment,Mallocationo
 		output("%sFailed to register double string argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (floats) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3023,7 +3029,7 @@ bool completedStringStringFunction(Menvironment* const _environment,Mallocationo
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3038,7 +3044,7 @@ bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationown
 		output("%sFailed to register double real argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 /**
  * @brief returns true, when successfully registering two (map and token) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3048,7 +3054,7 @@ bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationown
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3063,7 +3069,8 @@ bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner
 		output("%sFailed to register map token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (tokens) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3073,7 +3080,7 @@ bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3088,7 +3095,8 @@ bool completedTokenTokenFunction(Menvironment* const _environment,Mallocationown
 		output("%sFailed to register two token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (values) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3098,7 +3106,7 @@ bool completedTokenTokenFunction(Menvironment* const _environment,Mallocationown
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3113,7 +3121,8 @@ bool completedValueValueFunction(Menvironment* const _environment,Mallocationown
 		output("%sFailed to register two value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (integer and value) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3123,7 +3132,7 @@ bool completedValueValueFunction(Menvironment* const _environment,Mallocationown
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3138,7 +3147,8 @@ bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationo
 		output("%sFailed to register integer value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (value and integer) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3148,7 +3158,7 @@ bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationo
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3163,7 +3173,8 @@ bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationo
 		output("%sFailed to register value integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (list and index) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3173,7 +3184,7 @@ bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationo
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListIndexFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3188,7 +3199,8 @@ bool completedListIndexFunction(Menvironment* const _environment,Mallocationowne
 		output("%sFailed to register list index function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering two (list and value) argument function \p twoArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3198,7 +3210,7 @@ bool completedListIndexFunction(Menvironment* const _environment,Mallocationowne
  * @param twoArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,TwoArgumentFunction twoArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3214,7 +3226,7 @@ bool completedListValueFunction(Menvironment* const _environment,Mallocationowne
 		output("%sFailed to register list value function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering three (string, map and token) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -3225,7 +3237,7 @@ bool completedListValueFunction(Menvironment* const _environment,Mallocationowne
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3240,7 +3252,8 @@ bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocatio
 		output("%sFailed to register string map token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering three (list, function and value) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3250,7 +3263,7 @@ bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocatio
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListFunctionValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3265,7 +3278,8 @@ bool completedListFunctionValueFunction(Menvironment* const _environment,Malloca
 		output("%sFailed to register list function value function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering three (map, map and list) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3275,7 +3289,7 @@ bool completedListFunctionValueFunction(Menvironment* const _environment,Malloca
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedMapMapListFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3290,7 +3304,8 @@ bool completedMapMapListFunction(Menvironment* const _environment,Mallocationown
 		output("%sFailed to register map map list function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering three (value, text and function) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3300,7 +3315,7 @@ bool completedMapMapListFunction(Menvironment* const _environment,Mallocationown
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedValueTextValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3315,7 +3330,8 @@ bool completedValueTextValueFunction(Menvironment* const _environment,Mallocatio
 		output("%sFailed to register a value text value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering three (list, function and value) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3325,7 +3341,7 @@ bool completedValueTextValueFunction(Menvironment* const _environment,Mallocatio
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedValueValueValueFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3341,6 +3357,7 @@ bool completedValueValueValueFunction(Menvironment* const _environment,Mallocati
 	}
 	return false;
 }
+
 /**
  * @brief returns true, when successfully registering three (list, value and integer) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3350,7 +3367,7 @@ bool completedValueValueValueFunction(Menvironment* const _environment,Mallocati
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListValueIntegerFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3365,7 +3382,8 @@ bool completedListValueIntegerFunction(Menvironment* const _environment,Mallocat
 		output("%sFailed to register list value integer function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering three (list, value and index) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3375,7 +3393,7 @@ bool completedListValueIntegerFunction(Menvironment* const _environment,Mallocat
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedListValueIndexFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3390,7 +3408,8 @@ bool completedListValueIndexFunction(Menvironment* const _environment,Mallocatio
 		output("%sFailed to register list value index function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+
 /**
  * @brief returns true, when successfully registering three (integers) argument function \p threeArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
  * 
@@ -3400,7 +3419,7 @@ bool completedListValueIndexFunction(Menvironment* const _environment,Mallocatio
  * @param threeArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedThreeIntegersFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){//////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function!=NULL){
@@ -3415,8 +3434,7 @@ bool completedThreeIntegersFunction(Menvironment* const _environment,Mallocation
 		output("%sFailed to register three integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
-
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering four (value and 3 tokens) argument function \p fourArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -3427,7 +3445,7 @@ bool completedThreeIntegersFunction(Menvironment* const _environment,Mallocation
  * @param fourArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction){////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
@@ -3446,7 +3464,7 @@ bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mall
 		output("%sFailed to register value three token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering four (tokens) argument function \p fourArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -3457,7 +3475,7 @@ bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mall
  * @param fourArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FourArgumentFunction fourArgumentFunction){///////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
@@ -3472,7 +3490,7 @@ bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mall
 		output("%sFailed to register four token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
 
 /**
  * @brief returns true, when successfully registering five (tokens) argument function \p fiveArgumentFunction with name \p functionName in M enviroment \p _environment, false otherwise
@@ -3483,7 +3501,7 @@ bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mall
  * @param fiveArgumentFunction 
  * @return true 
  * @return false 
- */
+ ///
 bool completedTokenTokenTokenTokenTokenFunction(Menvironment* const _environment,Mallocationowner owner_environment,const char* const functionName,FiveArgumentFunction fiveArgumentFunction){/////Mallocationowner owner=getOwner(__LINE__);
 	Mfunction* _function=_getFunction(_environment,owner_environment,functionName);
 	if(_function){
@@ -3498,7 +3516,8 @@ bool completedTokenTokenTokenTokenTokenFunction(Menvironment* const _environment
 		output("%sFailed to register five token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
 	}
 	return false;
-}/* VALIDATED */
+}// VALIDATED
+END OF OBSOLETE completed...Functions */
 
 // MDH@09JUL2019: a function is defined as a parameter map (with defaults) and a body token
 // MDH@10JUL2019: the caller will need to register the function in the function map of the definition environment
