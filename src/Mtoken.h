@@ -162,6 +162,7 @@ typedef struct Mtoken{
 	struct Mtoken* prevIdentifier;
 	long long argument; // the argument level (1 for local variables, all other values for non-local variables)
 	uint64_t envid; // keep track of the special function call environment id
+	long long element;
 }Mtoken;
 
 Mtoken* __token();

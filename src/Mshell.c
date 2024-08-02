@@ -2830,10 +2830,19 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 		// take special care when the new token ends a list, map or function call
 		// MDH@29OCT2019: no need for \p first anymore (that we used previously) because testing for the first TT_EXPRESSION can also be done by looking at the text in the expression
 		//				TODO in time we should change the first token into a WHITESPACE token
-		if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_length(prevToken->text)>0&&string_char(prevToken->text,0)!=' '))
+		if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_length(prevToken->text)>0&&string_char(prevToken->text,0)!=' ')){
 			_token->expr=prevToken;
-		else
+			_token->argument=1;
+		}else{
 			_token->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token
+			_token->argument=prevToken->argument;
+		}
+		/*
+		if(prevToken->type==TT_END_OF_LIST&&prevToken->expr!=NULL)
+			_token->element=prevToken->expr->prev->element;
+		else
+			_token->element=prevToken->element; // MDH@01AUG2024: duplicate element
+		*/
 		//////outputChar('C');
 		// MDH@09AUG2019: before we actually kill the expr in the end of function call we update the envid
 		// if ending a special function call, we should zero the last set octet, but determining whether that is the case is not as easy as it seems
@@ -2843,20 +2852,30 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 			// we have to decrement the octet that should be incremented
 			// it would be nicer to make the octet we loose 0 in the process because in that case we do not need to do that when we nest again
 			// the number of bits per level determines value to increment ander with and shift (at this moment the maximum depth is at most 15 i.e. 4 bits are always used to keep track of the current level)
-			uint64_t ander=0,incrementoctet=0;while(incrementoctet!=(prevToken->envid&15)){ander=(ander<<M_BITS_PER_ENV_LEVEL)+((1<<M_BITS_PER_ENV_LEVEL)-1);incrementoctet++;}
+			uint64_t ander=0,incrementoctet=0;
+			while(incrementoctet!=(prevToken->envid&15)){
+				ander=(ander<<M_BITS_PER_ENV_LEVEL)+((1<<M_BITS_PER_ENV_LEVEL)-1);
+				incrementoctet++;
+			}
 			_token->envid=(((prevToken->envid>>4)<<4)+incrementoctet-1)&((ander<<4)+15); // shifting ander by 4 additional bits and adding 15 to maintain the level value (increment octet)
 		}else
 			_token->envid=prevToken->envid; // MDH@09AUG2019: take over the environment id!!
+
 		//////outputChar('D');
 		// MDH@16OCT2019: if the previous token was an end of list/function call/map it was accepted and itself would be pointing to the start of the list/function call/map
 		//				therefore we do not need to set 
 		if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
 			// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't _token->expr will most likely be NULL
 			//				TODO this is checked afterwards, so perhaps we should do that here?????
-			if(_token->expr!=NULL)_token->expr=_token->expr->expr;else newTokenType=TT_ERROR;
+			if(_token->expr!=NULL){
+				_token->expr=_token->expr->expr;
+				///_token->argument=_token->expr->argument;
+			}else 
+				newTokenType=TT_ERROR;
 		}
 		// we still have to recognize an error
-		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)if(NULL==_token->expr)
+		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)
+		if(NULL==_token->expr)
 			newTokenType=TT_ERROR;
 		//////outputChar('E');
 		/* replacing:
@@ -2948,15 +2967,21 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 					_token->prevIdentifier=prevToken->prevIdentifier;
 				free(_identifierName);
 			}
+			
 			//////outputChar('K');
 			/////if(amDebugging())inputInfo("E5");
 			// what to do with the argument if a function call ends???????
 			// the function name of the function call should contain the right argument value TODO check this!!!!!!!!
 			// BUG FIX aha end of function call does not always end a function call, but an expression (a single opening parenthesis without a function name in front of it), so explicitly checking for that!!!
-			if(prevToken->type==TT_END_OF_FUNCTION_CALL&&prevToken->expr!=NULL&&prevToken->expr->type==TT_FUNCTION_CALL)
+			// MDH@02AUG2024: if we also want to count elements finishing a list, just like we do with function calls
+			//                we're going to have to do the same when a list ends
+			if((prevToken->expr!=NULL)
+				&&((prevToken->type==TT_END_OF_FUNCTION_CALL&&(prevToken->expr->type==TT_FUNCTION_CALL||prevToken->expr->type==TT_EXPRESSION))
+					||(prevToken->type==TT_END_OF_LIST&&prevToken->expr->type==TT_LIST))){
 				_token->argument=prevToken->expr->prev->argument;
-			else
+			}else
 				_token->argument=prevToken->argument;
+			if(inputInfoFunction)(*inputInfoFunction)("Argument: %lld.",_token->argument);
 			//////outputChar('L');
 			/////if(amDebugging())inputInfo("E6");
 			// should we change the argument??????
@@ -3041,7 +3066,8 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 						// MDH@10APR2023: now allowed in TT_EXPR, so that we can have array results
 						newTokenType=TT_ERROR;
 						if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[_token->expr->type]);
-					}
+					}else // MDH@01AUG2024: we need to keep track of the number of comma's we've had
+						_token->argument++; // same as what we do with functions
 					//////outputChar('Q');
 				}else{ // a comma should always match either a map or list or expression start
 					newTokenType=TT_ERROR;
@@ -3049,7 +3075,9 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 					if(onInput)(*inputErrorFunction)("Comma not allowed outside map, list, array or function call!");
 					else outputError("Comma not allowed outside map, list, array or function call");
 				}
-			}
+			}else
+			if(newTokenType==TT_LIST||newTokenType==TT_EXPRESSION)
+				_token->argument=1;
 			/////if(amDebugging())inputInfo("E7");
 		}
 		//////outputChar('R');

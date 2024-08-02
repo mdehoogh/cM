@@ -5082,11 +5082,16 @@ bool atArgumentPrompt(){
 }
 bool argumentPromptRemoved(){
 	Mtoken* lastToken=_userInputCommand->_lastToken;
+	while(string_length(lastToken->text)>lastToken->significantCharacterCount){
+		if(!removePreviousTokenCharacter())return false;
+	}
+	/* replacing:
 	size_t numberOfCharactersToRemove=string_length(lastToken->text)-lastToken->significantCharacterCount;
 	while(numberOfCharactersToRemove){
 		if(!removePreviousTokenCharacter())return false;
 		numberOfCharactersToRemove--;
 	}
+	*/
 	unfinishToken(lastToken); // TODO is this really necessary???
 	return true;
 }
@@ -5357,24 +5362,41 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		// MDH@30JUL2024: a want to embed the name of the expected argument if this is a function call or list element token
 		if(result&NEW_TOKEN_CHARACTER){
 			size_t argumentIndex=0;
-			Mtoken* functionToken=NULL;
+			Mtoken *functionToken=NULL,*sequenceToken=NULL;
 			if(newLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){
 				functionToken=newLastCommandToEvaluateToken->prev;
 				argumentIndex=1;
 			}else
 			if(newLastCommandToEvaluateToken->type==TT_LISTELEMENT){
 				Mtoken* startListToken=newLastCommandToEvaluateToken->expr;
-				functionToken=(startListToken!=NULL&&startListToken->type==TT_FUNCTION_CALL?startListToken->prev:NULL);
-				// can we get the actual argument index?????
-				if(functionToken!=NULL)argumentIndex=1+startListToken->argument-newLastCommandToEvaluateToken->argument;
+				if(startListToken!=NULL){
+					if(startListToken->type==TT_FUNCTION_CALL){
+						functionToken=startListToken->prev;
+						// can we get the actual argument index?????
+						if(functionToken!=NULL)argumentIndex=1+startListToken->argument-newLastCommandToEvaluateToken->argument;
+					}else
+					if(startListToken->type==TT_LIST||startListToken->type==TT_EXPRESSION){
+						sequenceToken=startListToken;
+						argumentIndex=newLastCommandToEvaluateToken->argument; /////1+startListToken->argument-newLastCommandToEvaluateToken->argument;
+					}
+				}
 			}
-			if(functionToken!=NULL){
-				Mstring* _functionNameText=owned_string(_getSignificantTokenText(functionToken),owner);
-				Mfunction* function=getFunction(NULL,string(_functionNameText));
-				FREE_STRING(_functionNameText,owner);
-				char* parameterName=(function!=NULL?getMapKey(function->_parameterMap,argumentIndex):NULL);
-				if(parameterName!=NULL){
-					Mstring* _argumentPromptText=owned_string(_getString(parameterName),owner);
+			if(functionToken!=NULL||sequenceToken!=NULL){
+				Mstring* _argumentPromptText=owned_string(__string(),owner);
+				if(_argumentPromptText!=NULL){
+					if(functionToken!=NULL){
+						Mstring* _functionNameText=owned_string(_getSignificantTokenText(functionToken),owner);
+						Mfunction* function=getFunction(NULL,string(_functionNameText));
+						FREE_STRING(_functionNameText,owner);
+						char* parameterName=(function!=NULL?getMapKey(function->_parameterMap,argumentIndex):NULL);
+						if(parameterName==NULL||string_append(_argumentPromptText,parameterName)==NULL){
+							FREE_STRING(_argumentPromptText,owner);_argumentPromptText=NULL;
+						}
+					}else{
+						if(NULL==string_append_ll(_argumentPromptText,argumentIndex)){
+							FREE_STRING(_argumentPromptText,owner);_argumentPromptText=NULL;
+						}
+					}
 					if(_argumentPromptText!=NULL){
 						if(string_append_char(_argumentPromptText,':')!=NULL){
 							finishToken(newLastCommandToEvaluateToken);
