@@ -767,10 +767,11 @@ void outputAllocationTypeMarks(char* linePrefix){
  * @param verbose when true, outputs diagnostic messages
  * @return size_t the number of nulled allocations
  */
-size_t nulledAllocationsRemoved(bool verbose){
+size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
 	size_t nr_allocations=allocations.l;
 	if(allocations.nulled){ // there are nulled allocation pointers
-		if(verbose)printf("Removing %zu nulled allocation pointers out of %zu allocations.\n",allocations.nulled,allocations.l);
+		if(verbose)
+			printf("Removing %zu nulled allocation pointers out of %zu allocations.\n",allocations.nulled,allocations.l);
 		// we need to keep track of the first and last position of a block of non null allocation pointers
 		// ok in the order of appeance
 		size_t removed,moved,firstNonNullIndex,nextNullIndex,firstNullIndex=0; // the index of the first null pointer
@@ -780,7 +781,7 @@ size_t nulledAllocationsRemoved(bool verbose){
 		while(firstNullIndex<allocations.l&&owners[firstNullIndex]!=NULL)firstNullIndex++;
 		size_t blocksMoved=0;
 		while(firstNullIndex<allocations.l){ // there could still be non null pointers to move
-			if(verbose)printf("\tDetecting block #%zu of active allocations to move to #%zu.\n",++blocksMoved,firstNullIndex);
+			if(veryverbose)printf("\tDetecting block #%zu of active allocations to move to #%zu.\n",++blocksMoved,firstNullIndex);
 			/////////if(verbose)printf("\t\tFirst null allocation index: %ld.\n",firstNullIndex);
 			// find the first non null index starting from the first position behind the nextNullIndex
 			firstNonNullIndex=firstNullIndex;
@@ -795,11 +796,11 @@ size_t nulledAllocationsRemoved(bool verbose){
 			nextNullIndex=firstNonNullIndex;
 			while(++nextNullIndex<allocations.l&&owners[nextNullIndex]!=NULL);
 			moved=nextNullIndex-firstNonNullIndex; // the number of active allocation pointers to move
-			if(verbose)printf("\t\tMoving %zu allocation pointers %zu through %zu back by %zu to #%zu.\n",moved,firstNonNullIndex,nextNullIndex-1,removed,firstNullIndex);
+			if(veryverbose)printf("\t\tMoving %zu allocation pointers #%zu through #%zu back by %zu to #%zu.\n",moved,firstNonNullIndex,nextNullIndex-1,removed,firstNullIndex);
 			memmove(owners+firstNullIndex,owners+firstNonNullIndex,sizeof(Mallocationtypeowner)*moved);
-			if(verbose)printf("\t\t%zu active allocations moved.\n",moved);
+			if(veryverbose)printf("\t\t%zu active allocations moved.\n",moved);
 			memset(owners+firstNullIndex+moved,0,sizeof(Mallocationtypeowner)*removed); // 'moving' the nulls behind
-			if(verbose)printf("\t\t%zu null allocations set!\n",removed);
+			if(veryverbose)printf("\t\t%zu null allocations set!\n",removed);
 			// adjust the allocation indices of the moved block consuming moved
 			while(moved--){
 				if(owners[firstNullIndex])
@@ -808,7 +809,7 @@ size_t nulledAllocationsRemoved(bool verbose){
 					bug("Null allocation pointer encountered at #%zu.",firstNullIndex);
 				firstNullIndex++;
 			}
-			if(verbose)printf("\t\tAllocation indices adapted!\n");
+			if(veryverbose)printf("\t\tAllocation indices adapted!\n");
 			/* replacing:
 			// we can now start moving immediately one by one
 			if(verbose)printf("\t\tMoving non-null allocations starting at #%zu by %zu positions.\n",firstNonNullIndex,removed);

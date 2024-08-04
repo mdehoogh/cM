@@ -14807,14 +14807,12 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 
 			//reportNumberOfAllocations("shellInitialized 27");
-
-
-			if(!registerFunction(_Menvironment,owner,"removed",Mremoved,2,(char*[]){"(list)","index(integer)"},NULL)
-					||!registerFunction(_Menvironment,owner,"push",Mpush,2,(char*[]){"(list)","index(integer)"},NULL)
-					||!registerFunction(_Menvironment,owner,"append",Mpush,2,(char*[]){"(list)",NULL},NULL)
-					||!registerFunction(_Menvironment,owner,"shove",Mshove,2,(char*[]){"(list)",NULL},NULL)
+			if(!registerFunction(_Menvironment,owner,"removed",Mremoved,2,(char*[]){"(list)",NULL},NULL)
+					||!registerFunction(_Menvironment,owner,"push",Mpush,2,(char*[]){"(list)","(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"append",Mpush,2,(char*[]){"(list)","(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"shove",Mshove,2,(char*[]){"(list)","(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"prepend",Mshove,2,(char*[]){"(list)",NULL},NULL)
-					||!registerFunction(_Menvironment,owner,"insert",Minsert,3,(char*[]){"(list)",NULL,"index(integer)"},NULL)
+					||!registerFunction(_Menvironment,owner,"insert",Minsert,3,(char*[]){"(list)","(any)","index(integer)"},NULL)
 					||!registerFunction(_Menvironment,owner,"sort",Msort,2,(char*[]){"(list)","order('a'|'d')"},NULL)
 					||!registerFunction(_Menvironment,owner,"sorted",Msorted,2,(char*[]){"(list)","order('a'|'d')"},NULL)
 					||!registerFunction(_Menvironment,owner,"runpoints",Mrunpoints,1,(char*[]){"(list)"},NULL)

@@ -85,7 +85,7 @@ Mallocationtype* _getAllocationTypes();
 
 bool resetAllocationManagement();
 
-size_t nulledAllocationsRemoved(bool verbose);
+size_t nulledAllocationsRemoved(bool verbose,bool veryverbose);
 size_t getNumberOfAllocations();
 void reportNumberOfAllocations(char const * const prefix);
 void reportAllocations(char* title,char* prefix);

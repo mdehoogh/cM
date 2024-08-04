@@ -5382,6 +5382,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 				}
 			}
 			if(functionToken!=NULL||sequenceToken!=NULL){
+				finishToken(newLastCommandToEvaluateToken);
 				Mstring* _argumentPromptText=owned_string(__string(),owner);
 				if(_argumentPromptText!=NULL){
 					if(functionToken!=NULL){
@@ -5389,7 +5390,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 						Mfunction* function=getFunction(NULL,string(_functionNameText));
 						FREE_STRING(_functionNameText,owner);
 						char* parameterName=(function!=NULL?getMapKey(function->_parameterMap,argumentIndex):NULL);
-						if(parameterName==NULL||string_append(_argumentPromptText,parameterName)==NULL){
+						if(NULL==parameterName||NULL==string_append(_argumentPromptText,parameterName)){
 							FREE_STRING(_argumentPromptText,owner);_argumentPromptText=NULL;
 						}
 					}else{
@@ -5399,7 +5400,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 					}
 					if(_argumentPromptText!=NULL){
 						if(string_append_char(_argumentPromptText,':')!=NULL){
-							finishToken(newLastCommandToEvaluateToken);
+							////////finishToken(newLastCommandToEvaluateToken);
 							char* argumentPrompt=string(_argumentPromptText);
 							if(string_append(newLastCommandToEvaluateToken->text,argumentPrompt)!=NULL){
 								setColor(getCommentColor());
@@ -6469,18 +6470,20 @@ bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 	if(blockCommandLevel==0){
 		// garbage collection: remove any values not used anymore...
 		// if(amVerboseDebugging())
-		if(amVerboseDebugging())
+		if(amVerbose/*Debugging*/())
 			outputInfo("Removing unreferenced values.");
-		size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
-		if(amVerbose())
-		{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No values garbage collected.");}
-
+		size_t removedValueCount=getNumberOfRemovedValues(amVerbose()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
+		if(amVerbose()){
+			if(removedValueCount)
+				output("Number of garbage collected values: %lu.\n",removedValueCount);
+			else 
+				outputInfo("No values garbage collected.");
+		}
 		// MDH@17JAN2023
-		size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose());
+		size_t removedNulledAllocations=nulledAllocationsRemoved(amVerbose(),amVerboseDebugging());
 		if(amVerbose())
 			output("Number of nulled allocations removed: %lld.\n",removedNulledAllocations);
-
-		if(amVerbose())
+		if(amVerboseDebugging())
 			reportAllocations("Allocations.\n","\t");
 
 		// switch to function body input mode when this command contained at least one user function definition

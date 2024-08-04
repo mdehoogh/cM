@@ -1590,8 +1590,11 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
 				if(NULL==_argumentmapelement->_variable){FREE_MAPELEMENT(_argumentmapelement,true,owner_functionargumentmap);break;}
 				// probably can't simply assign??? let's use _strdup then 
 				// MDH@17APR2020: _strdup() replaced by _getChars() as on so many other places today
-				_argumentmapelement->_variable->_name=SUBOWNED(owned_chars(_getChars(functionParameterMapelement->_variable->_name->chars),owner_functionargumentmap),1); // MDH@09JUN2020: OOPS make the right owner
-				if(NULL==_argumentmapelement->_variable->_name){FREE_MAPELEMENT(_argumentmapelement,true,owner_functionargumentmap);break;}
+				// MDH@04AUG2024: BUG FIX: function parameter map variables COULD well be NULL (anonymous without default!!!!)
+				if(functionParameterMapelement->_variable!=NULL){
+					_argumentmapelement->_variable->_name=SUBOWNED(owned_chars(_getChars(functionParameterMapelement->_variable->_name->chars),owner_functionargumentmap),1); // MDH@09JUN2020: OOPS make the right owner
+					if(NULL==_argumentmapelement->_variable->_name){FREE_MAPELEMENT(_argumentmapelement,true,owner_functionargumentmap);break;}
+				}
 				// associate the argument list element value (if available)
 				// MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)
 				//				we get a problem with functions like push() and shove() that try to adjust their argument
@@ -1601,6 +1604,7 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
 					// replacing: assignValue(&_argumentmapelement->_variable->_value,argumentListelement->_value);
 					// MDH@05NOV2019: no need to do the following anymore, because we incrementing the argument list element at the start of the loop; removing: argumentListelement=argumentListelement->_next;
 				}else // use the default!!!
+				if(functionParameterMapelement->_variable!=NULL) // MDH@04AUG2024 BUG FIX: the variable may be undefined in the function's parameter map
 					_argumentmapelement->_variable->_value=functionParameterMapelement->_variable->_value;
 					// replacing: assignValue(&_argumentmapelement->_variable->_value,functionParameterMapelement->_variable->_value);
 				// append to _argumentMap
@@ -3593,9 +3597,12 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 						/////////DEBUGGING outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
 						_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 						_mapelement->_next=NULL; // TODO do we need this?????
-						_mapelement->_variable=_getVariableWithName(argumentNames[argumentIndex],defaultValues!=NULL&&defaultValues[argumentIndex]!=NULL?defaultValues[argumentIndex]->type:VT_UNDEFINED,true,Msubowner(owner,2));
-						if(defaultValues!=NULL&&defaultValues[argumentIndex]!=NULL)
-							assignValue(&_mapelement->_variable->_value,defaultValues[argumentIndex]);
+						if(argumentNames[argumentIndex]!=NULL){
+							_mapelement->_variable=_getVariableWithName(argumentNames[argumentIndex],defaultValues!=NULL&&defaultValues[argumentIndex]!=NULL?defaultValues[argumentIndex]->type:VT_UNDEFINED,0,Msubowner(owner,2));
+							if(_mapelement->_variable!=NULL&&defaultValues!=NULL&&defaultValues[argumentIndex]!=NULL)
+								assignValue(&_mapelement->_variable->_value,defaultValues[argumentIndex]);
+						}else
+							_mapelement->_variable=NULL;
 						if(NULL==_prevmapelement)
 							_argumentMap->_first=owned_mapelement(disowned_mapelement(_mapelement,owner),Msubowner(owner,3)); // BUG FIX owner_environment changed to (the actual) owner
 						else

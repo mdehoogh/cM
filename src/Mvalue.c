@@ -330,8 +330,11 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
 	if(_mapelement!=NULL){
 		if(report)
 			output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
-		result=(_mapelement->_next!=NULL?free_mapelement(_mapelement->_next,weak):0);
-		_mapelement->_next=NULL;
+		if(_mapelement->_next!=NULL){
+			result=free_mapelement(_mapelement->_next,weak);
+			_mapelement->_next=NULL;
+		}else
+			result=0;
 		if(_mapelement->_variable!=NULL){
 			if(_mapelement->_variable->_name!=NULL){
 				if(report)
@@ -605,8 +608,9 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 			checked++;
 			if(_valueListelement->_value!=NULL){
 				if(showInfo){
-					output("\nChecking value #%llu with id %llu",checked,_valueListelement->index);
-					outputValue(": '",_valueListelement->_value,"'.\n");
+					output("Checking value #%llu with id %llu",checked,_valueListelement->index);
+					/////outputValue(": '",_valueListelement->_value,"'");
+					output(". ");
 				}
 				// if(showInfo)outputInfo("\tChecking the count!");
 				if(_valueListelement->_value->count==0){ // unused
@@ -1159,11 +1163,14 @@ Mvalue* getFirstScalarValue(Mvalue* value){
  * @return char* the key at index \p mapIndex of \p map
  */
 char* getMapKey(Mmap const * const map,size_t mapIndex){ // MDH@30JUL2024
-	if(map!=NULL&&mapIndex>0){
+	if(map!=NULL&&mapIndex>0&&mapIndex<=map->numberOfElements){
 		Mmapelement* mapelement=map->_first;
 		while(mapelement!=NULL){
-			if(--mapIndex==0)
-				return mapelement->_variable->_name->chars;
+			if(--mapIndex==0){
+				if(mapelement->_variable!=NULL&&mapelement->_variable->_name!=NULL)
+					return mapelement->_variable->_name->chars;
+				break;
+			}
 			mapelement=mapelement->_next;
 		}
 	}
@@ -1319,7 +1326,7 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
  * 
  * @param name 
  * @param valuetype 
- * @param immutable sets the immutable flag of the new M variable returned
+ * @param unlockCode sets the immutable flag of the new M variable returned
  * @param owner_variable 
  * @return Mvariable* a new M variable with name \p name and value type \p valuetype
  */
@@ -2810,7 +2817,7 @@ Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquote
 		}
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(NULL==p){FREE_STRING(result,owner);result=NULL;}
+		if(NULL==p){FREE_STRING(result,owner);return NULL;}
 	}
 	return disowned_string(result,owner);
 }/* VALIDATED */
