@@ -2121,7 +2121,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_list)return NULL;
 	bool disowned_list=Misdisowned(_list);
-	if(amVerbose())
+	if(amVerboseDebugging())
 		output("Wrapping a %s list.\n",(disowned_list?"disowned":"owned"));
 	Mvalue* _value=__value(_list->weak?"weak list":"strong list");
 	if(NULL==_value){
@@ -2130,7 +2130,7 @@ Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocat
 	}
 	_value->value._list=(disowned_list?owned_list(_list,owner_value_data):_list); // MDH@09JUN2020: _value is to take over ownership of _list
 	_value->type=VT_LIST;
-	if(amVerbose())
+	if(amVerboseDebugging())
 		output("%s list wrapped.\n",(disowned_list?"Disowned":"Owned"));
 	return _value;
 }/* VALIDATED */
@@ -2227,7 +2227,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		output(M_ERROR_PREFIX);
 		outputValue("Unable to add '",_value,"'");
 		output(" of type '%s' to a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
-		return 0;
+		/////return 0;
 	}
 	// check validity of index first
 	long long lastindex=(_list->_last!=NULL?_list->_last->index:0); // ASSERT lastindex nonnegative
@@ -2316,6 +2316,8 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		//if(amVerboseDebugging()){outputValue("\t'",_listelement->_value,"' prepended to a list");output(" (now) with %llu elements.\n",_list->numberOfElements);}
 	}
 	if(amDebugging())checkList(_list);
+	if(amVerbose())
+		output("New list index: %llu.\n",_listelement->index);
 	return _listelement->index;
 }/* VALIDATED */
 // MDH@23NOV2020: inserting is similar to appending except that it should NOT replace a value but put it in front of it

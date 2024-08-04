@@ -6995,7 +6995,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		}
 	}
 
-	//if(amVerbose())
+	if(amVerbose())
 		reportAllocations("Initial allocations:\n","\t");
 
 	// the main user input loop

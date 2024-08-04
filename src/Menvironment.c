@@ -311,6 +311,8 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner own
 	if(columnNamesList!=NULL){
 		Mlist* _table=owned_list(_getListOfType(VT_LIST),owner);
 		if(_table!=NULL){
+			if(amVerbose())
+				output("Table created.\n");
 			_table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
 			// wrap the column names list in a value
 			// oops this is going to be a nuisance as the list would be copied wouldn't it????????
@@ -318,7 +320,8 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner own
 			//	  
 			Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
 			if(columnNamesListValue!=NULL){
-				outputValue("Column names values table: '",columnNamesListValue,"'.\n");
+				if(amVerbose())
+					outputValue("Column names values table: '",columnNamesListValue,"'.\n");
 				if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
 					// MDH@23MAR2023: should we return lists or arrays????? perhaps better to return arrays
 					while(numberOfRows>0){
@@ -365,14 +368,21 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 				Mlist* tablerowValueList=(tablerowValue!=NULL&&tablerowValue->type==VT_LIST?tablerowValue->value._list:NULL);
 				if(tablerowValueList!=NULL){
 					if(tablerowValueList->_first){
-						size_t* columnLengths=calloc(tablerowValueList->numberOfElements,sizeof(size_t));
+						//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
+						size_t maximumNumberOfColumns=tablerowValueList->numberOfElements;
+						output("Maximum number of columns: %zu.",maximumNumberOfColumns);
+						size_t* columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
 						if(columnLengths!=NULL){
 							// get the value text of all elements in the header list
 							Mlistelement* headerrowListelement=tablerowValueList->_first;
 							size_t columnIndex=0;
 							written+=newline(); // start a new line before outputting the table!!!
+
 							while(headerrowListelement!=NULL){
-								if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table header loop!");break;}
+								if(columnIndex>=tablerowValueList->numberOfElements){
+									outputBug("Had to break out of table header loop!");
+									break;
+								}
 								Mstring* _columnNameText=owned_string(_getValueText(headerrowListelement->_value,true,true),owner);
 								if(_columnNameText!=NULL){
 									columnLengths[columnIndex]=output("%s",string(_columnNameText));
@@ -382,6 +392,8 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 								columnIndex++;
 								headerrowListelement=headerrowListelement->_next;
 							}
+							//////if(amVerbose())output("Showing %llu table data rows.\n",table->numberOfElements-1);
+
 							// ready to show the data rows 
 							while(tableListelement->_next!=NULL){
 								tableListelement=tableListelement->_next;
@@ -390,34 +402,47 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 									// allowing the rows to be lists as well (which was the original implementation of table rows)
 									size_t cellLength;
 									if(tablerowValue->type==VT_LIST){
+										/////////output("Showing the list!\n");
 										tablerowValueList=tablerowValue->value._list;
 										if(tablerowValueList!=NULL&&tablerowValueList->numberOfElements>0){
 											written+=newline();
 											columnIndex=0;
 											Mlistelement* rowListelement=tablerowValueList->_first;
-											while(rowListelement){
-												if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table data row loop!");break;}
+											while(rowListelement!=NULL){
 												Mstring* _cellText=owned_string(_getValueText(rowListelement->_value,true,true),owner);
 												cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
 												written+=cellLength;
-												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
-												FREE_STRING(_cellText,owner);
+												if(columnIndex<maximumNumberOfColumns){
+													while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
+												}else
+													written+=output("! ");
+												if(_cellText!=NULL)FREE_STRING(_cellText,owner);
 												rowListelement=rowListelement->_next;
 												columnIndex++;
+												if(columnIndex>tablerowValueList->numberOfElements){
+													outputBug("Had to break out of table data row loop!");break;
+												}
+												///////if(columnIndex>=tablerowValueList->numberOfElements)break; // safety
 											}
 										}
+										
 									}else
 									if(tablerowValue->type==VT_ARRAY){
+										////DEBUG output("Showing the array!\n");
 										Mvalue* cellValue;
 										Marray* tablerowValueArray=tablerowValue->value._array;
 										if(tablerowValueArray!=NULL){
+											written+=newline();
 											size_t numberOfColumns=tablerowValueArray->numberOfElements;
 											for(size_t columnIndex=0;columnIndex<numberOfColumns;++columnIndex){
 												Mstring* _cellText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner);
 												cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
 												written+=cellLength;
-												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
-												FREE_STRING(_cellText,owner);
+												if(columnIndex<maximumNumberOfColumns){
+													while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
+												}else
+													written+=output("! ");
+												if(_cellText!=NULL)FREE_STRING(_cellText,owner);
 											}
 										}
 									}
@@ -480,6 +505,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
 		// NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
 		_valuesTable=owned_list(_getTable(_valuesColumnNames,numberOfAllocationTypes,owner),owner);
 		if(_valuesTable!=NULL){
+			if(amVerbose())output("Values table created!\n");
 			if(numberOfAllocationTypes){
 				// we start with a general overview (the counts per type)
 				// NOTE dividing by sizeof(char) is far fetched
@@ -518,7 +544,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
 						}else
 							outputError("Failed to create a values table row.");
 					}
-					FREE_STRING(_allocationTypeText,owner);
+					if(_allocationTypeText!=NULL)FREE_STRING(_allocationTypeText,owner);
 				}
 			}else
 				outputError("No allocation types/counts registered");
