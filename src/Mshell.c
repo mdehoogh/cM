@@ -14797,7 +14797,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 
 			//reportNumberOfAllocations("shellInitialized 26");
-
+			if(!registerFunction(_Menvironment,owner,"list",Mcreatelist,2,(char*[]){"length(integer)","fill(any)"},NULL))
+			{
+				outputError("Failed to register the create list function");
+				return NULL;
+			}
 
 			if(!registerFunction(_Menvironment,owner,"array",Mcreatearray,2,(char*[]){"length(integer)","fill"},NULL)
 					||!registerFunction(_Menvironment,owner,"fill",Mfillarray,2,(char*[]){"(array)",NULL},NULL)

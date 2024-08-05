@@ -4,6 +4,7 @@
 // (sequence) iterator support
 Miterator getListiterator(Mlist* list);
 
+Mvalue* Mcreatelist(Mvalue* lengthValue,Mvalue* fillValue);
 Mvalue* Mclear(Mvalue* value); // will also work on a map though (TODO move over to functions.h/c I guess)
 Mvalue* Mempty(Mvalue* value); // will also work on a map though (TODO move over to functions.h/c I guess)
 Mvalue* Mkeys(Mvalue* value); // will also work on a map (although perhaps those are attributes)

@@ -65,6 +65,28 @@ Miterator getListiterator(Mlist* list){
 }
 
 /**
+ * @brief returns a list with \p lengthValue elements with value \p fillValue
+ * 
+ * @param lengthValue 
+ * @param fillValue 
+ * @return Mvalue* a wrapped list with \p lengthValue elements with value \p fillValue
+ */
+Mvalue* Mcreatelist(Mvalue* lengthValue,Mvalue* fillValue){Mallocationowner owner=getOwner(__LINE__);
+	if(lengthValue!=NULL){
+		long long length=getValueInteger(lengthValue);
+		if(length>=0){
+			Mlist* _list=owned_list(__list("createlist"),owner);
+			while(--length>=0)
+			if(appendedToList(_list,owner,fillValue,M_LL_INVALID)<0)
+			outputError("Failed to append list element!");
+			return _getValueOfList(disowned_list(_list,owner));
+		}else
+			outputError("Invalid list length!");
+	}
+	return NULL;
+}
+
+/**
  * @brief removes all elements of a M list or M map wrapped in \p value
  * @details returns M_LL_INVALID if \p value does not wrap a list or a map
  * @param value 
