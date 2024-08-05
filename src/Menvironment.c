@@ -307,12 +307,11 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
  * @param owner_columnNamesList the owner of the column names list
  * @return Mlist* the table
  */
-Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner owner_columnNamesList){Mallocationowner owner=getOwner(__LINE__);
+static Mlist* _getTable(Mlist* columnNamesList/*,size_t numberOfRows*/,Mallocationowner owner_columnNamesList){Mallocationowner owner=getOwner(__LINE__);
 	if(columnNamesList!=NULL){
 		Mlist* _table=owned_list(_getListOfType(VT_LIST),owner);
 		if(_table!=NULL){
-			if(amVerbose())
-				output("Table created.\n");
+			////if(amVerbose())output("Table created.\n");
 			_table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
 			// wrap the column names list in a value
 			// oops this is going to be a nuisance as the list would be copied wouldn't it????????
@@ -320,9 +319,9 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner own
 			//	  
 			Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
 			if(columnNamesListValue!=NULL){
-				if(amVerbose())
-					outputValue("Column names values table: '",columnNamesListValue,"'.\n");
+				//////if(amVerbose())outputValue("Column names values table: '",columnNamesListValue,"'.\n");
 				if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
+					/*
 					// MDH@23MAR2023: should we return lists or arrays????? perhaps better to return arrays
 					while(numberOfRows>0){
 						numberOfRows--;
@@ -330,6 +329,7 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner own
 						if(NULL==_rowValue){outputError("Failed to create a new table row; the table will be incomplete");break;}
 						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row; the table will be incomplete");break;}
 					}
+					*/
 					/* replacing:
 					while(numberOfRows>0){
 						numberOfRows--;
@@ -370,7 +370,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 					if(tablerowValueList->_first){
 						//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
 						size_t maximumNumberOfColumns=tablerowValueList->numberOfElements;
-						output("Maximum number of columns: %zu.",maximumNumberOfColumns);
+						///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
 						size_t* columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
 						if(columnLengths!=NULL){
 							// get the value text of all elements in the header list
@@ -493,17 +493,19 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
 	Mlist* _valuesColumnNames=owned_list(_getListOfType(VT_TEXT),owner);
 	if(_valuesColumnNames!=NULL
 		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'Values: "),M_LL_INVALID)>0
-		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'TYPE		"),M_LL_INVALID)>0
-		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'SIZE		"),M_LL_INVALID)>0
-		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'ALLOCATED   "),M_LL_INVALID)>0
-		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'FREED	   "),M_LL_INVALID)>0
+		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'TYPE  "),M_LL_INVALID)>0
+		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'SIZE  "),M_LL_INVALID)>0
+		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'ALLOCATED#0 "),M_LL_INVALID)>0
+		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'FREED#0 "),M_LL_INVALID)>0
+		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'ALLOCATED#1 "),M_LL_INVALID)>0
+		&&appendedToList(_valuesColumnNames,owner,_getTextValue("'FREED#1 "),M_LL_INVALID)>0
 		// &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED ",false),M_LL_INVALID)>0
 		// &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED	 ",false),M_LL_INVALID)>0
 		){
 		long long numberOfAllocationTypes=getNumberOfAllocationTypes();
 		// get a table with the given values column names and number of rows (which are initialized to empty lists)
 		// NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
-		_valuesTable=owned_list(_getTable(_valuesColumnNames,numberOfAllocationTypes,owner),owner);
+		_valuesTable=owned_list(_getTable(_valuesColumnNames/*,numberOfAllocationTypes*/,owner),owner);
 		if(_valuesTable!=NULL){
 			if(amVerbose())output("Values table created!\n");
 			if(numberOfAllocationTypes){
@@ -512,9 +514,14 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
 				for(long long i=0;i<numberOfAllocationTypes;i++){
 					Mstring* _allocationTypeText=owned_string(_getString("'"),owner);
 					if(_allocationTypeText!=NULL
-							&&string_append_char(_allocationTypeText,_allocationTypes[i].type)
+							&&string_append_char(_allocationTypeText,(_allocationTypes[i].type<0?'-':' '))
+							&&string_append_char(_allocationTypeText,'\'')
+							&&string_append_char(_allocationTypeText,abs(_allocationTypes[i].type))
+							&&string_append_char(_allocationTypeText,'\'')
+							/*
 							&&string_append(_allocationTypeText,"=0x")
-							&&string_append(_allocationTypeText,HEXCHARS[_allocationTypes[i].type]))
+							&&string_append(_allocationTypeText,HEXCHARS[_allocationTypes[i].type])*/
+						)
 					{
 						Mlist* _valuecountsList=owned_list(_getListOfType(VT_UNDEFINED),owner); // we're going to store the value counts in a map
 						if(_valuecountsList!=NULL){

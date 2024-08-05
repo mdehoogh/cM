@@ -2316,8 +2316,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		//if(amVerboseDebugging()){outputValue("\t'",_listelement->_value,"' prepended to a list");output(" (now) with %llu elements.\n",_list->numberOfElements);}
 	}
 	if(amDebugging())checkList(_list);
-	if(amVerbose())
-		output("New list index: %llu.\n",_listelement->index);
+	///////if(amVerbose())output("New list index: %llu.\n",_listelement->index);
 	return _listelement->index;
 }/* VALIDATED */
 // MDH@23NOV2020: inserting is similar to appending except that it should NOT replace a value but put it in front of it
