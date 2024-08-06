@@ -118,7 +118,7 @@ size_t newline(){return outputChar('\n');}
  * 
  * @param s the text to output as control text
  */
-void outputControlText(char* s){output(ES"%s",s);}
+size_t outputControlText(char* s){return output(ES"%s",s);}
 
 /**
  * @brief tries to set echo_to_output_file to true

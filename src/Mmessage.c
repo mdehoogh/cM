@@ -9,10 +9,92 @@
 static int32_t const MODULE_ID=(2<<4);
 
 // the texts to be used in certain message types
-extern const char* const INFO_PREFIX;
+extern const char* const M_INFO_PREFIX;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char* const M_BUG_PREFIX;
+
+// MDH@06AUG2024: what if we pass all output through outputf() instead of directly through output() so we can process it
+static char* outputText=NULL; // where we're going to collect the output texts
+static size_t outputLength,outputSize; // the part currently occupied of outputText
+static size_t errorPrefixLength,bugPrefixLength,warningPrefixLength;
+char **warnings=NULL,**errors=NULL,**bugs=NULL;
+static void registerWarning(){
+
+}
+static void registerError(){
+
+}
+static void registerBug(){
+
+}
+static void outputLine(char* newlinePosition){
+	*newlinePosition='\0';
+	output("%s%c",outputText,'\n');
+	// now we can check whether outputText is an error, bug or warning
+	if(strncmp(M_ERROR_PREFIX,outputText,errorPrefixLength)==0){
+		registerError();
+	}else
+	if(strncmp(M_BUG_PREFIX,outputText,bugPrefixLength)==0){
+		registerBug();
+	}else
+	if(strncmp(M_WARNING_PREFIX,outputText,warningPrefixLength)==0){
+		registerWarning();
+	}
+	outputLength-=(newlinePosition-outputText);
+	if(outputLength)memmove(outputText,newlinePosition+1,outputLength);
+	// we have to move the remaining text up
+	*(outputText+outputLength)='\0';
+}
+static bool initializeTextOutput(){
+	errorPrefixLength=strlen(M_ERROR_PREFIX);
+	bugPrefixLength=strlen(M_BUG_PREFIX);
+	warningPrefixLength=strlen(M_WARNING_PREFIX);
+	outputText=calloc(256,sizeof(char)); // should suffice
+	if(NULL==outputText)return false;
+	outputLength=0;outputSize=256;
+	return true;
+}
+static size_t outputf(char const * const fmt,...){
+	size_t result=0;
+	if(fmt!=NULL){
+	  va_list args;
+  	va_start(args,fmt);
+		if(outputText!=NULL){
+			do{
+			 	int count=snprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+				if(count<0){
+					output("%s%s",M_ERROR_PREFIX,"Output format error!");
+					break;
+				}
+				if(count>0){
+					if(!*(outputText+outputLength+count)){ // success
+						result=count;
+						outputLength+=result; // new start
+						// if we have a full line output that full line
+						char* newlinePosition=strchr(outputText,'\n');
+						if(newlinePosition!=NULL){
+							outputLine(newlinePosition);
+						}
+						break;
+					}else{
+						outputSize+=64;
+						char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+						if(NULL==newOutputText){
+							output("%s%s",M_ERROR_PREFIX,"Output memory error");
+							break;
+						}
+						outputText=newOutputText;
+						// and try to fit the text in again
+					}
+				}
+			}while(outputText!=NULL);
+		}else // directly pass along to output
+			output(fmt,args);
+		va_end(args);
+	}
+	return result;
+}
 
 /**
  * @brief outputs \p info prefixed with M_INFO_PREFIX, appending a period when not present in info
@@ -25,8 +107,8 @@ size_t outputInfo(char const * const info){
 	if(info!=NULL){
 		size_t l=strlen(info);
 		if(l>0){
-			if(NULL==INFO_PREFIX)result=output("%s,info");else
-    	result=output("%s%s",INFO_PREFIX,info);
+			if(NULL==M_INFO_PREFIX)result=outputf("%s",info);else
+    	result=output("%s%s",M_INFO_PREFIX,info);
     	l--;if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
 	    result+=newline();
 		}
@@ -272,5 +354,9 @@ size_t outputMessage(char const * const messageType,char const * const messagefm
  * @return false on failure
  */
 bool messageStreamsInitialized(char const * const source){
+	if(initializeTextOutput())
+		output("Text output initialized!\n");
+	else
+		output("%sFailed to initialize text output.\n",M_ERROR_PREFIX);
 	return(_messageStreamStack!=NULL||pushMessageStream(stdout,(source!=NULL?source:""),NULL)); // stdout is the principal output message stream
 }

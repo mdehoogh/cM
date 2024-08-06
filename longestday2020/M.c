@@ -1168,7 +1168,7 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
 static size_t outputToken(Mtoken* _token){
-	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
+	size_t numberOfCharactersToOutput=(_token!=NULL&&_token->text!=NULL?string_length(_token->text):0);
 	if(numberOfCharactersToOutput>0){
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
 		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with

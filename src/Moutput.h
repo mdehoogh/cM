@@ -26,4 +26,4 @@ size_t outputChar(char c); // MDH@18APR2019: individual characters can use outpu
 size_t newline();
 
 // all output to the display has to go through output!!
-void outputControlText(char* s);
+size_t outputControlText(char* s);
