@@ -28,7 +28,7 @@ static void registerError(){
 static void registerBug(){
 
 }
-static void outputLine(char* newlinePosition){
+static void logLine(char* newlinePosition){
 	*newlinePosition='\0';
 	output("%s%c",outputText,'\n');
 	// now we can check whether outputText is an error, bug or warning
@@ -41,57 +41,69 @@ static void outputLine(char* newlinePosition){
 	if(strncmp(M_WARNING_PREFIX,outputText,warningPrefixLength)==0){
 		registerWarning();
 	}
-	outputLength-=(newlinePosition-outputText);
-	if(outputLength)memmove(outputText,newlinePosition+1,outputLength);
-	// we have to move the remaining text up
-	*(outputText+outputLength)='\0';
+	ssize_t shortened=(newlinePosition-outputText);
+	if(shortened<=outputLength){
+		outputLength-=shortened;
+		if(outputLength)memmove(outputText,newlinePosition+1,outputLength);
+		// we have to move the remaining text up
+		*(outputText+outputLength)='\0';
+	}else
+		printf("%sCan't shorten %zu by %zu.\n",M_ERROR_PREFIX,outputLength,shortened);
 }
 static bool initializeTextOutput(){
+	outputLength=0;outputSize=256;
 	errorPrefixLength=strlen(M_ERROR_PREFIX);
 	bugPrefixLength=strlen(M_BUG_PREFIX);
 	warningPrefixLength=strlen(M_WARNING_PREFIX);
 	outputText=calloc(256,sizeof(char)); // should suffice
-	if(NULL==outputText)return false;
-	outputLength=0;outputSize=256;
-	return true;
+	return(outputText!=NULL);
 }
-static size_t outputf(char const * const fmt,...){
+
+/**
+ * @brief logs formatted text
+ * 
+ * @param fmt 
+ * @param ... 
+ * @return size_t the number of characters logged
+ */
+size_t logText(char const * const fmt,...){
 	size_t result=0;
-	if(fmt!=NULL){
-	  va_list args;
-  	va_start(args,fmt);
+	if(fmt!=NULL&&strlen(fmt)>0){
 		if(outputText!=NULL){
 			do{
-			 	int count=snprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
-				if(count<0){
+			  va_list args;
+  			va_start(args,fmt);
+			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+				va_end(args);
+				if(count<=0){
+					outputText[outputLength]='\0'; // just in case
 					output("%s%s",M_ERROR_PREFIX,"Output format error!");
 					break;
 				}
-				if(count>0){
-					if(!*(outputText+outputLength+count)){ // success
-						result=count;
-						outputLength+=result; // new start
-						// if we have a full line output that full line
-						char* newlinePosition=strchr(outputText,'\n');
-						if(newlinePosition!=NULL){
-							outputLine(newlinePosition);
-						}
-						break;
-					}else{
-						outputSize+=64;
-						char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
-						if(NULL==newOutputText){
-							output("%s%s",M_ERROR_PREFIX,"Output memory error");
-							break;
-						}
-						outputText=newOutputText;
-						// and try to fit the text in again
-					}
+				if(outputLength+count<outputSize){ // success
+					result=count;
+					outputLength+=result; // new start
+					// if we have a full line output that full line
+					printf(outputText);
+					char* newlinePosition=strchr(outputText,'\n');
+					if(newlinePosition!=NULL)
+						logLine(newlinePosition);
+					break;
 				}
-			}while(outputText!=NULL);
-		}else // directly pass along to output
-			output(fmt,args);
-		va_end(args);
+				outputSize+=64;
+				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				if(NULL==newOutputText){
+					output("%s%s",M_ERROR_PREFIX,"Output memory error");
+					break;
+				}
+				outputText=newOutputText;
+			}while(true);
+		}else{ // directly pass along to output
+		  va_list args;
+  		va_start(args,fmt);
+			vprintf(fmt,args);
+			va_end(args);
+		}
 	}
 	return result;
 }
@@ -107,7 +119,7 @@ size_t outputInfo(char const * const info){
 	if(info!=NULL){
 		size_t l=strlen(info);
 		if(l>0){
-			if(NULL==M_INFO_PREFIX)result=outputf("%s",info);else
+			if(NULL==M_INFO_PREFIX)result=output("%s",info);else
     	result=output("%s%s",M_INFO_PREFIX,info);
     	l--;if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
 	    result+=newline();
@@ -327,7 +339,7 @@ bool popAllMessageStreams(char const * const source){
 //                wondering where to send the output message to
 //                this is a 'generic' function in that it outputs to all the registered output streams
 //                but perhaps there should be an output stream for each of the message types
-size_t outputMessage(char const * const messageType,char const * const messagefmt,...){
+size_t logMessage(char const * const messageType,char const * const messagefmt,...){
 	size_t result=0;
 	MessageStream* messageStream=_messageStreamStack;
 	while(messageStream!=NULL){
@@ -354,9 +366,11 @@ size_t outputMessage(char const * const messageType,char const * const messagefm
  * @return false on failure
  */
 bool messageStreamsInitialized(char const * const source){
+	/*
 	if(initializeTextOutput())
 		output("Text output initialized!\n");
 	else
 		output("%sFailed to initialize text output.\n",M_ERROR_PREFIX);
+		*/
 	return(_messageStreamStack!=NULL||pushMessageStream(stdout,(source!=NULL?source:""),NULL)); // stdout is the principal output message stream
 }

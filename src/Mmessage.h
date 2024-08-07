@@ -26,4 +26,7 @@ bool popMessageStream(char const * const source,char const * const messageType);
 bool popAllMessageStreams(char const * const source);
 bool messageStreamsInitialized(char const * const source);
 
-size_t outputMessage(char const * const messageType, char const * const messagefmt,...);
+size_t logMessage(char const * const messageType, char const * const messagefmt,...);
+
+// MDH@07AUG2024: for logging any text (that may contain any message types)
+size_t logText(char const * const fmt,...);
