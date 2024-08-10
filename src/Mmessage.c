@@ -14,215 +14,6 @@ extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char* const M_BUG_PREFIX;
 
-// MDH@06AUG2024: what if we pass all output through outputf() instead of directly through output() so we can process it
-static char* outputText=NULL; // where we're going to collect the output texts
-static size_t outputLength,outputSize; // the part currently occupied of outputText
-static size_t errorPrefixLength,bugPrefixLength,warningPrefixLength;
-char **warnings=NULL,**errors=NULL,**bugs=NULL;
-static void registerWarning(){
-
-}
-static void registerError(){
-
-}
-static void registerBug(){
-
-}
-static void logLine(char* newlinePosition){
-	*newlinePosition='\0';
-	output("%s%c",outputText,'\n');
-	// now we can check whether outputText is an error, bug or warning
-	if(strncmp(M_ERROR_PREFIX,outputText,errorPrefixLength)==0){
-		registerError();
-	}else
-	if(strncmp(M_BUG_PREFIX,outputText,bugPrefixLength)==0){
-		registerBug();
-	}else
-	if(strncmp(M_WARNING_PREFIX,outputText,warningPrefixLength)==0){
-		registerWarning();
-	}
-	ssize_t shortened=(newlinePosition-outputText);
-	if(shortened<=outputLength){
-		outputLength-=shortened;
-		if(outputLength)memmove(outputText,newlinePosition+1,outputLength);
-		// we have to move the remaining text up
-		*(outputText+outputLength)='\0';
-	}else
-		printf("%sCan't shorten %zu by %zu.\n",M_ERROR_PREFIX,outputLength,shortened);
-}
-static bool initializeTextOutput(){
-	outputLength=0;outputSize=256;
-	errorPrefixLength=strlen(M_ERROR_PREFIX);
-	bugPrefixLength=strlen(M_BUG_PREFIX);
-	warningPrefixLength=strlen(M_WARNING_PREFIX);
-	outputText=calloc(256,sizeof(char)); // should suffice
-	return(outputText!=NULL);
-}
-
-/**
- * @brief logs formatted text
- * 
- * @param fmt 
- * @param ... 
- * @return size_t the number of characters logged
- */
-size_t logText(char const * const fmt,...){
-	size_t result=0;
-	if(fmt!=NULL&&strlen(fmt)>0){
-		if(outputText!=NULL){
-			do{
-			  va_list args;
-  			va_start(args,fmt);
-			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
-				va_end(args);
-				if(count<=0){
-					outputText[outputLength]='\0'; // just in case
-					output("%s%s",M_ERROR_PREFIX,"Output format error!");
-					break;
-				}
-				if(outputLength+count<outputSize){ // success
-					result=count;
-					outputLength+=result; // new start
-					// if we have a full line output that full line
-					printf(outputText);
-					char* newlinePosition=strchr(outputText,'\n');
-					if(newlinePosition!=NULL)
-						logLine(newlinePosition);
-					break;
-				}
-				outputSize+=64;
-				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
-				if(NULL==newOutputText){
-					output("%s%s",M_ERROR_PREFIX,"Output memory error");
-					break;
-				}
-				outputText=newOutputText;
-			}while(true);
-		}else{ // directly pass along to output
-		  va_list args;
-  		va_start(args,fmt);
-			vprintf(fmt,args);
-			va_end(args);
-		}
-	}
-	return result;
-}
-
-/**
- * @brief outputs \p info prefixed with M_INFO_PREFIX, appending a period when not present in info
- * 
- * @param info the info text to output
- * @returns the number of characters output
- */
-size_t outputInfo(char const * const info){
-	size_t result=0;
-	if(info!=NULL){
-		size_t l=strlen(info);
-		if(l>0){
-			if(NULL==M_INFO_PREFIX)result=output("%s",info);else
-    	result=output("%s%s",M_INFO_PREFIX,info);
-    	l--;if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-	    result+=newline();
-		}
-	}
-	return result;
-}
-
-/**
- * @brief outputs \p warning prefixed with M_WARNING_PREFIX, appending a period when not present in info
- * 
- * @param warning the warning text to output
- */
-size_t outputWarning(char const * const warning){
-	size_t result=0;
-	if(warning!=NULL){
-    size_t l=strlen(warning);
-    if(l>0){
-    	if(NULL==M_WARNING_PREFIX)result=output("%s",warning);else
-    	result=output("%s%s",M_WARNING_PREFIX,warning);
-    	l--;if(l>0)if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=newline();
-		}
-	}
-	return result;
-}
-
-/**
- * @brief outputs \p error prefixed with M_ERROR_PREFIX, appending a period if not present in \p error
- * 
- * @param error the error text to output
- */
-size_t outputError(char const * const error){
-	size_t result=0;
-	if(error!=NULL){
-  	size_t l=strlen(error);
-  	if(l>0){
-  		if(NULL==M_ERROR_PREFIX)result=output("%s",error);else
-    	result=output("%s%s",M_ERROR_PREFIX,error);
-    	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=newline();
-		}
-	}
-	return result;
-}
-
-/**
- * @brief outputs \p memoryerror prefixed by a memory error text
- * 
- * @param memoryerror the memory error text
- */
-size_t outputMemoryError(char const * const memoryerror){
-  if(NULL==memoryerror)return 0;
-	return output("%s%s. Probable cause: out of memory!\n",M_ERROR_PREFIX,memoryerror);
-}
-
-// MDH@05NOV2019: might come in handy to be able to report bugs
-/**
- * @brief outputs \p error as error and \p text as is
- * 
- * @param error the error text
- * @param text text to output after the error text
- */
-size_t outputErrorAndText(char const * const error,char const * const text){
-	size_t result=0;
-	if(error!=NULL)result=output("%s%s",M_ERROR_PREFIX,error);
-	if(text!=NULL)result+=output(text);
-	return result+output(".\n");
-}
-
-/**
- * @brief outputs \p bug prefixed by M_BUG_PREFIX, postfixing a period if not present in \p bug
- * 
- * @param bug the bug text
- */
-size_t outputBug(char const * const bug){
-	size_t result=0;
-	if(bug!=NULL){
-    size_t l=strlen(bug);
-		if(l>0){
-			if(NULL==M_BUG_PREFIX)result=output("%s",bug);else
-			result=output("%s%s",M_BUG_PREFIX,bug);
-			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-			result+=newline();
-		}
-	}
-	return result;
-} 
-
-// for now placing kbhit() here
-/**
- * @brief checks the console for a recent keystroke
- * 
- * @return int nonzero when there is a key in the keyboard buffer
- */
-int kbhit(){
-    struct timeval tv={0L,0L};
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(0, &fds);
-    return select(1,&fds,NULL,NULL,&tv);
-}
-
 typedef struct MessageStream{
 	char* source;
 	char* messageType; // the type of the messages it is allowed to receive
@@ -339,7 +130,7 @@ bool popAllMessageStreams(char const * const source){
 //                wondering where to send the output message to
 //                this is a 'generic' function in that it outputs to all the registered output streams
 //                but perhaps there should be an output stream for each of the message types
-size_t logMessage(char const * const messageType,char const * const messagefmt,...){
+size_t logToMessageStream(char const * const messageType,char const * const messagefmt,...){
 	size_t result=0;
 	MessageStream* messageStream=_messageStreamStack;
 	while(messageStream!=NULL){
@@ -358,19 +149,391 @@ size_t logMessage(char const * const messageType,char const * const messagefmt,.
 	}
 	return result;
 }
+
+const char* const M_SYSTEM_ERROR_PREFIX="SYSTEM";
+
+// helper functions to manage the message (type) lists
+/*
+typedef struct{
+	char *msg;
+	struct MessageNode *next;
+}MessageNode;
+*/
+/**
+ * @brief the list containing the message lists of a given type
+ * 
+ */
+typedef struct MessageNode{
+	Message* message;
+	struct MessageNode* next;
+}MessageNode;
+typedef struct MessageTypeListNode{
+	char* messageType;
+	size_t count; // keeps track of the number of messages in the message type list
+	MessageNode* firstMessageNode; // points to the first message in the queue
+	MessageNode* lastMessageNode; // points to the last message in the queue
+	struct MessageTypeListNode *next;
+}MessageTypeListNode;
+// keep a singly-linked list of message type lists
+static MessageTypeListNode *firstMessageTypeListNode=NULL,*lastMessageTypeListNode=NULL;
+static MessageTypeListNode* getMessageTypeListNode(char const * const messageType){
+	MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+	while(messageTypeListNode!=NULL&&strcmp(messageTypeListNode->messageType,messageType)!=0)
+		messageTypeListNode=messageTypeListNode->next;
+	return messageTypeListNode;
+}
+static MessageTypeListNode* getNewMessageTypeListNode(char const * const messageType){
+	MessageTypeListNode* newMessageTypeListNode=calloc(1,sizeof(MessageTypeListNode));
+	if(newMessageTypeListNode!=NULL){
+		newMessageTypeListNode->messageType=strdup(messageType);
+		if(NULL==newMessageTypeListNode->messageType){
+			free(newMessageTypeListNode);
+			newMessageTypeListNode==NULL;
+		}
+	}
+	return newMessageTypeListNode;
+}
+static size_t freedMessageNode(MessageNode* messageNode){
+	size_t result=0;
+	if(messageNode!=NULL){
+		if(messageNode->next!=NULL){result=freedMessageNode(messageNode->next);messageNode->next=NULL;}
+		free(messageNode);
+		result++;
+	}
+	return result;
+}
+
+static size_t messageIndex=0; // keeps track of the total number of messages
+/**
+ * @brief returns the message type list node of message type \p messageType
+ * 
+ * @param messageType 
+ * @return MessageTypeListNode* the message type list node of message type \p messageType
+ */
+static MessageTypeListNode* _getMessageTypeListNode(char const * const messageType){
+	MessageTypeListNode* messageTypeListNode=NULL;
+	if(messageType!=NULL){
+		// find the message type list with of the given messageType
+		messageTypeListNode=getMessageTypeListNode(messageType);
+		// when not found, try to create one
+		if(messageTypeListNode==NULL)
+			messageTypeListNode=getNewMessageTypeListNode(messageType);
+		if(NULL==messageTypeListNode)return NULL;
+		if(NULL==firstMessageTypeListNode)
+			firstMessageTypeListNode=messageTypeListNode;
+		else
+			lastMessageTypeListNode->next=messageTypeListNode;
+		lastMessageTypeListNode=messageTypeListNode;
+	}
+	return messageTypeListNode;
+}
+bool addMessageOfType(char const * const messageText,char const * const messageType){
+	MessageTypeListNode *messageTypeListNode=_getMessageTypeListNode(messageType);
+	if(messageTypeListNode!=NULL){
+		MessageNode* messageNode=malloc(sizeof(MessageNode));
+		if(messageNode!=NULL){
+			messageNode->message=malloc(sizeof(Message));
+			if(NULL==messageNode->message){
+				free(messageNode);
+				return false;
+			}
+			messageNode->message->msg=strdup(messageText);
+			if(NULL==messageNode->message->msg){
+				free(messageNode->message);
+				free(messageNode);
+				return false;
+			}
+			messageNode->message->index=++messageIndex;
+			messageTypeListNode->count++;
+			if(messageTypeListNode->lastMessageNode!=NULL)
+				messageTypeListNode->lastMessageNode->next=messageNode;
+			messageTypeListNode->lastMessageNode=messageNode;
+			if(NULL==messageTypeListNode->firstMessageNode)
+				messageTypeListNode->firstMessageNode=messageNode;
+		}
+	}
+	return false;
+}
+// end message type lists helper functions
+
+/**
+ * @brief returns a MessageList containing all messages of type \p messageType
+ * 
+ * @param messageType 
+ * @return MessageList* the list of collected messages of type \p messageType
+ */
+Messages* getMessagesOfType(char const * const messageType){
+	if(messageType!=NULL){
+		MessageTypeListNode* messageTypeListNode=getMessageTypeListNode(messageType);
+		if(messageTypeListNode!=NULL){
+			Messages* messages=calloc(1,sizeof(Messages));
+			if(messages!=NULL){
+				messages->messages=calloc(messages->count,sizeof(Message));
+				if(messages->messages!=NULL){
+					MessageNode* messageNode=messageTypeListNode->firstMessageNode;
+					size_t messageNodeIndex=0;
+					while(messageNode!=NULL){
+						messages->messages[messageNodeIndex]=messageNode->message;
+						messageNodeIndex++;
+						if(messageNodeIndex>=messages->count)break;
+						messageNode=messageNode->next;
+					}
+					return messages;
+				}
+				free(messages);
+			}
+		}
+	}
+	return NULL;
+}
+/**
+ * @brief removes all messages of type messageType
+ * 
+ * @param messageType 
+ * @return * exposes 
+ */
+size_t removeMessagesOfType(char const * const messageType){
+	MessageTypeListNode* messageTypeListNode=getMessageTypeListNode(messageType);
+	if(messageTypeListNode!=NULL&&messageTypeListNode->count>0){
+		size_t freedMessageNodes=freedMessageNode(messageTypeListNode->firstMessageNode);
+		messageTypeListNode->count-=freedMessageNodes;
+		if(messageTypeListNode->count==0){
+			messageTypeListNode->firstMessageNode=NULL;
+			messageTypeListNode->lastMessageNode=NULL;
+		}
+		return messageTypeListNode->count; // return the number of not freed message nodes
+	}
+	return 0;
+}
+
+void outputSystemError(char const * const systemError){
+	output("%s%s",M_SYSTEM_ERROR_PREFIX,systemError);
+}
+// MDH@06AUG2024: what if we pass all output through outputf() instead of directly through output() so we can process it
+static char* outputText=NULL; // where we're going to collect the output texts
+static size_t outputLength,outputSize; // the part currently occupied of outputText
+static size_t errorPrefixLength,bugPrefixLength,warningPrefixLength;
+char **warnings=NULL,**errors=NULL,**bugs=NULL;
+static void registerWarning(){
+	if(!addMessageOfType(M_WARNING_PREFIX,outputText+warningPrefixLength))
+		outputSystemError("Failed to register a warning!");
+}
+static void registerError(){
+	if(!addMessageOfType(M_ERROR_PREFIX,outputText+errorPrefixLength))
+		outputSystemError("Failed to register an error!");
+}
+static void registerBug(){
+	if(!addMessageOfType(M_BUG_PREFIX,outputText+bugPrefixLength))
+		outputSystemError("Failed to register a bug!");
+}
+static void collectLine(char* newlinePosition){
+	*newlinePosition='\0';
+	output("%s%c",outputText,'\n');
+	// now we can check whether outputText is an error, bug or warning
+	if(strncmp(M_ERROR_PREFIX,outputText,errorPrefixLength)==0){
+		registerError();
+	}else
+	if(strncmp(M_BUG_PREFIX,outputText,bugPrefixLength)==0){
+		registerBug();
+	}else
+	if(strncmp(M_WARNING_PREFIX,outputText,warningPrefixLength)==0){
+		registerWarning();
+	}
+	ssize_t shortened=(newlinePosition-outputText);
+	if(shortened<=outputLength){
+		outputLength-=shortened;
+		if(outputLength)memmove(outputText,newlinePosition+1,outputLength);
+		// we have to move the remaining text up
+		*(outputText+outputLength)='\0';
+	}else
+		printf("%sCan't shorten the length of the output buffer (%zu) by %zu.\n",M_ERROR_PREFIX,outputLength,shortened);
+}
+
+/**
+ * @brief outputs \p info prefixed with M_INFO_PREFIX, appending a period when not present in info
+ * 
+ * @param info the info text to output
+ * @returns the number of characters output
+ */
+size_t outputInfo(char const * const info){
+	size_t result=0;
+	if(info!=NULL){
+		size_t l=strlen(info);
+		if(l>0){
+			if(NULL==M_INFO_PREFIX)result=output("%s",info);else
+    	result=output("%s%s",M_INFO_PREFIX,info);
+    	l--;if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+	    result+=newline();
+		}
+	}
+	return result;
+}
+
+/**
+ * @brief outputs \p warning prefixed with M_WARNING_PREFIX, appending a period when not present in info
+ * 
+ * @param warning the warning text to output
+ */
+size_t outputWarning(char const * const warning){
+	size_t result=0;
+	if(warning!=NULL){
+    size_t l=strlen(warning);
+    if(l>0){
+    	if(NULL==M_WARNING_PREFIX)result=output("%s",warning);else
+    	result=output("%s%s",M_WARNING_PREFIX,warning);
+    	l--;if(l>0)if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    	result+=newline();
+		}
+	}
+	return result;
+}
+
+/**
+ * @brief outputs \p error prefixed with M_ERROR_PREFIX, appending a period if not present in \p error
+ * 
+ * @param error the error text to output
+ */
+size_t outputError(char const * const error){
+	size_t result=0;
+	if(error!=NULL){
+  	size_t l=strlen(error);
+  	if(l>0){
+  		if(NULL==M_ERROR_PREFIX)result=output("%s",error);else
+    	result=output("%s%s",M_ERROR_PREFIX,error);
+    	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    	result+=newline();
+		}
+	}
+	return result;
+}
+
+/**
+ * @brief outputs \p memoryerror prefixed by a memory error text
+ * 
+ * @param memoryerror the memory error text
+ */
+size_t outputMemoryError(char const * const memoryerror){
+  if(NULL==memoryerror)return 0;
+	return output("%s%s. Probable cause: out of memory!\n",M_ERROR_PREFIX,memoryerror);
+}
+
+// MDH@05NOV2019: might come in handy to be able to report bugs
+/**
+ * @brief outputs \p error as error and \p text as is
+ * 
+ * @param error the error text
+ * @param text text to output after the error text
+ */
+size_t outputErrorAndText(char const * const error,char const * const text){
+	size_t result=0;
+	if(error!=NULL)result=output("%s%s",M_ERROR_PREFIX,error);
+	if(text!=NULL)result+=output(text);
+	return result+output(".\n");
+}
+
+/**
+ * @brief outputs \p bug prefixed by M_BUG_PREFIX, postfixing a period if not present in \p bug
+ * 
+ * @param bug the bug text
+ */
+size_t outputBug(char const * const bug){
+	size_t result=0;
+	if(bug!=NULL){
+    size_t l=strlen(bug);
+		if(l>0){
+			if(NULL==M_BUG_PREFIX)result=output("%s",bug);else
+			result=output("%s%s",M_BUG_PREFIX,bug);
+			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+			result+=newline();
+		}
+	}
+	return result;
+} 
+
+// for now placing kbhit() here
+/**
+ * @brief checks the console for a recent keystroke
+ * 
+ * @return int nonzero when there is a key in the keyboard buffer
+ */
+int kbhit(){
+	struct timeval tv={0L,0L};
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(0, &fds);
+	return select(1,&fds,NULL,NULL,&tv);
+}
+
+/**
+ * @brief logs formatted text
+ * 
+ * @param fmt 
+ * @param ... 
+ * @return size_t the number of characters logged
+ */
+size_t q2outputandcollect(char const * const fmt,...){
+	size_t result=0;
+	if(fmt!=NULL&&strlen(fmt)>0){
+		if(outputText!=NULL){
+			do{
+			  va_list args;
+  			va_start(args,fmt);
+			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+				va_end(args);
+				if(count<=0){
+					outputText[outputLength]='\0'; // just in case
+					output("%s%s",M_ERROR_PREFIX,"Output format error!");
+					break;
+				}
+				if(outputLength+count<outputSize){ // success
+					result=count;
+					outputLength+=result; // new start
+					// if we have a full line output that full line
+					printf(outputText);
+					char* newlinePosition=strchr(outputText,'\n');
+					if(newlinePosition!=NULL)
+						collectLine(newlinePosition);
+					break;
+				}
+				outputSize+=64;
+				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				if(NULL==newOutputText){
+					output("%s%s",M_ERROR_PREFIX,"Output memory error");
+					break;
+				}
+				outputText=newOutputText;
+			}while(true);
+		}else{ // directly pass along to output
+		  va_list args;
+  		va_start(args,fmt);
+			vprintf(fmt,args);
+			va_end(args);
+		}
+	}
+	return result;
+}
+
+bool outputCollectorInitialized(){
+	outputLength=0;outputSize=256;
+	errorPrefixLength=strlen(M_ERROR_PREFIX);
+	bugPrefixLength=strlen(M_BUG_PREFIX);
+	warningPrefixLength=strlen(M_WARNING_PREFIX);
+	outputText=calloc(256,sizeof(char)); // should suffice
+	return(outputText!=NULL);
+}
+
 /**
  * @brief initializes the output message stream service to always writing message to stdout
  * 
  * @param source the name of the message stream that outputs to stdout
  * @return true on success
  * @return false on failure
- */
+ ///
 bool messageStreamsInitialized(char const * const source){
-	/*
-	if(initializeTextOutput())
+	if(initializeOutputCollector())
 		output("Text output initialized!\n");
 	else
 		output("%sFailed to initialize text output.\n",M_ERROR_PREFIX);
-		*/
 	return(_messageStreamStack!=NULL||pushMessageStream(stdout,(source!=NULL?source:""),NULL)); // stdout is the principal output message stream
 }
+*/

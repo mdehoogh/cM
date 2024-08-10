@@ -7,6 +7,33 @@
 
 #include "Moutput.h"
 
+/* possibly move to a separate module in the future
+// support for multiple message streams stored in a double-linked message stream list (_messageStreamStack)
+bool pushMessageStream(FILE* stream,char const * const source,char const * const messageType);
+bool popMessageStream(char const * const source,char const * const messageType);
+bool popAllMessageStreams(char const * const source);
+
+bool messageStreamsInitialized(char const * const source);
+*/
+typedef struct Message{
+	size_t index;
+	char* msg;
+}Message;
+typedef struct Messages{
+	size_t count; // the number of message nodes in the message array
+	Message** messages; // the array of messages
+}Messages;
+
+Messages* getMessagesOfType(char const * const messageType); // exposes messages of a certain type
+size_t removeMessagesOfType(char const * const messageType);
+
+////////size_t logMessage(char const * const messageType, char const * const messagefmt,...);
+
+// MDH@07AUG2024: for logging any text (that may contain any message types)
+size_t q2outputandcollect(char const * const fmt,...);
+
+bool outputCollectorInitialized();
+
 size_t outputInfo(char const * const info); // replacing outputLine in all modules
 
 size_t outputWarning(char const * const warning);
@@ -19,14 +46,3 @@ size_t outputMemoryError(char const * const memoryerror);
 size_t outputBug(char const * const bug);
 
 int kbhit();
-
-// support for multiple message streams stored in a double-linked message stream list (_messageStreamStack)
-bool pushMessageStream(FILE* stream,char const * const source,char const * const messageType);
-bool popMessageStream(char const * const source,char const * const messageType);
-bool popAllMessageStreams(char const * const source);
-bool messageStreamsInitialized(char const * const source);
-
-size_t logMessage(char const * const messageType, char const * const messagefmt,...);
-
-// MDH@07AUG2024: for logging any text (that may contain any message types)
-size_t logText(char const * const fmt,...);
