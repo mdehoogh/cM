@@ -174,20 +174,27 @@ struct MessageIdStack{
  * @brief registers \p messageId as he current (active) message id
  * @param messageId 
  */
-void setMessageId(char const * const messageId){
+char* setMessageId(char const * const messageId){
 	if(messageId!=NULL){
 		if(messageIdStack.last==NULL||strcmp(messageIdStack.last->msgId,messageId)!=0){
 			MessageId* newMessageId=calloc(1,sizeof(MessageId));
 			if(newMessageId!=NULL){
-				if(NULL==messageIdStack.last)
-					messageIdStack.first=newMessageId;
-				else
-					messageIdStack.last->next=newMessageId;
-				messageIdStack.last=newMessageId;
+				newMessageId->msgId=strdup(messageId); // duplicate the message id
+				if(newMessageId->msgId!=NULL){
+					if(NULL==messageIdStack.last)
+						messageIdStack.first=newMessageId;
+					else
+						messageIdStack.last->next=newMessageId;
+					messageIdStack.last=newMessageId;
+				}else{
+					free(newMessageId);
+					outputSystemError("Failed to register a message id!");
+				}
 			}else
-				outputSystemError("Failed to register a message id!");
+				outputSystemError("Failed to create a message id!");
 		}
 	}
+	return(messageIdStack.last!=NULL?messageIdStack.last->msgId:NULL);
 }
 /**
  * @brief the list containing the message lists of a given type

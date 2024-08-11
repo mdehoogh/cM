@@ -1,8 +1,8 @@
 // the configured options and settings for M
 #define M_VERSION_MAJOR "0"
 #define M_VERSION_MINOR "1"
-#define M_VERSION_PATCH "9"
+#define M_VERSION_PATCH "7"
 #define M_VERSION_TWEAK ""
-#define M_VERSION_BUILD "14"
-#define M_VERSION_DATE "10 August 2024"
-#define M_BUILD_TIMESTAMP "08/10/2024 13:40:00"
+#define M_VERSION_BUILD "11"
+#define M_VERSION_DATE "13 April 2022"
+#define M_BUILD_TIMESTAMP "11-08-2024 12:56:22"

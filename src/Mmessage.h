@@ -28,7 +28,7 @@ typedef struct Messages{
 Messages* getMessagesOfType(char const * const messageType); // exposes messages of a certain type
 size_t removeMessagesOfType(char const * const messageType);
 bool addMessageOfType(char const * const messageText,char const * const messageType);
-void setMessageId(char const * const messageId);
+char* setMessageId(char const * const messageId); // echoes the messageId
 
 ////////size_t logMessage(char const * const messageType, char const * const messagefmt,...);
 

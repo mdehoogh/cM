@@ -1599,14 +1599,25 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				*/
 				if(_environmentName!=NULL){
 					// MDH@11AUG2024: ascertain to append the environment name to the prompt M string
+					string_append(prompt,string(_environmentName));
+					/*
 					if(string_append(prompt,string(_environmentName))!=NULL)
 						promptLength=output(string(_environmentName));
+						*/
 				}
 				// MDH@18APR2024: now asking getNewPromptCommandIndex for the command index to use in the prompt
 				size_t newPromptCommandIndex=getNewPromptCommandIndex(string(_environmentName),environment->commandCount);
-				if(newPromptCommandIndex)
+				if(newPromptCommandIndex){
+					string_append_char(prompt,'[');
+					string_append_ull(prompt,newPromptCommandIndex);
+					string_append_char(prompt,']');
+					/*
 					if(string_append_ull(prompt,newPromptCommandIndex)!=NULL)
 						promptLength+=output("[%lu]",newPromptCommandIndex);
+					*/
+				}
+				// MDH@11AUG2024: register the current prompt as the current message id
+				promptLength=output("%s",setMessageId(string(prompt))); 
 				/* replacing (so we won't need str anymore)
 				// when inside a block of commands show the block name
 				if(blockCommandLevel>0){
@@ -1629,7 +1640,6 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				*/
 				if(_environmentName!=NULL)FREE_STRING(_environmentName,owner);
 				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
-				setMessageId(string(prompt)); // MDH@11AUG2024: register the current prompt as the current message id
 				promptLength+=output("%s"," = ");
 				clearScreenFromCursor();
 			}
@@ -6391,7 +6401,10 @@ bool interactiveSessionInitialized(){
 bool preparedForUserInput(){
 	// MDH@11AUG2024: ascertain to have a prompt string that we can use as message id
 	prompt=owned_string(__string("prompt"),owner_prompt);
-	if(NULL==prompt){outputError("Failed to initialize the message id string");return false;}
+	if(NULL==prompt||NULL==string_setlength(prompt,getNumberOfWindowTextColumns())){
+		outputError("Failed to initialize the message id string");
+		return false;
+	}
 	//enableRawMode();
 	// disable output buffering on printf (as in raw input mode it would not write at all)
 	// MDH@23OCT2021: initialize the session passing in the prefix and suffix of the output filename
