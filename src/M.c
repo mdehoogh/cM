@@ -1559,6 +1559,9 @@ size_t getNewPromptCommandIndex(char* environmentName,size_t defaultPromptComman
 	return defaultPromptCommandCount+1;
 }
 
+// MDH@11AUG2024: if we want to be able to set the message id to the actual prompt we need to collect
+//                the prompt characters first
+Mstring* prompt=NULL;Mallocationowner owner_prompt=(Mallocationowner){MI_MAIN,__LINE__,1}; // the gobal variable to store the prompt in!!
 /**
  * @brief shows the prompt and sets the global prompt length \p promptLength accordingly
  * 
@@ -1573,7 +1576,8 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	switch(inputMode){
 		case IM_COMMAND:
 			{
-				outputTimestamp();
+				string_setlength(prompt,0);
+				outputTimestamp(); // TODO now obsolete, so to be removed eventually
 				echoToOutputFile();
 				/* MDH@16APR2024: removed, because we're now using the environment to get at the name, see below
 				Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner); // free asap
@@ -1593,12 +1597,16 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				/* replacing:
 				char* environmentName=(environment!=NULL&&environment->_name!=NULL?environment->_name->chars:NULL);
 				*/
-				if(_environmentName!=NULL)
-					promptLength=output(string(_environmentName));
+				if(_environmentName!=NULL){
+					// MDH@11AUG2024: ascertain to append the environment name to the prompt M string
+					if(string_append(prompt,string(_environmentName))!=NULL)
+						promptLength=output(string(_environmentName));
+				}
 				// MDH@18APR2024: now asking getNewPromptCommandIndex for the command index to use in the prompt
 				size_t newPromptCommandIndex=getNewPromptCommandIndex(string(_environmentName),environment->commandCount);
 				if(newPromptCommandIndex)
-					promptLength+=output("[%lu]",newPromptCommandIndex);
+					if(string_append_ull(prompt,newPromptCommandIndex)!=NULL)
+						promptLength+=output("[%lu]",newPromptCommandIndex);
 				/* replacing (so we won't need str anymore)
 				// when inside a block of commands show the block name
 				if(blockCommandLevel>0){
@@ -1621,6 +1629,7 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				*/
 				if(_environmentName!=NULL)FREE_STRING(_environmentName,owner);
 				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
+				setMessageId(string(prompt)); // MDH@11AUG2024: register the current prompt as the current message id
 				promptLength+=output("%s"," = ");
 				clearScreenFromCursor();
 			}
@@ -6380,6 +6389,9 @@ bool interactiveSessionInitialized(){
  * @return false on failure
  */
 bool preparedForUserInput(){
+	// MDH@11AUG2024: ascertain to have a prompt string that we can use as message id
+	prompt=owned_string(__string("prompt"),owner_prompt);
+	if(NULL==prompt){outputError("Failed to initialize the message id string");return false;}
 	//enableRawMode();
 	// disable output buffering on printf (as in raw input mode it would not write at all)
 	// MDH@23OCT2021: initialize the session passing in the prefix and suffix of the output filename

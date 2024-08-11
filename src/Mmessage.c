@@ -150,7 +150,10 @@ size_t logToMessageStream(char const * const messageType,char const * const mess
 	return result;
 }
 
-const char* const M_SYSTEM_ERROR_PREFIX="SYSTEM";
+char const * const M_SYSTEM_ERROR_PREFIX="SYSTEM";
+void outputSystemError(char const * const systemError){
+	output("%s%s\n",M_SYSTEM_ERROR_PREFIX,systemError);
+}
 
 // helper functions to manage the message (type) lists
 /*
@@ -159,6 +162,33 @@ typedef struct{
 	struct MessageNode *next;
 }MessageNode;
 */
+typedef struct MessageId{
+	char* msgId;
+	struct MessageId* next;
+}MessageId;
+struct MessageIdStack{
+	MessageId* first;
+	MessageId* last;
+}messageIdStack;
+/**
+ * @brief registers \p messageId as he current (active) message id
+ * @param messageId 
+ */
+void setMessageId(char const * const messageId){
+	if(messageId!=NULL){
+		if(messageIdStack.last==NULL||strcmp(messageIdStack.last->msgId,messageId)!=0){
+			MessageId* newMessageId=calloc(1,sizeof(MessageId));
+			if(newMessageId!=NULL){
+				if(NULL==messageIdStack.last)
+					messageIdStack.first=newMessageId;
+				else
+					messageIdStack.last->next=newMessageId;
+				messageIdStack.last=newMessageId;
+			}else
+				outputSystemError("Failed to register a message id!");
+		}
+	}
+}
 /**
  * @brief the list containing the message lists of a given type
  * 
@@ -188,7 +218,7 @@ static MessageTypeListNode* getNewMessageTypeListNode(char const * const message
 		newMessageTypeListNode->messageType=strdup(messageType);
 		if(NULL==newMessageTypeListNode->messageType){
 			free(newMessageTypeListNode);
-			newMessageTypeListNode==NULL;
+			newMessageTypeListNode=NULL;
 		}
 	}
 	return newMessageTypeListNode;
@@ -227,6 +257,14 @@ static MessageTypeListNode* _getMessageTypeListNode(char const * const messageTy
 	}
 	return messageTypeListNode;
 }
+/**
+ * @brief adds \p messageText to the message queue of type \p messageType
+ * 
+ * @param messageText 
+ * @param messageType 
+ * @return true on success
+ * @return false on failure
+ */
 bool addMessageOfType(char const * const messageText,char const * const messageType){
 	MessageTypeListNode *messageTypeListNode=_getMessageTypeListNode(messageType);
 	if(messageTypeListNode!=NULL){
@@ -243,6 +281,8 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 				free(messageNode);
 				return false;
 			}
+			// MDH@11AUG2024: register the current (active) message id as the id of the new message added
+			messageNode->message->id=(messageIdStack.last!=NULL?messageIdStack.last->msgId:NULL);
 			messageNode->message->index=++messageIndex;
 			messageTypeListNode->count++;
 			if(messageTypeListNode->lastMessageNode!=NULL)
@@ -251,7 +291,8 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			if(NULL==messageTypeListNode->firstMessageNode)
 				messageTypeListNode->firstMessageNode=messageNode;
 		}
-	}
+	}else
+		outputSystemError("Failed to register a message");
 	return false;
 }
 // end message type lists helper functions
@@ -268,7 +309,7 @@ Messages* getMessagesOfType(char const * const messageType){
 		if(messageTypeListNode!=NULL){
 			Messages* messages=calloc(1,sizeof(Messages));
 			if(messages!=NULL){
-				messages->messages=calloc(messages->count,sizeof(Message));
+				messages->messages=calloc(messages->count,sizeof(Message*));
 				if(messages->messages!=NULL){
 					MessageNode* messageNode=messageTypeListNode->firstMessageNode;
 					size_t messageNodeIndex=0;
@@ -306,9 +347,6 @@ size_t removeMessagesOfType(char const * const messageType){
 	return 0;
 }
 
-void outputSystemError(char const * const systemError){
-	output("%s%s",M_SYSTEM_ERROR_PREFIX,systemError);
-}
 // MDH@06AUG2024: what if we pass all output through outputf() instead of directly through output() so we can process it
 static char* outputText=NULL; // where we're going to collect the output texts
 static size_t outputLength,outputSize; // the part currently occupied of outputText
@@ -514,6 +552,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 }
 
 bool outputCollectorInitialized(){
+	messageIdStack.first=NULL;messageIdStack.last=NULL; // MDH@11AUG2024: intialize the message id stack
 	outputLength=0;outputSize=256;
 	errorPrefixLength=strlen(M_ERROR_PREFIX);
 	bugPrefixLength=strlen(M_BUG_PREFIX);

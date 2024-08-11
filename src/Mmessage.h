@@ -17,6 +17,7 @@ bool messageStreamsInitialized(char const * const source);
 */
 typedef struct Message{
 	size_t index;
+	char* id; // the id of the message identifying the group it belongs to
 	char* msg;
 }Message;
 typedef struct Messages{
@@ -26,6 +27,8 @@ typedef struct Messages{
 
 Messages* getMessagesOfType(char const * const messageType); // exposes messages of a certain type
 size_t removeMessagesOfType(char const * const messageType);
+bool addMessageOfType(char const * const messageText,char const * const messageType);
+void setMessageId(char const * const messageId);
 
 ////////size_t logMessage(char const * const messageType, char const * const messagefmt,...);
 
@@ -34,6 +37,7 @@ size_t q2outputandcollect(char const * const fmt,...);
 
 bool outputCollectorInitialized();
 
+// might copy these to Moutput.c/h and create queued versions
 size_t outputInfo(char const * const info); // replacing outputLine in all modules
 
 size_t outputWarning(char const * const warning);
