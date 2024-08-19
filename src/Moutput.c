@@ -110,7 +110,9 @@ size_t outputChar(char c){
  * 
  * @return size_t the number of characters written
  */
-size_t newline(){return outputChar('\n');}
+size_t newline(){
+	return outputChar('\n');
+}
 
 // all output to the display has to go through output!!
 /**

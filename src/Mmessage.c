@@ -371,9 +371,16 @@ static void registerBug(){
 	if(!addMessageOfType(M_BUG_PREFIX,outputText+bugPrefixLength))
 		outputSystemError("Failed to register a bug!");
 }
-static void collectLine(char* newlinePosition){
+/**
+ * @brief outputs (when \p echoToOutput is true) and collects outputText until \p newlinePosition
+ * 
+ * @param newlinePosition 
+ * @param echoToOutput outputs outputText until newlinePosition when true
+ */
+static void collectLine(char* newlinePosition,bool echoToOutput){
+	assert(newlinePosition);
 	*newlinePosition='\0';
-	output("%s%c",outputText,'\n');
+	if(echoToOutput)output("%s%c",outputText,'\n');
 	// now we can check whether outputText is an error, bug or warning
 	if(strncmp(M_ERROR_PREFIX,outputText,errorPrefixLength)==0){
 		registerError();
@@ -405,10 +412,10 @@ size_t outputInfo(char const * const info){
 	if(info!=NULL){
 		size_t l=strlen(info);
 		if(l>0){
-			if(NULL==M_INFO_PREFIX)result=output("%s",info);else
-    	result=output("%s%s",M_INFO_PREFIX,info);
-    	l--;if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-	    result+=newline();
+			if(NULL==M_INFO_PREFIX)result=q2outputandcollect("%s",info);else
+    	result=q2outputandcollect("%s%s",M_INFO_PREFIX,info);
+    	l--;if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')result+=q2outputandcollect("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+	    result+=q2outputandcollect("%c",'\n');// replacing: newline();
 		}
 	}
 	return result;
@@ -424,10 +431,12 @@ size_t outputWarning(char const * const warning){
 	if(warning!=NULL){
     size_t l=strlen(warning);
     if(l>0){
-    	if(NULL==M_WARNING_PREFIX)result=output("%s",warning);else
-    	result=output("%s%s",M_WARNING_PREFIX,warning);
-    	l--;if(l>0)if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=newline();
+			// MDH@19AUG2024: it's a nuisance if a warning does not end with a period and we have to add a period
+			//                so we can't directly call addMessageOfType() here
+    	if(NULL==M_WARNING_PREFIX)result=q2outputandcollect("%s",warning);else
+    	result=q2outputandcollect("%s%s",M_WARNING_PREFIX,warning);
+    	l--;if(l>0)if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')result+=q2outputandcollect("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    	result+=q2outputandcollect("%c",'\n'); // replacing: newline();
 		}
 	}
 	return result;
@@ -443,10 +452,10 @@ size_t outputError(char const * const error){
 	if(error!=NULL){
   	size_t l=strlen(error);
   	if(l>0){
-  		if(NULL==M_ERROR_PREFIX)result=output("%s",error);else
-    	result=output("%s%s",M_ERROR_PREFIX,error);
-    	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=newline();
+  		if(NULL==M_ERROR_PREFIX)result=q2outputandcollect("%s",error);else
+    	result=q2outputandcollect("%s%s",M_ERROR_PREFIX,error);
+    	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=q2outputandcollect("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    	result+=q2outputandcollect("%c",'\n'); // replacing: newline();
 		}
 	}
 	return result;
@@ -459,7 +468,7 @@ size_t outputError(char const * const error){
  */
 size_t outputMemoryError(char const * const memoryerror){
   if(NULL==memoryerror)return 0;
-	return output("%s%s. Probable cause: out of memory!\n",M_ERROR_PREFIX,memoryerror);
+	return q2outputandcollect("%s%s. Probable cause: out of memory!\n",M_ERROR_PREFIX,memoryerror);
 }
 
 // MDH@05NOV2019: might come in handy to be able to report bugs
@@ -471,9 +480,9 @@ size_t outputMemoryError(char const * const memoryerror){
  */
 size_t outputErrorAndText(char const * const error,char const * const text){
 	size_t result=0;
-	if(error!=NULL)result=output("%s%s",M_ERROR_PREFIX,error);
-	if(text!=NULL)result+=output(text);
-	return result+output(".\n");
+	if(error!=NULL)result=q2outputandcollect("%s%s",M_ERROR_PREFIX,error);
+	if(text!=NULL)result+=q2outputandcollect(text);
+	return result+q2outputandcollect(".\n");
 }
 
 /**
@@ -486,10 +495,10 @@ size_t outputBug(char const * const bug){
 	if(bug!=NULL){
     size_t l=strlen(bug);
 		if(l>0){
-			if(NULL==M_BUG_PREFIX)result=output("%s",bug);else
-			result=output("%s%s",M_BUG_PREFIX,bug);
-			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-			result+=newline();
+			if(NULL==M_BUG_PREFIX)result=q2outputandcollect("%s",bug);else
+			result=q2outputandcollect("%s%s",M_BUG_PREFIX,bug);
+			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=q2outputandcollect("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+			result+=q2outputandcollect("%c",'\n'); //newline();
 		}
 	}
 	return result;
@@ -507,6 +516,55 @@ int kbhit(){
 	FD_ZERO(&fds);
 	FD_SET(0, &fds);
 	return select(1,&fds,NULL,NULL,&tv);
+}
+
+/**
+ * @brief collects without outputting formatted text
+ * 
+ * @param fmt 
+ * @param ... 
+ * @return size_t the number of characters collected
+ */
+size_t q2collect(char const * const fmt,...){
+	size_t result=0;
+	if(fmt!=NULL&&strlen(fmt)>0){
+		if(outputText!=NULL){
+			do{
+			  va_list args;
+  			va_start(args,fmt);
+			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+				va_end(args);
+				if(count<=0){
+					outputText[outputLength]='\0'; // just in case
+					output("%s%s",M_ERROR_PREFIX,"Output format error!");
+					break;
+				}
+				if(outputLength+count<outputSize){ // success
+					result=count;
+					outputLength+=result; // new start
+					// if we have a full line output that full line
+					printf(outputText);
+					char* newlinePosition=strchr(outputText,'\n');
+					if(newlinePosition!=NULL)
+						collectLine(newlinePosition,false);
+					break;
+				}
+				outputSize+=64;
+				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				if(NULL==newOutputText){
+					output("%s%s",M_ERROR_PREFIX,"Output memory error");
+					break;
+				}
+				outputText=newOutputText;
+			}while(true);
+		}else{ // directly pass along to output
+		  va_list args;
+  		va_start(args,fmt);
+			vprintf(fmt,args);
+			va_end(args);
+		}
+	}
+	return result;
 }
 
 /**
@@ -537,7 +595,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 					printf(outputText);
 					char* newlinePosition=strchr(outputText,'\n');
 					if(newlinePosition!=NULL)
-						collectLine(newlinePosition);
+						collectLine(newlinePosition,true);
 					break;
 				}
 				outputSize+=64;
@@ -556,6 +614,14 @@ size_t q2outputandcollect(char const * const fmt,...){
 		}
 	}
 	return result;
+}
+/**
+ * @brief outputs and collects a new line character
+ * 
+ * @return size_t 
+ */
+size_t q2newline(){
+	return q2outputandcollect("%c",'\n');
 }
 
 bool outputCollectorInitialized(){

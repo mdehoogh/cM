@@ -4,6 +4,7 @@
  */
 #include <stdio.h>
 #include <stdarg.h>
+#include <assert.h>
 
 #include "Moutput.h"
 
@@ -32,12 +33,15 @@ char* setMessageId(char const * const messageId); // echoes the messageId
 
 ////////size_t logMessage(char const * const messageType, char const * const messagefmt,...);
 
-// MDH@07AUG2024: for logging any text (that may contain any message types)
+// MDH@07AUG2024: for logging any text to either output and/or collect (that may contain any message types)
+size_t q2collect(char const * const fmt,...);
 size_t q2outputandcollect(char const * const fmt,...);
+size_t q2newline();
 
 bool outputCollectorInitialized();
 
 // might copy these to Moutput.c/h and create queued versions
+// MDH@19AUG2024: changed to queued (collected) versions because we want these messages collected as well!!!
 size_t outputInfo(char const * const info); // replacing outputLine in all modules
 
 size_t outputWarning(char const * const warning);

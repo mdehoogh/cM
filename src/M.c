@@ -3042,7 +3042,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		if(allocationMarkAdded())
 			allocationMarksAdded++;
 		else
-			outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
+			outputError("Failed to mark the allocation before evaluating the command"); // mark the allocations at the start of evaluating a command!!!
 	}
 
 	if(amVerboseDebugging())
@@ -3095,7 +3095,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		output("%s",string(_commandText));
 		FREE_STRING(_commandText,owner);
 	}else
-		outputError("%sFailed to obtain the command result text");
+		output("%sFailed to obtain the command text.\n",M_ERROR_PREFIX);
 	output(" = ");
 
 	// if the result is a null value, show the NULL_value
@@ -3104,6 +3104,22 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	long long elapsed_writing=(clock()-before_writing)/M_CLOCKS_PER_MS;
 	
 	newline(); // outputValueColored() doesn't do that!!
+
+	// MDH@19AUG2024: let's now collect the same thing but without color!
+	Mstring* _uncoloredCommandText=owned_string(_getCommandText(false),owner); // MDH@13MAR2020 TODO determine later???????
+	if(_uncoloredCommandText!=NULL){
+		q2collect("%s",string(_uncoloredCommandText));
+		FREE_STRING(_uncoloredCommandText,owner);
+	}else
+		q2collect("%sFailed to obtain the command text",M_ERROR_PREFIX);
+	q2collect("%s"," = ");
+	Mstring* _resultText=owned_string(_getValueText(isValueNull(*resultValue)?NULL_value:*resultValue,false,false),owner);
+	if(_resultText!=NULL){
+		q2collect("%s\n",string(_resultText));
+		FREE_STRING(_resultText,owner);
+	}else
+		q2collect("%s\n","Failed to obtain the result text");
+
 	/*
 	Mstring* _doneShowingResultTimestamp=owned_string(_getTimestamp(NULL),owner);
 	if(_doneShowingResultTimestamp){
@@ -6428,7 +6444,8 @@ bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 	newline();
 	// let's mark the allocation directly behind evaluating the command
 	if(allocationMarksAdded>0){
-		if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
+		if(allocationMarkAdded())allocationMarksAdded++;
+		else outputError("Failed to mark the allocations after evaluating the command.");
 	}
 	// TODO the next part should be improved, as it is getting a bit messy
 	Mstring* _userInputCommandText=owned_string(_getCommandText(false),owner); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
@@ -6520,7 +6537,8 @@ bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 		// MDH@12MAY2020: output two incremental out
 		if(allocationMarksAdded>0){
 			outputTotalMemoryUsage();
-			if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)outputError("Not all command allocation marks output.");
+			if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)
+				outputError("Not all command allocation marks output.");
 			while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
 		}
 	}/*else // a little trick to return to entering immediately executing commands
@@ -6936,16 +6954,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	}
 
 	resetOutputColor(); // just in case
-	outputInfo("Welcome to M.");
+	output("Welcome to M.");
 	newline();
-	q2outputandcollect("Version: %s - Build: %s - Date: %s - Build at: %s.\n",M_VERSION,M_BUILD,M_DATE,M_TIMESTAMP);
+	output("Version: %s - Build: %s - Date: %s - Build at: %s.\n",M_VERSION,M_BUILD,M_DATE,M_TIMESTAMP);
 	newline();
 	displayFlags();
 	newline();
 	
 	// MDH@11NOV2019: at this point getNumberOfValues() still represents the actual number of remembered values (before values are removed from it)
 	////if(amVerbose())
-		q2outputandcollect("M shell initialized with %llu predefined values.\n",getNumberOfValues());
+		output("M shell initialized with %llu predefined values.\n",getNumberOfValues());
 
 	// done by getShellEnvironment()!!!! pushExecutionEnvironment(_Menvironment);
 	
@@ -6955,7 +6973,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		FREE_STRING(predefinedVariableNames,owner); // no get rid of it!!!
 		predefinedVariableNames=NULL;
 	}else
-		outputInfo("No predefined variables!");
+		output("No predefined variables!\n");
 	//////////output("Number of predefined variables: %d.",getNumberOfVariables(mEnvironment));
 	
 	// initialize commands and input mode
@@ -6970,7 +6988,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// TODO shouldn't we do this in initEnvironment? (or its alternative initM() yet to be created)
 	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);
-	if(NULL==_immediateFeedforwardText)outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
+	if(NULL==_immediateFeedforwardText)
+		output("%sFailed to allow immediate feed forward.\n",M_ERROR_PREFIX); // TODO we can do better than this!!
 
 	// MDH@13JUL2023: closers are characters that end a (function call argument) (list), a array (element) or a map (element)
 	//                NOTE that with function calls the amount of argument list elements is limited, whereas in an array or map it is not
@@ -6980,20 +6999,20 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
 	_expectedCharacterStack=owned_string(__string(),owner_expectedCharacterStack);
 	if(NULL==_expectedCharacterStack)
-		outputError("Failed to feed forward closing parentheses!");
+		output("%sFailed to feed forward closing parentheses!\n",M_ERROR_PREFIX);
 
 	_suggestedText=owned_string(__string(),owner_suggestedText);
 	if(NULL==_suggestedText)
-		outputError("Failed to allow suggested text");
+		output("%sFailed to allow suggested text.\n",M_ERROR_PREFIX);
 	/* do not initialize _manualFeedforwardText because there's now a difference between manual feed forward being NULL or empty (not blocking vs blocking identifier continuation)
 	_manualFeedforwardText=__string();if(!_manualFeedforwardText)outputError("Failed to allow manual feed forward");
 	*/
 	
 	char inputChar,inputCharType;
 
-	outputInfo("");
-	outputInfo("Use Ctrl-Z to exit M immediately at any time.");
-	outputInfo("In any mode press the Enter key on an empty line to switch modes.");
+	newline();
+	output("Use Ctrl-Z to exit M immediately at any time.\n");
+	output("In any mode press the Enter key on an empty line to switch modes.\n");
 
 	// let's mark the allocations BEFORE we start looping
 
@@ -7009,19 +7028,19 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");
 					FREE_STRING(_sessionStartTimestamp,owner);
 				}else
-					outputBug("Failed to obtain a session start timestamp.");
-				q2outputandcollect("Session information will be written to %s.\n",string(_outputFilename));
+					output("%sFailed to obtain a session start timestamp.\n",M_BUG_PREFIX);
+				output("Session information will be written to %s.\n",string(_outputFilename));
 			}else
-				q2outputandcollect("%sFailed to open %s for writing session information to.\n",M_ERROR_PREFIX,string(_outputFilename));
+				output("%sFailed to open %s for writing session information to.\n",M_ERROR_PREFIX,string(_outputFilename));
 		}else
-			outputError("No session log will be written, due to failing to compose the output filename.");
+			output("%sNo session log will be written, due to failing to compose the output filename.\n",M_ERROR_PREFIX);
 		FREE_STRING(_outputFilename,owner);
 		_outputFilename=NULL; // MDH@16NOV2020: precaution
 	}
 
 	if(getNumberOfAllocationMarks()==0){
 		if(!allocationMarkAdded()){
-			outputError("Failed to create the first allocation mark!");
+			output("%sFailed to create the first allocation mark!\n",M_ERROR_PREFIX);
 			exit(3);
 		}
 	}
