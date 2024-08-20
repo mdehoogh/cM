@@ -26,6 +26,7 @@ typedef struct Messages{
 	Message** messages; // the array of messages
 }Messages;
 
+Messages* getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
 Messages* getMessagesOfType(char const * const messageType); // exposes messages of a certain type
 size_t removeMessagesOfType(char const * const messageType);
 bool addMessageOfType(char const * const messageText,char const * const messageType);

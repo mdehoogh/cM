@@ -305,6 +305,64 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 // end message type lists helper functions
 
 /**
+ * @brief returns all registered messages in the original order
+ * 
+ * @return Messages* 
+ */
+Messages* getMessages(){
+	Messages* messages=calloc(1,sizeof(Messages));
+	if(messages!=NULL){
+		// now we're going to count all messages we need
+		size_t totalMessageCount=0,totalMessageTypeCount=0;
+		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+		while(messageTypeListNode!=NULL){
+			if(messageTypeListNode->count){
+				totalMessageTypeCount++;
+				totalMessageCount+=messageTypeListNode->count;
+			}
+			messageTypeListNode=messageTypeListNode->next;
+		}
+		if(totalMessageTypeCount){
+			MessageNode** messageTypeNodes=calloc(totalMessageTypeCount,sizeof(MessageNode*));
+			if(messageTypeNodes!=NULL){
+				messages->count=totalMessageCount;
+				messages->messages=calloc(totalMessageCount,sizeof(Message*));
+				if(messages->messages!=NULL){
+					// now we need to merge messages from all the message type list nodes
+					// 1. initialize messageTypeListNodes to the first of all the message type list nodes
+					MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+					size_t messageTypeIndex=0;
+					while(messageTypeListNode!=NULL){
+						messageTypeNodes[messageTypeIndex++]=messageTypeListNode->firstMessageNode;
+						messageTypeListNode=messageTypeListNode->next;
+					}
+					// 2. now ready for merging
+					size_t messageIndex=0,unfinishedMessageTypeListNodeCount=totalMessageTypeCount;
+					while(unfinishedMessageTypeListNodeCount){
+						// there's at least one message type list node unequal to NULL
+						size_t firstMessageTypeIndex=0;
+						while(NULL==messageTypeNodes[firstMessageTypeIndex])firstMessageTypeIndex++;
+						// iterate over the remaining ones
+						for(int messageTypeIndex=firstMessageTypeIndex+1;messageTypeIndex<totalMessageTypeCount;messageTypeIndex++)
+							if(messageTypeNodes[messageTypeIndex]->message->index<messageTypeNodes[firstMessageTypeIndex]->message->index)
+								firstMessageTypeIndex=messageTypeIndex;
+						// register the message at firstMessageTypeIndex as the next one
+						messages->messages[messageIndex++]=messageTypeNodes[firstMessageTypeIndex]->message;
+						messageTypeNodes[firstMessageTypeIndex]=messageTypeNodes[firstMessageTypeIndex]->next;
+						if(NULL==messageTypeNodes[firstMessageTypeIndex])unfinishedMessageTypeListNodeCount--;
+					}
+				}
+				free(messageTypeNodes);			
+			}
+			if(messages->messages!=NULL)
+				return messages;
+		}
+		free(messages);
+	}
+	return NULL;
+}
+
+/**
  * @brief returns a MessageList containing all messages of type \p messageType
  * 
  * @param messageType 
