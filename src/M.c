@@ -6269,56 +6269,58 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 		}
 		// if M_value wasn't bound to the M variable, it's memory will be freed by the garbage collector, by setting M_value to NULL we know we do not need to update the wrapped list
 		if(M_value->count==0){
-			M_value=NULL;errorflags|=2;q2outputandcollect("%sFailed to initialize variable '%s'.\n",M_ERROR_PREFIX,M_VARIABLE_NAME);
+			M_value=NULL;
+			errorflags|=2;
+			output("%sFailed to initialize variable '%s'.\n",M_ERROR_PREFIX,M_VARIABLE_NAME);
 		}else
 		if(amVerboseDebugging())
-			q2outputandcollect("Variable '%s' initialized.\n",M_VARIABLE_NAME); 
+			output("Variable '%s' initialized.\n",M_VARIABLE_NAME); 
 	}else{
 		errorflags|=4;
-		outputWarning("Failed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!");
+		output("%sFailed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!",M_WARNING_PREFIX);
 	}
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
 	if(M_value!=NULL){
 		if(!registerFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME,MM,1,(char*[]){"index(integer)"},NULL)){
 			errorflags|=8;
-			q2outputandcollect("%sFailed to register function %s.\n",M_ERROR_PREFIX,MFUNCTION_NAME);
+			output("%sFailed to register function %s.\n",M_ERROR_PREFIX,MFUNCTION_NAME);
 		}else
 		if(amVerbose())
-			q2outputandcollect("Function '%s' registered.\n",MFUNCTION_NAME);
+			output("Function '%s' registered.\n",MFUNCTION_NAME);
 	}
 
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables,1,(char*[]){"(environment)"},NULL)){
 		errorflags|=16;
-		outputWarning("Failed to register the variables() function");
+		output("%sFailed to register the variables() function",M_WARNING_PREFIX);
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"values",Mvalues,1,(char*[]){"variables(list)"},NULL)){
 		errorflags|=32;
-		outputWarning("Failed to register the values() function");
+		output("%sFailed to register the values() function",M_WARNING_PREFIX);
 	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"in",Min,1,(char*[]){"prompt(text)"},NULL)){
 		errorflags|=64;
-		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
+		output("%sFailed to register the in function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"os",MexecuteOSCommand,1,(char*[]){"os command(text)"},NULL)){
 		errorflags|=128;
-		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
+		output("%sFailed to register the os function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 
 	// color functions
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"bc",Mbc,1,(char*[]){"background color(integer)"},NULL)){
 		errorflags|=256;
-		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
+		output("%sFailed to register the bc function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"tc",Mtc,1,(char*[]){"text color(integer)"},NULL)){
 		errorflags|=512;
-		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
+		output("%sFailed to register the tc function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"python",Mpython,2,(char*[]){"python code(file|text)","output variable(text)"},NULL)){
 		errorflags|=1024;
-		outputWarning("Failed to register the python function"); // moved out of registerInternalFunctions!!!!
+		output("%sFailed to register the python function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 
 	return errorflags;
@@ -6404,7 +6406,6 @@ bool interactiveSessionInitialized(){
 		if(!blocksInitialized()){outputError("Failed to initialize the subcommand block feature");return false;}
 		outputInfo("Subcommand block feature initialized.");*/
 	}
-	outputInfo("Ready for an interactive session.");
 	return true;
 }
 // MDH@27FEB2020: called from within main() only, so can be placed directly in front of main (and separated into a separate M.c or better Minterpreter.c or Mcli.c)
@@ -6905,14 +6906,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								q2outputandcollect("Module (M_MODULE_DEBUGGING&MM_MAIN) mask: 0x%x.\n",moduleMask);
 								Debugging|=moduleMask;
 							}else
-								q2outputandcollect("%s'%s' does not denote a module.\n",M_ERROR_PREFIX,debuggingCharacters);
+								output("%s'%s' does not denote a module.\n",M_ERROR_PREFIX,debuggingCharacters);
 							// and reinitialize
 							debuggingCharacters[0]='\0';
 							debuggingCharacters[1]='\0';
 						}
 					}
 					debuggingCharacters[0]='\0'; // just in case a user forgot the second character!!! 
-					q2outputandcollect("Module (M_MODULE_DEBUGGING&MM_MAIN) flags: 0x%x.\n",Debugging);
+					output("Module (M_MODULE_DEBUGGING&MM_MAIN) flags: 0x%x.\n",Debugging);
 				}
 			}
 		}
@@ -6920,43 +6921,45 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!	
 	if(!preparedForUserInput()){
-		outputError("Failed to initialize the user session.");
+		output("%sFailed to initialize the user session.\n",M_ERROR_PREFIX);
 		resetOutputColor();
 		exit(2);
 	}
-	outputInfo("User session initialized.");
+	output("User session initialized.\n");
 
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
 	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
 	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutoCompletionText,NULL)){ // ascertain to have an shell environment!!!
-		outputError("Failed to initialize the M shell!");
+		output("%sFailed to initialize the M shell!",M_ERROR_PREFIX);
 		resetOutputColor();
 		exit(3);
 	}
-	outputInfo("Shell initialized.");
+	output("Shell initialized.\n");
 	if(_settingsCharacterText){FREE_STRING(_settingsCharacterText,owner);_settingsCharacterText=NULL;}
 
 	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
 
 	// prepare an interactive session
 	if(!interactiveSessionInitialized()){
-		outputError("Failed to initialize the interactive session");
+		output("%sFailed to initialize the interactive session.\n",M_ERROR_PREFIX);
 		resetOutputColor();
 		exit(2);
 	}
+	output("Ready for an interactive session.\n");
 
 	if(!blocksInitialized()){
-		outputError("Failed to activate the subcommand block feature");
+		output("%sFailed to activate the subcommand block feature.\n",M_ERROR_PREFIX);
 		resetOutputColor();
 		exit(3);
 	}
 
 	resetOutputColor(); // just in case
+	///////q2outputandcollect("%s\n","Welcome to M.");
 	output("Welcome to M.");
 	newline();
-	output("Version: %s - Build: %s - Date: %s - Build at: %s.\n",M_VERSION,M_BUILD,M_DATE,M_TIMESTAMP);
+	q2collect("Version: %s - Build: %s - Date: %s - Build at: %s.\n",M_VERSION,M_BUILD,M_DATE,M_TIMESTAMP);
 	newline();
 	displayFlags();
 	newline();
@@ -7896,7 +7899,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// we can get 'n' or 'x' responses
 					if(sessionSettingApplied<0){
 						if(!settingApplied(inputChar))
-							q2outputandcollect("%sSetting character '%c' not recognized.\n",M_ERROR_PREFIX,inputChar);
+							output("%sSetting character '%c' not recognized.\n",M_ERROR_PREFIX,inputChar);
 					}else
 					if(sessionSettingApplied>0)inputCharType=sessionSettingApplied;
 					break;

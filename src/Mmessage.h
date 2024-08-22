@@ -37,7 +37,7 @@ char* setMessageId(char const * const messageId); // echoes the messageId
 // MDH@07AUG2024: for logging any text to either output and/or collect (that may contain any message types)
 size_t q2collect(char const * const fmt,...);
 size_t q2outputandcollect(char const * const fmt,...);
-size_t q2newline();
+size_t q2newline(bool echoToOutput);
 
 bool outputCollectorInitialized();
 

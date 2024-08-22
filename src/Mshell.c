@@ -14977,6 +14977,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
+			if(!registerFunction(_Menvironment,owner,"messages",Mmessages,1,(char*[]){"type(text)"},NULL))
+			{
+				outputError("Failed to register the messages functions");
+				return NULL;
+			}
 			//reportNumberOfAllocations("shellInitialized 40");
 
 		}

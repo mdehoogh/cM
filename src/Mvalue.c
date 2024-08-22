@@ -7690,3 +7690,40 @@ Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner
 	if(value!=NULL&&value->type==VT_RATIONAL)return value->value._rational;
 	return _getValueRational(value);
 }
+
+// MDH@20AUG2024: messages M functions
+Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=getOwner(__LINE__);
+	Messages* messages=NULL;
+	if(messageTypeValue!=NULL){
+		if(messageTypeValue->type==VT_TEXT){
+			messages=getMessagesOfType(messageTypeValue->value._text->_c);
+		}
+		outputError("Invalid message type; will return all messages");
+		messages=getMessages();
+	}else
+		messages=getMessages();
+	if(messages!=NULL){
+		output("Number of messages: %zu.\n",messages->count);
+		Marray* messagesArray=owned_array(_getArray("Mmessages",messages->count,NULL),owner);
+		if(messagesArray!=NULL){
+			size_t messageIndex=messages->count;
+			while(messageIndex>0){
+				messageIndex--;
+				Message* message=messages->messages[--messageIndex];
+				if(NULL==message)continue;
+				Mstring* msgText=owned_string(_getString("'"),owner);
+				if(msgText==NULL){outputError("Failed to create text to store message in");continue;}
+				if(strlen(message->id)){
+					string_append(msgText,message->id);
+					string_append(msgText,": ");
+				}
+				string_append(msgText,message->msg);
+				assignValue(messagesArray->values+messageIndex,_getValueOfText(_getText(string(msgText))));
+				FREE_STRING(msgText,owner);
+			}
+			return _getValueOfArray(disowned_array(messagesArray,owner));
+		}
+	}else
+		output("No messages!\n");
+	return NULL;
+}

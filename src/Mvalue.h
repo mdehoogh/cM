@@ -642,3 +642,5 @@ Mrational* _getValueRational(Mvalue const * const value);
 Mrational* getValueRational(Mvalue const * const value);
 
 Mfile* _getFile(char const * const filename);
+
+Mvalue* Mmessages(Mvalue const * const messageTypeValue);

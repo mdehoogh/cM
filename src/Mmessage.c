@@ -280,10 +280,12 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			messageNode->message=malloc(sizeof(Message));
 			if(NULL==messageNode->message){
 				free(messageNode);
+				output("%sFailed to allocate message.\n",M_ERROR_PREFIX);
 				return false;
 			}
 			messageNode->message->msg=strdup(messageText);
 			if(NULL==messageNode->message->msg){
+				output("%sFailed to store message.\n",M_ERROR_PREFIX);
 				free(messageNode->message);
 				free(messageNode);
 				return false;
@@ -297,9 +299,10 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			messageTypeListNode->lastMessageNode=messageNode;
 			if(NULL==messageTypeListNode->firstMessageNode)
 				messageTypeListNode->firstMessageNode=messageNode;
+			return true;
 		}
 	}else
-		outputSystemError("Failed to register a message");
+		output("%sFailed to register a message.\n",M_ERROR_PREFIX);
 	return false;
 }
 // end message type lists helper functions
@@ -310,24 +313,32 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
  * @return Messages* 
  */
 Messages* getMessages(){
+	output("Retrieving messages.\n");
 	Messages* messages=calloc(1,sizeof(Messages));
 	if(messages!=NULL){
 		// now we're going to count all messages we need
+		output("Counting messages.\n");
 		size_t totalMessageCount=0,totalMessageTypeCount=0;
-		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
-		while(messageTypeListNode!=NULL){
-			if(messageTypeListNode->count){
-				totalMessageTypeCount++;
-				totalMessageCount+=messageTypeListNode->count;
+		if(firstMessageTypeListNode!=NULL){
+			MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+			while(messageTypeListNode!=NULL){
+				if(messageTypeListNode->count){
+					totalMessageTypeCount++;
+					totalMessageCount+=messageTypeListNode->count;
+				}else
+					output("%sNo messages of type '%s'.\n",M_WARNING_PREFIX,messageTypeListNode->messageType);
+				messageTypeListNode=messageTypeListNode->next;
 			}
-			messageTypeListNode=messageTypeListNode->next;
-		}
+		}else
+			output("%sNo message types!\n",M_WARNING_PREFIX);
 		if(totalMessageTypeCount){
+			output("Total number of messages: %zu.\n",totalMessageTypeCount);
 			MessageNode** messageTypeNodes=calloc(totalMessageTypeCount,sizeof(MessageNode*));
 			if(messageTypeNodes!=NULL){
 				messages->count=totalMessageCount;
 				messages->messages=calloc(totalMessageCount,sizeof(Message*));
 				if(messages->messages!=NULL){
+					output("Collecting messages.\n");
 					// now we need to merge messages from all the message type list nodes
 					// 1. initialize messageTypeListNodes to the first of all the message type list nodes
 					MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
@@ -338,6 +349,7 @@ Messages* getMessages(){
 					}
 					// 2. now ready for merging
 					size_t messageIndex=0,unfinishedMessageTypeListNodeCount=totalMessageTypeCount;
+					output("Number of message types: %zu.\n",unfinishedMessageTypeListNodeCount);
 					while(unfinishedMessageTypeListNodeCount){
 						// there's at least one message type list node unequal to NULL
 						size_t firstMessageTypeIndex=0;
@@ -347,18 +359,28 @@ Messages* getMessages(){
 							if(messageTypeNodes[messageTypeIndex]->message->index<messageTypeNodes[firstMessageTypeIndex]->message->index)
 								firstMessageTypeIndex=messageTypeIndex;
 						// register the message at firstMessageTypeIndex as the next one
+						output("Collecting message #%zu.\n",messageIndex+1);
 						messages->messages[messageIndex++]=messageTypeNodes[firstMessageTypeIndex]->message;
+						output("Message #%zu collected.\n",messageIndex);
 						messageTypeNodes[firstMessageTypeIndex]=messageTypeNodes[firstMessageTypeIndex]->next;
-						if(NULL==messageTypeNodes[firstMessageTypeIndex])unfinishedMessageTypeListNodeCount--;
+						if(NULL==messageTypeNodes[firstMessageTypeIndex]){
+							unfinishedMessageTypeListNodeCount--;
+							output("Number of message types left: %zu.\n",unfinishedMessageTypeListNodeCount);
+						}
 					}
-				}
+				}else
+					output("%sNo memory for messages.\n",M_ERROR_PREFIX);
 				free(messageTypeNodes);			
-			}
+			}else
+				output("%sNo message type nodes.\n",M_WARNING_PREFIX);
 			if(messages->messages!=NULL)
 				return messages;
-		}
+		}else
+			output("%sNo messages.\n",M_WARNING_PREFIX);
+		if(messages->messages!=NULL)free(messages->messages); // unlikely though
 		free(messages);
-	}
+	}else
+		output("%sNo memory for messages array!\n",M_WARNING_PREFIX);
 	return NULL;
 }
 
@@ -438,6 +460,7 @@ static void registerBug(){
 static void collectLine(char* newlinePosition,bool echoToOutput){
 	assert(newlinePosition);
 	*newlinePosition='\0';
+	output("Collecting line '%s'.\n",outputText);
 	if(echoToOutput)output("%s%c",outputText,'\n');
 	// now we can check whether outputText is an error, bug or warning
 	if(strncmp(M_ERROR_PREFIX,outputText,errorPrefixLength)==0){
@@ -449,10 +472,12 @@ static void collectLine(char* newlinePosition,bool echoToOutput){
 	if(strncmp(M_WARNING_PREFIX,outputText,warningPrefixLength)==0){
 		registerWarning();
 	}
+	// increment newlinePosition so it will stand on the first character of the next line (if any)
+	newlinePosition++; 
 	ssize_t shortened=(newlinePosition-outputText);
 	if(shortened<=outputLength){
 		outputLength-=shortened;
-		if(outputLength)memmove(outputText,newlinePosition+1,outputLength);
+		if(outputLength)memmove(outputText,newlinePosition,outputLength);
 		// we have to move the remaining text up
 		*(outputText+outputLength)='\0';
 	}else
@@ -588,23 +613,31 @@ size_t q2collect(char const * const fmt,...){
 	if(fmt!=NULL&&strlen(fmt)>0){
 		if(outputText!=NULL){
 			do{
+				output("Output size: %llu - length: %llu - format: '%s'",outputSize,outputLength,fmt);
 			  va_list args;
   			va_start(args,fmt);
 			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
 				va_end(args);
+				output("Count: %d",count);
 				if(count<=0){
-					outputText[outputLength]='\0'; // just in case
+					///////outputText[outputLength]='\0'; // just in case
 					output("%s%s",M_ERROR_PREFIX,"Output format error!");
 					break;
 				}
 				if(outputLength+count<outputSize){ // success
 					result=count;
 					outputLength+=result; // new start
+					///////outputText[outputLength]='\0'; // just in case
+					output(" - output length: %llu",outputLength);
 					// if we have a full line output that full line
-					printf(outputText);
+					output(" - output text: <<<<<<<");
+					for(size_t i=0;i<outputSize;i++)output("(%d)",outputText[i]);
+					output(">>>>>>>>>>\n");
 					char* newlinePosition=strchr(outputText,'\n');
 					if(newlinePosition!=NULL)
 						collectLine(newlinePosition,false);
+					else
+						output("%s!\n","No end-of-line");
 					break;
 				}
 				outputSize+=64;
@@ -616,6 +649,7 @@ size_t q2collect(char const * const fmt,...){
 				outputText=newOutputText;
 			}while(true);
 		}else{ // directly pass along to output
+			output("%sNo output collector!\n",M_WARNING_PREFIX);
 		  va_list args;
   		va_start(args,fmt);
 			vprintf(fmt,args);
@@ -642,7 +676,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
 				va_end(args);
 				if(count<=0){
-					outputText[outputLength]='\0'; // just in case
+					//////outputText[outputLength]='\0'; // just in case
 					output("%s%s",M_ERROR_PREFIX,"Output format error!");
 					break;
 				}
@@ -650,7 +684,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 					result=count;
 					outputLength+=result; // new start
 					// if we have a full line output that full line
-					printf(outputText);
+					printf("%s",outputText);
 					char* newlinePosition=strchr(outputText,'\n');
 					if(newlinePosition!=NULL)
 						collectLine(newlinePosition,true);
@@ -665,6 +699,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 				outputText=newOutputText;
 			}while(true);
 		}else{ // directly pass along to output
+			output("%sNo output collector!\n",M_WARNING_PREFIX);
 		  va_list args;
   		va_start(args,fmt);
 			vprintf(fmt,args);
@@ -678,16 +713,16 @@ size_t q2outputandcollect(char const * const fmt,...){
  * 
  * @return size_t 
  */
-size_t q2newline(){
-	return q2outputandcollect("%c",'\n');
+size_t q2newline(bool echoToOutput){
+	return(echoToOutput?q2outputandcollect("%c",'\n'):q2collect("%c",'\n'));
 }
 
 bool outputCollectorInitialized(){
 	messageIdStack.first=NULL;messageIdStack.last=NULL; // MDH@11AUG2024: intialize the message id stack
-	outputLength=0;outputSize=256;
 	errorPrefixLength=strlen(M_ERROR_PREFIX);
 	bugPrefixLength=strlen(M_BUG_PREFIX);
 	warningPrefixLength=strlen(M_WARNING_PREFIX);
+	outputLength=0;outputSize=256;
 	outputText=calloc(256,sizeof(char)); // should suffice
 	return(outputText!=NULL);
 }
