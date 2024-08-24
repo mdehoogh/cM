@@ -7708,14 +7708,18 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=
 		if(messagesArray!=NULL){
 			size_t messageIndex=messages->count;
 			while(messageIndex>0){
-				messageIndex--;
 				Message* message=messages->messages[--messageIndex];
 				if(NULL==message)continue;
 				Mstring* msgText=owned_string(_getString("'"),owner);
 				if(msgText==NULL){outputError("Failed to create text to store message in");continue;}
-				if(strlen(message->id)){
+				if(message->id!=NULL&&strlen(message->id)){
+					string_append_char(msgText,'(');
 					string_append(msgText,message->id);
-					string_append(msgText,": ");
+					string_append(msgText,") ");
+				}
+				if(messages->types[messageIndex]!=NULL){
+					string_append(msgText,messages->types[messageIndex]);
+					///////string_append(msgText,": ");
 				}
 				string_append(msgText,message->msg);
 				assignValue(messagesArray->values+messageIndex,_getValueOfText(_getText(string(msgText))));

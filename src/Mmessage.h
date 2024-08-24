@@ -21,8 +21,10 @@ typedef struct Message{
 	char* id; // the id of the message identifying the group it belongs to
 	char* msg;
 }Message;
+
 typedef struct Messages{
 	size_t count; // the number of message nodes in the message array
+	char** types; // the types of the messages (the fastest way to return the types as well)
 	Message** messages; // the array of messages
 }Messages;
 
