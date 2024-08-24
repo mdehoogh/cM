@@ -222,6 +222,7 @@ static MessageTypeListNode* getMessageTypeListNode(char const * const messageTyp
 static MessageTypeListNode* getNewMessageTypeListNode(char const * const messageType){
 	MessageTypeListNode* newMessageTypeListNode=calloc(1,sizeof(MessageTypeListNode));
 	if(newMessageTypeListNode!=NULL){
+		newMessageTypeListNode->next=NULL; // should not be required though!!!
 		newMessageTypeListNode->messageType=strdup(messageType);
 		if(NULL==newMessageTypeListNode->messageType){
 			free(newMessageTypeListNode);
@@ -253,14 +254,15 @@ static MessageTypeListNode* _getMessageTypeListNode(char const * const messageTy
 		// find the message type list with of the given messageType
 		messageTypeListNode=getMessageTypeListNode(messageType);
 		// when not found, try to create one
-		if(messageTypeListNode==NULL)
+		if(messageTypeListNode==NULL){
 			messageTypeListNode=getNewMessageTypeListNode(messageType);
-		if(NULL==messageTypeListNode)return NULL;
-		if(NULL==firstMessageTypeListNode)
-			firstMessageTypeListNode=messageTypeListNode;
-		else
-			lastMessageTypeListNode->next=messageTypeListNode;
-		lastMessageTypeListNode=messageTypeListNode;
+			if(NULL==messageTypeListNode)return NULL;
+			if(NULL==firstMessageTypeListNode)
+				firstMessageTypeListNode=messageTypeListNode;
+			else
+				lastMessageTypeListNode->next=messageTypeListNode;
+			lastMessageTypeListNode=messageTypeListNode;
+		}
 	}
 	return messageTypeListNode;
 }
@@ -300,6 +302,7 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			messageTypeListNode->lastMessageNode=messageNode;
 			if(NULL==messageTypeListNode->firstMessageNode)
 				messageTypeListNode->firstMessageNode=messageNode;
+			output("Message #%zu registered!\n",messageIndex);
 			return true;
 		}
 	}else
@@ -490,8 +493,8 @@ static void collectLine(char* newlinePosition,bool echoToOutput){
 	}else
 	if(strncmp(M_WARNING_PREFIX,outputText,warningPrefixLength)==0){
 		registerWarning();
-	}/*else
-		registerMessage();*/
+	}else
+		registerMessage();
 
 	// increment newlinePosition so it will stand on the first character of the next line (if any)
 	newlinePosition++; 
@@ -543,6 +546,7 @@ size_t outputWarning(char const * const warning){
     	result+=q2outputandcollect("%c",'\n'); // replacing: newline();
 		}
 	}
+	output("Warning length: %zu.\n",result);
 	return result;
 }
 
@@ -651,9 +655,10 @@ size_t q2collect(char const * const fmt,...){
 					///////outputText[outputLength]='\0'; // just in case
 					output(" - output length: %llu",outputLength);
 					// if we have a full line output that full line
-					output(" - output text: <<<<<<<");
-					for(size_t i=0;i<outputSize;i++)output("(%d)",outputText[i]);
-					output(">>>>>>>>>>\n");
+					output("%s"," - output text: <<<<<<<");
+					//////output("%s",outputText);
+					for(size_t i=0;i<outputSize&&outputText[i]!=0;i++)output("%c",outputText[i]);
+					output("%s",">>>>>>>>>>\n");
 					char* newlinePosition=strchr(outputText,'\n');
 					if(newlinePosition!=NULL)
 						collectLine(newlinePosition,false);

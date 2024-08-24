@@ -14321,23 +14321,24 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 	// register the callbacks
 	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else outputWarning("No input character read function defined!");
-	if(!_inputInfoFunction){inputInfoFunction=inputInfo;outputWarning("Using the default input info function.");}else inputInfoFunction=_inputInfoFunction;
-	if(!_inputErrorFunction){inputErrorFunction=inputError;outputWarning("Using the default input error function.");}else inputErrorFunction=_inputErrorFunction;
-	if(!_outputTokenFunction){outputTokenFunction=outputToken;outputWarning("Using the default output token function.");}else outputTokenFunction=_outputTokenFunction;
-	if(!_reoutputTokenFunction)outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
-	if(!_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
-	if(!_outputCommandInfoFunction)outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
+	if(NULL==_inputInfoFunction){inputInfoFunction=inputInfo;outputWarning("Using the default input info function.");}else inputInfoFunction=_inputInfoFunction;
+	if(NULL==_inputErrorFunction){inputErrorFunction=inputError;outputWarning("Using the default input error function.");}else inputErrorFunction=_inputErrorFunction;
+	if(NULL==_outputTokenFunction){outputTokenFunction=outputToken;outputWarning("Using the default output token function.");}else outputTokenFunction=_outputTokenFunction;
+	if(NULL==_reoutputTokenFunction)outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
+	if(NULL==_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
+	if(NULL==_outputCommandInfoFunction)output("%sNo output command info function.",M_WARNING_PREFIX);else outputCommandInfoFunction=_outputCommandInfoFunction;
 
 	//reportNumberOfAllocations("shellInitialized 5");
 
-	if(!inputInfoFunction)outputWarning("No input info function!");else outputInfo("Input info function set!");
-	if(!inputErrorFunction)outputWarning("No input error function!");else outputInfo("Input error function set!");
-	if(!inputCharReadFunction)outputWarning("No input char read function!");else outputInfo("Input char read function set!");
-	if(!outputTokenFunction)outputWarning("No output token function!");else outputInfo("Output token function set!");
-	if(!reoutputTokenFunction)outputWarning("No reoutput token function!");else outputInfo("Reoutput token function set!");
-	if(!updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");else outputInfo("Update last token auto completion text function set!");
-	if(!outputCommandInfoFunction)outputWarning("No output command info function!");else outputInfo("Output command info function set!");
+	if(NULL==inputInfoFunction)outputWarning("No input info function!");else outputInfo("Input info function set!");
+	if(NULL==inputErrorFunction)outputWarning("No input error function!");else outputInfo("Input error function set!");
+	if(NULL==inputCharReadFunction)outputWarning("No input char read function!");else outputInfo("Input char read function set!");
+	if(NULL==outputTokenFunction)outputWarning("No output token function!");else outputInfo("Output token function set!");
+	if(NULL==reoutputTokenFunction)outputWarning("No reoutput token function!");else outputInfo("Reoutput token function set!");
+	if(NULL==updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");else outputInfo("Update last token auto completion text function set!");
+	if(NULL==outputCommandInfoFunction)output("%sNo output command info function!",M_WARNING_PREFIX);else outputInfo("Output command info function set!");
 
+	outputWarning("Dit is een test");
 	//reportNumberOfAllocations("shellInitialized 6");
 
 	long long decimalprecision=getDP();
