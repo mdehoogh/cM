@@ -7696,14 +7696,14 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=
 	Messages* messages=NULL;
 	if(messageTypeValue!=NULL){
 		if(messageTypeValue->type==VT_TEXT){
-			messages=getMessagesOfType(messageTypeValue->value._text->_c);
+			messages=_getMessagesOfType(messageTypeValue->value._text->_c);
 		}
 		outputError("Invalid message type; will return all messages");
-		messages=getMessages();
+		messages=_getMessages();
 	}else
-		messages=getMessages();
+		messages=_getMessages();
 	if(messages!=NULL){
-		output("Number of messages: %zu.\n",messages->count);
+		///output("Number of messages: %zu.\n",messages->count);
 		Marray* messagesArray=owned_array(_getArray("Mmessages",messages->count,NULL),owner);
 		if(messagesArray!=NULL){
 			size_t messageIndex=messages->count;
@@ -7725,8 +7725,13 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=
 				assignValue(messagesArray->values+messageIndex,_getValueOfText(_getText(string(msgText))));
 				FREE_STRING(msgText,owner);
 			}
-			return _getValueOfArray(disowned_array(messagesArray,owner));
 		}
+		// essential to free the (unmanaged) messages
+		free(messages->messages);
+		free(messages->types);
+		free(messages);
+		if(messagesArray!=NULL)
+			return _getValueOfArray(disowned_array(messagesArray,owner));
 	}else
 		output("No messages!\n");
 	return NULL;

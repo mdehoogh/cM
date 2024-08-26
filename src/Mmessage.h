@@ -28,8 +28,8 @@ typedef struct Messages{
 	Message** messages; // the array of messages
 }Messages;
 
-Messages* getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
-Messages* getMessagesOfType(char const * const messageType); // exposes messages of a certain type
+Messages* _getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
+Messages* _getMessagesOfType(char const * const messageType); // exposes messages of a certain type
 size_t removeMessagesOfType(char const * const messageType);
 bool addMessageOfType(char const * const messageText,char const * const messageType);
 char* setMessageId(char const * const messageId); // echoes the messageId
