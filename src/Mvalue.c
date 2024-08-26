@@ -7727,12 +7727,27 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=
 			}
 		}
 		// essential to free the (unmanaged) messages
-		free(messages->messages);
-		free(messages->types);
-		free(messages);
+		free_messages(messages);
 		if(messagesArray!=NULL)
 			return _getValueOfArray(disowned_array(messagesArray,owner));
 	}else
 		output("No messages!\n");
 	return NULL;
+}
+/**
+ * @brief removes all messages of type \p messageTypeValue
+ * 
+ * @param messageTypeValue 
+ * @return Mvalue* the number of unremoved messages, or M_LL_INVALID when the type is not registered
+ */
+Mvalue* Mremovemessages(Mvalue const * const messageTypeValue){
+	long long result=M_LL_INVALID;
+	if(messageTypeValue!=NULL){
+		if(messageTypeValue->type==VT_TEXT){
+			result=removeMessagesOfType(messageTypeValue->value._text->_c);
+			if(result<0)result=M_LL_INVALID;
+		}
+	}else // removing all messages (not the types)
+		result=removeMessagesOfType(NULL);
+	return _getIntegerValue(result);
 }

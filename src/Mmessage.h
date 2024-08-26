@@ -29,8 +29,10 @@ typedef struct Messages{
 }Messages;
 
 Messages* _getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
+void free_messages(Messages const * const messages);
 Messages* _getMessagesOfType(char const * const messageType); // exposes messages of a certain type
-size_t removeMessagesOfType(char const * const messageType);
+long long removeMessagesOfType(char const * const messageType);
+
 bool addMessageOfType(char const * const messageText,char const * const messageType);
 char* setMessageId(char const * const messageId); // echoes the messageId
 

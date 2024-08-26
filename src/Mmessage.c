@@ -235,6 +235,10 @@ static size_t freedMessageNode(MessageNode* messageNode){
 	size_t result=0;
 	if(messageNode!=NULL){
 		if(messageNode->next!=NULL){result=freedMessageNode(messageNode->next);messageNode->next=NULL;}
+		if(messageNode->message!=NULL){
+			////free(messageNode->message->id); // the id points to a registered message id (so message doesn't own it)
+			free(messageNode->message->msg);
+		}
 		free(messageNode);
 		result++;
 	}
@@ -403,7 +407,17 @@ Messages* _getMessages(){
 		output("%sNo memory for messages array!\n",M_WARNING_PREFIX);
 	return NULL;
 }
-
+/**
+ * @brief frees \p messages returned by _getMessages() or _getMessagesOfType()
+ * 
+ * @param messages the messages to free
+ */
+void free_messages(Messages const * const messages){
+	if(NULL==messages)return;
+	free(messages->messages);
+	free(messages->types);
+	free(messages);
+}
 /**
  * @brief returns a MessageList containing all messages of type \p messageType
  * 
@@ -435,27 +449,44 @@ Messages* _getMessagesOfType(char const * const messageType){
 	return NULL;
 }
 /**
+ * @brief removes all messages registered in \p messageTypeListNode
+ * 
+ * @param messageTypeListNode 
+ */
+static void removeMessageTypeListNode(MessageTypeListNode * const messageTypeListNode){
+	if(NULL==messageTypeListNode)return;
+	size_t freedMessageNodes=freedMessageNode(messageTypeListNode->firstMessageNode);
+	messageTypeListNode->count-=freedMessageNodes;
+	if(messageTypeListNode->count==0){
+		messageTypeListNode->firstMessageNode=NULL;
+		messageTypeListNode->lastMessageNode=NULL;
+	}
+}
+/**
  * @brief removes all messages of type messageType
  * 
  * @param messageType 
  * @return * exposes 
  */
-size_t removeMessagesOfType(char const * const messageType){
+long long removeMessagesOfType(char const * const messageType){
+	long long unremovedMessageCount=-1;
 	if(messageType!=NULL){
 		MessageTypeListNode* messageTypeListNode=getMessageTypeListNode(messageType);
 		if(messageTypeListNode!=NULL&&messageTypeListNode->count>0){
-			size_t freedMessageNodes=freedMessageNode(messageTypeListNode->firstMessageNode);
-			messageTypeListNode->count-=freedMessageNodes;
-			if(messageTypeListNode->count==0){
-				messageTypeListNode->firstMessageNode=NULL;
-				messageTypeListNode->lastMessageNode=NULL;
-			}
-			return messageTypeListNode->count; // return the number of not freed message nodes
+			removeMessageTypeListNode(messageTypeListNode);
+			unremovedMessageCount=messageTypeListNode->count; // return the number of not freed message nodes
 		}
+		return 0;
 	}else{ // remove all messages
-
+		unremovedMessageCount=0;
+		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+		while(messageTypeListNode!=NULL){
+			removeMessageTypeListNode(messageTypeListNode);
+			unremovedMessageCount+=messageTypeListNode->count;
+			messageTypeListNode=messageTypeListNode->next;
+		}
 	}
-	return 0;
+	return unremovedMessageCount;
 }
 
 // MDH@06AUG2024: what if we pass all output through outputf() instead of directly through output() so we can process it

@@ -14978,7 +14978,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
-			if(!registerFunction(_Menvironment,owner,"messages",Mmessages,1,(char*[]){"type(text)"},NULL))
+			if(!registerFunction(_Menvironment,owner,"messages",Mmessages,1,(char*[]){"[type(text)]"},NULL)
+					||!registerFunction(_Menvironment,owner,"removemessages",Mremovemessages,1,(char*[]){"[type(text)]"},NULL))
 			{
 				outputError("Failed to register the messages functions");
 				return NULL;
