@@ -643,6 +643,6 @@ Mrational* getValueRational(Mvalue const * const value);
 
 Mfile* _getFile(char const * const filename);
 
-Mvalue* Mmessages(Mvalue const * const messageTypeValue);
+Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const returnTypeValue);
 Mvalue* Mremovemessages(Mvalue const * const messageTypeValue);
 Mvalue* Maddmessage(Mvalue const * const messageValue);

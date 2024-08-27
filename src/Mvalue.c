@@ -3780,7 +3780,7 @@ bool isMapProperty(Mmap* map,char* propertyName){
 	if(map!=NULL&&propertyName!=NULL){
 		Mmapelement* mapelement=map->_first;
 		while(mapelement!=NULL){
-			if(!strcmp(mapelement->_variable->_name->chars,propertyName))return true; // found
+			if(strcmp(mapelement->_variable->_name->chars,propertyName)==0)return true; // found
 			mapelement=mapelement->_next;
 		}
 	}
@@ -7693,7 +7693,14 @@ Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner
 }
 
 // MDH@20AUG2024: messages M functions
-Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=getOwner(__LINE__);
+/**
+ * @brief returns all message of type \p messageTypeValue in the return type indicated by \p returnTypeValue
+ * 
+ * @param messageTypeValue 
+ * @param returnTypeValue 
+ * @return Mvalue* 
+ */
+Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const returnTypeValue){Mallocationowner owner=getOwner(__LINE__);
 	Messages* messages=NULL;
 	if(messageTypeValue!=NULL){
 		if(messageTypeValue->type!=VT_TEXT){
@@ -7705,32 +7712,107 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=
 		messages=_getMessagesOfType(NULL);
 	if(messages!=NULL){
 		output("Number of messages: %zu.\n",messages->count);
-		Marray* messagesArray=owned_array(_getArray("Mmessages",messages->count,NULL),owner);
-		if(messagesArray!=NULL){
-			size_t messageIndex=messages->count;
-			while(messageIndex>0){
-				Message* message=messages->messages[--messageIndex];
-				if(NULL==message)continue;
-				Mstring* msgText=owned_string(_getString("'"),owner);
-				if(msgText==NULL){output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);continue;}
-				if(message->id!=NULL&&strlen(message->id)){
-					string_append_char(msgText,'(');
-					string_append(msgText,message->id);
-					string_append(msgText,") ");
+		char returnType='l'; // returns a list by default
+		if(returnTypeValue!=NULL&&returnTypeValue->type==VT_TEXT){
+			if(strlen(returnTypeValue->value._text->_c)>0){
+				returnType=(returnTypeValue->value._text->_c[0]);
+				if(returnType!='a'&&returnType!='m')returnType='l';
+			}
+		}
+		output("Return type: %c.\n",returnType);
+		Marray* messagesArray=NULL;
+		Mlist* messagesList=NULL;
+		Mmap* messagesMap=NULL;
+		if(returnType=='a'){
+			// instead of an array we could return a list as well, or as a map (with the id used as key)
+			messagesArray=owned_array(_getArray("Mmessages",messages->count,NULL),owner);
+			if(messagesArray!=NULL){
+				size_t messageIndex=messages->count;
+				while(messageIndex>0){
+					Message* message=messages->messages[--messageIndex];
+					if(NULL==message)continue;
+					Mstring* msgText=owned_string(_getString("'"),owner);
+					if(msgText==NULL){output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);continue;}
+					if(message->id!=NULL&&strlen(message->id)){
+						string_append_char(msgText,'(');
+						string_append(msgText,message->id);
+						string_append(msgText,") ");
+					}
+					if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
+						string_append(msgText,messages->types[messageIndex]);
+						///////string_append(msgText,": ");
+					}
+					string_append(msgText,message->msg);
+					assignValue(messagesArray->values+messageIndex,_getValueOfText(_getText(string(msgText))));
+					FREE_STRING(msgText,owner);
 				}
-				if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
-					string_append(msgText,messages->types[messageIndex]);
-					///////string_append(msgText,": ");
+			}
+		}else
+		if(returnType=='m'){
+			messagesMap=owned_map(__map("Mmessages"),owner);
+			if(messagesMap!=NULL){
+				char *messageId,*currentMessageId=NULL;
+				Mlist* idMessageList;
+				size_t messageIndex=0,messageCount=messages->count;
+				while(messageIndex<messageCount){
+					Message* message=messages->messages[messageIndex++];
+					if(NULL==message)continue;
+					messageId=message->id;if(NULL==messageId)messageId="";
+					if(!isMapProperty(messagesMap,messageId)){
+						idMessageList=owned_list(__list("Mmessages"),owner);
+						if(appendedToMap(messagesMap,owner,messageId,_getValueOfList(disowned_list(idMessageList,owner)))!=M_TRUE){
+							free_list(idMessageList);idMessageList=NULL;
+						}
+					}else
+						idMessageList=getMapelement(messagesMap,messageId)->_variable->_value->value._list;
+					if(NULL==idMessageList)continue;
+					Mstring* msgText=owned_string(_getString("'"),owner);
+					if(msgText==NULL){
+						output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);
+						continue;
+					}
+					if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
+						string_append(msgText,messages->types[messageIndex]);
+						///////string_append(msgText,": ");
+					}
+					string_append(msgText,message->msg);
+					if(appendedToList(idMessageList,owner,_getValueOfText(_getText(string(msgText))),M_LL_INVALID)<=0)
+						output("%sFailed to append message to id message list.\n",M_ERROR_PREFIX);
+					FREE_STRING(msgText,owner);
 				}
-				string_append(msgText,message->msg);
-				assignValue(messagesArray->values+messageIndex,_getValueOfText(_getText(string(msgText))));
-				FREE_STRING(msgText,owner);
+			}
+		}else{ // return the messages as a list (the default)
+			messagesList=owned_list(__list("Mmessages"),owner);
+			if(messagesList!=NULL){
+				size_t messageIndex=0,messageCount=messages->count;
+				while(messageIndex<messageCount){
+					Message* message=messages->messages[messageIndex++];
+					Mstring* msgText=owned_string(_getString("'"),owner);
+					if(msgText==NULL){output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);continue;}
+					if(message->id!=NULL&&strlen(message->id)){
+						string_append_char(msgText,'(');
+						string_append(msgText,message->id);
+						string_append(msgText,") ");
+					}
+					if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
+						string_append(msgText,messages->types[messageIndex]);
+						///////string_append(msgText,": ");
+					}
+					string_append(msgText,message->msg);
+					if(appendedToList(messagesList,owner,_getValueOfText(_getText(string(msgText))),message->index)<=0)
+						output("%sFailed to append messages to the messages list.\n",M_ERROR_PREFIX);
+					FREE_STRING(msgText,owner);
+				}
 			}
 		}
 		// essential to free the (unmanaged) messages
 		free_messages(messages);
+		if(messagesList!=NULL)
+			return _getValueOfList(disowned_list(messagesList,owner));
 		if(messagesArray!=NULL)
 			return _getValueOfArray(disowned_array(messagesArray,owner));
+		if(messagesMap!=NULL)
+			return _getValueOfMap(disowned_map(messagesMap,owner));
 	}else
 		output("No messages!\n");
 	return NULL;
