@@ -42,6 +42,7 @@ const char* const M_INFO_PREFIX=""; // MDH@27FEB2020: as for now NO actual info 
 const char* const M_ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const M_WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const M_BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
+const char* const M_USER_PREFIX="USER: "; // MDH@27AUG2024: for user messages
 
 const char* M_HIDDEN_VARIABLE_NAMES[]={"M","?","_"}; // MDH@14NOV2019: the variable names not to show when the variables are shown (with their current value)
 const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES=3;// MDH@14NOV2019: yes, three of them
@@ -14979,7 +14980,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 
 			if(!registerFunction(_Menvironment,owner,"messages",Mmessages,1,(char*[]){"[type(text)]"},NULL)
-					||!registerFunction(_Menvironment,owner,"removemessages",Mremovemessages,1,(char*[]){"[type(text)]"},NULL))
+					||!registerFunction(_Menvironment,owner,"removemessages",Mremovemessages,1,(char*[]){"[type(text)]"},NULL)
+					||!registerFunction(_Menvironment,owner,"addmessage",Maddmessage,1,(char*[]){"message(text)"},NULL))
 			{
 				outputError("Failed to register the messages functions");
 				return NULL;

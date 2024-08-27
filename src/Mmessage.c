@@ -237,7 +237,11 @@ static size_t freedMessageNode(MessageNode* messageNode){
 		if(messageNode->next!=NULL){result=freedMessageNode(messageNode->next);messageNode->next=NULL;}
 		if(messageNode->message!=NULL){
 			////free(messageNode->message->id); // the id points to a registered message id (so message doesn't own it)
-			free(messageNode->message->msg);
+			if(messageNode->message->msg!=NULL){
+				output("Releasing message '%s'.\n",messageNode->message->msg);
+				free(messageNode->message->msg);
+			}
+			free(messageNode->message);
 		}
 		free(messageNode);
 		result++;
@@ -282,9 +286,10 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 	MessageTypeListNode *messageTypeListNode=_getMessageTypeListNode(messageType);
 	if(messageTypeListNode!=NULL){
 		///output("Registering message '%s' of type '%s'.\n",messageText,messageType);
-		MessageNode* messageNode=malloc(sizeof(MessageNode));
+		MessageNode* messageNode=calloc(1,sizeof(MessageNode));
 		if(messageNode!=NULL){
-			messageNode->message=malloc(sizeof(Message));
+			//// malloc() above changed to calloc()!!! messageNode->next=NULL; // essential bro'
+			messageNode->message=calloc(1,sizeof(Message));
 			if(NULL==messageNode->message){
 				free(messageNode);
 				output("%sFailed to allocate message.\n",M_ERROR_PREFIX);
@@ -315,11 +320,12 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 }
 // end message type lists helper functions
 
-/**
+/* _getMessagesOfType() can take care of the general case of retrieving all messages as well now
+///**
  * @brief returns all registered messages in the original order
  * 
  * @return Messages* 
- */
+ 
 Messages* _getMessages(){
 	///output("Retrieving messages.\n");
 	Messages* messages=calloc(1,sizeof(Messages));
@@ -407,15 +413,17 @@ Messages* _getMessages(){
 		output("%sNo memory for messages array!\n",M_WARNING_PREFIX);
 	return NULL;
 }
+*/
 /**
  * @brief frees \p messages returned by _getMessages() or _getMessagesOfType()
  * 
  * @param messages the messages to free
  */
-void free_messages(Messages const * const messages){
+void free_messages(Messages* messages){
 	if(NULL==messages)return;
-	free(messages->messages);
-	free(messages->types);
+	output("Freeing messages.\n");
+	if(messages->messages!=NULL)free(messages->messages);
+	if(messages->types!=NULL)free(messages->types);
 	free(messages);
 }
 /**
@@ -424,27 +432,56 @@ void free_messages(Messages const * const messages){
  * @param messageType 
  * @return MessageList* the list of collected messages of type \p messageType
  */
-Messages* _getMessagesOfType(char const * const messageType){
-	if(messageType!=NULL){
-		MessageTypeListNode* messageTypeListNode=getMessageTypeListNode(messageType);
-		if(messageTypeListNode!=NULL){
-			Messages* messages=calloc(1,sizeof(Messages));
-			if(messages!=NULL){
-				messages->messages=calloc(messages->count,sizeof(Message*));
-				if(messages->messages!=NULL){
-					MessageNode* messageNode=messageTypeListNode->firstMessageNode;
-					size_t messageNodeIndex=0;
-					while(messageNode!=NULL){
-						messages->messages[messageNodeIndex]=messageNode->message;
-						messageNodeIndex++;
-						if(messageNodeIndex>=messages->count)break;
-						messageNode=messageNode->next;
-					}
-					return messages;
-				}
-				free(messages);
-			}
+Messages* _getMessagesOfType(char const * const messageTypePrefix){
+	Messages* messages=calloc(1,sizeof(Messages));
+	if(messages!=NULL){
+		size_t messageTypePrefixLength=(messageTypePrefix!=NULL?strlen(messageTypePrefix):0);
+		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+		size_t totalMessageCount=0;
+		while(messageTypeListNode!=NULL){
+			if(NULL==messageTypePrefix
+				||(messageTypePrefixLength==0
+					?strlen(messageTypeListNode->messageType)==0
+					:strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0))
+				totalMessageCount+=messageTypeListNode->count;
+			messageTypeListNode=messageTypeListNode->next;
 		}
+		if(totalMessageCount>0){
+			output("Total number of matching messages: %zu.\n",totalMessageCount);
+			// we need to count the messages
+			messages->messages=calloc(totalMessageCount,sizeof(Message*));
+			messages->types=calloc(totalMessageCount,sizeof(char*));
+			if(messages->messages!=NULL&&messages->types!=NULL){
+				messages->count=totalMessageCount;
+				size_t messageNodeIndex=0;
+				messageTypeListNode=firstMessageTypeListNode;
+				while(messageTypeListNode!=NULL){
+					output("Checking %zu messages of type '%s'.\n",messageTypeListNode->count,messageTypeListNode->messageType);
+					if(NULL==messageTypePrefix
+						||(messageTypePrefixLength==0&&strlen(messageTypeListNode->messageType)==0)
+						||(messageTypePrefixLength>0&&strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0)){
+						char* messageType=messageTypeListNode->messageType;
+						output("Adding %zu messages of type '%s'.\n",messageTypeListNode->count,messageType);
+						MessageNode* messageNode=messageTypeListNode->firstMessageNode;
+						while(messageNode!=NULL){
+							output("Adding message #%zu.\n",messageNodeIndex+1);
+							messages->messages[messageNodeIndex]=messageNode->message;
+							messages->types[messageNodeIndex]=messageType;
+							messageNodeIndex++;
+							output("Message #%zu added.\n",messageNodeIndex);
+							if(messageNodeIndex>=totalMessageCount)break;
+							messageNode=messageNode->next;
+						}
+					}
+					if(messageNodeIndex>=totalMessageCount)break;
+					messageTypeListNode=messageTypeListNode->next;
+				}
+				output("Messages retrieved.\n");
+				return messages;
+			}
+			output("Failed to allocate memory to store messages.\n",M_ERROR_PREFIX);
+		}
+		free_messages(messages);
 	}
 	return NULL;
 }
@@ -455,12 +492,15 @@ Messages* _getMessagesOfType(char const * const messageType){
  */
 static void removeMessageTypeListNode(MessageTypeListNode * const messageTypeListNode){
 	if(NULL==messageTypeListNode)return;
+	output("Removing %zu message%s of type '%s'.\n",messageTypeListNode->count,(messageTypeListNode->count>1?"s":""),messageTypeListNode->messageType);
+	if(messageTypeListNode->count==0)return;
 	size_t freedMessageNodes=freedMessageNode(messageTypeListNode->firstMessageNode);
 	messageTypeListNode->count-=freedMessageNodes;
 	if(messageTypeListNode->count==0){
 		messageTypeListNode->firstMessageNode=NULL;
 		messageTypeListNode->lastMessageNode=NULL;
-	}
+	}else
+		output("%sNot all messages of type '%s' removed!",M_ERROR_PREFIX,messageTypeListNode->messageType);
 }
 /**
  * @brief removes all messages of type messageType
@@ -468,24 +508,32 @@ static void removeMessageTypeListNode(MessageTypeListNode * const messageTypeLis
  * @param messageType 
  * @return * exposes 
  */
-long long removeMessagesOfType(char const * const messageType){
+long long removeMessagesOfType(char const * const messageTypePrefix){
 	long long unremovedMessageCount=-1;
-	if(messageType!=NULL){
-		MessageTypeListNode* messageTypeListNode=getMessageTypeListNode(messageType);
+	/*
+	if(messageTypePrefix!=NULL){
+		MessageTypeListNode* messageTypeListNode=getMessageTypeListNode(messageTypePrefix);
 		if(messageTypeListNode!=NULL&&messageTypeListNode->count>0){
 			removeMessageTypeListNode(messageTypeListNode);
 			unremovedMessageCount=messageTypeListNode->count; // return the number of not freed message nodes
 		}
 		return 0;
 	}else{ // remove all messages
+	*/
+		size_t messageTypePrefixLength=(messageTypePrefix!=NULL?strlen(messageTypePrefix):0);
 		unremovedMessageCount=0;
 		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
 		while(messageTypeListNode!=NULL){
-			removeMessageTypeListNode(messageTypeListNode);
-			unremovedMessageCount+=messageTypeListNode->count;
+			if(NULL==messageTypePrefix
+				||(messageTypePrefixLength==0
+					?strlen(messageTypeListNode->messageType)==0
+					:strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0)){
+				removeMessageTypeListNode(messageTypeListNode);
+				unremovedMessageCount+=messageTypeListNode->count;
+			}
 			messageTypeListNode=messageTypeListNode->next;
 		}
-	}
+	///}
 	return unremovedMessageCount;
 }
 

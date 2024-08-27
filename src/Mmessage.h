@@ -28,12 +28,12 @@ typedef struct Messages{
 	Message** messages; // the array of messages
 }Messages;
 
-Messages* _getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
-void free_messages(Messages const * const messages);
+////////Messages* _getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
 Messages* _getMessagesOfType(char const * const messageType); // exposes messages of a certain type
-long long removeMessagesOfType(char const * const messageType);
-
+void free_messages(Messages* messages);
+long long removeMessagesOfType(char const * const messageTypePrefix);
 bool addMessageOfType(char const * const messageText,char const * const messageType);
+
 char* setMessageId(char const * const messageId); // echoes the messageId
 
 ////////size_t logMessage(char const * const messageType, char const * const messagefmt,...);

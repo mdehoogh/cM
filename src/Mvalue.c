@@ -38,6 +38,7 @@ extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated 
 extern const char * const M_ERROR_PREFIX;
 extern const char * const M_WARNING_PREFIX;
 extern const char * const M_BUG_PREFIX;
+extern const char * const M_USER_PREFIX;
 extern const char * const M_NULL_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value that is NULL
 extern const char * const M_UNDEFINED_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value of type VT_UNDEFINED
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
@@ -7695,15 +7696,15 @@ Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner
 Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=getOwner(__LINE__);
 	Messages* messages=NULL;
 	if(messageTypeValue!=NULL){
-		if(messageTypeValue->type==VT_TEXT){
+		if(messageTypeValue->type!=VT_TEXT){
+			outputError("Invalid message type; will return all messages");
+			messages=_getMessagesOfType(NULL);
+		}else
 			messages=_getMessagesOfType(messageTypeValue->value._text->_c);
-		}
-		outputError("Invalid message type; will return all messages");
-		messages=_getMessages();
 	}else
-		messages=_getMessages();
+		messages=_getMessagesOfType(NULL);
 	if(messages!=NULL){
-		///output("Number of messages: %zu.\n",messages->count);
+		output("Number of messages: %zu.\n",messages->count);
 		Marray* messagesArray=owned_array(_getArray("Mmessages",messages->count,NULL),owner);
 		if(messagesArray!=NULL){
 			size_t messageIndex=messages->count;
@@ -7711,13 +7712,13 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue){Mallocationowner owner=
 				Message* message=messages->messages[--messageIndex];
 				if(NULL==message)continue;
 				Mstring* msgText=owned_string(_getString("'"),owner);
-				if(msgText==NULL){outputError("Failed to create text to store message in");continue;}
+				if(msgText==NULL){output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);continue;}
 				if(message->id!=NULL&&strlen(message->id)){
 					string_append_char(msgText,'(');
 					string_append(msgText,message->id);
 					string_append(msgText,") ");
 				}
-				if(messages->types[messageIndex]!=NULL){
+				if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
 					string_append(msgText,messages->types[messageIndex]);
 					///////string_append(msgText,": ");
 				}
@@ -7745,9 +7746,22 @@ Mvalue* Mremovemessages(Mvalue const * const messageTypeValue){
 	if(messageTypeValue!=NULL){
 		if(messageTypeValue->type==VT_TEXT){
 			result=removeMessagesOfType(messageTypeValue->value._text->_c);
-			if(result<0)result=M_LL_INVALID;
+			//////if(result<0)result=M_LL_INVALID;
 		}
 	}else // removing all messages (not the types)
 		result=removeMessagesOfType(NULL);
+	return _getIntegerValue(result);
+}
+/**
+ * @brief adds \p messageValue to the user message queue
+ * 
+ * @param messageValue 
+ * @return Mvalue* M_TRUE on success, M_FALSE on failure, or M_LL_INVALID when incorrect input
+ */
+Mvalue* Maddmessage(Mvalue const * const messageValue){
+	long long result=M_LL_INVALID;
+	if(messageValue!=NULL&&messageValue->type==VT_TEXT){
+		result=(addMessageOfType(messageValue->value._text->_c,M_USER_PREFIX)?M_TRUE:M_FALSE);
+	}
 	return _getIntegerValue(result);
 }
