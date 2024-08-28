@@ -421,7 +421,7 @@ Messages* _getMessages(){
  */
 void free_messages(Messages* messages){
 	if(NULL==messages)return;
-	output("Freeing messages.\n");
+	///output("Freeing messages.\n");
 	if(messages->messages!=NULL)free(messages->messages);
 	if(messages->types!=NULL)free(messages->types);
 	free(messages);
@@ -447,7 +447,7 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
 			messageTypeListNode=messageTypeListNode->next;
 		}
 		if(totalMessageCount>0){
-			output("Total number of matching messages: %zu.\n",totalMessageCount);
+			///output("Total number of matching messages: %zu.\n",totalMessageCount);
 			// we need to count the messages
 			messages->messages=calloc(totalMessageCount,sizeof(Message*));
 			messages->types=calloc(totalMessageCount,sizeof(char*));
@@ -456,19 +456,19 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
 				size_t messageNodeIndex=0;
 				messageTypeListNode=firstMessageTypeListNode;
 				while(messageTypeListNode!=NULL){
-					output("Checking %zu messages of type '%s'.\n",messageTypeListNode->count,messageTypeListNode->messageType);
+					///output("Checking %zu messages of type '%s'.\n",messageTypeListNode->count,messageTypeListNode->messageType);
 					if(NULL==messageTypePrefix
 						||(messageTypePrefixLength==0&&strlen(messageTypeListNode->messageType)==0)
 						||(messageTypePrefixLength>0&&strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0)){
 						char* messageType=messageTypeListNode->messageType;
-						output("Adding %zu messages of type '%s'.\n",messageTypeListNode->count,messageType);
+						///output("Adding %zu messages of type '%s'.\n",messageTypeListNode->count,messageType);
 						MessageNode* messageNode=messageTypeListNode->firstMessageNode;
 						while(messageNode!=NULL){
-							output("Adding message #%zu.\n",messageNodeIndex+1);
+							///output("Adding message #%zu.\n",messageNodeIndex+1);
 							messages->messages[messageNodeIndex]=messageNode->message;
 							messages->types[messageNodeIndex]=messageType;
 							messageNodeIndex++;
-							output("Message #%zu added.\n",messageNodeIndex);
+							///output("Message #%zu added.\n",messageNodeIndex);
 							if(messageNodeIndex>=totalMessageCount)break;
 							messageNode=messageNode->next;
 						}
@@ -476,7 +476,7 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
 					if(messageNodeIndex>=totalMessageCount)break;
 					messageTypeListNode=messageTypeListNode->next;
 				}
-				output("Messages retrieved.\n");
+				///output("Messages retrieved.\n");
 				return messages;
 			}
 			output("Failed to allocate memory to store messages.\n",M_ERROR_PREFIX);
@@ -492,7 +492,7 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
  */
 static void removeMessageTypeListNode(MessageTypeListNode * const messageTypeListNode){
 	if(NULL==messageTypeListNode)return;
-	output("Removing %zu message%s of type '%s'.\n",messageTypeListNode->count,(messageTypeListNode->count>1?"s":""),messageTypeListNode->messageType);
+	///output("Removing %zu message%s of type '%s'.\n",messageTypeListNode->count,(messageTypeListNode->count>1?"s":""),messageTypeListNode->messageType);
 	if(messageTypeListNode->count==0)return;
 	size_t freedMessageNodes=freedMessageNode(messageTypeListNode->firstMessageNode);
 	messageTypeListNode->count-=freedMessageNodes;

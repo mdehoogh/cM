@@ -7755,7 +7755,9 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 				Mlist* idMessageList;
 				size_t messageIndex=0,messageCount=messages->count;
 				while(messageIndex<messageCount){
-					Message* message=messages->messages[messageIndex++];
+					Message* message=messages->messages[messageIndex];
+					char* messageType=(messages->types!=NULL?messages->types[messageIndex]:NULL);
+					messageIndex++;
 					if(NULL==message)continue;
 					messageId=message->id;if(NULL==messageId)messageId="";
 					if(!isMapProperty(messagesMap,messageId)){
@@ -7771,8 +7773,8 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);
 						continue;
 					}
-					if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
-						string_append(msgText,messages->types[messageIndex]);
+					if(messageType!=NULL){
+						string_append(msgText,messageType);
 						///////string_append(msgText,": ");
 					}
 					string_append(msgText,message->msg);
@@ -7786,7 +7788,10 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 			if(messagesList!=NULL){
 				size_t messageIndex=0,messageCount=messages->count;
 				while(messageIndex<messageCount){
-					Message* message=messages->messages[messageIndex++];
+					Message* message=messages->messages[messageIndex];
+					char* messageType=(messages->types!=NULL?messages->types[messageIndex]:NULL);
+					messageIndex++;
+					if(NULL==message)continue;
 					Mstring* msgText=owned_string(_getString("'"),owner);
 					if(msgText==NULL){output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);continue;}
 					if(message->id!=NULL&&strlen(message->id)){
@@ -7794,8 +7799,8 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						string_append(msgText,message->id);
 						string_append(msgText,") ");
 					}
-					if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
-						string_append(msgText,messages->types[messageIndex]);
+					if(messageType!=NULL){
+						string_append(msgText,messageType);
 						///////string_append(msgText,": ");
 					}
 					string_append(msgText,message->msg);
