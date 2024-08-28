@@ -43,6 +43,7 @@ const char* const M_ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (def
 const char* const M_WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const M_BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
 const char* const M_USER_PREFIX="USER: "; // MDH@27AUG2024: for user messages
+const char* const M_RESULT_PREFIX="RESULT: "; // MDH@28AUG2024: for results
 
 const char* M_HIDDEN_VARIABLE_NAMES[]={"M","?","_"}; // MDH@14NOV2019: the variable names not to show when the variables are shown (with their current value)
 const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES=3;// MDH@14NOV2019: yes, three of them

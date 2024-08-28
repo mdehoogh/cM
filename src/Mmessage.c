@@ -13,6 +13,7 @@ extern const char* const M_INFO_PREFIX;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char* const M_BUG_PREFIX;
+/////extern const char* const M_RESULT_PREFIX="RESULT: "; // MDH@28AUG2024: for results
 
 typedef struct MessageStream{
 	char* source;

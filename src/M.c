@@ -29,6 +29,7 @@ extern char const* const M_ERROR_PREFIX;
 extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual info prefix text to use
 extern const char* const M_WARNING_PREFIX; // used in Mexecution.c as well (defined there as extern!!!)
 extern const char* const M_BUG_PREFIX; // MDH@05NOV2019: for reporting bugs
+extern const char* const M_RESULT_PREFIX; // MDH@28AUG2024: for reporting command results
 extern const char M_WHITESPACE_CHARACTER; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 extern const char M_NEWLINE_CHARACTER; // MDH@31OCT2019: the character to request a newline with!!!
 extern const char* const M_VARIABLE_NAME; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
@@ -3106,20 +3107,24 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	newline(); // outputValueColored() doesn't do that!!
 
 	// MDH@19AUG2024: let's now collect the same thing but without color!
+	Mstring* _commandResultText=owned_string(_getString("'"),owner);
 	Mstring* _uncoloredCommandText=owned_string(_getCommandText(false),owner); // MDH@13MAR2020 TODO determine later???????
 	if(_uncoloredCommandText!=NULL){
-		q2collect("%s",string(_uncoloredCommandText));
+		string_append(_commandResultText,string(_uncoloredCommandText));
+		// replacing: q2collect("%s",string(_uncoloredCommandText));
 		FREE_STRING(_uncoloredCommandText,owner);
 	}else
-		q2collect("%sFailed to obtain the command text",M_ERROR_PREFIX);
-	q2collect("%s"," = ");
+		string_append_char(_commandResultText,'?'); // replacing: q2collect("%sFailed to obtain the command text",M_ERROR_PREFIX);
+	string_append(_commandResultText," = "); // replacing: q2collect("%s"," = ");
 	Mstring* _resultText=owned_string(_getValueText(isValueNull(*resultValue)?NULL_value:*resultValue,false,false),owner);
 	if(_resultText!=NULL){
-		q2collect("%s\n",string(_resultText));
+		string_append(_commandResultText,string(_resultText)); // replacing: q2collect("%s\n",string(_resultText));
 		FREE_STRING(_resultText,owner);
 	}else
-		q2collect("%s\n","Failed to obtain the result text");
-
+		string_append_char(_commandResultText,'?'); ///q2collect("%s\n","Failed to obtain the result text");
+	if(!addMessageOfType(string(_commandResultText),M_RESULT_PREFIX))
+		output("%sFailed to register the result message.\n",M_ERROR_PREFIX);
+	FREE_STRING(_commandResultText,owner);
 	/*
 	Mstring* _doneShowingResultTimestamp=owned_string(_getTimestamp(NULL),owner);
 	if(_doneShowingResultTimestamp){
