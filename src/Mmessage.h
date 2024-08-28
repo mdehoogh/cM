@@ -28,10 +28,24 @@ typedef struct Messages{
 	Message** messages; // the array of messages
 }Messages;
 
+typedef struct MessageCount{
+	size_t count;
+	char* messageType;
+}MessageCount;
+
+typedef struct MessageCounts{
+	size_t count;
+	MessageCount* messagecounts;
+}MessageCounts;
+
 ////////Messages* _getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
 Messages* _getMessagesOfType(char const * const messageType); // exposes messages of a certain type
 void free_messages(Messages* messages);
 long long removeMessagesOfType(char const * const messageTypePrefix);
+// MDH@28AUG2024: for retrieving and freeing message counts!!
+MessageCounts* _getMessageCounts();
+void free_messagecounts(MessageCounts* messageCounts);
+
 bool addMessageOfType(char const * const messageText,char const * const messageType);
 
 char* setMessageId(char const * const messageId); // echoes the messageId

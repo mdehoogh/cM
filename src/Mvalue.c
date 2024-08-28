@@ -7852,3 +7852,25 @@ Mvalue* Maddmessage(Mvalue const * const messageValue){
 	}
 	return _getIntegerValue(result);
 }
+/**
+ * @brief returns the message counts
+ * 
+ * @return Mvalue* the message counts in a map with the message types as keys
+ */
+Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _messagecountsMap=owned_map(__map("Mmessagecounts"),owner);
+	if(_messagecountsMap!=NULL){
+		MessageCounts* _messageCounts=_getMessageCounts();
+		if(_messageCounts!=NULL){
+			size_t messageCounts=_messageCounts->count,messageIndex=0;
+			while(messageIndex<messageCounts){
+				MessageCount messageCount=_messageCounts->messagecounts[messageIndex++];
+				if(appendedToMap(_messagecountsMap,owner,messageCount.messageType,_getIntegerValue(messageCount.count))!=M_TRUE)
+					output("%sFailed to append message count of type '%s'.\n",M_ERROR_PREFIX,messageCount.messageType);
+			}
+			free_messagecounts(_messageCounts);
+			return _getValueOfMap(disowned_map(_messagecountsMap,owner));
+		}
+	}
+	return NULL;
+}

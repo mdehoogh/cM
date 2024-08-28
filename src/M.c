@@ -30,6 +30,7 @@ extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual inf
 extern const char* const M_WARNING_PREFIX; // used in Mexecution.c as well (defined there as extern!!!)
 extern const char* const M_BUG_PREFIX; // MDH@05NOV2019: for reporting bugs
 extern const char* const M_RESULT_PREFIX; // MDH@28AUG2024: for reporting command results
+
 extern const char M_WHITESPACE_CHARACTER; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 extern const char M_NEWLINE_CHARACTER; // MDH@31OCT2019: the character to request a newline with!!!
 extern const char* const M_VARIABLE_NAME; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to

@@ -538,6 +538,50 @@ long long removeMessagesOfType(char const * const messageTypePrefix){
 	return unremovedMessageCount;
 }
 
+/**
+ * @brief returns the message counts of type \p messageType
+ * 
+ * @param messageType 
+ * @return MessageCounts* 
+ */
+MessageCounts* _getMessageCounts(){
+	MessageCounts* messageCounts=calloc(1,sizeof(MessageCounts));
+	if(messageCounts!=NULL){
+		size_t totalMessageTypeCount=0;
+		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+		while(messageTypeListNode!=NULL){
+			totalMessageTypeCount++;
+			messageTypeListNode=messageTypeListNode->next;
+		}
+		if(totalMessageTypeCount>0){
+			messageCounts->messagecounts=calloc(totalMessageTypeCount,sizeof(MessageCount));
+			if(messageCounts->messagecounts!=NULL){
+				messageCounts->count=totalMessageTypeCount;
+				totalMessageTypeCount=0;
+				MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+				while(messageTypeListNode!=NULL){
+					messageCounts->messagecounts[totalMessageTypeCount++]
+						=(MessageCount){messageTypeListNode->count,messageTypeListNode->messageType};
+					messageTypeListNode=messageTypeListNode->next;
+				}
+				return messageCounts;
+			}		
+		}
+		free_messagecounts(messageCounts);
+	}
+	return NULL;
+}
+/**
+ * @brief frees \p messageCounts
+ * 
+ * @param messageCounts 
+ */
+void free_messagecounts(MessageCounts* messageCounts){
+	if(NULL==messageCounts)return;
+	if(messageCounts->messagecounts)free(messageCounts->messagecounts);
+	free(messageCounts);
+}
+
 // MDH@06AUG2024: what if we pass all output through outputf() instead of directly through output() so we can process it
 static char* outputText=NULL; // where we're going to collect the output texts
 static size_t outputLength,outputSize; // the part currently occupied of outputText
