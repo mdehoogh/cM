@@ -7743,7 +7743,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						///////string_append(msgText,": ");
 					}
 					string_append(msgText,message->msg);
-					assignValue(messagesArray->values+messageIndex,_getValueOfText(_getText(string(msgText))));
+					assignValue(messagesArray->values+messageIndex,_getStringTextValue(msgText));
 					FREE_STRING(msgText,owner);
 				}
 			}
@@ -7778,7 +7778,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						///////string_append(msgText,": ");
 					}
 					string_append(msgText,message->msg);
-					if(appendedToList(idMessageList,owner,_getValueOfText(_getText(string(msgText))),M_LL_INVALID)<=0)
+					if(appendedToList(idMessageList,owner,_getStringTextValue(msgText),M_LL_INVALID)<=0)
 						output("%sFailed to append message to id message list.\n",M_ERROR_PREFIX);
 					FREE_STRING(msgText,owner);
 				}
@@ -7804,7 +7804,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						///////string_append(msgText,": ");
 					}
 					string_append(msgText,message->msg);
-					if(appendedToList(messagesList,owner,_getValueOfText(_getText(string(msgText))),message->index)<=0)
+					if(appendedToList(messagesList,owner,_getStringTextValue(msgText),message->index)<=0)
 						output("%sFailed to append messages to the messages list.\n",M_ERROR_PREFIX);
 					FREE_STRING(msgText,owner);
 				}
