@@ -207,6 +207,7 @@ typedef struct MessageNode{
 }MessageNode;
 typedef struct MessageTypeListNode{
 	char* messageType;
+	size_t filtered; // MDH@30AUG2024: this is a temporary field used by _getFilteredMessages() representing the number of messages to return
 	size_t count; // keeps track of the number of messages in the message type list
 	MessageNode* firstMessageNode; // points to the first message in the queue
 	MessageNode* lastMessageNode; // points to the last message in the queue
@@ -428,11 +429,108 @@ void free_messages(Messages* messages){
 	free(messages);
 }
 /**
- * @brief returns a MessageList containing all messages of type \p messageType
+ * @brief returns the messages filtered by \p messageCounts
  * 
- * @param messageType 
- * @return MessageList* the list of collected messages of type \p messageType
+ * @param messageCounts the original message counts
+ * @return Messages* the messages filtered by \p messageCounts
  */
+Messages* _getFilteredMessages(MessageCounts * const messageCounts){
+	Messages* _messages=calloc(1,sizeof(Messages));
+	if(_messages!=NULL){
+		// we want to store for each message type how many messages to return
+		// we could well store this amount with the message type itself
+		// 1. count all the messages
+		MessageCount* messageCountFilters=(messageCounts!=NULL?messageCounts->messagecounts:NULL);
+		size_t totalMessageCount=0,filterCounts=(messageCountFilters!=NULL?messageCounts->count:0);
+		size_t messageTypePrefixLength,filterCount;
+		// we could collect the message types present in messageCounts?
+		// NO, we can simply iterate over the messageCount structures in messageCounts->messagecounts
+		// NOTE some message types might not match the filters in which case NONE of the messages are to be passed
+		//      where can we actually store 
+		char* messageTypePrefix;
+		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+		while(messageTypeListNode!=NULL){
+			// messageTypeCount is the maximum number of messages that match the filters
+			size_t messageTypeCount=messageTypeListNode->count; // the maximum number of (returnable) messages of the current type
+			messageTypeListNode->filtered=0; // assume no filter matches
+			if(messageTypeCount>0){ // there are messages of this type that we could return
+				// iterate over all filters
+				size_t filterCountIndex=filterCounts;
+				if(filterCountIndex>0){ // there are filters
+					do{
+						filterCountIndex--;
+						// does this message type match this filter???
+						messageTypePrefix=messageCountFilters[filterCountIndex].messageType;
+						messageTypePrefixLength=strlen(messageTypePrefix);
+						if(NULL==messageTypePrefix
+								||(messageTypePrefixLength==0&&strlen(messageTypeListNode->messageType)==0)
+								||(messageTypePrefixLength>0&&strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0)){
+							// the message type matches the filter message type
+							// there's only a restriction if the filter count is positive and below messageTypeCunt
+							filterCount=messageCountFilters[filterCountIndex].count; // the maximum number of messages to return
+							if(filterCount==0){ // all messages in this type should be returned
+								messageTypeListNode->filtered=messageTypeListNode->count;
+								break;
+							}
+							// only to be returned partly when filterCount is below the current message type count
+							if(filterCount<messageTypeCount) // more restrictive
+								messageTypeListNode->filtered=(messageTypeCount=filterCount);
+						}
+					}while(filterCountIndex);
+				}
+				totalMessageCount+=messageTypeListNode->filtered;
+			}
+			// the next message type list to check
+			messageTypeListNode=messageTypeListNode->next;
+		}
+		if(totalMessageCount>0){ // there are messages to return
+			///output("Total number of matching messages: %zu.\n",totalMessageCount);
+			_messages->messages=calloc(totalMessageCount,sizeof(Message*));
+			_messages->types=calloc(totalMessageCount,sizeof(char*));
+			if(_messages->messages!=NULL&&_messages->types!=NULL){
+				_messages->count=totalMessageCount;
+				size_t messageNodeIndex=0;
+				messageTypeListNode=firstMessageTypeListNode;
+				size_t messagesToReturn,messagesNotToReturn;
+				while(messageTypeListNode!=NULL){
+					messagesToReturn=messageTypeListNode->filtered;
+					if(messagesToReturn>0){ // we are to return this amount of messages
+						char* messageType=messageTypeListNode->messageType;
+						messagesNotToReturn=messageTypeListNode->count-messagesToReturn;
+						///output("Adding %zu messages of type '%s'.\n",messageTypeListNode->count,messageType);
+						MessageNode* messageNode=messageTypeListNode->firstMessageNode;
+						while(messagesNotToReturn>0){
+							messageNode=messageNode->next;
+							messagesNotToReturn--;
+						}
+						while(messageNode!=NULL){
+							///output("Adding message #%zu.\n",messageNodeIndex+1);
+							_messages->messages[messageNodeIndex]=messageNode->message;
+							_messages->types[messageNodeIndex]=messageType;
+							messageNodeIndex++;
+							///output("Message #%zu added.\n",messageNodeIndex);
+							if(messageNodeIndex>=totalMessageCount)break;
+							messageNode=messageNode->next;
+						}
+					}
+					if(messageNodeIndex>=totalMessageCount)break;
+					messageTypeListNode=messageTypeListNode->next;
+				}
+				///output("Messages retrieved.\n");
+				return _messages;
+			}
+			output("Failed to allocate memory to store messages.\n",M_ERROR_PREFIX);
+		}
+		free_messages(_messages);
+	}
+	return NULL;
+}
+/* replaces:
+// * @brief returns a MessageList containing all messages of type \p messageType
+// * 
+// * @param messageType 
+// * @return MessageList* the list of collected messages of type \p messageType
+// /
 Messages* _getMessagesOfType(char const * const messageTypePrefix){
 	Messages* messages=calloc(1,sizeof(Messages));
 	if(messages!=NULL){
@@ -486,6 +584,7 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
 	}
 	return NULL;
 }
+*/
 /**
  * @brief removes all messages registered in \p messageTypeListNode
  * 
@@ -560,8 +659,11 @@ MessageCounts* _getMessageCounts(){
 				totalMessageTypeCount=0;
 				MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
 				while(messageTypeListNode!=NULL){
+					// MDH@30AUG2024: we're strdup()ing messageType here so free_messagecounts() can free the messageType's
+					//                because the MessageCounts that getFilteredMessages() receive also has dynamically allocated message types!!!
+					// TODO what if strdup() fails????? for now, we just ignore it assuming it won't!!!
 					messageCounts->messagecounts[totalMessageTypeCount++]
-						=(MessageCount){messageTypeListNode->count,messageTypeListNode->messageType};
+						=(MessageCount){messageTypeListNode->count,strdup(messageTypeListNode->messageType)};
 					messageTypeListNode=messageTypeListNode->next;
 				}
 				return messageCounts;
@@ -578,6 +680,13 @@ MessageCounts* _getMessageCounts(){
  */
 void free_messagecounts(MessageCounts* messageCounts){
 	if(NULL==messageCounts)return;
+	if(messageCounts->count){
+		do{
+			messageCounts->count--;
+			if(messageCounts->messagecounts[messageCounts->count].messageType!=NULL)
+				free(messageCounts->messagecounts[messageCounts->count].messageType);
+		}while(messageCounts->count);
+	}
 	if(messageCounts->messagecounts)free(messageCounts->messagecounts);
 	free(messageCounts);
 }

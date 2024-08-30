@@ -39,7 +39,8 @@ typedef struct MessageCounts{
 }MessageCounts;
 
 ////////Messages* _getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
-Messages* _getMessagesOfType(char const * const messageType); // exposes messages of a certain type
+Messages* _getFilteredMessages(MessageCounts * const messageCounts);
+// replacing: Messages* _getMessagesOfType(char const * const messageType); // exposes messages of a certain type
 void free_messages(Messages* messages);
 long long removeMessagesOfType(char const * const messageTypePrefix);
 // MDH@28AUG2024: for retrieving and freeing message counts!!

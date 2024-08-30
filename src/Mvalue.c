@@ -7702,6 +7702,45 @@ Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner
  */
 Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const returnTypeValue){Mallocationowner owner=getOwner(__LINE__);
 	Messages* messages=NULL;
+	// MDH@30AUG2024: instead of a single message type we now also allow message type count limits
+	//                which means translating messageTypeValue into a MessageCounts object
+	MessageCounts* messageCounts=NULL;
+	if(messageTypeValue!=NULL){
+		messageCounts=calloc(1,sizeof(MessageCounts));
+		if(messageCounts!=NULL){
+			if(messageTypeValue->type==VT_ARRAY){
+
+			}else
+			if(messageTypeValue->type==VT_LIST){
+
+			}else
+			if(messageTypeValue->type==VT_MAP){
+
+			}else{ // single value message type
+				messageCounts->count=1;
+				messageCounts->messagecounts=calloc(1,sizeof(MessageCount));
+				if(messageCounts->messagecounts!=NULL){
+					if(messageTypeValue->type!=VT_TEXT){
+						Mstring* _valueText=owned_string(_getValueText(messageTypeValue,true,true),owner);
+						messageCounts->messagecounts[0]=(MessageCount){0,strdup(string(_valueText))};
+						FREE_STRING(_valueText,owner);
+					}else
+						messageCounts->messagecounts[0]=(MessageCount){0,strdup(messageTypeValue->value._text->_c)};
+				}else{
+					output("%sFailed to allocate message type counts.\n",M_ERROR_PREFIX);
+					free_messagecounts(messageCounts);
+					messageCounts=NULL;
+				}
+			}
+			if(messageCounts!=NULL){
+				messages=_getFilteredMessages(messageCounts); // getFilteredMessages() replaces getMessagesOfType()
+				free_messagecounts(messageCounts);
+			}
+		}else
+			output("%sFailed to allocated memory for the message type counts.\n",M_ERROR_PREFIX);
+	}else
+			messages=_getFilteredMessages(NULL);
+	/* replacing:
 	if(messageTypeValue!=NULL){
 		if(messageTypeValue->type!=VT_TEXT){
 			outputError("Invalid message type; will return all messages");
@@ -7710,6 +7749,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 			messages=_getMessagesOfType(messageTypeValue->value._text->_c);
 	}else
 		messages=_getMessagesOfType(NULL);
+	*/
 	if(messages!=NULL){
 		output("Number of messages: %zu.\n",messages->count);
 		char returnType='l'; // returns a list by default
