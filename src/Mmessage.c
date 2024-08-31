@@ -442,6 +442,7 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 		// 1. count all the messages
 		MessageCount* messageCountFilters=(messageCounts!=NULL?messageCounts->messagecounts:NULL);
 		size_t totalMessageCount=0,filterCounts=(messageCountFilters!=NULL?messageCounts->count:0);
+		size_t totalMessageTypeCount=0; // the number of message types that are requested
 		size_t messageTypePrefixLength,filterCount;
 		// we could collect the message types present in messageCounts?
 		// NO, we can simply iterate over the messageCount structures in messageCounts->messagecounts
@@ -478,17 +479,72 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 						}
 					}while(filterCountIndex);
 				}
-				totalMessageCount+=messageTypeListNode->filtered;
+				if(messageTypeListNode->filtered){
+					totalMessageCount+=messageTypeListNode->filtered;
+					totalMessageTypeCount++; // register as one of the returned message types
+				}
 			}
 			// the next message type list to check
 			messageTypeListNode=messageTypeListNode->next;
 		}
 		if(totalMessageCount>0){ // there are messages to return
-			///output("Total number of matching messages: %zu.\n",totalMessageCount);
-			_messages->messages=calloc(totalMessageCount,sizeof(Message*));
-			_messages->types=calloc(totalMessageCount,sizeof(char*));
-			if(_messages->messages!=NULL&&_messages->types!=NULL){
-				_messages->count=totalMessageCount;
+			// we need to start out from the right message nodes
+			MessageNode** messageTypeNodes=calloc(totalMessageTypeCount,sizeof(MessageNode*));
+			char** messageTypes=calloc(totalMessageTypeCount,sizeof(char*));
+			if(messageTypeNodes!=NULL&&messageTypes!=NULL){
+				///output("Total number of matching messages: %zu.\n",totalMessageCount);
+				_messages->messages=calloc(totalMessageCount,sizeof(Message*));
+				_messages->types=calloc(totalMessageCount,sizeof(char*));
+				if(_messages->messages!=NULL&&_messages->types!=NULL){
+					_messages->count=totalMessageCount;
+					///output("Collecting messages.\n");
+					// now we need to merge messages from all the message type list nodes
+					// 1. initialize messageTypeListNodes to the first of all the message type list nodes
+					MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+					size_t messageTypeIndex=0,messagesNotToReturn;
+					MessageNode* firstMessageTypeNode; // this is the first message node for a given type to return
+					while(messageTypeListNode!=NULL){
+						if(messageTypeListNode->filtered){ // messages of this type are to be returned
+							messagesNotToReturn=messageTypeListNode->count-messageTypeListNode->filtered;
+							firstMessageTypeNode=messageTypeListNode->firstMessageNode;
+							while(firstMessageTypeNode!=NULL&&messagesNotToReturn>0){
+								firstMessageTypeNode=firstMessageTypeNode->next;
+								messagesNotToReturn--;
+							}
+							if(firstMessageTypeNode!=NULL){ // messages left to return
+								messageTypeNodes[messageTypeIndex]=firstMessageTypeNode;
+								messageTypes[messageTypeIndex]=messageTypeListNode->messageType;
+								messageTypeIndex++;
+							}
+						}
+						messageTypeListNode=messageTypeListNode->next;
+					}
+					// 2. now ready for merging
+					size_t collectedMessageIndex=0,unfinishedMessageTypeListNodeCount=totalMessageTypeCount;
+					///output("Number of unfinished message types: %zu.\n",unfinishedMessageTypeListNodeCount);
+					while(unfinishedMessageTypeListNodeCount>0&&collectedMessageIndex<totalMessageCount){
+						///output("Collecting message #%zu.\n",collectedMessageIndex+1);
+						// there's at least one message type list node unequal to NULL
+						long long firstMessageTypeIndex=-1,messageTypeIndex=totalMessageTypeCount;
+						while(--messageTypeIndex>=0)
+							if(messageTypeNodes[messageTypeIndex]!=NULL
+									&&(firstMessageTypeIndex<0
+										||messageTypeNodes[messageTypeIndex]->message->index<messageTypeNodes[firstMessageTypeIndex]->message->index))
+								firstMessageTypeIndex=messageTypeIndex;
+						if(firstMessageTypeIndex<0){outputBug("No messages left!");break;} // should not happen!!
+						// register the message at firstMessageTypeIndex as the next one
+						_messages->messages[collectedMessageIndex]=messageTypeNodes[firstMessageTypeIndex]->message;
+						_messages->types[collectedMessageIndex]=messageTypes[firstMessageTypeIndex];
+						collectedMessageIndex++;
+						///output("Message #%zu of type #%zu collected.\n",collectedMessageIndex,firstMessageTypeIndex);
+						messageTypeNodes[firstMessageTypeIndex]=messageTypeNodes[firstMessageTypeIndex]->next;
+						if(NULL==messageTypeNodes[firstMessageTypeIndex]){
+							unfinishedMessageTypeListNodeCount--;
+							///output("Number of message types left: %zu.\n",unfinishedMessageTypeListNodeCount);
+						}
+					}
+				}
+				/* replacing:
 				size_t messageNodeIndex=0;
 				messageTypeListNode=firstMessageTypeListNode;
 				size_t messagesToReturn,messagesNotToReturn;
@@ -516,6 +572,7 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 					if(messageNodeIndex>=totalMessageCount)break;
 					messageTypeListNode=messageTypeListNode->next;
 				}
+				*/
 				///output("Messages retrieved.\n");
 				return _messages;
 			}
