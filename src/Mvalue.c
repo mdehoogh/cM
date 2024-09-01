@@ -7708,21 +7708,24 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 	if(messageTypeValue!=NULL){
 		messageCounts=calloc(1,sizeof(MessageCounts));
 		if(messageCounts!=NULL){
+			output("Constructing the filter message counts.\n");
 			if(messageTypeValue->type==VT_ARRAY){
 				Marray* array=messageTypeValue->value._array;
 				size_t numberOfArrayElements=(array!=NULL?array->numberOfElements:0);
 				if(numberOfArrayElements){
-					Mvalue* arrayElementValue;
-					size_t messageCountIndex;
+					output("Retrieving %zu message types from array.\n",numberOfArrayElements);
 					// accept only text elements
 					messageCounts->messagecounts=calloc(numberOfArrayElements,sizeof(MessageCount));
 					if(messageCounts->messagecounts!=NULL){
+						Mvalue* arrayElementValue;
+						size_t messageCountIndex=0;
 						for(size_t arrayElementIndex=0;arrayElementIndex<numberOfArrayElements;arrayElementIndex++){
 							arrayElementValue=array->values[arrayElementIndex];
-							if(arrayElementValue==NULL||arrayElementValue->type!=VT_TEXT)continue;
-							messageCounts->messagecounts[messageCountIndex++]=(MessageCount){0,strdup(arrayElementValue->value._text->_c)};
+							if(arrayElementValue!=NULL&&arrayElementValue->type==VT_TEXT)
+								messageCounts->messagecounts[messageCountIndex++]=(MessageCount){0,strdup(arrayElementValue->value._text->_c)};
 						}
 						// although we may have allocated more room in messageCounts->messagecounts only messageCountIndex are set
+						output("Number of message type filters in array: %zu.\n",messageCountIndex);
 						messageCounts->count=messageCountIndex;
 					}else
 						output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
@@ -7732,11 +7735,11 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 				Mlist* list=messageTypeValue->value._list;
 				size_t numberOfListElements=(list!=NULL?list->numberOfElements:0);
 				if(numberOfListElements){
-					Mvalue* listElementValue;
-					size_t messageCountIndex;
 					// accept only text elements
 					messageCounts->messagecounts=calloc(numberOfListElements,sizeof(MessageCount));
 					if(messageCounts->messagecounts!=NULL){
+						Mvalue* listElementValue;
+						size_t messageCountIndex=0;
 						Mlistelement* listElement=list->_first;
 						while(listElement!=NULL&&messageCountIndex<numberOfListElements){
 							listElementValue=listElement->_value;
@@ -7745,6 +7748,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 							listElement=listElement->_next;
 						}
 						// although we may have allocated more room in messageCounts->messagecounts only messageCountIndex are set
+						output("Number of message type filters in list: %zu.\n",messageCountIndex);
 						messageCounts->count=messageCountIndex;
 					}else
 						output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
@@ -7755,12 +7759,12 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 				Mmap* map=messageTypeValue->value._map;
 				size_t numberOfMapElements=(map!=NULL?map->numberOfElements:0);
 				if(numberOfMapElements){
-					Mvariable* mapElementVariable;
-					Mvalue* mapElementValue;
-					size_t messageCountIndex;
 					// accept only text elements
 					messageCounts->messagecounts=calloc(numberOfMapElements,sizeof(MessageCount));
 					if(messageCounts->messagecounts!=NULL){
+						Mvariable* mapElementVariable;
+						Mvalue* mapElementValue;
+						size_t messageCountIndex=0;
 						Mmapelement* mapElement=map->_first;
 						while(mapElement!=NULL&&messageCountIndex<numberOfMapElements){
 							mapElementVariable=mapElement->_variable;
@@ -7775,6 +7779,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 							mapElement=mapElement->_next;
 						}
 						// although we may have allocated more room in messageCounts->messagecounts only messageCountIndex are set
+						output("Number of message type filters in map: %zu.\n",messageCountIndex);
 						messageCounts->count=messageCountIndex;
 					}else
 						output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
@@ -7802,8 +7807,10 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 				output("%sFailed to compose the message type counts.\n",M_ERROR_PREFIX);
 		}else
 			output("%sFailed to allocated memory for the message type counts.\n",M_ERROR_PREFIX);
-	}else
+	}else{
+		output("Retrieving all messages!\n");
 		messages=_getFilteredMessages(NULL);
+	}
 	/* replacing:
 	if(messageTypeValue!=NULL){
 		if(messageTypeValue->type!=VT_TEXT){
