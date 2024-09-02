@@ -7694,6 +7694,112 @@ Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner
 
 // MDH@20AUG2024: messages M functions
 /**
+ * @brief returns the MessageCounts pointer corresponding to \p messageTypeValue
+ * 
+ * @param messageTypeValue 
+ * @return MessageCounts* 
+ */
+static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeValue){Mallocationowner owner=getOwner(__LINE__);
+	assert(messageTypeValue!=NULL);
+	MessageCounts* _messageCounts=calloc(1,sizeof(MessageCounts));
+	if(_messageCounts!=NULL){
+		output("Constructing the filter message counts.\n");
+		if(messageTypeValue->type==VT_ARRAY){
+			Marray* array=messageTypeValue->value._array;
+			size_t numberOfArrayElements=(array!=NULL?array->numberOfElements:0);
+			if(numberOfArrayElements){
+				output("Retrieving %zu message types from array.\n",numberOfArrayElements);
+				// accept only text elements
+				_messageCounts->messagecounts=calloc(numberOfArrayElements,sizeof(MessageCount));
+				if(_messageCounts->messagecounts!=NULL){
+					Mvalue* arrayElementValue;
+					size_t messageCountIndex=0;
+					for(size_t arrayElementIndex=0;arrayElementIndex<numberOfArrayElements;arrayElementIndex++){
+						arrayElementValue=array->values[arrayElementIndex];
+						if(arrayElementValue!=NULL&&arrayElementValue->type==VT_TEXT)
+							_messageCounts->messagecounts[messageCountIndex++]=(MessageCount){0,strdup(arrayElementValue->value._text->_c)};
+					}
+					// although we may have allocated more room in _messageCounts->messagecounts only messageCountIndex are set
+					output("Number of message type filters in array: %zu.\n",messageCountIndex);
+					_messageCounts->count=messageCountIndex;
+				}else
+					output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
+			}
+		}else
+		if(messageTypeValue->type==VT_LIST){
+			Mlist* list=messageTypeValue->value._list;
+			size_t numberOfListElements=(list!=NULL?list->numberOfElements:0);
+			if(numberOfListElements){
+				// accept only text elements
+				_messageCounts->messagecounts=calloc(numberOfListElements,sizeof(MessageCount));
+				if(_messageCounts->messagecounts!=NULL){
+					Mvalue* listElementValue;
+					size_t messageCountIndex=0;
+					Mlistelement* listElement=list->_first;
+					while(listElement!=NULL&&messageCountIndex<numberOfListElements){
+						listElementValue=listElement->_value;
+						if(listElementValue!=NULL&&listElementValue->type==VT_TEXT)
+							_messageCounts->messagecounts[messageCountIndex++]=(MessageCount){0,strdup(listElementValue->value._text->_c)};
+						listElement=listElement->_next;
+					}
+					// although we may have allocated more room in _messageCounts->messagecounts only messageCountIndex are set
+					output("Number of message type filters in list: %zu.\n",messageCountIndex);
+					_messageCounts->count=messageCountIndex;
+				}else
+					output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
+			}
+		}else
+		if(messageTypeValue->type==VT_MAP){
+			// the map values should be integers
+			Mmap* map=messageTypeValue->value._map;
+			size_t numberOfMapElements=(map!=NULL?map->numberOfElements:0);
+			if(numberOfMapElements){
+				// accept only text elements
+				_messageCounts->messagecounts=calloc(numberOfMapElements,sizeof(MessageCount));
+				if(_messageCounts->messagecounts!=NULL){
+					Mvariable* mapElementVariable;
+					Mvalue* mapElementValue;
+					size_t messageCountIndex=0;
+					Mmapelement* mapElement=map->_first;
+					while(mapElement!=NULL&&messageCountIndex<numberOfMapElements){
+						mapElementVariable=mapElement->_variable;
+						if(mapElementVariable!=NULL&&mapElementVariable->_name!=NULL){
+							mapElementValue=mapElementVariable->_value;
+							if(mapElementValue!=NULL){
+								long long count=getValueInteger(mapElementValue);
+								if(count>=0)
+									_messageCounts->messagecounts[messageCountIndex++]=(MessageCount){count,strdup(mapElementVariable->_name->chars)};
+							}
+						}
+						mapElement=mapElement->_next;
+					}
+					// although we may have allocated more room in _messageCounts->messagecounts only messageCountIndex are set
+					output("Number of message type filters in map: %zu.\n",messageCountIndex);
+					_messageCounts->count=messageCountIndex;
+				}else
+					output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
+			}
+		}else{ // single value message type
+			_messageCounts->count=1;
+			_messageCounts->messagecounts=calloc(1,sizeof(MessageCount));
+			if(_messageCounts->messagecounts!=NULL){
+				if(messageTypeValue->type!=VT_TEXT){
+					Mstring* _valueText=owned_string(_getValueText(messageTypeValue,true,true),owner);
+					_messageCounts->messagecounts[0]=(MessageCount){0,strdup(string(_valueText))};
+					FREE_STRING(_valueText,owner);
+				}else
+					_messageCounts->messagecounts[0]=(MessageCount){0,strdup(messageTypeValue->value._text->_c)};
+			}else{
+				output("%sFailed to allocate message type counts.\n",M_ERROR_PREFIX);
+				freeMessageCounts(_messageCounts);
+				_messageCounts=NULL;
+			}
+		}
+	}else
+		output("%sFailed to allocated memory for the message type counts.\n",M_ERROR_PREFIX);
+	return _messageCounts;
+}
+/**
  * @brief returns all message of type \p messageTypeValue in the return type indicated by \p returnTypeValue
  * 
  * @param messageTypeValue 
@@ -7701,115 +7807,19 @@ Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner
  * @return Mvalue* 
  */
 Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const returnTypeValue){Mallocationowner owner=getOwner(__LINE__);
-	Messages* messages=NULL;
+	Messages* _messages=NULL;
 	// MDH@30AUG2024: instead of a single message type we now also allow message type count limits
 	//                which means translating messageTypeValue into a MessageCounts object
-	MessageCounts* messageCounts=NULL;
 	if(messageTypeValue!=NULL){
-		messageCounts=calloc(1,sizeof(MessageCounts));
-		if(messageCounts!=NULL){
-			output("Constructing the filter message counts.\n");
-			if(messageTypeValue->type==VT_ARRAY){
-				Marray* array=messageTypeValue->value._array;
-				size_t numberOfArrayElements=(array!=NULL?array->numberOfElements:0);
-				if(numberOfArrayElements){
-					output("Retrieving %zu message types from array.\n",numberOfArrayElements);
-					// accept only text elements
-					messageCounts->messagecounts=calloc(numberOfArrayElements,sizeof(MessageCount));
-					if(messageCounts->messagecounts!=NULL){
-						Mvalue* arrayElementValue;
-						size_t messageCountIndex=0;
-						for(size_t arrayElementIndex=0;arrayElementIndex<numberOfArrayElements;arrayElementIndex++){
-							arrayElementValue=array->values[arrayElementIndex];
-							if(arrayElementValue!=NULL&&arrayElementValue->type==VT_TEXT)
-								messageCounts->messagecounts[messageCountIndex++]=(MessageCount){0,strdup(arrayElementValue->value._text->_c)};
-						}
-						// although we may have allocated more room in messageCounts->messagecounts only messageCountIndex are set
-						output("Number of message type filters in array: %zu.\n",messageCountIndex);
-						messageCounts->count=messageCountIndex;
-					}else
-						output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
-				}
-			}else
-			if(messageTypeValue->type==VT_LIST){
-				Mlist* list=messageTypeValue->value._list;
-				size_t numberOfListElements=(list!=NULL?list->numberOfElements:0);
-				if(numberOfListElements){
-					// accept only text elements
-					messageCounts->messagecounts=calloc(numberOfListElements,sizeof(MessageCount));
-					if(messageCounts->messagecounts!=NULL){
-						Mvalue* listElementValue;
-						size_t messageCountIndex=0;
-						Mlistelement* listElement=list->_first;
-						while(listElement!=NULL&&messageCountIndex<numberOfListElements){
-							listElementValue=listElement->_value;
-							if(listElementValue!=NULL&&listElementValue->type==VT_TEXT)
-								messageCounts->messagecounts[messageCountIndex++]=(MessageCount){0,strdup(listElementValue->value._text->_c)};
-							listElement=listElement->_next;
-						}
-						// although we may have allocated more room in messageCounts->messagecounts only messageCountIndex are set
-						output("Number of message type filters in list: %zu.\n",messageCountIndex);
-						messageCounts->count=messageCountIndex;
-					}else
-						output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
-				}
-			}else
-			if(messageTypeValue->type==VT_MAP){
-				// the map values should be integers
-				Mmap* map=messageTypeValue->value._map;
-				size_t numberOfMapElements=(map!=NULL?map->numberOfElements:0);
-				if(numberOfMapElements){
-					// accept only text elements
-					messageCounts->messagecounts=calloc(numberOfMapElements,sizeof(MessageCount));
-					if(messageCounts->messagecounts!=NULL){
-						Mvariable* mapElementVariable;
-						Mvalue* mapElementValue;
-						size_t messageCountIndex=0;
-						Mmapelement* mapElement=map->_first;
-						while(mapElement!=NULL&&messageCountIndex<numberOfMapElements){
-							mapElementVariable=mapElement->_variable;
-							if(mapElementVariable!=NULL&&mapElementVariable->_name!=NULL){
-								mapElementValue=mapElementVariable->_value;
-								if(mapElementValue!=NULL){
-									long long count=getValueInteger(mapElementValue);
-									if(count>=0)
-										messageCounts->messagecounts[messageCountIndex++]=(MessageCount){count,strdup(mapElementVariable->_name->chars)};
-								}
-							}
-							mapElement=mapElement->_next;
-						}
-						// although we may have allocated more room in messageCounts->messagecounts only messageCountIndex are set
-						output("Number of message type filters in map: %zu.\n",messageCountIndex);
-						messageCounts->count=messageCountIndex;
-					}else
-						output("%sFailed to allocate memory for message counts.\n",M_ERROR_PREFIX);
-				}
-			}else{ // single value message type
-				messageCounts->count=1;
-				messageCounts->messagecounts=calloc(1,sizeof(MessageCount));
-				if(messageCounts->messagecounts!=NULL){
-					if(messageTypeValue->type!=VT_TEXT){
-						Mstring* _valueText=owned_string(_getValueText(messageTypeValue,true,true),owner);
-						messageCounts->messagecounts[0]=(MessageCount){0,strdup(string(_valueText))};
-						FREE_STRING(_valueText,owner);
-					}else
-						messageCounts->messagecounts[0]=(MessageCount){0,strdup(messageTypeValue->value._text->_c)};
-				}else{
-					output("%sFailed to allocate message type counts.\n",M_ERROR_PREFIX);
-					free_messagecounts(messageCounts);
-					messageCounts=NULL;
-				}
-			}
-			if(messageCounts!=NULL){
-				messages=_getFilteredMessages(messageCounts); // getFilteredMessages() replaces getMessagesOfType()
-				free_messagecounts(messageCounts);
-			}else
-				output("%sFailed to compose the message type counts.\n",M_ERROR_PREFIX);
+		MessageCounts* _messageCounts=_getValueMessageCounts(messageTypeValue);
+		if(_messageCounts!=NULL){
+			_messages=_getFilteredMessages(_messageCounts); // getFilteredMessages() replaces getMessagesOfType()
+			freeMessageCounts(_messageCounts);
 		}else
-			output("%sFailed to allocated memory for the message type counts.\n",M_ERROR_PREFIX);
+			output("%sFailed to compose the message type counts.\n",M_ERROR_PREFIX);
 	}else{
 		output("Retrieving all messages!\n");
-		messages=_getFilteredMessages(NULL);
+		_messages=_getFilteredMessages(NULL);
 	}
 	/* replacing:
 	if(messageTypeValue!=NULL){
@@ -7821,8 +7831,8 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 	}else
 		messages=_getMessagesOfType(NULL);
 	*/
-	if(messages!=NULL){
-		output("Number of messages: %zu.\n",messages->count);
+	if(_messages!=NULL){
+		output("Number of messages: %zu.\n",_messages->count);
 		char returnType='l'; // returns a list by default
 		if(returnTypeValue!=NULL&&returnTypeValue->type==VT_TEXT){
 			if(strlen(returnTypeValue->value._text->_c)>0){
@@ -7836,11 +7846,11 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 		Mmap* messagesMap=NULL;
 		if(returnType=='a'){
 			// instead of an array we could return a list as well, or as a map (with the id used as key)
-			messagesArray=owned_array(_getArray("Mmessages",messages->count,NULL),owner);
+			messagesArray=owned_array(_getArray("Mmessages",_messages->count,NULL),owner);
 			if(messagesArray!=NULL){
-				size_t messageIndex=messages->count;
+				size_t messageIndex=_messages->count;
 				while(messageIndex>0){
-					Message* message=messages->messages[--messageIndex];
+					Message* message=_messages->messages[--messageIndex];
 					if(NULL==message)continue;
 					Mstring* msgText=owned_string(_getString("'"),owner);
 					if(msgText==NULL){output("%sFailed to create text to store message in.\n",M_ERROR_PREFIX);continue;}
@@ -7849,8 +7859,8 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						string_append(msgText,message->id);
 						string_append(msgText,") ");
 					}
-					if(messages->types!=NULL&&messages->types[messageIndex]!=NULL){
-						string_append(msgText,messages->types[messageIndex]);
+					if(_messages->types!=NULL&&_messages->types[messageIndex]!=NULL){
+						string_append(msgText,_messages->types[messageIndex]);
 						///////string_append(msgText,": ");
 					}
 					string_append(msgText,message->msg);
@@ -7864,10 +7874,10 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 			if(messagesMap!=NULL){
 				char *messageId,*currentMessageId=NULL;
 				Mlist* idMessageList;
-				size_t messageIndex=0,messageCount=messages->count;
+				size_t messageIndex=0,messageCount=_messages->count;
 				while(messageIndex<messageCount){
-					Message* message=messages->messages[messageIndex];
-					char* messageType=(messages->types!=NULL?messages->types[messageIndex]:NULL);
+					Message* message=_messages->messages[messageIndex];
+					char* messageType=(_messages->types!=NULL?_messages->types[messageIndex]:NULL);
 					messageIndex++;
 					if(NULL==message)continue;
 					messageId=message->id;if(NULL==messageId)messageId="";
@@ -7897,10 +7907,10 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 		}else{ // return the messages as a list (the default)
 			messagesList=owned_list(__list("Mmessages"),owner);
 			if(messagesList!=NULL){
-				size_t messageIndex=0,messageCount=messages->count;
+				size_t messageIndex=0,messageCount=_messages->count;
 				while(messageIndex<messageCount){
-					Message* message=messages->messages[messageIndex];
-					char* messageType=(messages->types!=NULL?messages->types[messageIndex]:NULL);
+					Message* message=_messages->messages[messageIndex];
+					char* messageType=(_messages->types!=NULL?_messages->types[messageIndex]:NULL);
 					messageIndex++;
 					if(NULL==message)continue;
 					Mstring* msgText=owned_string(_getString("'"),owner);
@@ -7922,7 +7932,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 			}
 		}
 		// essential to free the (unmanaged) messages
-		free_messages(messages);
+		freeMessages(_messages);
 		if(messagesList!=NULL)
 			return _getValueOfList(disowned_list(messagesList,owner));
 		if(messagesArray!=NULL)
@@ -7942,12 +7952,13 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 Mvalue* Mremovemessages(Mvalue const * const messageTypeValue){
 	long long result=M_LL_INVALID;
 	if(messageTypeValue!=NULL){
-		if(messageTypeValue->type==VT_TEXT){
-			result=removeMessagesOfType(messageTypeValue->value._text->_c);
-			//////if(result<0)result=M_LL_INVALID;
+		MessageCounts* _messageCounts=_getValueMessageCounts(messageTypeValue);
+		if(_messageCounts!=NULL){
+			result=removeMessages(_messageCounts);
+			freeMessageCounts(_messageCounts);
 		}
 	}else // removing all messages (not the types)
-		result=removeMessagesOfType(NULL);
+		result=removeMessages(NULL);
 	return _getIntegerValue(result);
 }
 /**
@@ -7979,7 +7990,7 @@ Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
 				if(appendedToMap(_messagecountsMap,owner,messageCount.messageType,_getIntegerValue(messageCount.count))!=M_TRUE)
 					output("%sFailed to append message count of type '%s'.\n",M_ERROR_PREFIX,messageCount.messageType);
 			}
-			free_messagecounts(_messageCounts);
+			freeMessageCounts(_messageCounts);
 			return _getValueOfMap(disowned_map(_messagecountsMap,owner));
 		}
 	}

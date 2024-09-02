@@ -233,6 +233,7 @@ static MessageTypeListNode* getNewMessageTypeListNode(char const * const message
 	}
 	return newMessageTypeListNode;
 }
+/*
 static size_t freedMessageNode(MessageNode* messageNode){
 	size_t result=0;
 	if(messageNode!=NULL){
@@ -250,7 +251,7 @@ static size_t freedMessageNode(MessageNode* messageNode){
 	}
 	return result;
 }
-
+*/
 static size_t messageIndex=0; // keeps track of the total number of messages
 /**
  * @brief returns the message type list node of message type \p messageType
@@ -421,7 +422,7 @@ Messages* _getMessages(){
  * 
  * @param messages the messages to free
  */
-void free_messages(Messages* messages){
+void freeMessages(Messages* messages){
 	if(NULL==messages)return;
 	///output("Freeing messages.\n");
 	if(messages->messages!=NULL)free(messages->messages);
@@ -446,6 +447,94 @@ static void outputMessageCounts(MessageCounts const * const messageCounts){
 		output("%sNo message counts defined to output!\n",M_ERROR_PREFIX);
 }
 /**
+ * @brief frees \p message
+ * 
+ * @param message 
+ */
+static void freeMessage(Message* message){
+	if(NULL==message)return;
+	if(message->msg!=NULL)free(message->msg);
+	free(message);
+}
+/**
+ * @brief frees \p messageNode
+ * 
+ * @param messageNode 
+ */
+static void freeMessageNode(MessageNode* messageNode){
+	if(NULL==messageNode)return;
+	if(messageNode->message!=NULL)freeMessage(messageNode->message);
+	free(messageNode);
+}
+/**
+ * @brief updates the filtered field of all message type list nodes from \p messageCounts
+ * 
+ * @param messageCounts 
+ * @result the number of message types with non-zero filtered fields
+ */
+static size_t updateMessageTypeListNodeFiltered(MessageCounts const * const messageCounts,size_t* _totalMessageCount){
+	*_totalMessageCount=0;
+	size_t totalMessageTypeCount=0; // the value to return
+	MessageCount* messageCountFilters=(messageCounts!=NULL?messageCounts->messagecounts:NULL);
+	size_t numberOfFilters=(messageCountFilters!=NULL?messageCounts->count:0);
+	if(numberOfFilters>0){ // there are filters, so there may be messages
+		size_t messageTypePrefixLength,filterCount;
+		// we could collect the message types present in messageCounts?
+		// NO, we can simply iterate over the messageCount structures in messageCounts->messagecounts
+		// NOTE some message types might not match the filters in which case NONE of the messages are to be passed
+		//      where can we actually store 
+		char* messageTypePrefix;
+		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+		while(messageTypeListNode!=NULL){
+			messageTypeListNode->filtered=0; // assume no filter matches
+			// messageTypeCount is the maximum number of messages that match the filters
+			size_t messageTypeCount=messageTypeListNode->count; // the maximum number of (returnable) messages of the current type
+			if(messageTypeCount>0){ // there are messages of this type that we could return
+				// iterate over all filters (which we know there are!!!), and adapt ->filtered accordingly
+				size_t filterCountIndex=numberOfFilters;
+				do{
+					filterCountIndex--;
+					// does this message type match this filter???
+					messageTypePrefix=messageCountFilters[filterCountIndex].messageType;
+					messageTypePrefixLength=strlen(messageTypePrefix);
+					if(NULL==messageTypePrefix
+							||(messageTypePrefixLength==0&&strlen(messageTypeListNode->messageType)==0)
+							||(messageTypePrefixLength>0&&strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0)){
+						// the message type matches the filter message type
+						// there's only a restriction if the filter count is positive and below messageTypeCunt
+						filterCount=messageCountFilters[filterCountIndex].count; // the maximum number of messages to return
+						// if filterCount==0 all messages of this type are allowed, so does not limit filtered!!!!!
+						// but we should NOT break, because other filters should still be allowed to limit the number of message of this type to return
+						if(filterCount==0){ // all messages in this type should be returned
+							if(messageTypeListNode->filtered==0)
+								messageTypeListNode->filtered=(messageTypeCount=messageTypeListNode->count);
+						}else
+						// only to be returned partly when filterCount is below the current message type count
+						if(filterCount<messageTypeCount) // more restrictive
+							messageTypeListNode->filtered=(messageTypeCount=filterCount);
+					}
+				}while(filterCountIndex);
+				if(messageTypeListNode->filtered){
+					*_totalMessageCount+=messageTypeListNode->filtered;
+					totalMessageTypeCount++; // register as one of the returned message types
+				}
+			}
+			// the next message type list to check
+			messageTypeListNode=messageTypeListNode->next;
+		}
+	}else
+	if(NULL==messageCounts){ // force all messages to be returned
+		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
+		while(messageTypeListNode!=NULL){
+			messageTypeListNode->filtered=messageTypeListNode->count;
+			*_totalMessageCount+=messageTypeListNode->filtered;
+			totalMessageTypeCount++;
+			messageTypeListNode=messageTypeListNode->next;
+		}
+	}
+	return totalMessageTypeCount;
+}
+/**
  * @brief returns the messages filtered by \p messageCounts
  * 
  * @param messageCounts the original message counts
@@ -458,63 +547,8 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 		// we want to store for each message type how many messages to return
 		// we could well store this amount with the message type itself
 		// 1. count all the messages
-		MessageCount* messageCountFilters=(messageCounts!=NULL?messageCounts->messagecounts:NULL);
-		size_t totalMessageCount=0,totalMessageTypeCount=0,numberOfFilters=(messageCountFilters!=NULL?messageCounts->count:0);
-		if(numberOfFilters>0){ // there are filters, so there may be messages
-			size_t messageTypePrefixLength,filterCount;
-			// we could collect the message types present in messageCounts?
-			// NO, we can simply iterate over the messageCount structures in messageCounts->messagecounts
-			// NOTE some message types might not match the filters in which case NONE of the messages are to be passed
-			//      where can we actually store 
-			char* messageTypePrefix;
-			MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
-			while(messageTypeListNode!=NULL){
-				messageTypeListNode->filtered=0; // assume no filter matches
-				// messageTypeCount is the maximum number of messages that match the filters
-				size_t messageTypeCount=messageTypeListNode->count; // the maximum number of (returnable) messages of the current type
-				if(messageTypeCount>0){ // there are messages of this type that we could return
-					// iterate over all filters (which we know there are!!!), and adapt ->filtered accordingly
-					size_t filterCountIndex=numberOfFilters;
-					do{
-						filterCountIndex--;
-						// does this message type match this filter???
-						messageTypePrefix=messageCountFilters[filterCountIndex].messageType;
-						messageTypePrefixLength=strlen(messageTypePrefix);
-						if(NULL==messageTypePrefix
-								||(messageTypePrefixLength==0&&strlen(messageTypeListNode->messageType)==0)
-								||(messageTypePrefixLength>0&&strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0)){
-							// the message type matches the filter message type
-							// there's only a restriction if the filter count is positive and below messageTypeCunt
-							filterCount=messageCountFilters[filterCountIndex].count; // the maximum number of messages to return
-							// if filterCount==0 all messages of this type are allowed, so does not limit filtered!!!!!
-							// but we should NOT break, because other filters should still be allowed to limit the number of message of this type to return
-							if(filterCount==0){ // all messages in this type should be returned
-								if(messageTypeListNode->filtered==0)
-									messageTypeListNode->filtered=(messageTypeCount=messageTypeListNode->count);
-							}else
-							// only to be returned partly when filterCount is below the current message type count
-							if(filterCount<messageTypeCount) // more restrictive
-								messageTypeListNode->filtered=(messageTypeCount=filterCount);
-						}
-					}while(filterCountIndex);
-					if(messageTypeListNode->filtered){
-						totalMessageCount+=messageTypeListNode->filtered;
-						totalMessageTypeCount++; // register as one of the returned message types
-					}
-				}
-				// the next message type list to check
-				messageTypeListNode=messageTypeListNode->next;
-			}
-		}else
-		if(NULL==messageCounts){ // force all messages to be returned
-			MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
-			while(messageTypeListNode!=NULL){
-				messageTypeListNode->filtered=messageTypeListNode->count;
-				totalMessageCount+=messageTypeListNode->filtered;
-				totalMessageTypeCount++;
-				messageTypeListNode=messageTypeListNode->next;
-			}
-		}
+		size_t totalMessageCount=0;
+		size_t totalMessageTypeCount=updateMessageTypeListNodeFiltered(messageCounts,&totalMessageCount);
 		// if there are NO messages to return, just return _messages as is
 		if(totalMessageCount==0)return _messages;
 		output("Total number of matching messages: %zu.\n",totalMessageCount);
@@ -608,8 +642,7 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 			return _messages;
 		}
 		output("Failed to allocate memory to store messages.\n",M_ERROR_PREFIX);
-
-		free_messages(_messages);
+		freeMessages(_messages);
 	}
 	return NULL;
 }
@@ -679,10 +712,29 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
  * 
  * @param messageTypeListNode 
  */
-static void removeMessageTypeListNode(MessageTypeListNode * const messageTypeListNode){
-	if(NULL==messageTypeListNode)return;
+static void removeFilteredFromMessageTypeListNode(MessageTypeListNode * const messageTypeListNode){
+	if(NULL==messageTypeListNode)return; // no type to remove from
 	///output("Removing %zu message%s of type '%s'.\n",messageTypeListNode->count,(messageTypeListNode->count>1?"s":""),messageTypeListNode->messageType);
-	if(messageTypeListNode->count==0)return;
+	if(messageTypeListNode->count==0)return; // nothing left to remove
+	size_t messagesToRemove=messageTypeListNode->filtered; // number of messages to remove
+	if(messagesToRemove==0)return; // nothing requested to remove
+	MessageNode *messageNode,*nextMessageNode;
+	do{
+		messageNode=messageTypeListNode->firstMessageNode;
+		if(NULL==messageNode)break; // no first message node to remove
+		nextMessageNode=messageNode->next; // remember next to remove
+		freeMessageNode(messageNode); // free the first message node
+		messageTypeListNode->count--; // one less message in the list
+		messageTypeListNode->firstMessageNode=nextMessageNode; // replace the first message node
+	}while(--messagesToRemove); // loop until all requested removed
+	if(messageTypeListNode->count==0){
+		messageTypeListNode->lastMessageNode=NULL;
+		if(messageTypeListNode->firstMessageNode!=NULL){
+			messageTypeListNode->firstMessageNode=NULL;
+			output("%sFailed to remove all messages of type '%s'.\n",M_BUG_PREFIX,messageTypeListNode->messageType);
+		}
+	}
+	/* replacing:
 	size_t freedMessageNodes=freedMessageNode(messageTypeListNode->firstMessageNode);
 	messageTypeListNode->count-=freedMessageNodes;
 	if(messageTypeListNode->count==0){
@@ -690,6 +742,7 @@ static void removeMessageTypeListNode(MessageTypeListNode * const messageTypeLis
 		messageTypeListNode->lastMessageNode=NULL;
 	}else
 		output("%sNot all messages of type '%s' removed!",M_ERROR_PREFIX,messageTypeListNode->messageType);
+		*/
 }
 /**
  * @brief removes all messages of type messageType
@@ -697,32 +750,25 @@ static void removeMessageTypeListNode(MessageTypeListNode * const messageTypeLis
  * @param messageType 
  * @return * exposes 
  */
-long long removeMessagesOfType(char const * const messageTypePrefix){
+long long removeMessages(MessageCounts const * const messageCounts){
 	long long unremovedMessageCount=-1;
-	/*
-	if(messageTypePrefix!=NULL){
-		MessageTypeListNode* messageTypeListNode=getMessageTypeListNode(messageTypePrefix);
-		if(messageTypeListNode!=NULL&&messageTypeListNode->count>0){
-			removeMessageTypeListNode(messageTypeListNode);
-			unremovedMessageCount=messageTypeListNode->count; // return the number of not freed message nodes
-		}
-		return 0;
-	}else{ // remove all messages
-	*/
-		size_t messageTypePrefixLength=(messageTypePrefix!=NULL?strlen(messageTypePrefix):0);
+	size_t totalRemovedMessageCount=0;
+	size_t totalRemovedMessageTypeCount=updateMessageTypeListNodeFiltered(messageCounts,&totalRemovedMessageCount);
+	if(totalRemovedMessageCount>0){
 		unremovedMessageCount=0;
 		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
 		while(messageTypeListNode!=NULL){
-			if(NULL==messageTypePrefix
-				||(messageTypePrefixLength==0
-					?strlen(messageTypeListNode->messageType)==0
-					:strncmp(messageTypeListNode->messageType,messageTypePrefix,messageTypePrefixLength)==0)){
-				removeMessageTypeListNode(messageTypeListNode);
-				unremovedMessageCount+=messageTypeListNode->count;
+			// for each type we may determine how many messages we should remove
+			// we can store this amount in the filtered field as well like we did in _getFilter
+			if(messageTypeListNode->filtered){
+				size_t originalCount=messageTypeListNode->count;
+				removeFilteredFromMessageTypeListNode(messageTypeListNode);
+				unremovedMessageCount+=(messageTypeListNode->count-(originalCount-messageTypeListNode->filtered));
+				messageTypeListNode->filtered=0; // not really required
 			}
 			messageTypeListNode=messageTypeListNode->next;
 		}
-	///}
+	}
 	return unremovedMessageCount;
 }
 
@@ -758,7 +804,7 @@ MessageCounts* _getMessageCounts(){
 				return messageCounts;
 			}		
 		}
-		free_messagecounts(messageCounts);
+		freeMessageCounts(messageCounts);
 	}
 	return NULL;
 }
@@ -767,7 +813,7 @@ MessageCounts* _getMessageCounts(){
  * 
  * @param messageCounts 
  */
-void free_messagecounts(MessageCounts* messageCounts){
+void freeMessageCounts(MessageCounts* messageCounts){
 	if(NULL==messageCounts)return;
 	if(messageCounts->count){
 		do{

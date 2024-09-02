@@ -14980,8 +14980,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
-			if(!registerFunction(_Menvironment,owner,"messages",Mmessages,2,(char*[]){"[filter(s)]","[return type(text)]"},NULL)
-					||!registerFunction(_Menvironment,owner,"removemessages",Mremovemessages,1,(char*[]){"[type(text)]"},NULL)
+			if(!registerFunction(_Menvironment,owner,"messages",Mmessages,2,(char*[]){"[filter]","[return type(text)]"},NULL)
+					||!registerFunction(_Menvironment,owner,"removemessages",Mremovemessages,1,(char*[]){"[filter]"},NULL)
 					||!registerFunction(_Menvironment,owner,"messagecounts",Mmessagecounts,0,NULL,NULL)
 					||!registerFunction(_Menvironment,owner,"addmessage",Maddmessage,1,(char*[]){"message(text)"},NULL))
 			{

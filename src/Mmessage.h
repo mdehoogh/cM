@@ -41,11 +41,11 @@ typedef struct MessageCounts{
 ////////Messages* _getMessages(); // MDH@20AUG2024: for retrieving all messages (see also Mmessages() user function)
 Messages* _getFilteredMessages(MessageCounts * const messageCounts);
 // replacing: Messages* _getMessagesOfType(char const * const messageType); // exposes messages of a certain type
-void free_messages(Messages* messages);
-long long removeMessagesOfType(char const * const messageTypePrefix);
+void freeMessages(Messages* messages);
+long long removeMessages(MessageCounts const * const messageCounts);
 // MDH@28AUG2024: for retrieving and freeing message counts!!
 MessageCounts* _getMessageCounts();
-void free_messagecounts(MessageCounts* messageCounts);
+void freeMessageCounts(MessageCounts* messageCounts);
 
 bool addMessageOfType(char const * const messageText,char const * const messageType);
 
