@@ -745,13 +745,13 @@ static void removeFilteredFromMessageTypeListNode(MessageTypeListNode * const me
 		*/
 }
 /**
- * @brief removes all messages of type messageType
+ * @brief removes the number of messages of the types indicated in \p messageCounts
  * 
- * @param messageType 
- * @return * exposes 
+ * @param messageCounts
+ * @return the number of unremoved messages, or -1 if there were no messages to remove
  */
 long long removeMessages(MessageCounts const * const messageCounts){
-	long long unremovedMessageCount=-1;
+	size_t unremovedMessageCount=-1;
 	size_t totalRemovedMessageCount=0;
 	size_t totalRemovedMessageTypeCount=updateMessageTypeListNodeFiltered(messageCounts,&totalRemovedMessageCount);
 	if(totalRemovedMessageCount>0){
@@ -768,7 +768,10 @@ long long removeMessages(MessageCounts const * const messageCounts){
 			}
 			messageTypeListNode=messageTypeListNode->next;
 		}
-	}
+		if(unremovedMessageCount>0)
+			output("%sFailed to remove %zu messages.\n",M_ERROR_PREFIX,unremovedMessageCount);
+	}else
+		output("No messages to remove!\n");
 	return unremovedMessageCount;
 }
 
@@ -802,7 +805,7 @@ MessageCounts* _getMessageCounts(){
 					messageTypeListNode=messageTypeListNode->next;
 				}
 				return messageCounts;
-			}		
+			}
 		}
 		freeMessageCounts(messageCounts);
 	}
