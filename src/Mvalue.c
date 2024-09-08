@@ -7692,6 +7692,88 @@ Mrational* getValueRational(Mvalue const * const value){//Mallocationowner owner
 	return _getValueRational(value);
 }
 
+// MDH@08SEP2024: table functions
+/**
+ * @brief returns a new list with \p columnNamesArray as the first element (row)
+ * 
+ * @param columnNamesArray 
+ * @param owner_columnNamesArray 
+ * @return Mlist* a new list with \p columnNamesArray as the first element (row)
+ */
+Mlist* _getTableOfArrays(Marray* columnNamesArray,Mallocationowner owner_columnNamesArray){Mallocationowner owner=getOwner(__LINE__);
+	if(columnNamesArray!=NULL){
+		Mlist* _table=owned_list(_getListOfType(VT_ARRAY),owner);
+		if(_table!=NULL){
+			////if(amVerbose())output("Table created.\n");
+			_table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
+			// wrap the column names list in a value
+			// oops this is going to be a nuisance as the list would be copied wouldn't it????????
+			//	  NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
+			//	  
+			Mvalue* columnNamesArrayValue=_getValueOfArray(disowned_array(columnNamesArray,owner_columnNamesArray));
+			if(columnNamesArrayValue!=NULL){
+				if(appendedToList(_table,owner,columnNamesArrayValue,M_LL_INVALID)>0){
+					return disowned_list(_table,owner);
+				}
+				outputError("Failed to store the column names in a new table");
+			}
+		}
+	}
+	return NULL;
+}
+// MDH@25NOV2019: if we ask for the table, we receive a list with first element containing the column names
+/**
+ * @brief returns a M list containing a table like data structure with columns with names \p columnNamesList and \p numberOfRows rows
+ * 
+ * @param columnNamesList the names of the columns
+ * @param numberOfRows the number of table rows
+ * @param owner_columnNamesList the owner of the column names list
+ * @return Mlist* the table
+ */
+Mlist* _getTableOfLists(Mlist* columnNamesList/*,size_t numberOfRows*/,Mallocationowner owner_columnNamesList){Mallocationowner owner=getOwner(__LINE__);
+	if(columnNamesList!=NULL){
+		Mlist* _table=owned_list(_getListOfType(VT_LIST),owner);
+		if(_table!=NULL){
+			////if(amVerbose())output("Table created.\n");
+			_table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
+			// wrap the column names list in a value
+			// oops this is going to be a nuisance as the list would be copied wouldn't it????????
+			//	  NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
+			//	  
+			Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
+			if(columnNamesListValue!=NULL){
+				//////if(amVerbose())outputValue("Column names values table: '",columnNamesListValue,"'.\n");
+				if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
+					/*
+					// MDH@23MAR2023: should we return lists or arrays????? perhaps better to return arrays
+					while(numberOfRows>0){
+						numberOfRows--;
+						Mvalue* _rowValue=_getValueOfArray(_getArray("table",columnNamesList->numberOfElements,NULL));
+						if(NULL==_rowValue){outputError("Failed to create a new table row; the table will be incomplete");break;}
+						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row; the table will be incomplete");break;}
+					}
+					*/
+					/* replacing:
+					while(numberOfRows>0){
+						numberOfRows--;
+						Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED));
+						if(NULL==_rowValue){outputError("Failed to create a new table row");break;}
+						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row");break;}
+					}
+					*/
+					return disowned_list(_table,owner);
+				}
+				outputError("Failed to store the column names in a new table");
+			}
+		}
+		// in essence the values in the list have their counts incremented when being added to it
+		// and only by decrementing their counts in free_list() do the elements go free
+		//  TODO do we need this???? if(owner_columnNamesList.level==0)FREE_LIST(columnNamesList,owner_columnNamesList);
+	}
+	return NULL;
+}
+// END table functions
+
 // MDH@20AUG2024: messages M functions
 /**
  * @brief returns the MessageCounts pointer corresponding to \p messageTypeValue
@@ -7831,17 +7913,55 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 	*/
 	if(_messages!=NULL){
 		output("Number of messages: %zu.\n",_messages->count);
-		char returnType='l'; // returns a list by default
+		char returnType='t'; // returns a table by default
 		if(returnTypeValue!=NULL&&returnTypeValue->type==VT_TEXT){
 			if(strlen(returnTypeValue->value._text->_c)>0){
 				returnType=(returnTypeValue->value._text->_c[0]);
-				if(returnType!='a'&&returnType!='m')returnType='l';
+				if(returnType!='a'&&returnType!='m'&&returnType!='l')returnType='t';
 			}
 		}
 		output("Return type: %c.\n",returnType);
 		Marray* messagesArray=NULL;
 		Mlist* messagesList=NULL;
 		Mmap* messagesMap=NULL;
+		if(returnType=='t'){ // the 'table' actually is a list as well (or it could be an array containing lists????)
+			Mvalue* noTextValue=_getTextValue("");
+			// we can have _getTable() create the table we need passing it the list of column names
+			Marray* messageTableColumnNameArray=owned_array(_getArray("Mmessages",4,noTextValue),owner);
+			if(messageTableColumnNameArray!=NULL){
+				Mvalue** messageTableColumnNameArrayelement=messageTableColumnNameArray->values;
+				assignValue(messageTableColumnNameArrayelement++,_getTextValue("#"));
+				assignValue(messageTableColumnNameArrayelement++,_getTextValue("Id"));
+				assignValue(messageTableColumnNameArrayelement++,_getTextValue("Type"));
+				assignValue(messageTableColumnNameArrayelement++,_getTextValue("Text"));
+				Mlist* messagesList=owned_list(_getTableOfArrays(messageTableColumnNameArray,owner),owner);
+				// let's add the data rows to the table
+				if(messagesList!=NULL){
+					size_t messageIndex=0,messageCount=_messages->count;
+					while(messageIndex<messageCount){
+						Message* message=_messages->messages[messageIndex];
+						char* messageType=(_messages->types!=NULL?_messages->types[messageIndex]:NULL);
+						messageIndex++;
+						if(NULL==message)continue;
+						Marray* messageArray=owned_array(_getArray("Mmessages",4,noTextValue),owner);
+						if(NULL==messageArray)continue; // TODO should we break here???
+						long long messageIndex=message->index;
+						char *messageId=message->id,*messageText=message->msg;
+						Mvalue** messageArrayelement=messageArray->values;
+						assignValue(messageArrayelement++,_getIntegerValue(messageIndex));
+						assignValue(messageArrayelement++,_getTextValue(messageId));
+						assignValue(messageArrayelement++,_getTextValue(messageType));
+						assignValue(messageArrayelement,_getTextValue(messageText));
+						if(appendedToList(messagesList,owner,_getValueOfArray(disowned_array(messageArray,owner)),M_LL_INVALID)<=0)
+							output("%sFailed to append messages to the messages list.\n",M_ERROR_PREFIX);
+					}
+				}else
+					output("%sFailed to initialize the message table list.\n",M_ERROR_PREFIX);
+				/*}else
+					output("%sFailed to populate the messages table column names list.\n",M_ERROR_PREFIX);*/
+			}else
+				output("%sFailed to create the messages table column names list.\n",M_ERROR_PREFIX);
+		}else
 		if(returnType=='a'){
 			// instead of an array we could return a list as well, or as a map (with the id used as key)
 			messagesArray=owned_array(_getArray("Mmessages",_messages->count,NULL),owner);

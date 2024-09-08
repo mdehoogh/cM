@@ -298,57 +298,6 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
 	return NULL;
 }
 
-// MDH@25NOV2019: if we ask for the table, we receive a list with first element containing the column names
-/**
- * @brief returns a M list containing a table like data structure with columns with names \p columnNamesList and \p numberOfRows rows
- * 
- * @param columnNamesList the names of the columns
- * @param numberOfRows the number of table rows
- * @param owner_columnNamesList the owner of the column names list
- * @return Mlist* the table
- */
-static Mlist* _getTable(Mlist* columnNamesList/*,size_t numberOfRows*/,Mallocationowner owner_columnNamesList){Mallocationowner owner=getOwner(__LINE__);
-	if(columnNamesList!=NULL){
-		Mlist* _table=owned_list(_getListOfType(VT_LIST),owner);
-		if(_table!=NULL){
-			////if(amVerbose())output("Table created.\n");
-			_table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
-			// wrap the column names list in a value
-			// oops this is going to be a nuisance as the list would be copied wouldn't it????????
-			//	  NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
-			//	  
-			Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
-			if(columnNamesListValue!=NULL){
-				//////if(amVerbose())outputValue("Column names values table: '",columnNamesListValue,"'.\n");
-				if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
-					/*
-					// MDH@23MAR2023: should we return lists or arrays????? perhaps better to return arrays
-					while(numberOfRows>0){
-						numberOfRows--;
-						Mvalue* _rowValue=_getValueOfArray(_getArray("table",columnNamesList->numberOfElements,NULL));
-						if(NULL==_rowValue){outputError("Failed to create a new table row; the table will be incomplete");break;}
-						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row; the table will be incomplete");break;}
-					}
-					*/
-					/* replacing:
-					while(numberOfRows>0){
-						numberOfRows--;
-						Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED));
-						if(NULL==_rowValue){outputError("Failed to create a new table row");break;}
-						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row");break;}
-					}
-					*/
-					return disowned_list(_table,owner);
-				}
-				outputError("Failed to store the column names in a new table");
-			}
-		}
-		// in essence the values in the list have their counts incremented when being added to it
-		// and only by decrementing their counts in free_list() do the elements go free
-		//  TODO do we need this???? if(owner_columnNamesList.level==0)FREE_LIST(columnNamesList,owner_columnNamesList);
-	}
-	return NULL;
-}
 // MDH@25NOV2019: the first example of a list which is constructed as a table is the the values() table
 /**
  * @brief outputs an M list \p table containing a table
@@ -361,7 +310,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 	if(table!=NULL){
 		 if(table->numberOfElements>0&&table->_first!=NULL){
 			// the first list element is supposed to be contain the column names
-			if(table->valuetype==VT_LIST){
+			if(table->valuetype==VT_LIST||table->valuetype==VT_ARRAY){ // DONE shouldn't we allow ARRAYs as the type as well?
 				// the width of the column names determines the width of the columns with an additional blank in between NO not an extra blank
 				Mlistelement* tableListelement=table->_first;
 				Mvalue* tablerowValue=tableListelement->_value;
@@ -505,7 +454,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
 		long long numberOfAllocationTypes=getNumberOfAllocationTypes();
 		// get a table with the given values column names and number of rows (which are initialized to empty lists)
 		// NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
-		_valuesTable=owned_list(_getTable(_valuesColumnNames/*,numberOfAllocationTypes*/,owner),owner);
+		_valuesTable=owned_list(_getTableOfLists(_valuesColumnNames/*,numberOfAllocationTypes*/,owner),owner);
 		if(_valuesTable!=NULL){
 			if(amVerbose())output("Values table created!\n");
 			if(numberOfAllocationTypes){

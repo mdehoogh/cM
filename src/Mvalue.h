@@ -643,6 +643,10 @@ Mrational* getValueRational(Mvalue const * const value);
 
 Mfile* _getFile(char const * const filename);
 
+// Mmessages might return a 'table' as well (see Menvironment.c for another use of a 'table')
+Mlist* _getTableOfArrays(Marray* columnNamesArray/*,size_t numberOfRows*/,Mallocationowner owner_columnNamesArray);
+Mlist* _getTableOfLists(Mlist* columnNamesList/*,size_t numberOfRows*/,Mallocationowner owner_columnNamesList);
+
 Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const returnTypeValue);
 Mvalue* Mremovemessages(Mvalue const * const messageTypeValue);
 Mvalue* Maddmessage(Mvalue const * const messageValue);
