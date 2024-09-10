@@ -30,6 +30,7 @@ extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual inf
 extern const char* const M_WARNING_PREFIX; // used in Mexecution.c as well (defined there as extern!!!)
 extern const char* const M_BUG_PREFIX; // MDH@05NOV2019: for reporting bugs
 extern const char* const M_RESULT_PREFIX; // MDH@28AUG2024: for reporting command results
+extern const char* const M_MESSAGE_PREFIX; // MDH@10SEP2024
 
 extern const char M_WHITESPACE_CHARACTER; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 extern const char M_NEWLINE_CHARACTER; // MDH@31OCT2019: the character to request a newline with!!!
@@ -2489,7 +2490,7 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 												if(removeLastUserInputCommandToken())
 													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
 												else
-													inputError("%sFailed to undo failing to mark the last character as erroneous.",M_BUG_PREFIX);
+													inputError("%s%sFailed to undo failing to mark the last character as erroneous.",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 											}else{
 												reoutputToken(_errorToken);
 												// DEBUG outputChar('W');
@@ -2507,7 +2508,7 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 								if(amVerboseDebugging())
 									inputInfo("Reference complete!");
 							}else
-								inputInfo("%sLast character in reference vanished.",M_BUG_PREFIX);
+								inputInfo("%s%sLast character in reference vanished.",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 						}else
 							inputError("There is no existing variable that can be referenced anymore.");
 					}
@@ -2962,7 +2963,7 @@ Mtoken* uncommentCommand(){
 			size_t tokenCount=0;
 			while(firstToken!=NULL){
 				if(firstToken->type==TT_COMMENT)
-					q2outputandcollect("%sFailed to remove comment token #%zd.\n",M_ERROR_PREFIX,tokenCount);
+					q2outputandcollect("%s%sFailed to remove comment token #%zd.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,tokenCount);
 				firstToken=firstToken->next;
 				tokenCount++;
 			}
@@ -2992,7 +2993,7 @@ void recommentCommand(Mtoken* endCommentToken){
 				if(prevToken!=NULL){
 					token->next=prevToken;
 					if(prevToken->type!=TT_COMMENT)
-						output("%sA disconnected non-comment token of type %s encountered.\n",M_BUG_PREFIX,TOKENTYPE_STRING[prevToken->type]);
+						output("%s%sA disconnected non-comment token of type %s encountered.\n",M_BUG_PREFIX,M_MESSAGE_PREFIX,TOKENTYPE_STRING[prevToken->type]);
 				}else
 					outputBug("Removed tokens cannot be reinserted");
 			}
@@ -3097,7 +3098,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		output("%s",string(_commandText));
 		FREE_STRING(_commandText,owner);
 	}else
-		output("%sFailed to obtain the command text.\n",M_ERROR_PREFIX);
+		output("%s%sFailed to obtain the command text.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 	output(" = ");
 
 	// if the result is a null value, show the NULL_value
@@ -3124,7 +3125,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	}else
 		string_append_char(_commandResultText,'?'); ///q2collect("%s\n","Failed to obtain the result text");
 	if(!addMessageOfType(string(_commandResultText),M_RESULT_PREFIX))
-		output("%sFailed to register the result message.\n",M_ERROR_PREFIX);
+		output("%s%sFailed to register the result message.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 	FREE_STRING(_commandResultText,owner);
 	/*
 	Mstring* _doneShowingResultTimestamp=owned_string(_getTimestamp(NULL),owner);
@@ -3682,7 +3683,7 @@ bool removeFirstSuggestedCharacter(char inputChar){
 				char firstManualFeedForwardCharacter=string_char(_manualFeedforwardText,0);
 				if(inputChar!='\0'&&inputChar!=firstManualFeedForwardCharacter){
 					result=false;
-					logToOutputFile("%sFirst manual feed forward character '%c' does not match the consumed suggested character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter,inputChar);
+					logToOutputFile("%s%sFirst manual feed forward character '%c' does not match the consumed suggested character '%c'.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,firstManualFeedForwardCharacter,inputChar);
 				}else{
 					char manualFeedForwardCharacterRemoved=string_removed_char(_manualFeedforwardText,0);
 					if(manualFeedForwardCharacterRemoved=='\0'||(manualFeedForwardCharacterRemoved!=inputChar&&inputChar!='\0')){
@@ -3717,12 +3718,12 @@ bool removeFirstSuggestedCharacter(char inputChar){
 				char firstImmediateFeedforwardCharacter=string_char(_immediateFeedforwardText,0);
 				if(inputChar!='\0'&&inputChar!=firstImmediateFeedforwardCharacter){
 					result=false;
-					logToOutputFile("%sFirst immediate feed forward character '%c' does not match the input character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter,inputChar);
+					logToOutputFile("%s%sFirst immediate feed forward character '%c' does not match the input character '%c'.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,firstImmediateFeedforwardCharacter,inputChar);
 				}else{
 					char immediateFeedforwardCharacterRemoved=string_removed_char(_immediateFeedforwardText,0);
 					if(immediateFeedforwardCharacterRemoved=='\0'||(inputChar!='\0'&&immediateFeedforwardCharacterRemoved!=inputChar)){
 						result=false;
-						logToOutputFile("%sFailed to remove the first immediate feed forward character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter);
+						logToOutputFile("%s%sFailed to remove the first immediate feed forward character '%c'.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,firstImmediateFeedforwardCharacter);
 					}else
 						sourceRemoved=!string_length(_immediateFeedforwardText);
 				}
@@ -4654,7 +4655,7 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 			if(newReferencedToken)
 				_newUserInputCommand->_lastToken->expr=newReferencedToken;
 			else 
-				inputError("%sFailed to synchronize a token reference.",M_BUG_PREFIX);
+				inputError("%s%sFailed to synchronize a token reference.",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 		}else // nothing pointed to, so just in case
 			_newUserInputCommand->_lastToken->expr=NULL;
 		// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
@@ -5059,7 +5060,7 @@ char removedTokenCharacter(bool endOfInput){
 			}
 		}
 	}else
-		inputInfo("%sNo command to remove characters from!",M_BUG_PREFIX);
+		inputInfo("%s%sNo command to remove characters from!",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 	return tokenCharacterRemoved;
 }
 
@@ -5204,7 +5205,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	/////outputChar('2');
 	// if _userInputCommand->_lastToken is now NULL something went wrong (in copyUserInputCommand or createUserInputCommand most likely)
 	if(NULL==_userInputCommand){
-		inputError("%sNo user input command.",M_BUG_PREFIX);
+		inputError("%s%sNo user input command.",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 		return NO_USER_INPUT_ERROR;
 	}
 	
@@ -5513,7 +5514,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 					if(pythonCommandFile->stat.st_dev==pythonScriptFile->stat.st_dev&&pythonCommandFile->stat.st_ino==pythonScriptFile->stat.st_ino)
 						pythonScriptFileToExecute=true;
 				}else
-					q2outputandcollect("%sFailed to determine whether '%s' represents the default Python script file to execute (M.py).\n",M_ERROR_PREFIX,string(pythonCommandFile->_name));
+					q2outputandcollect("%s%sFailed to determine whether '%s' represents the default Python script file to execute (M.py).\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(pythonCommandFile->_name));
 			}
 			if(pythonScriptFileToExecute||fOpened(pythonScriptFile,owner,"w",true,false)==M_TRUE){
 				bool headerLinesWritten=false;
@@ -5582,7 +5583,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									if(fOpened(pythonCommandFile,getValueDataOwner(),"r",false,false)==M_TRUE)
 										opened=true;
 									else
-										q2outputandcollect("%sFailed to open Python command file '%s' to execute.\n",M_ERROR_PREFIX,string(pythonCommandFile));
+										q2outputandcollect("%s%sFailed to open Python command file '%s' to execute.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(pythonCommandFile));
 								if(pythonCommandFile->_f!=NULL&&fIsReadable(pythonCommandFile,false)){ // the file is opened and can be read
 									q2outputandcollect("Copying the Python script lines from '%s' to the Python script file.\n",string(pythonCommandValue->value._file->_name));
 									// TODO should we close it before reading the lines from it????
@@ -5611,7 +5612,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 										if(pythonScriptLinesWritten&&fWriteCharsToFile(pythonScriptFile,"'",true)!=0)
 											pythonScriptLinesWritten=false;
 										if(!pythonScriptLinesWritten){
-											q2outputandcollect("%sFailed to write '%s' to the Python script file.\n",M_ERROR_PREFIX,string(_pythonSourceLine));
+											q2outputandcollect("%s%sFailed to write '%s' to the Python script file.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_pythonSourceLine));
 											break;
 										}
 										FREE_STRING(_pythonSourceLine,owner);
@@ -5726,7 +5727,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 											}
 										}else // register any line in the output file!!!
 										if(appendedToList(evaluatedLinesList,owner,_getTextValue(string(outputFileLine)),lineIndex)<=0)
-											q2outputandcollect("Failed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+											q2outputandcollect("%s%sFailed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,lineIndex);
 										// we should NOT evaluate the read line here, that's basically up to the caller
 										if(prevOutputFileLine!=outputFileLine){FREE_STRING(outputFileLine,owner);outputFileLine=NULL;}
 										outputFileLine=owned_string(fReadLine(outputFile),owner);
@@ -5734,7 +5735,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									// if we have remember the last valid line that's the result line to return!!!
 									if(prevOutputFileLine!=NULL){
 										if(appendedToList(evaluatedLinesList,owner,_getTextValue(string(prevOutputFileLine)),lineIndex)<=0)
-											q2outputandcollect("Failed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+											q2outputandcollect("%s%sFailed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,lineIndex);
 										FREE_STRING(prevOutputFileLine,owner);
 									}
 									/* no need to do that here!!! let's close the output file
@@ -6238,7 +6239,7 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner
 			pclose(fp);
 			_commandOutputValue=_getValueOfList(disowned_list(_commandOutputList,owner));
 		}else
-			q2outputandcollect("%sFailed to execute OS command '%s'.\n",M_ERROR_PREFIX,string(_commandText));
+			q2outputandcollect("%s%sFailed to execute OS command '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_commandText));
 	}
 	if(_commandText!=NULL)FREE_STRING(_commandText,owner);
 	return _commandOutputValue;
@@ -6270,27 +6271,27 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			errorflags|=1;
 		}else
 		if(!setVariable(_Menvironment,M_VARIABLE_NAME,M_value)){
-			output("%sFailed to initialize variable '%s'.\n",M_WARNING_PREFIX,M_VARIABLE_NAME);
+			output("%s%sFailed to initialize variable '%s'.\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX,M_MESSAGE_PREFIX,M_VARIABLE_NAME);
 			errorflags|=1;
 		}
 		// if M_value wasn't bound to the M variable, it's memory will be freed by the garbage collector, by setting M_value to NULL we know we do not need to update the wrapped list
 		if(M_value->count==0){
 			M_value=NULL;
 			errorflags|=2;
-			output("%sFailed to initialize variable '%s'.\n",M_ERROR_PREFIX,M_VARIABLE_NAME);
+			output("%s%sFailed to initialize variable '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,M_VARIABLE_NAME);
 		}else
 		if(amVerboseDebugging())
 			output("Variable '%s' initialized.\n",M_VARIABLE_NAME); 
 	}else{
 		errorflags|=4;
-		output("%sFailed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!",M_WARNING_PREFIX);
+		output("%s%sFailed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
 	}
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
 	if(M_value!=NULL){
 		if(!registerFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME,MM,1,(char*[]){"index(integer)"},NULL)){
 			errorflags|=8;
-			output("%sFailed to register function %s.\n",M_ERROR_PREFIX,MFUNCTION_NAME);
+			output("%s%sFailed to register function %s.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,MFUNCTION_NAME);
 		}else
 		if(amVerbose())
 			output("Function '%s' registered.\n",MFUNCTION_NAME);
@@ -6298,35 +6299,35 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables,1,(char*[]){"(environment)"},NULL)){
 		errorflags|=16;
-		output("%sFailed to register the variables() function",M_WARNING_PREFIX);
+		output("%s%sFailed to register the variables() function",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"values",Mvalues,1,(char*[]){"variables(list)"},NULL)){
 		errorflags|=32;
-		output("%sFailed to register the values() function",M_WARNING_PREFIX);
+		output("%s%sFailed to register the values() function",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
 	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"in",Min,1,(char*[]){"prompt(text)"},NULL)){
 		errorflags|=64;
-		output("%sFailed to register the in function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
+		output("%s%sFailed to register the in function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"os",MexecuteOSCommand,1,(char*[]){"os command(text)"},NULL)){
 		errorflags|=128;
-		output("%sFailed to register the os function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
+		output("%s%sFailed to register the os function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 
 	// color functions
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"bc",Mbc,1,(char*[]){"background color(integer)"},NULL)){
 		errorflags|=256;
-		output("%sFailed to register the bc function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
+		output("%s%sFailed to register the bc function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"tc",Mtc,1,(char*[]){"text color(integer)"},NULL)){
 		errorflags|=512;
-		output("%sFailed to register the tc function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
+		output("%s%sFailed to register the tc function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"python",Mpython,2,(char*[]){"python code(file|text)","output variable(text)"},NULL)){
 		errorflags|=1024;
-		output("%sFailed to register the python function",M_WARNING_PREFIX); // moved out of registerInternalFunctions!!!!
+		output("%s%sFailed to register the python function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
 	}
 
 	return errorflags;
@@ -6739,7 +6740,7 @@ char getAcceptedSuggestedCharacter(char suggestedCharacter,char * const inputCha
 		// MDH@02NOV2021: not being able to consume the first suggested character is a bug and reported as such, but should not prevent further command character acceptation
 		if((commandCharacterAccepted(suggestedCharacter,&suggestedInputCharType,true,true)&NO_USER_INPUT_ERROR)==0){
 			if(!removeFirstSuggestedCharacter('\0'))
-				inputError("%sFailed to remove the first suggested character '%c'. See the log file for details!",M_BUG_PREFIX,suggestedCharacter);
+				inputError("%s%sFailed to remove the first suggested character '%c'. See the log file for details!",M_BUG_PREFIX,M_MESSAGE_PREFIX,suggestedCharacter);
 			//string_removed_char(_suggestedText,0); // TEST
 			*inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
 			if(*inputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
@@ -6912,7 +6913,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								q2outputandcollect("Module (M_MODULE_DEBUGGING&MM_MAIN) mask: 0x%x.\n",moduleMask);
 								Debugging|=moduleMask;
 							}else
-								output("%s'%s' does not denote a module.\n",M_ERROR_PREFIX,debuggingCharacters);
+								output("%s%s'%s' does not denote a module.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,debuggingCharacters);
 							// and reinitialize
 							debuggingCharacters[0]='\0';
 							debuggingCharacters[1]='\0';
@@ -6927,7 +6928,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!	
 	if(!preparedForUserInput()){
-		output("%sFailed to initialize the user session.\n",M_ERROR_PREFIX);
+		output("%s%sFailed to initialize the user session.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 		resetOutputColor();
 		exit(2);
 	}
@@ -6938,7 +6939,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
 	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
 	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutoCompletionText,NULL)){ // ascertain to have an shell environment!!!
-		output("%sFailed to initialize the M shell!",M_ERROR_PREFIX);
+		output("%s%sFailed to initialize the M shell!",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 		resetOutputColor();
 		exit(3);
 	}
@@ -6949,14 +6950,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// prepare an interactive session
 	if(!interactiveSessionInitialized()){
-		output("%sFailed to initialize the interactive session.\n",M_ERROR_PREFIX);
+		output("%s%sFailed to initialize the interactive session.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 		resetOutputColor();
 		exit(2);
 	}
 	output("Ready for an interactive session.\n");
 
 	if(!blocksInitialized()){
-		output("%sFailed to activate the subcommand block feature.\n",M_ERROR_PREFIX);
+		output("%s%sFailed to activate the subcommand block feature.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 		resetOutputColor();
 		exit(3);
 	}
@@ -6982,7 +6983,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		FREE_STRING(predefinedVariableNames,owner); // no get rid of it!!!
 		predefinedVariableNames=NULL;
 	}else
-		output("No predefined variables!\n");
+		output("%s%sNo predefined variables!\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
 	//////////output("Number of predefined variables: %d.",getNumberOfVariables(mEnvironment));
 	
 	// initialize commands and input mode
@@ -6998,7 +6999,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// TODO shouldn't we do this in initEnvironment? (or its alternative initM() yet to be created)
 	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);
 	if(NULL==_immediateFeedforwardText)
-		output("%sFailed to allow immediate feed forward.\n",M_ERROR_PREFIX); // TODO we can do better than this!!
+		output("%s%sFailed to allow immediate feed forward.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX); // TODO we can do better than this!!
 
 	// MDH@13JUL2023: closers are characters that end a (function call argument) (list), a array (element) or a map (element)
 	//                NOTE that with function calls the amount of argument list elements is limited, whereas in an array or map it is not
@@ -7008,11 +7009,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
 	_expectedCharacterStack=owned_string(__string(),owner_expectedCharacterStack);
 	if(NULL==_expectedCharacterStack)
-		output("%sFailed to feed forward closing parentheses!\n",M_ERROR_PREFIX);
+		output("%s%sFailed to feed forward closing parentheses!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 
 	_suggestedText=owned_string(__string(),owner_suggestedText);
 	if(NULL==_suggestedText)
-		output("%sFailed to allow suggested text.\n",M_ERROR_PREFIX);
+		output("%s%sFailed to allow suggested text.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 	/* do not initialize _manualFeedforwardText because there's now a difference between manual feed forward being NULL or empty (not blocking vs blocking identifier continuation)
 	_manualFeedforwardText=__string();if(!_manualFeedforwardText)outputError("Failed to allow manual feed forward");
 	*/
@@ -7037,19 +7038,19 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");
 					FREE_STRING(_sessionStartTimestamp,owner);
 				}else
-					output("%sFailed to obtain a session start timestamp.\n",M_BUG_PREFIX);
+					output("%s%sFailed to obtain a session start timestamp.\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 				output("Session information will be written to %s.\n",string(_outputFilename));
 			}else
-				output("%sFailed to open %s for writing session information to.\n",M_ERROR_PREFIX,string(_outputFilename));
+				output("%s%sFailed to open %s for writing session information to.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_outputFilename));
 		}else
-			output("%sNo session log will be written, due to failing to compose the output filename.\n",M_ERROR_PREFIX);
+			output("%s%sNo session log will be written, due to failing to compose the output filename.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 		FREE_STRING(_outputFilename,owner);
 		_outputFilename=NULL; // MDH@16NOV2020: precaution
 	}
 
 	if(getNumberOfAllocationMarks()==0){
 		if(!allocationMarkAdded()){
-			output("%sFailed to create the first allocation mark!\n",M_ERROR_PREFIX);
+			output("%s%sFailed to create the first allocation mark!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 			exit(3);
 		}
 	}
@@ -7847,7 +7848,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								inputError("No user input!");
 						}else{
 							////beep();
-							inputError("%sFailed to consume the first suggested character '%c'.",M_BUG_PREFIX,inputChar);
+							inputError("%s%sFailed to consume the first suggested character '%c'.",M_BUG_PREFIX,M_MESSAGE_PREFIX,inputChar);
 							switchToControlMode("See the log for details.");
 						}
 						/// MDH@02NOV2021: can't happen anymore	
@@ -7905,7 +7906,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// we can get 'n' or 'x' responses
 					if(sessionSettingApplied<0){
 						if(!settingApplied(inputChar))
-							output("%sSetting character '%c' not recognized.\n",M_ERROR_PREFIX,inputChar);
+							output("%s%sSetting character '%c' not recognized.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,inputChar);
 					}else
 					if(sessionSettingApplied>0)inputCharType=sessionSettingApplied;
 					break;

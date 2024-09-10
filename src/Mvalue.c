@@ -3041,6 +3041,30 @@ size_t outputValue(char const * const prefix,Mvalue const * const value,char con
 	if(suffix!=NULL)written+=output("%s",suffix);
 	return written;
 }/* VALIDATED */
+/**
+ * @brief outputs M value \p value prefixed by \p prefix and postfixed by \p suffix
+ * 
+ * @param prefix 
+ * @param value 
+ * @param suffix 
+ * @return size_t the number of characters output
+ */
+size_t q2outputValue(char const * const prefix,Mvalue const * const value, char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
+	size_t written=0;
+	if(prefix!=NULL)written=q2outputandcollect("%s",prefix);
+	if(value!=NULL){
+		// output("(%s)%u",TOKENTYPE_STRING[value->type],value->type); // DEBUG
+		Mstring* _valueText=owned_string(_getValueText(value,false,true),owner); // free asap
+		if(_valueText!=NULL){
+			written+=q2outputandcollect("%s",string(_valueText));
+			FREE_STRING(_valueText,owner);
+			_valueText=NULL;
+		}
+	}else
+		written+=q2outputandcollect("%c",'-');
+	if(suffix!=NULL)written+=q2outputandcollect("%s",suffix);
+	return written;
+}
 
 /**
  * @brief returns the integer stored in M value \p _value

@@ -339,6 +339,7 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted,bool showAll); 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(Mvalue const * const _value);
 size_t outputValue(char const * const prefix,Mvalue const * value,char const * const suffix);
+size_t q2outputValue(char const * const prefix,Mvalue const * const value, char const * const suffix); // MDH@10SEP2024
 
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getMapTokenMap(char* name1,char* name2);
