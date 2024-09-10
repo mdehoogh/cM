@@ -1222,10 +1222,11 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating,mpd_
 		if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
 		// can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
 		// the rounding at the end of course could prove to be problematic
-		_textDecimal=owned_decimal(__decimal(NULL,0,repeating),owner);
+		mpd_context_t* mpd_context_to_use=(mpd_context!=NULL?mpd_context:M_DECIMALCONTEXT->mpd_context);
+		_textDecimal=owned_decimal(__decimal(mpd_context_to_use,0,repeating),owner);
 		if(_textDecimal!=NULL){
 			uint32_t status=0;
-			mpd_qset_string(_textDecimal->mpd,decimalText,(mpd_context!=NULL?mpd_context:M_DECIMALCONTEXT->mpd_context),&status); // NOTE here we have to pass in the default decimal context
+			mpd_qset_string(_textDecimal->mpd,decimalText,mpd_context_to_use,&status); // NOTE here we have to pass in the default decimal context
 			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_textDecimal,owner);
 				output("%sFailed to parse decimal '%s' (error status: %" PRIu32 ").\n",M_ERROR_PREFIX,decimalText,status);
@@ -3696,7 +3697,7 @@ Mdecimal* _getDecimalSqrt(Mdecimal const * const decimal){Mallocationowner owner
 		Mdecimal* _result=owned_decimal(__decimal(decimalcontext->mpd_context,0,0),owner);
 		if(_result){
 			uint32_t status=0;
-			mpd_qsqrt(_result->mpd,decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
+			mpd_qsqrt(_result->mpd,decimal->mpd,decimalcontext->mpd_context,&status);
 			if((status&0xEFBF)==0)return disowned_decimal(_result,owner);
 			FREE_DECIMAL(_result,owner); /////_result=NULL;
 			outputError("Failed to compute the square root of a decimal");

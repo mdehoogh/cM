@@ -4354,6 +4354,7 @@ Mvalue* Md(Mvalue* value,Mvalue* precisionValue){Mallocationowner owner=getOwner
 	if(value!=NULL&&value->type!=VT_DECIMAL){
 		Mdecimal* _decimal=NULL;
 		mpd_context_t* mpd_context=(precisionValue!=NULL?get_mpd_context(getValueInteger(precisionValue)):NULL);
+		if(mpd_context!=NULL)output("Requested precision: %d.\n",mpd_context->prec);else output("No precision specified!\n");
 		switch(value->type){
 			// TODO all other types_
 			case VT_INTEGER:_decimal=owned_decimal(__decimal(mpd_context,value->value._integer->ll,0),owner);break;
@@ -14696,7 +14697,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"f",Mf,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"q",Mq,1,(char*[]){"(number)"},NULL)
 					||!registerFunction(_Menvironment,owner,"Q",MQ,1,(char*[]){"(number)"},NULL)
-					||!registerFunction(_Menvironment,owner,"d",Md,2,(char*[]){"(any)","(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"d",Md,2,(char*[]){"number","precision"},NULL)
 					||!registerFunction(_Menvironment,owner,"precision",Mprecision,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"o",Mo,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"O",MO,1,(char*[]){"(any)"},NULL)){

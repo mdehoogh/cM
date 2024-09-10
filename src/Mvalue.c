@@ -7930,11 +7930,11 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 			Marray* messageTableColumnNameArray=owned_array(_getArray("Mmessages",4,noTextValue),owner);
 			if(messageTableColumnNameArray!=NULL){
 				Mvalue** messageTableColumnNameArrayelement=messageTableColumnNameArray->values;
-				assignValue(messageTableColumnNameArrayelement++,_getTextValue("#"));
-				assignValue(messageTableColumnNameArrayelement++,_getTextValue("Id"));
-				assignValue(messageTableColumnNameArrayelement++,_getTextValue("Type"));
-				assignValue(messageTableColumnNameArrayelement++,_getTextValue("Text"));
-				Mlist* messagesList=owned_list(_getTableOfArrays(messageTableColumnNameArray,owner),owner);
+				assignValue(messageTableColumnNameArrayelement,_getTextValue("'#"));
+				assignValue(++messageTableColumnNameArrayelement,_getTextValue("'Id"));
+				assignValue(++messageTableColumnNameArrayelement,_getTextValue("'Type"));
+				assignValue(++messageTableColumnNameArrayelement,_getTextValue("'Text"));
+				messagesList=owned_list(_getTableOfArrays(messageTableColumnNameArray,owner),owner);
 				// let's add the data rows to the table
 				if(messagesList!=NULL){
 					size_t messageIndex=0,messageCount=_messages->count;
@@ -7948,10 +7948,10 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						long long messageIndex=message->index;
 						char *messageId=message->id,*messageText=message->msg;
 						Mvalue** messageArrayelement=messageArray->values;
-						assignValue(messageArrayelement++,_getIntegerValue(messageIndex));
-						assignValue(messageArrayelement++,_getTextValue(messageId));
-						assignValue(messageArrayelement++,_getTextValue(messageType));
-						assignValue(messageArrayelement,_getTextValue(messageText));
+						assignValue(messageArrayelement,_getIntegerValue(messageIndex));
+						assignValue(++messageArrayelement,_getValueOfText(_getSingleQuotedText(messageId)));
+						assignValue(++messageArrayelement,_getValueOfText(_getSingleQuotedText(messageType)));
+						assignValue(++messageArrayelement,_getValueOfText(_getSingleQuotedText(messageText)));
 						if(appendedToList(messagesList,owner,_getValueOfArray(disowned_array(messageArray,owner)),M_LL_INVALID)<=0)
 							output("%sFailed to append messages to the messages list.\n",M_ERROR_PREFIX);
 					}
