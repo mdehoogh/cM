@@ -28,6 +28,7 @@ extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with ea
 extern const char* const M_BUG_PREFIX;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
+extern const char* const M_MESSAGE_PREFIX;
 extern const char * const VALUETYPENAMES[];
 extern const char * const M_LOCALE_SETTINGS_VARIABLE_NAME; // MDH@05DEC2020
 
@@ -314,99 +315,123 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 				// the width of the column names determines the width of the columns with an additional blank in between NO not an extra blank
 				Mlistelement* tableListelement=table->_first;
 				Mvalue* tablerowValue=tableListelement->_value;
-				Mlist* tablerowValueList=(tablerowValue!=NULL&&tablerowValue->type==VT_LIST?tablerowValue->value._list:NULL);
-				if(tablerowValueList!=NULL){
-					if(tablerowValueList->_first){
-						//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
-						size_t maximumNumberOfColumns=tablerowValueList->numberOfElements;
-						///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
-						size_t* columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
-						if(columnLengths!=NULL){
-							// get the value text of all elements in the header list
-							Mlistelement* headerrowListelement=tablerowValueList->_first;
-							size_t columnIndex=0;
-							written+=newline(); // start a new line before outputting the table!!!
-
-							while(headerrowListelement!=NULL){
-								if(columnIndex>=tablerowValueList->numberOfElements){
-									outputBug("Had to break out of table header loop!");
-									break;
+				if(tablerowValue!=NULL){
+					size_t* columnLengths=NULL;
+					size_t maximumNumberOfColumns,columnIndex;
+					if(tablerowValue->type==VT_LIST){
+						Mlist* tablerowValueList=tablerowValue->value._list;
+						if(tablerowValueList!=NULL&&tablerowValueList->_first!=NULL){
+							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
+							maximumNumberOfColumns=tablerowValueList->numberOfElements;
+							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
+							columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
+							if(columnLengths!=NULL){
+								// get the value text of all elements in the header list
+								Mlistelement* headerrowListelement=tablerowValueList->_first;
+								columnIndex=0;
+								written+=newline(); // start a new line before outputting the table!!!
+								while(headerrowListelement!=NULL){
+									if(columnIndex>=tablerowValueList->numberOfElements){
+										outputBug("Had to break out of table header loop!");
+										break;
+									}
+									Mstring* _columnNameText=owned_string(_getValueText(headerrowListelement->_value,true,true),owner);
+									if(_columnNameText!=NULL){
+										columnLengths[columnIndex]=output("%s",string(_columnNameText));
+										written+=columnLengths[columnIndex];
+										FREE_STRING(_columnNameText,owner);
+									}
+									columnIndex++;
+									headerrowListelement=headerrowListelement->_next;
 								}
-								Mstring* _columnNameText=owned_string(_getValueText(headerrowListelement->_value,true,true),owner);
-								if(_columnNameText!=NULL){
-									columnLengths[columnIndex]=output("%s",string(_columnNameText));
-									written+=columnLengths[columnIndex];
-									FREE_STRING(_columnNameText,owner);
-								}
-								columnIndex++;
-								headerrowListelement=headerrowListelement->_next;
 							}
-							//////if(amVerbose())output("Showing %llu table data rows.\n",table->numberOfElements-1);
-
-							// ready to show the data rows 
-							while(tableListelement->_next!=NULL){
-								tableListelement=tableListelement->_next;
-								tablerowValue=tableListelement->_value;
-								if(tablerowValue!=NULL){
-									// allowing the rows to be lists as well (which was the original implementation of table rows)
-									size_t cellLength;
-									if(tablerowValue->type==VT_LIST){
-										/////////output("Showing the list!\n");
-										tablerowValueList=tablerowValue->value._list;
-										if(tablerowValueList!=NULL&&tablerowValueList->numberOfElements>0){
-											written+=newline();
-											columnIndex=0;
-											Mlistelement* rowListelement=tablerowValueList->_first;
-											while(rowListelement!=NULL){
-												Mstring* _cellText=owned_string(_getValueText(rowListelement->_value,true,true),owner);
-												cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
-												written+=cellLength;
-												if(columnIndex<maximumNumberOfColumns){
-													while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
-												}else
-													written+=output("! ");
-												if(_cellText!=NULL)FREE_STRING(_cellText,owner);
-												rowListelement=rowListelement->_next;
-												columnIndex++;
-												if(columnIndex>tablerowValueList->numberOfElements){
-													outputBug("Had to break out of table data row loop!");break;
-												}
-												///////if(columnIndex>=tablerowValueList->numberOfElements)break; // safety
+						}
+					}else
+					if(tablerowValue->type==VT_ARRAY){
+						Marray* tablerowValueArray=tablerowValue->value._array;
+						if(tablerowValueArray!=NULL&&tablerowValueArray->numberOfElements>0){
+							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
+							maximumNumberOfColumns=tablerowValueArray->numberOfElements;
+							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
+							columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
+							if(columnLengths!=NULL){
+								// get the value text of all elements in the header list
+								columnIndex=0;
+								written+=newline(); // start a new line before outputting the table!!!
+								while(columnIndex<maximumNumberOfColumns){
+									Mstring* _columnNameText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner);
+									if(_columnNameText!=NULL){
+										columnLengths[columnIndex]=output("%s",string(_columnNameText));
+										written+=columnLengths[columnIndex];
+										FREE_STRING(_columnNameText,owner);
+									}
+									columnIndex++;
+								}
+							}
+						}
+					}
+					if(columnLengths!=NULL){
+						// ready to show the data rows 
+						while(tableListelement->_next!=NULL){
+							tableListelement=tableListelement->_next;
+							tablerowValue=tableListelement->_value;
+							if(tablerowValue!=NULL){
+								// allowing the rows to be lists as well (which was the original implementation of table rows)
+								size_t cellLength;
+								if(tablerowValue->type==VT_LIST){
+									/////////output("Showing the list!\n");
+									Mlist* tablerowValueList=tablerowValue->value._list;
+									if(tablerowValueList!=NULL&&tablerowValueList->numberOfElements>0){
+										written+=newline();
+										size_t columnIndex=0;
+										Mlistelement* rowListelement=tablerowValueList->_first;
+										while(rowListelement!=NULL){
+											Mstring* _cellText=owned_string(_getValueText(rowListelement->_value,true,true),owner);
+											cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
+											written+=cellLength;
+											if(columnIndex<maximumNumberOfColumns){
+												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
+											}else
+												written+=output("! ");
+											if(_cellText!=NULL)FREE_STRING(_cellText,owner);
+											rowListelement=rowListelement->_next;
+											columnIndex++;
+											if(columnIndex>tablerowValueList->numberOfElements){
+												outputBug("Had to break out of table data row loop!");break;
 											}
+											///////if(columnIndex>=tablerowValueList->numberOfElements)break; // safety
 										}
-										
-									}else
-									if(tablerowValue->type==VT_ARRAY){
-										////DEBUG output("Showing the array!\n");
-										Mvalue* cellValue;
-										Marray* tablerowValueArray=tablerowValue->value._array;
-										if(tablerowValueArray!=NULL){
-											written+=newline();
-											size_t numberOfColumns=tablerowValueArray->numberOfElements;
-											for(size_t columnIndex=0;columnIndex<numberOfColumns;++columnIndex){
-												Mstring* _cellText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner);
-												cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
-												written+=cellLength;
-												if(columnIndex<maximumNumberOfColumns){
-													while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
-												}else
-													written+=output("! ");
-												if(_cellText!=NULL)FREE_STRING(_cellText,owner);
-											}
+									}
+								}else
+								if(tablerowValue->type==VT_ARRAY){
+									////DEBUG output("Showing the array!\n");
+									Mvalue* cellValue;
+									Marray* tablerowValueArray=tablerowValue->value._array;
+									if(tablerowValueArray!=NULL){
+										written+=newline();
+										size_t numberOfColumns=tablerowValueArray->numberOfElements;
+										for(size_t columnIndex=0;columnIndex<numberOfColumns;++columnIndex){
+											Mstring* _cellText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner);
+											cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
+											written+=cellLength;
+											if(columnIndex<maximumNumberOfColumns){
+												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
+											}else
+												written+=output("! ");
+											if(_cellText!=NULL)FREE_STRING(_cellText,owner);
 										}
 									}
 								}
 							}
-							free(columnLengths); // essential bro'
-							written+=newline(); // one newline() at the end!!
-						}else 
-							outputError("Failed to prepare for displaying the table header.");
+						}
+						free(columnLengths); // essential bro'
+						written+=newline(); // one newline() at the end!!
 					}else 
-						outputError("Header table row empty!");
+						outputError("Failed to prepare for displaying the table header.");
 				}else 
 					outputError("Header of table not a list.");
 			}else
-				outputError("Rows of assumed table not (all) lists.");
+				q2outputandcollect("Rows of assumed table not (all) lists or arrays but %s.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,VALUETYPENAMES[table->valuetype]);
 		}else
 			outputWarning("The table to output is empty.");
 	}else

@@ -1970,12 +1970,12 @@ Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const 
 		if(_array->values!=NULL){
 			_array->numberOfElements=numberOfElements;
 			if(fillValue!=NULL){
-				outputValue("Fill value: ",fillValue,".\n");
+				///outputValue("Fill value: ",fillValue,".\n");
 				while(numberOfElements>0)assignValue(&_array->values[--numberOfElements],fillValue); // assign the fillValue to each element in the array
 				_array->valuetype=fillValue->type; // the type of fillValue becomes the value type of the array
 				if(fillValue->type==VT_ARRAY)
 					_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
-				output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
+				///output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
 			}
 		}else
 			outputError("Failed to allocate memory for storing the array elements");

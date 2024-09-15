@@ -68,9 +68,13 @@ long long _strtoll(char* _c,long long invalid){
  * @return long \p invalid on failure, or the represented long double precision number on success
  */
 long double _strtold(char* _c,long double invalid){
-	size_t l=(_c?strlen(_c):0);
-	if(!l)return invalid;
-	char* end;
-	long double ld=strtold(_c,&end);
-	return(strlen(end)?invalid:ld);
+	long double ld=invalid;
+	if(_c!=NULL&&strlen(_c)){
+		char* end=NULL;
+		ld=strtold(_c,&end);
+		if(errno==ERANGE)ld=invalid; // only accept a single long double!!!
+		else
+		if(end!=NULL&*end)ld=invalid;
+	}
+	return ld;
 }

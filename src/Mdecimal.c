@@ -604,7 +604,10 @@ long double getDecimalLongDouble(Mdecimal* _decimal){
 	if(_decimal!=NULL){
 		// MDH@20MAY2020: TODO same here _decimalText escaping memory management
 		char* _decimalText=mpd_to_sci(_decimal->mpd,0); // NOTE do NOT use _getDecimalText here!!!
-		if(_decimalText!=NULL){ldDecimal=_strtold(_decimalText,ldDecimal);free(_decimalText);} // no need for this anymore
+		if(_decimalText!=NULL){
+			ldDecimal=_strtold(_decimalText,ldDecimal);
+			free(_decimalText);
+		} // no need for this anymore
 	}
 	return ldDecimal;
 }/* VALIDATED */

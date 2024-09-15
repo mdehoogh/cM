@@ -445,7 +445,7 @@ static void outputMessageCounts(MessageCounts const * const messageCounts){
 				,messageCounts->messagecounts[messageCountIndex].messageType,messageCounts->messagecounts[messageCountIndex].count);
 		}
 	}else
-		output("%sNo message counts defined to output!\n",M_ERROR_PREFIX);
+		output("%s%sNo message counts defined to output!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 }
 /**
  * @brief frees \p message

@@ -120,6 +120,8 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue);
 Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value);
 Mvalue* Mstats(Mvalue* _sequenceValue);
 
+Mvalue* Moutputtable(Mvalue* tableValue);
+
 void outputCommandInfo(Mcommand const * const _command);
 
 // and finally obtaining a root environment

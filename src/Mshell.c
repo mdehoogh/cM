@@ -4695,7 +4695,7 @@ Mvalue* Mf(Mvalue* value){
 		case VT_BYTES:
 		default:return NAF_value; // if NAF_value is returned, we do NOT disown it as we would with _floatValue being created here!!!
 	}
-	return(isLongDoubleUndefined(ld)==M_FALSE?_getFloatValue(ld):NULL);
+	return(isLongDoubleUndefined(ld)!=M_TRUE?_getFloatValue(ld):NULL);
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
 /**
@@ -11294,6 +11294,21 @@ Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
 	return(_statsMap?_getValueOfMap(disowned_map(_statsMap,owner)):NULL);
 }
 
+// MDH15SEP2024
+/**
+ * @brief outputs the table stored in \p tableValue
+ * 
+ * @param tableValue 
+ * @return Mvalue* the number of characters output
+ */
+Mvalue* Moutputtable(Mvalue* tableValue){
+	long long result=M_LL_INVALID;
+	if(tableValue!=NULL&&tableValue->type==VT_LIST){
+		result=outputTable(tableValue->value._list);
+	}
+	return _getIntegerValue(result);
+}
+
 // MDH@29OCT2020: the famous array functions of JS: foreach, map, reduce, filter
 /**
  * @brief reduces the wrapped M list \p _listValue using the wrapped M function \p _functionValue
@@ -15058,6 +15073,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 			//reportNumberOfAllocations("shellInitialized 40");
+
+			if(!registerFunction(_Menvironment,owner,"outputtable",Moutputtable,1,(char*[]){"table"},NULL)){
+				outputError("Failed to register the outputtable function");
+				return NULL;
+			}
 
 		}
 	}
