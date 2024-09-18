@@ -313,10 +313,11 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 			// the first list element is supposed to be contain the column names
 			if(table->valuetype==VT_LIST||table->valuetype==VT_ARRAY){ // DONE shouldn't we allow ARRAYs as the type as well?
 				// the width of the column names determines the width of the columns with an additional blank in between NO not an extra blank
+				//size_t numberOfRows=table->numberOfElements;
 				Mlistelement* tableListelement=table->_first;
 				Mvalue* tablerowValue=tableListelement->_value;
 				if(tablerowValue!=NULL){
-					size_t* columnLengths=NULL;
+					size_t* _columnLengths=NULL;
 					size_t maximumNumberOfColumns,columnIndex;
 					if(tablerowValue->type==VT_LIST){
 						Mlist* tablerowValueList=tablerowValue->value._list;
@@ -324,12 +325,13 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
 							maximumNumberOfColumns=tablerowValueList->numberOfElements;
 							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
-							columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
-							if(columnLengths!=NULL){
+							_columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
+							/*
+							if(_columnLengths!=NULL){
 								// get the value text of all elements in the header list
 								Mlistelement* headerrowListelement=tablerowValueList->_first;
 								columnIndex=0;
-								written+=newline(); // start a new line before outputting the table!!!
+								//written+=newline(); // start a new line before outputting the table!!!
 								while(headerrowListelement!=NULL){
 									if(columnIndex>=tablerowValueList->numberOfElements){
 										outputBug("Had to break out of table header loop!");
@@ -337,14 +339,17 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 									}
 									Mstring* _columnNameText=owned_string(_getValueText(headerrowListelement->_value,true,true),owner);
 									if(_columnNameText!=NULL){
-										columnLengths[columnIndex]=output("%s",string(_columnNameText));
-										written+=columnLengths[columnIndex];
+										_columnLengths[columnIndex]=string_length(_columnNameText);
+										/// replacing:
+										///columnLengths[columnIndex]=output("%s",string(_columnNameText));
+										///written+=columnLengths[columnIndex];
 										FREE_STRING(_columnNameText,owner);
 									}
 									columnIndex++;
 									headerrowListelement=headerrowListelement->_next;
 								}
 							}
+							*/
 						}
 					}else
 					if(tablerowValue->type==VT_ARRAY){
@@ -353,24 +358,83 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
 							maximumNumberOfColumns=tablerowValueArray->numberOfElements;
 							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
-							columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
-							if(columnLengths!=NULL){
+							_columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
+							/*
+							if(_columnLengths!=NULL){
 								// get the value text of all elements in the header list
 								columnIndex=0;
 								written+=newline(); // start a new line before outputting the table!!!
 								while(columnIndex<maximumNumberOfColumns){
 									Mstring* _columnNameText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner);
 									if(_columnNameText!=NULL){
-										columnLengths[columnIndex]=output("%s",string(_columnNameText));
-										written+=columnLengths[columnIndex];
+										_columnLengths[columnIndex]=string_length(_columnNameText);
+										/// replacing:
+										///columnLengths[columnIndex]=output("%s",string(_columnNameText));
+										///written+=columnLengths[columnIndex];
 										FREE_STRING(_columnNameText,owner);
 									}
 									columnIndex++;
 								}
 							}
+							*/
 						}
 					}
-					if(columnLengths!=NULL){
+					output("Maximum number of columns: %zu.\n",maximumNumberOfColumns);
+					Mstring** _cells=(_columnLengths!=NULL?calloc(table->numberOfElements*maximumNumberOfColumns,sizeof(Mstring*)):NULL);
+					if(_cells!=NULL){
+						// collect the separate lines to store in _cells
+						size_t cellTextLength,numberOfRows=table->numberOfElements,cellIndex=0,rowIndex=0;
+						tableListelement=table->_first;
+						do{
+							tablerowValue=tableListelement->_value;
+							if(tablerowValue!=NULL&&(tablerowValue->type==VT_LIST||tablerowValue->type==VT_ARRAY)){
+								if(tablerowValue->type==VT_LIST){
+									Mlist* tablerowValueList=tablerowValue->value._list;
+									Mlistelement* cellListelement=tablerowValueList->_first;
+									for(int columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
+										Mstring* _cellText=(cellListelement!=NULL
+																				?owned_string(_getValueText(cellListelement->_value,true,true),owner)
+																				:NULL);
+										if(_cellText!=NULL){
+											cellTextLength=string_length(_cellText);
+											if(cellTextLength>_columnLengths[columnIndex])
+												_columnLengths[columnIndex]=cellTextLength;
+										}
+										_cells[cellIndex++]=_cellText;
+										if(cellListelement!=NULL)cellListelement=cellListelement->_next;
+									}
+								}else{
+									Marray* tablerowValueArray=tablerowValue->value._array;
+									output("Number of column elements: %zu.\n",tablerowValueArray->numberOfElements);
+									for(int columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
+										Mstring* _cellText=(columnIndex<tablerowValueArray->numberOfElements
+																				?owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner)
+																				:NULL);
+										if(_cellText!=NULL){
+											cellTextLength=string_length(_cellText);
+											if(cellTextLength>_columnLengths[columnIndex])
+												_columnLengths[columnIndex]=cellTextLength;
+										}
+										_cells[cellIndex++]=_cellText;
+									}
+								}
+							}
+							tableListelement=tableListelement->_next;
+						}while(tableListelement!=NULL&&++rowIndex<=table->numberOfElements);
+						for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++)
+							output("Column #%zu length: %zu.\n",columnIndex,_columnLengths[columnIndex]);
+						// ready to show the cells
+						cellIndex=0;
+						written+=newline();
+						while(numberOfRows--){
+							for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
+								cellTextLength=output("%s",string(_cells[cellIndex++]));
+								written+=cellTextLength;
+								while(cellTextLength<=_columnLengths[columnIndex]){written+=outputChar(' ');cellTextLength++;}
+							}
+							written+=newline();
+						}
+						/* replacing:
 						// ready to show the data rows 
 						while(tableListelement->_next!=NULL){
 							tableListelement=tableListelement->_next;
@@ -424,7 +488,10 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 								}
 							}
 						}
-						free(columnLengths); // essential bro'
+						*/
+						free(_columnLengths); // essential bro'
+						while(cellIndex)FREE_STRING(_cells[--cellIndex],owner); // essential to release all created Mstring's
+						free(_cells);
 						written+=newline(); // one newline() at the end!!
 					}else 
 						outputError("Failed to prepare for displaying the table header.");

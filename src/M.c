@@ -3109,7 +3109,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	newline(); // outputValueColored() doesn't do that!!
 
 	// MDH@19AUG2024: let's now collect the same thing but without color!
-	Mstring* _commandResultText=owned_string(_getString("'"),owner);
+	Mstring* _commandResultText=owned_string(__string(),owner);
 	Mstring* _uncoloredCommandText=owned_string(_getCommandText(false),owner); // MDH@13MAR2020 TODO determine later???????
 	if(_uncoloredCommandText!=NULL){
 		string_append(_commandResultText,string(_uncoloredCommandText));
