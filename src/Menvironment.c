@@ -28,7 +28,7 @@ extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with ea
 extern const char* const M_BUG_PREFIX;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
-extern const char* const M_MESSAGE_PREFIX;
+//extern const char* const M_MESSAGE_PREFIX;
 extern const char * const VALUETYPENAMES[];
 extern const char * const M_LOCALE_SETTINGS_VARIABLE_NAME; // MDH@05DEC2020
 
@@ -498,7 +498,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 				}else 
 					outputError("Header of table not a list.");
 			}else
-				q2outputandcollect("Rows of assumed table not (all) lists or arrays but %s.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,VALUETYPENAMES[table->valuetype]);
+				outputMessage(M_ERROR_PREFIX,"Rows of assumed table not (all) lists or arrays but %s.",VALUETYPENAMES[table->valuetype]);
 		}else
 			outputWarning("The table to output is empty.");
 	}else

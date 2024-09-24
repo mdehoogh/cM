@@ -2963,7 +2963,7 @@ Mtoken* uncommentCommand(){
 			size_t tokenCount=0;
 			while(firstToken!=NULL){
 				if(firstToken->type==TT_COMMENT)
-					q2outputandcollect("%s%sFailed to remove comment token #%zd.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,tokenCount);
+					outputMessage(M_ERROR_PREFIX,"Failed to remove comment token #%zd.\n",tokenCount);
 				firstToken=firstToken->next;
 				tokenCount++;
 			}
@@ -5514,7 +5514,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 					if(pythonCommandFile->stat.st_dev==pythonScriptFile->stat.st_dev&&pythonCommandFile->stat.st_ino==pythonScriptFile->stat.st_ino)
 						pythonScriptFileToExecute=true;
 				}else
-					q2outputandcollect("%s%sFailed to determine whether '%s' represents the default Python script file to execute (M.py).\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(pythonCommandFile->_name));
+					outputMessage(M_ERROR_PREFIX,"Failed to determine whether '%s' represents the default Python script file to execute (M.py).\n",string(pythonCommandFile->_name));
 			}
 			if(pythonScriptFileToExecute||fOpened(pythonScriptFile,owner,"w",true,false)==M_TRUE){
 				bool headerLinesWritten=false;
@@ -5583,9 +5583,9 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									if(fOpened(pythonCommandFile,getValueDataOwner(),"r",false,false)==M_TRUE)
 										opened=true;
 									else
-										q2outputandcollect("%s%sFailed to open Python command file '%s' to execute.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(pythonCommandFile));
+										outputMessage(M_ERROR_PREFIX,"Failed to open Python command file '%s' to execute.\n",string(pythonCommandFile));
 								if(pythonCommandFile->_f!=NULL&&fIsReadable(pythonCommandFile,false)){ // the file is opened and can be read
-									q2outputandcollect("Copying the Python script lines from '%s' to the Python script file.\n",string(pythonCommandValue->value._file->_name));
+									outputMessage(NULL,"Copying the Python script lines from '%s' to the Python script file.\n",string(pythonCommandValue->value._file->_name));
 									// TODO should we close it before reading the lines from it????
 									unsigned long long lineIndex=0;
 									Mstring* _pythonSourceLine=fReadLine(pythonCommandFile);
@@ -5612,14 +5612,14 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 										if(pythonScriptLinesWritten&&fWriteCharsToFile(pythonScriptFile,"'",true)!=0)
 											pythonScriptLinesWritten=false;
 										if(!pythonScriptLinesWritten){
-											q2outputandcollect("%s%sFailed to write '%s' to the Python script file.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_pythonSourceLine));
+											outputMessage(M_ERROR_PREFIX,"Failed to write '%s' to the Python script file.\n",string(_pythonSourceLine));
 											break;
 										}
 										FREE_STRING(_pythonSourceLine,owner);
 										///////output("Reading the next line!\n");
 										_pythonSourceLine=fReadLine(pythonCommandFile);
 									}
-									q2outputandcollect("Number of Python source lines written: %u.\n",lineIndex);
+									outputMessage(NULL,"Number of Python source lines written: %u.\n",lineIndex);
 									if(opened)
 										if(fClosed(pythonCommandFile,getValueDataOwner(),true)!=M_TRUE)
 											outputError("Failed to close the Python source file");
@@ -5704,7 +5704,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 					// 2. EXECUTE THE PYTHON SCRIPT
 					int pythonCallErrorcode=execute_shellCommandText("python M.py > M.py.out");
 					if(pythonCallErrorcode==0){
-						q2outputandcollect("Retrieving the contents of the Python output file.\n");
+						outputMessage(NULL,"Retrieving the contents of the Python output file.\n");
 						Mfile* outputFile=owned_file(_getFile("M.py.out"),owner);
 						if(outputFile!=NULL){
 							// open the output file for reading, which we have to succeed in to continue
@@ -5718,7 +5718,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									long long lineIndex=0;
 									while(outputFileLine!=NULL){
 										lineIndex++;
-										q2outputandcollect("Processing Python output line '%s'.\n",string(outputFileLine));
+										outputMessage(NULL,"Processing Python output line '%s'.\n",string(outputFileLine));
 										if(sysExitValue!=NULL){ // only interested in the last valid line, which we will copy
 											if(string_length(outputFileLine)>1){ // we know the read line starts with a single quote
 												// replace the previously remembered last line by the newly read output file line
@@ -5727,7 +5727,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 											}
 										}else // register any line in the output file!!!
 										if(appendedToList(evaluatedLinesList,owner,_getTextValue(string(outputFileLine)),lineIndex)<=0)
-											q2outputandcollect("%s%sFailed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,lineIndex);
+											outputMessage(M_ERROR_PREFIX,"Failed to register line #%lld of the python output file.\n",lineIndex);
 										// we should NOT evaluate the read line here, that's basically up to the caller
 										if(prevOutputFileLine!=outputFileLine){FREE_STRING(outputFileLine,owner);outputFileLine=NULL;}
 										outputFileLine=owned_string(fReadLine(outputFile),owner);
@@ -5735,14 +5735,14 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 									// if we have remember the last valid line that's the result line to return!!!
 									if(prevOutputFileLine!=NULL){
 										if(appendedToList(evaluatedLinesList,owner,_getTextValue(string(prevOutputFileLine)),lineIndex)<=0)
-											q2outputandcollect("%s%sFailed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,lineIndex);
+											outputMessage(M_ERROR_PREFIX,"Failed to register the result at line #%lld of the python output file.\n",lineIndex);
 										FREE_STRING(prevOutputFileLine,owner);
 									}
 									/* no need to do that here!!! let's close the output file
 									if(fClosed(outputFile)!=M_TRUE)
 										outputWarning("Failed to close the python output file");
 									*/
-									q2outputandcollect("Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
+									outputMessage(NULL,"Number of output lines evaluated: %lld.\n",evaluatedLinesList->numberOfElements);
 									if(evaluatedLinesList->numberOfElements){
 										if(evaluatedLinesList->numberOfElements==1){ // a single output line
 											assignValue(&resultValue,evaluatedLinesList->_first->_value);
@@ -6239,7 +6239,7 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner
 			pclose(fp);
 			_commandOutputValue=_getValueOfList(disowned_list(_commandOutputList,owner));
 		}else
-			q2outputandcollect("%s%sFailed to execute OS command '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_commandText));
+			outputMessage(M_ERROR_PREFIX,"Failed to execute OS command '%s'.\n",string(_commandText));
 	}
 	if(_commandText!=NULL)FREE_STRING(_commandText,owner);
 	return _commandOutputValue;
@@ -6271,63 +6271,63 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			errorflags|=1;
 		}else
 		if(!setVariable(_Menvironment,M_VARIABLE_NAME,M_value)){
-			output("%s%sFailed to initialize variable '%s'.\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX,M_MESSAGE_PREFIX,M_VARIABLE_NAME);
+			outputMessage(M_WARNING_PREFIX,"Failed to initialize variable '%s'.\n",M_VARIABLE_NAME);
 			errorflags|=1;
 		}
 		// if M_value wasn't bound to the M variable, it's memory will be freed by the garbage collector, by setting M_value to NULL we know we do not need to update the wrapped list
 		if(M_value->count==0){
 			M_value=NULL;
 			errorflags|=2;
-			output("%s%sFailed to initialize variable '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,M_VARIABLE_NAME);
+			outputMessage(M_ERROR_PREFIX,"Failed to initialize variable '%s'.\n",M_VARIABLE_NAME);
 		}else
 		if(amVerboseDebugging())
-			output("Variable '%s' initialized.\n",M_VARIABLE_NAME); 
+			outputMessage(NULL,"Variable '%s' initialized.\n",M_VARIABLE_NAME); 
 	}else{
 		errorflags|=4;
-		output("%s%sFailed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
+		outputWarning("Failed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!");
 	}
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
 	if(M_value!=NULL){
 		if(!registerFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME,MM,1,(char*[]){"index(integer)"},NULL)){
 			errorflags|=8;
-			output("%s%sFailed to register function %s.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,MFUNCTION_NAME);
+			outputMessage(M_ERROR_PREFIX,"Failed to register function %s.\n",MFUNCTION_NAME);
 		}else
 		if(amVerbose())
-			output("Function '%s' registered.\n",MFUNCTION_NAME);
+			outputMessage(NULL,"Function '%s' registered.\n",MFUNCTION_NAME);
 	}
 
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"variables",Mvariables,1,(char*[]){"(environment)"},NULL)){
 		errorflags|=16;
-		output("%s%sFailed to register the variables() function",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
+		outputWarning("Failed to register the variables() function");
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"values",Mvalues,1,(char*[]){"variables(list)"},NULL)){
 		errorflags|=32;
-		output("%s%sFailed to register the values() function",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
+		outputWarning("Failed to register the values() function");
 	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"in",Min,1,(char*[]){"prompt(text)"},NULL)){
 		errorflags|=64;
-		output("%s%sFailed to register the in function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
+		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"os",MexecuteOSCommand,1,(char*[]){"os command(text)"},NULL)){
 		errorflags|=128;
-		output("%s%sFailed to register the os function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
+		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	// color functions
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"bc",Mbc,1,(char*[]){"background color(integer)"},NULL)){
 		errorflags|=256;
-		output("%s%sFailed to register the bc function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
+		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"tc",Mtc,1,(char*[]){"text color(integer)"},NULL)){
 		errorflags|=512;
-		output("%s%sFailed to register the tc function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
+		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
 	}
 	if(!registerFunction(_Menvironment,owner_executionenvironment,"python",Mpython,2,(char*[]){"python code(file|text)","output variable(text)"},NULL)){
 		errorflags|=1024;
-		output("%s%sFailed to register the python function",M_WARNING_PREFIX,M_MESSAGE_PREFIX); // moved out of registerInternalFunctions!!!!
+		outputWarning("Failed to register the python function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	return errorflags;
@@ -6883,11 +6883,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	if(_settingsCharacterText!=NULL){
 		output("Settings characters text: '%s'.\n",string(_settingsCharacterText));
 		if(argc>1){
-			printf("%s\n","Arguments");
+			output("%s\n","Arguments");
 			char debuggingCharacters[]={'\0','\0','\0','\0'}; // for each module we take two successive characters
 			char settingCharacter,debuggingCharacter;
 			for(int arg=1;arg<argc;arg++){
-				printf("%i. %s\n",arg,argv[arg]);
+				output("%i. %s\n",arg,argv[arg]);
 				if(argv[arg][0]=='-'){ // a setting flag (or flags)
 					int i=0;
 					while((settingCharacter=argv[arg][++i])){
@@ -6910,17 +6910,17 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							debuggingCharacters[2]='\0'; // done looking
 							if(pos){ // TODO if we can find a better way to get the flag
 								moduleMask=(1<<((pos-M_MODULE_DEBUG_CHARACTERS)/3));
-								q2outputandcollect("Module (M_MODULE_DEBUGGING&MM_MAIN) mask: 0x%x.\n",moduleMask);
+								outputMessage(NULL,"Module (M_MODULE_DEBUGGING&MM_MAIN) mask: 0x%x.\n",moduleMask);
 								Debugging|=moduleMask;
 							}else
-								output("%s%s'%s' does not denote a module.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,debuggingCharacters);
+								outputMessage(M_ERROR_PREFIX,"'%s' does not denote a module.\n",debuggingCharacters);
 							// and reinitialize
 							debuggingCharacters[0]='\0';
 							debuggingCharacters[1]='\0';
 						}
 					}
 					debuggingCharacters[0]='\0'; // just in case a user forgot the second character!!! 
-					output("Module (M_MODULE_DEBUGGING&MM_MAIN) flags: 0x%x.\n",Debugging);
+					outputMessage(NULL,"Module (M_MODULE_DEBUGGING&MM_MAIN) flags: 0x%x.\n",Debugging);
 				}
 			}
 		}
@@ -6928,7 +6928,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!	
 	if(!preparedForUserInput()){
-		output("%s%sFailed to initialize the user session.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("Failed to initialize the user session");
 		resetOutputColor();
 		exit(2);
 	}
@@ -6939,7 +6939,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
 	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
 	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutoCompletionText,NULL)){ // ascertain to have an shell environment!!!
-		output("%s%sFailed to initialize the M shell!",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);
 	}
@@ -6950,14 +6950,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 	// prepare an interactive session
 	if(!interactiveSessionInitialized()){
-		output("%s%sFailed to initialize the interactive session.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("Failed to initialize the interactive session");
 		resetOutputColor();
 		exit(2);
 	}
 	output("Ready for an interactive session.\n");
 
 	if(!blocksInitialized()){
-		output("%s%sFailed to activate the subcommand block feature.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("Failed to activate the subcommand block feature");
 		resetOutputColor();
 		exit(3);
 	}
@@ -6983,7 +6983,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		FREE_STRING(predefinedVariableNames,owner); // no get rid of it!!!
 		predefinedVariableNames=NULL;
 	}else
-		output("%s%sNo predefined variables!\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
+		outputWarning("No predefined variables!");
 	//////////output("Number of predefined variables: %d.",getNumberOfVariables(mEnvironment));
 	
 	// initialize commands and input mode
@@ -6999,7 +6999,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// TODO shouldn't we do this in initEnvironment? (or its alternative initM() yet to be created)
 	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);
 	if(NULL==_immediateFeedforwardText)
-		output("%s%sFailed to allow immediate feed forward.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX); // TODO we can do better than this!!
+		outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
 
 	// MDH@13JUL2023: closers are characters that end a (function call argument) (list), a array (element) or a map (element)
 	//                NOTE that with function calls the amount of argument list elements is limited, whereas in an array or map it is not
@@ -7009,11 +7009,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
 	_expectedCharacterStack=owned_string(__string(),owner_expectedCharacterStack);
 	if(NULL==_expectedCharacterStack)
-		output("%s%sFailed to feed forward closing parentheses!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("Failed to feed forward closing parentheses!");
 
 	_suggestedText=owned_string(__string(),owner_suggestedText);
 	if(NULL==_suggestedText)
-		output("%s%sFailed to allow suggested text.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("Failed to allow suggested text");
 	/* do not initialize _manualFeedforwardText because there's now a difference between manual feed forward being NULL or empty (not blocking vs blocking identifier continuation)
 	_manualFeedforwardText=__string();if(!_manualFeedforwardText)outputError("Failed to allow manual feed forward");
 	*/
@@ -7038,19 +7038,19 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");
 					FREE_STRING(_sessionStartTimestamp,owner);
 				}else
-					output("%s%sFailed to obtain a session start timestamp.\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
-				output("Session information will be written to %s.\n",string(_outputFilename));
+					outputBug("Failed to obtain a session start timestamp");
+				outputMessage(NULL,"Session information will be written to %s.\n",string(_outputFilename));
 			}else
-				output("%s%sFailed to open %s for writing session information to.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_outputFilename));
+				outputMessage(M_ERROR_PREFIX,"Failed to open %s for writing session information to.\n",string(_outputFilename));
 		}else
-			output("%s%sNo session log will be written, due to failing to compose the output filename.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+			outputError("No session log will be written, due to failing to compose the output filename");
 		FREE_STRING(_outputFilename,owner);
 		_outputFilename=NULL; // MDH@16NOV2020: precaution
 	}
 
 	if(getNumberOfAllocationMarks()==0){
 		if(!allocationMarkAdded()){
-			output("%s%sFailed to create the first allocation mark!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+			outputError("Failed to create the first allocation mark!");
 			exit(3);
 		}
 	}
@@ -7906,7 +7906,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					// we can get 'n' or 'x' responses
 					if(sessionSettingApplied<0){
 						if(!settingApplied(inputChar))
-							output("%s%sSetting character '%c' not recognized.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,inputChar);
+							outputMessage(M_ERROR_PREFIX,"Setting character '%c' not recognized.\n",inputChar);
 					}else
 					if(sessionSettingApplied>0)inputCharType=sessionSettingApplied;
 					break;

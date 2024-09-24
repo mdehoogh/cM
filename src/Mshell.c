@@ -336,11 +336,11 @@ bool registerVariables(Menvironment * environment,Mallocationowner owner_environ
 				// if(strlen(variableName)>0){
 					// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
 					if(!addVariable(environment,owner_environment,variableName,variableMapelementVariable->valuetype,false)){
-						q2outputandcollect("%s%sFailed to add variable '%s' as local variable.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,variableName);
+						outputMessage(M_ERROR_PREFIX,"Failed to add variable '%s' as local variable.\n",variableName);
 						return false;
 					}
 					if(!setValue(environment,variableName,variableMapelementVariable->_value)){
-						q2outputandcollect("%s%sFailed to initialize local variable '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,variableName);
+						outputMessage(M_ERROR_PREFIX,"Failed to initialize local variable '%s'.\n",variableName);
 						return false;
 					}
 					if(amVerboseDebugging())
@@ -597,7 +597,7 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 			default:
 				{
 					if(report)
-						q2outputandcollect("%s%sUnknown expression with first token of type %s left unfinished.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
+						outputMessage(M_ERROR_PREFIX,"Unknown expression with first token of type %s left unfinished.\n",TOKENTYPE_STRING[expressionToken->expr->type]);
 					return -6;
 				}
 		}
@@ -784,7 +784,7 @@ Mvalue* Msetdp(Mvalue* value){
 		return NULL;
 	}
 	if(decimalprecision<6){
-		q2outputandcollect("%s%sRequested decimal precision (%llu) not activated: it should at least be 6.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,decimalprecision);
+		outputMessage(M_ERROR_PREFIX,"Requested decimal precision (%llu) not activated: it should at least be 6.\n",decimalprecision);
 		return NULL;
 	}
 	// if I fail to create the associated decimal context, no go
@@ -794,7 +794,7 @@ Mvalue* Msetdp(Mvalue* value){
 		M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
 		////DP_value->value._integer->ll=_decimalContext->prec;
 	}else
-		q2outputandcollect("%s%sActive decimal context not replaced: failed to create a decimal context with precision %llu.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,decimalprecision);
+		outputMessage(M_ERROR_PREFIX,"Active decimal context not replaced: failed to create a decimal context with precision %llu.\n",decimalprecision);
 	return _getIntegerValue(olddecimalprecision);
 }
 
@@ -1169,7 +1169,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 					forEnvironmentInitialized=false;
 				}
 			}else
-				q2outputandcollect("%s%sFailed to add or initialize the for loop result and counter local variables $ and _.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+				outputError("Failed to add or initialize the for loop result and counter local variables $ and _");
 			if(!forEnvironmentInitialized){
 				// FREE_ENVIRONMENT(_forEnvironment,owner); // have to free the environment myself
 				// if(amVerbose())
@@ -1386,19 +1386,19 @@ static long long pushInitializedEnvironment(Menvironment * const _withEnvironmen
 										withMap->numberOfElements++; // count one more
 									}
 								}else
-									q2outputandcollect("%s%sFailed to copy the map attribute name '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,localMapelementVariable->_name->chars);
+									outputMessage(M_ERROR_PREFIX,"Failed to copy the map attribute name '%s'.\n",localMapelementVariable->_name->chars);
 							}
 						}else
-							q2outputandcollect("%s%sFailed to copy map attribute '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,localMapelementVariable->_name->chars);
+							outputMessage(M_ERROR_PREFIX,"Failed to copy map attribute '%s'.\n",localMapelementVariable->_name->chars);
 						localMapelement=localMapelement->_next;
 					}
 					if(localMapelement!=NULL)
 						outputError("Not all with local variables registered");
 				}
 				result=M_TRUE;
-				output("Environment '%s' initialized.\n",_withEnvironment->_name->chars);
+				outputMessage(NULL,"Environment '%s' initialized.\n",_withEnvironment->_name->chars);
 			}else{
-				q2outputandcollect("%s%sFailed to initialize environment '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_withEnvironment->_name->chars);
+				outputMessage(M_ERROR_PREFIX,"Failed to initialize environment '%s'.\n",_withEnvironment->_name->chars);
 				free_environment(_withEnvironment);//////////_withEnvironment=NULL;
 			}
 		}
@@ -2601,10 +2601,10 @@ static Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtok
 				popExecutionEnvironment(); // pop the eval environment we successfully pushed
 			}else{
 				free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
-				q2outputandcollect("%s%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)));
+				outputMessage(M_ERROR_PREFIX,"Unable to setup the evaluation of '%s'.\n",string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)));
 			}
 		}else
-			q2outputandcollect("%s%sFailed to evaluate '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
+			outputMessage(M_ERROR_PREFIX,"Failed to evaluate '%s'.\n",string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
 		if(NULL==commandText&&_commandText!=NULL)free_string(_commandText);
 	}else
 		logToOutputFile("%s%sUnable to evaluate a subcommand!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
@@ -2640,7 +2640,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 				commandCharacterType=INPUTCHARACTERTYPES[commandCharacter];
 				newCommandToken=commandCharacterAppended(_command,commandCharacter,&commandCharacterType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
 				if(newCommandToken==NULL){
-					q2outputandcollect("%s%sFailed to append command character '%c' parsing '%s'!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,commandCharacter,commandText);
+					outputMessage(M_ERROR_PREFIX,"Failed to append command character '%c' parsing '%s'!\n",commandCharacter,commandText);
 					break;
 				}
 				// MDH@28MAY2020: take over ownership of the new token returned
@@ -3554,7 +3554,8 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 	if(!amVerbose())
 		output("No decimal precision specified! Will use the current default decimal precision (%lld)!\n",numberOfRequestedDecimals);
 	if(numberOfRequestedDecimals<6){
-		q2outputandcollect("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		q2outputandcollect("%s",M_ERROR_PREFIX);
+		output("%s",M_MESSAGE_PREFIX);
 		q2outputValue("Argument '",value,"' to the pi() function should ");
 		if(numberOfRequestedDecimals==M_LL_INVALID)
 			q2outputandcollect("denote a valid small integer");
@@ -3626,14 +3627,14 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							Mbiginteger* _addendumNumerator=owned_biginteger(_getBiginteger(iter%2?-1:1),owner); // the numerator is either 1 or -1
 							if(NULL==_addendumNumerator){
 								FREE_BIGINTEGER(_addendumDenominator,owner);
-								q2outputandcollect("%s%sFailed to set the addendum numerator at iteration %u.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,iter);
+								outputMessage(M_ERROR_PREFIX,"Failed to set the addendum numerator at iteration %u.\n",iter);
 								break;
 							}
 							// both _addendumNumerator and _addendumDenominator are now available to be bound in the rational
 							Mrational* _addendumRational=owned_rational(_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false),owner);
 							FREE_BIGINTEGER(_addendumNumerator,owner);
 							if(NULL==_addendumRational){ // failed to bind in the rational
-								q2outputandcollect("%s%sFailed to compute the rational to add to the approximation of pi in step %u.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,iter);
+								outputMessage(M_ERROR_PREFIX,"Failed to compute the rational to add to the approximation of pi in step %u.",iter);
 								break;
 							}
 							// add the addendum to the current rational
@@ -3644,7 +3645,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							Mrational* _newRational=owned_rational(_getRationalSum(_rational,_addendumRational),owner); // _qsum replaced by _getRationalSum in Mrational.h/c
 							if(NULL==_newRational){
 								// we have to free the addendum numerator and denominator
-								q2outputandcollect("%s%sFailed to add this addendum at step %u in approximating pi.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,iter);
+								outputMessage(M_ERROR_PREFIX,"Failed to add this addendum at step %u in approximating pi.\n",iter);
 								FREE_RATIONAL(_addendumRational,owner); // to free the addendum numerator and denominator bound to _addendumRational
 								break;
 							}
@@ -3739,7 +3740,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							////////////if(amVerbose())output("Square numerator: %llu.",square);
 							Mbiginteger* _bigintegerSquare=owned_biginteger(_getBiginteger(square),owner);
 							if(NULL==_bigintegerSquare){
-								q2outputandcollect("%s%sFailed to compute the big integer of square %llu.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,square);
+								outputMessage(M_ERROR_PREFIX,"Failed to compute the big integer of square %llu.\n",square);
 								break;
 							}
 							if(amVerbose())
@@ -3769,6 +3770,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					Mrational* _inverseDenominatorRational=owned_rational(_getInverseRational(_denominatorRational),owner);
 					Mrational* _result=NULL;
 					if(NULL==_inverseDenominatorRational){
+						// TODO q2...?
 						output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX); // TODO use q2... here??
 						outputRational("Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").\n");
 						FREE_RATIONAL(_rational,owner);_rational=NULL;
@@ -4160,9 +4162,8 @@ Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							Mvalue** valueholder=array->values;
 							do{
 								if(appendedToList(_list,owner,*valueholder,M_LL_INVALID)<=0){
-									// TODO q2...?
-									output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
-									outputValue("Failed to append '",*valueholder,"' to the list.\n");
+									q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+									q2outputValue("Failed to append '",*valueholder,"' to the list.\n");
 								}
 								valueholder++;
 							}while(--arraylength);
@@ -4198,8 +4199,8 @@ Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						outputBug("Value map missing!");
 				}else{ // a single value, to be wrapped in a list
 					if(appendedToList(_list,owner,value,M_LL_INVALID)<=0){
-						// TODO q2... here?
-						output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);outputValue("Failed to wrap '",value,"' in a list.\n");
+						q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+						q2outputValue("Failed to wrap '",value,"' in a list.\n");
 					}
 				}
 			}
@@ -4232,8 +4233,7 @@ Mvalue* Mm(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						if(_key!=NULL){
 							if(appendedToMap(_map,owner,_key,listelement->_value)!=M_TRUE){
 								// TODO q2... herer?
-								output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
-								output("Failed to append list element #%llu to the map.\n",listelement->index);
+								outputMessage(M_ERROR_PREFIX,"Failed to append list element #%llu to the map.\n",listelement->index);
 							}
 							FREE_DISOWNED(_key,strlen(_key)+1,-'"',owner);
 						}else
@@ -4255,7 +4255,7 @@ Mvalue* Mm(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							char* _key=OWNED(_getIntegerCharacters(++arrayindex),owner);
 							if(_key!=NULL){
 								if(appendedToMap(_map,owner,_key,*valueholder)!=M_TRUE)
-									q2outputandcollect("%s%sFailed to append array element #%llu to the map.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,arrayindex);
+									outputMessage(M_ERROR_PREFIX,"Failed to append array element #%llu to the map.\n",arrayindex);
 								FREE_DISOWNED(_key,strlen(_key)+1,-'"',owner);
 							}else
 								outputError("Failed to create the array index map key");
@@ -4341,7 +4341,7 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					}
 					return _getValueOfArray(disowned_array(_array,owner));
 				}
-				q2outputandcollect("%s%sFailed to create the array to store %llu map elements in.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,maplength);
+				outputMessage(M_ERROR_PREFIX,"Failed to create the array to store %llu map elements in.",maplength);
 			}else
 				outputBug("No (value) map to convert to an array!");
 		}else{ // a single value, to be wrapped in an array
@@ -5187,20 +5187,20 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 		return NULL;
 	}
 	if(amVerboseDebugging())
-		output("Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		outputMessage(NULL,"Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	unsigned long long listElementIndex=0;
 	uint32_t firstElementToNotEvaluate=(maximumNumberOfElements==0||numberOfElementsToNotEvaluate>maximumNumberOfElements?0:maximumNumberOfElements-numberOfElementsToNotEvaluate+1);
 	if(amVerboseDebugging())
-		output("First element not to evaluate: %u.\n",firstElementToNotEvaluate);
+		outputMessage(NULL,"First element not to evaluate: %u.\n",firstElementToNotEvaluate);
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
 	while((expressionToken=nextEnvironmentExpressionToken())!=NULL){
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
 		if(amVerboseDebugging())
-			output("Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			outputMessage(NULL,"Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		Mvalue* _listElementValue=NULL;
 		if(firstElementToNotEvaluate>0&&listElementIndex>=firstElementToNotEvaluate){ // copy the tokens in the argument
 			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
@@ -5209,11 +5209,11 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 			Mtoken* _firstUnevaluatedToken=owned_token(_getEvaluatableTokenCopy(expressionToken),owner);
 			if(_firstUnevaluatedToken!=NULL){
 				if(amVerboseDebugging())
-					output("Evaluating special function call argument tokens:");
+					q2outputandcollect("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 				while(unevaluatedToken!=NULL){
 					if(amVerboseDebugging())
-						output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
+						q2outputandcollect(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(NULL==expressionToken)break; // NOTE shouldn't happen though
 					if(NULL==expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
@@ -5221,7 +5221,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 					unevaluatedToken=unevaluatedToken->next;
 				}
 				if(amVerboseDebugging())
-					outputChar('\n');
+					q2newline(true);
 				_listElementValue=_getValueOfToken(disowned_token(_firstUnevaluatedToken,owner));
 			}
 		}else{ // evaluate
@@ -5229,11 +5229,11 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
 			if(amVerboseDebugging())
-				outputValue("List element value: '",_listElementValue,"'.\n");
+				q2outputValue("List element value: '",_listElementValue,"'.\n");
 		}
 		if(NULL==_listElementValue){
 			if(amVerboseDebugging())
-				outputInfo("List element missing!");
+				outputMessage(NULL,"List element missing!");
 			continue;
 		} // undefined list elements should NEVER be added to the list
 		if(amVerboseDebugging())
@@ -5244,26 +5244,26 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
 			if(amVerboseDebugging())
-				output("Appending list element #%llu.\n",listElementIndex);
+				outputMessage(NULL,"Appending list element #%llu.\n",listElementIndex);
 			long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex<=0){
 				// TODO q2... here?
-				output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
-				outputValue("Failed to append list element '",_listElementValue,"'.\n");
+				q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+				q2outputValue("Failed to append list element '",_listElementValue,"'.\n");
 				break;
 			}
 			if(amVerboseDebugging())
-				output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
+				outputMessage(NULL,"List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
 		}else
 		if(amVerboseDebugging())
-			output("Maximum number of elements reached.\n");
+			outputMessage(NULL,"Maximum number of elements reached.\n");
 		if(NULL==expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
 	Mvalue* _listValue=_getValueOfList(disowned_list(_list,owner));
 	if(amVerboseDebugging())
-		outputValue("List '",_listValue,"' extracted!\n");
+		q2outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
 
@@ -5321,14 +5321,14 @@ static Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 		////////if(string_length(_attributeName)>0)
 		if(_map==NULL||!appendedToMap(_map,owner,string(_attributeName),_attributeValueValue)){
 			// TODO q2... here?
-			output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
-			outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
+			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
 		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
 		FREE_STRING(_attributeName,owner); // ALWAYS free the name text
 		if(NULL==expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(amVerboseDebugging())
-			output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
+			outputMessage(NULL,"Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
 	Mvalue* _mapValue=_getValueOfMap(disowned_map(_map,owner));
 	if(amVerboseDebugging())
@@ -5392,10 +5392,10 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 						return (functionResultValue!=NULL?functionResultValue:functionEvaluationValue);
 					}
 					// ASSERT failed to push the created function execution environment which also means it failed to be bound in a value, and thus I need to free it as it will not be garbage-collected like any value would
-					q2outputandcollect("%s%sFailed to create the function execution environment of function '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,functionName);
+					outputMessage(M_ERROR_PREFIX,"Failed to create the function execution environment of function '%s'.\n",functionName);
 					FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 				}else
-					q2outputandcollect("%s%sFailed to create the environment to execute function '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,functionName);
+					outputMessage(M_ERROR_PREFIX,"Failed to create the environment to execute function '%s'.\n",functionName);
 				return NULL;
 			}
 			break;
@@ -5553,10 +5553,10 @@ FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequ
  * @return FunctionBodyRequest* a new function body request with name \p functionName
  */
 static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
-	if(NULL==functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
+	if(NULL==functionName||!strlen(functionName)){outputError("Invalid or missing function name");return NULL;} // invalid input
 	// ASSERT a 'valid' function name
 	if(getFunctionBodyRequest(functionName)!=NULL){
-		q2outputandcollect("%s%sDuplicate function name '%s'.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Duplicate function name '%s'.",functionName);
 		return NULL;
 	} // already have it
 	// technically it should not have been requested already (or exist)
@@ -5569,9 +5569,9 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 		_lastFunctionBodyRequest=OWNED(_functionBodyRequest,owner_functionBodyRequest); // replace _lastFunctionBodyRequest taking over the ownership
 		if(NULL==_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
 		if(amVerbose())
-			output("The request for the body of function '%s' was created.\n",functionName);
+			outputMessage(NULL,"The request for the body of function '%s' was created.\n",functionName);
 	}else
-		q2outputandcollect("%s%sFailed to create the request for the body of function '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to create the request for the body of function '%s'.\n",functionName);
 	return _functionBodyRequest;
 }
 /**
@@ -5627,7 +5627,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		}else
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
-		q2outputandcollect("%s%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_functionBodyRequest->_functionName);
+		outputMessage(M_ERROR_PREFIX,"Can't find function '%s' for accepting its body commands.\n",_functionBodyRequest->_functionName);
 	FREE_DISOWNED_1(_currentFunctionBodyInput,'8',owner_currentFunctionBodyInput);
 	_currentFunctionBodyInput=NULL; // TODO is this a good idea then?????
 	return false;
@@ -5649,7 +5649,7 @@ bool startFunctionBodyInput(){
 	//						   now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
 	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
 	if(!functionBodyInputCreated)
-		q2outputandcollect("%s%sFailed to honour the request to input the body of function '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_firstFunctionBodyRequest->_functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to honour the request to input the body of function '%s'.\n",_firstFunctionBodyRequest->_functionName);
 	free_functionbodyrequest(_firstFunctionBodyRequest,owner_functionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request (if we succeed to request the function body input or not)
 	if(!functionBodyInputCreated){ // i.e. failed to start requesting for the body of the given function, so we should continue with the next one
 		// failed, so do the next one
@@ -5783,7 +5783,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
 						//				so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
 					}else
-						q2outputandcollect("%s%sReferenced variable '%s' does not exist.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_valuereference->_name->chars+1);
+						outputMessage(M_ERROR_PREFIX,"Referenced variable '%s' does not exist.\n",_valuereference->_name->chars+1);
 				}else // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
 					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name->chars); // the value at the top level
@@ -5922,7 +5922,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																					if(NULL==newValueholder){
 																						if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)!=1)
-																							q2outputandcollect("%s%sFailed to add property '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_attributenameText));
+																							outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.\n",string(_attributenameText));
 																						else
 																							newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																					}/*else{
@@ -5945,7 +5945,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
 																if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																	q2outputandcollect("%s%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,valueholderIndex+numberOfNewValueholders);
+																	outputMessage(M_ERROR_PREFIX,"Failed to set map element #%zd.\n",valueholderIndex+numberOfNewValueholders);
 															}else
 															if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
@@ -5973,9 +5973,9 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																							if(listIndex>0){
 																								newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																								if(amDebugging())
-																									output("List element at index #%zd retrieved.\n",listIndex);	
+																									outputMessage(NULL,"List element at index #%zd retrieved.\n",listIndex);	
 																							}else
-																								q2outputandcollect("%s%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,listIndex);
+																								outputMessage(M_ERROR_PREFIX,"Failed to add list element at index '%lld'.\n",listIndex);
 																						}
 																					}else
 																						newValueholder=NULL;
@@ -6002,7 +6002,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																q2outputandcollect("%s%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,valueholderIndex+numberOfNewValueholders);
+																outputMessage(M_ERROR_PREFIX,"Failed to set list element #%zd.\n",valueholderIndex+numberOfNewValueholders);
 														}
 													}
 												}
@@ -6327,7 +6327,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																							if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
 																							{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																						}else
-																							q2outputandcollect("%s%sFailed to add property '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_attributename);
+																							outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.\n",_attributename);
 																					}/*else{
 																						//FREE_DISOWNED_1(valueholders,'_');
 																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
@@ -6347,7 +6347,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																}
 																if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 																if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																	q2outputandcollect("%s%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,valueholderIndex+numberOfNewValueholders);
+																	outputMessage(M_ERROR_PREFIX,"Failed to set map element #%zd.\n",valueholderIndex+numberOfNewValueholders);
 															}else{ // map is locked, and therefore immutable
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																outputError("Map is locked, and therefore immutable!");
@@ -6380,21 +6380,24 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																					if(NULL==newValueholder){
 																						listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
 																						if(listIndex>0){
-																							if(amVerboseDebugging())
-																							{output("List after appending NULL at index %lld",listIndex);outputList(": '",valueholderList,"'.\n");}
+																							if(amVerboseDebugging()){
+																								// TODO q2...?
+																								output("List after appending NULL at index %lld",listIndex);
+																								outputList(": '",valueholderList,"'.\n");
+																							}
 																							newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																							// if(amVerboseDebugging())output("List element at index #%zd retrieved.\n",listIndex);
 																							// register in the assigned index list
 																							if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getIntegerValue(listIndex),M_LL_INVALID)<=0)
 																							{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																						}else
-																							q2outputandcollect("%s%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,listIndex);
+																							outputMessage(M_ERROR_PREFIX,"Failed to add list element at index '%lld'.\n",listIndex);
 																					}
 																				}else{ // MDH@23NOV2020: an array (and we're NOT going to create an element that's not there like we do with a list!!!!)
 																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
 																					if(report)
 																						if(newValueholder!=NULL)
-																							output("New value holder reference value #%llu in array.\n",listIndex);
+																							outputMessage(NULL,"New value holder reference value #%llu in array.\n",listIndex);
 																				}
 																				//}else	newValueholder=NULL;
 																			}
@@ -6589,7 +6592,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				}
 				*/
 			}else
-				q2outputandcollect("%s%sVariable '%s' cannot be indexed: its value is not a list or a map.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_valuereference->_name);
+				outputMessage(M_ERROR_PREFIX,"Variable '%s' cannot be indexed: its value is not a list or a map.\n",_valuereference->_name);
 		}else{
 			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
 			//				the same way as happens when you use the defun internal function
@@ -6618,7 +6621,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				if(report)
 					outputInfo("Value set!");
 			}else{
-				q2outputandcollect("%s%sFailed to %s variable '%s'",M_ERROR_PREFIX,M_MESSAGE_PREFIX,(variable?"set":"initialize"),variableName);
+				q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+				q2outputandcollect("Failed to %s variable '%s'",(variable?"set":"initialize"),variableName);
 				q2outputValue(" to '",_newValue,"'.\n");
 			}
 		}
@@ -6835,7 +6839,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
 								if(functionCallArgumentList!=NULL&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
-									q2outputandcollect("%s%sFailed to create the to %s expression list.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_significantTokenText));
+									outputMessage(M_ERROR_PREFIX,"Failed to create the to %s expression list.\n",string(_significantTokenText));
 									FREE_LIST(functionCallArgumentList,owner);
 									functionCallArgumentList=NULL; // so nothing will get done!!
 								}
@@ -6886,7 +6890,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}else
 								if(strlen(definedFunctionName))
-									q2outputandcollect("%s%sFailed to create function '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,definedFunctionName);
+									outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.\n",definedFunctionName);
 								else
 									outputError("Name of function to create not defined.");
 							}
@@ -6895,8 +6899,10 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
-							if(amVerboseDebugging())
-								{outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
+							if(amVerboseDebugging()){
+								outputValue("Function call result value: '",_valueReference->_value,"'.\n");
+								outputInfo("Freeing the function argument map!");
+							}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
 							FREE_MAP(_functionCallArgumentMap,owner); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerboseDebugging())
@@ -6904,7 +6910,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						}else
 							outputError("No function arguments");
 					}else
-						q2outputandcollect("%s%sFunction '%s' unknown!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_significantTokenText);
+						outputMessage(M_ERROR_PREFIX,"Function '%s' unknown!\n",_significantTokenText);
 				}
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
@@ -6920,13 +6926,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),getOwnerExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
-					q2outputandcollect("%s%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
+					outputMessage(M_ERROR_PREFIX,"Failed to add%s variable '%s' to environment '%s'.\n",(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					FREE_STRING(_environmentName,owner);
 					break; // NO retrieves the undefined value subsequently!!
 				}
 				if(amVerboseDebugging())
 					if(expressionToken->argument!=1&&expressionToken->envid)
-						q2outputandcollect("%s%sNot explicitly declared local variable '%s' encountered.\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX,_significantTokenText);
+						outputMessage(M_WARNING_PREFIX,"Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
 				// MDH@25MAR2020 allow indexing of new variables as well!!!! removing: if(expressionToken->type==TT_VARIABLE)
 				canbeindexedtheoretically=true;
@@ -6934,7 +6940,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				_valueReference->_name=owned_chars(_getChars(_significantTokenText),Msubowner(owner,1));
 				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerboseDebugging())
-					output("Value reference variable name: '%s'.\n",_valueReference->_name->chars);
+					outputMessage(NULL,"Value reference variable name: '%s'.\n",_valueReference->_name->chars);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
 				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
@@ -7161,7 +7167,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				if(NULL==itemIdsList){
 					itemIdsList=owned_list(_getListOfType(VT_UNDEFINED),owner); // we know we're going to need to list
 					if(NULL==itemIdsList){
-						q2outputandcollect("%s%sFailed to create a list to store the indices of '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,_valueReference->_name);
+						outputMessage(M_ERROR_PREFIX,"Failed to create a list to store the indices of '%s'.\n",_valueReference->_name);
 						break;
 					}
 				}
@@ -7196,14 +7202,14 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(index!=getNAI()){
 							Mvalue* indexValue=_getIntegerValue(index);
 							if(NULL==indexValue||appendedToList(itemIdsList,owner,indexValue,M_LL_INVALID)<=0){
-								q2outputandcollect("%s%sFailed to add index '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_propertyName),_valueReference->_name);
+								outputMessage(M_ERROR_PREFIX,"Failed to add index '%s' to the index list of '%s'.\n",string(_propertyName),_valueReference->_name);
 								// TODO can't break here
 							}
 						}else
 						if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 							Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
 							if(NULL==propertyNameValue||appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)<=0){
-								q2outputandcollect("%s%sFailed to add property name '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(_propertyName),_valueReference->_name);
+								outputMessage(M_ERROR_PREFIX,"Failed to add property name '%s' to the index list of '%s'.\n",string(_propertyName),_valueReference->_name);
 								// TODO can't break here
 							}
 						}
@@ -8114,7 +8120,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													free_mpd(_bigintegerRootDecimal->mpd);_bigintegerRootDecimal->mpd=mpd_qncopy(_nextBigintegerRootDecimal->mpd);
 												}
 												if((status&0xEFBF)!=0){
-													q2outputandcollect("%s%sRoot computation ended with error code " PRIu32 ".\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,status);
+													outputMessage(M_ERROR_PREFIX,"Root computation ended with error code " PRIu32 ".\n",status);
 													FREE_DECIMAL(_bigintegerRootDecimal,owner);
 												}else{
 													_bigintegerRootValue=_getValueOfDecimal(disowned_decimal(_bigintegerRootDecimal,owner));
@@ -8163,7 +8169,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 				outputError("Failed to create a decimal context for computing a decimal root");
 			if(rootArgumentValue->type!=VT_DECIMAL)FREE_DECIMAL(_rootArgumentDecimal,owner);
 		}else{
-			q2outputandcollect("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
 			q2outputValue("Failed to convert root argument '",rootArgumentValue,"' to a decimal.\n");
 		}
 	}
@@ -9016,8 +9022,11 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 					:mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger)))!=MP_OKAY){
 				FREE_BIGINTEGER(_shiftleftBiginteger,owner);_shiftleftBiginteger=NULL;
 				// TODO q2... here?
-				output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
-				outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
+				Mstring* _bigintegerValueText=owned_string(_getValueText(_value1,true,true),owner);
+				if(_bigintegerValueText!=NULL){
+					outputMessage(M_ERROR_PREFIX,"Failed to shift '%s' to the left.\n",_bigintegerValueText);		
+					FREE_STRING(_bigintegerValueText,owner);
+				}
 			}else 
 				outputError("Failed to shift left a big integer");
 		}else
@@ -9053,7 +9062,7 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 					_shiftleftRational->normalized=false;
 					if(!normalizeRational(_shiftleftRational,owner)){
 						// TODO q2... here?
-						output("%s%s",M_ERROR_PREFIX),M_MESSAGE_PREFIX;
+						output("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 						outputRational("Failed to normalize shift left rational ",_shiftleftRational,".\n");
 					}
 				}
@@ -10110,8 +10119,11 @@ Mvalue* Mirange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	Mvalue* result=NULL;
 	if(_value1!=NULL&&_value2!=NULL){
-		if(amVerbose()&&amDebugging())
-		{outputValue("Computing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.\n");}
+		if(amVerboseDebugging()){
+			q2outputValue("Computing '",_value1,NULL);
+			q2outputandcollect("' %s '",operator);
+			q2outputValue(NULL,_value2,"'.\n");
+		}
 		switch(operator[0]){
 			// real arithmetic
 			case '+' :result=Madd(_value1,_value2);break;
@@ -10132,11 +10144,11 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '=' :result=Mequalto(_value1,_value2);break;
 			case ':' :result=Mirange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:
-				q2outputandcollect("%s%sUnknown binary operator '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,operator);
+				outputMessage(M_ERROR_PREFIX,"Unknown binary operator '%s'.\n",operator);
 		}
 		if(amVerboseDebugging()){
 			if(result)
-				outputValue("Result of applying binary operator: '",result,"'.\n");
+				q2outputValue("Result of applying binary operator: '",result,"'.\n");
 			else
 				outputInfo("No result!");
 		}
@@ -10380,7 +10392,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			// MDH@16MAY2019: can't end an expression with an operator BRO'
 			if(expressionToken!=NULL){
 				if(amVerboseDebugging())
-					output("Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+					outputMessage(NULL,"Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				endTokenTypeIndex=endTokenTypeCount;
 				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
 				if(endTokenTypeIndex){
@@ -10392,11 +10404,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					outputInfo(" NO");
 
 				if(amVerboseDebugging())
-					output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+					outputMessage(NULL,"Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
 				_formulaelement->_operator=owned_string(_getSignificantTokenText(expressionToken),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
 				if(NULL==_formulaelement->_operator){
-					q2outputandcollect("%s%sFailed to copy operator '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,string(expressionToken->text));
+					outputMessage(M_ERROR_PREFIX,"Failed to copy operator '%s'.\n",string(expressionToken->text));
 					break;
 				}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
@@ -10971,7 +10983,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 				if(_bodyTokenValue!=NULL){
 					_userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
 					if(NULL==_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
-						q2outputandcollect("%s%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,functionName->_c);
+						outputMessage(M_ERROR_PREFIX,"Failed to store the inline command as body of function definition of '%s'.\n",functionName->_c);
 					// replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
 				}
 				//////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
@@ -10989,7 +11001,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 					return _getIntegerValue(1);
 				}
 				///////////free_value(_userfunctionValue); // freed
-				q2outputandcollect("%s%sFailed to create function '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,functionName);
+				outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.\n",functionName);
 				///////}
 			}
 		}else
@@ -11195,8 +11207,8 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 															Mvalue* corr=Mcorr(value,nextvalue);
 															if(corr!=NULL){
 																if(appendedToList(_nextcorrsList,owner,corr,nextindex)<=0){
-																	q2outputandcollect("%s%sFailed to store correlation coefficient ",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
-																	q2outputValue("'",corr,"'.\n");
+																	q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+																	q2outputValue("Failed to store correlation coefficient '",corr,"'.\n");
 																}
 															}else 
 																outputError("Failed to compute a correlation coefficient");
@@ -11214,7 +11226,7 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 										if(valuestatsMapValue!=NULL){
 											if(appendedToList(_statsList,owner,valuestatsMapValue,index)<=0){
 												valuestatsMapValue=NULL;
-												q2outputandcollect("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+												q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
 												q2outputValue("Failed to compute the statistics of '",value,"'.\n");
 											}
 										}
@@ -11248,7 +11260,7 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 		if(valuetype==VT_UNDEFINED)
 			_statsMap=owned_map(_getSampleStatisticsMap(iterator),owner);
 		else
-			q2outputandcollect("%s%sInvalid iterator value type '%s' in computing statistics.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,VALUETYPENAMES[valuetype]);
+			outputMessage(M_ERROR_PREFIX,"Invalid iterator value type '%s' in computing statistics.\n",VALUETYPENAMES[valuetype]);
 	}
 	return disowned_map(_statsMap,owner);
 }
@@ -11448,7 +11460,11 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 								// compute the accumulated value
 								Mmap* _filterFunctionArgumentMap=_getFunctionArgumentMap(function,_filterFunctionArgumentList,owner);
 								Mvalue* _filterFunctionValue=getValueOfFunctionCall(function,"",_filterFunctionArgumentMap);
-								if(report){outputMap("Result of applying the filter function to '",_filterFunctionArgumentMap,"'");outputValue(": '",_filterFunctionValue,"'.\n");}
+								if(report){
+									// TODO q2...?
+									outputMap("Result of applying the filter function to '",_filterFunctionArgumentMap,"'");
+									outputValue(": '",_filterFunctionValue,"'.\n");
+								}
 								FREE_MAP(_filterFunctionArgumentMap,owner);
 								// if _filterFunctionValue is 'true' the current value should be appended to the result list
 								// now the question is whether or not the filter function returned something that can be tested for being M_TRUE
@@ -11470,7 +11486,7 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 				}else{ // no filter function specified 
 					do{
 						if(appendedToList(_filterList,owner,listelement->_value,M_LL_INVALID)<=0)
-							q2outputandcollect("%s%sFailed to append a filter list element #%llu.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,listelement->index);
+							outputMessage(M_ERROR_PREFIX,"Failed to append a filter list element #%llu.\n",listelement->index);
 						listelement=listelement->_next;
 					}while(listelement);
 				}
@@ -11652,82 +11668,83 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 		unsigned long long arraylength=_array->numberOfElements;
 		if(arraylength>1){ // things to compare
 			if(report)
-				output("Sorting an array of %zd elements with quicksort.\n",arraylength);
-				unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(arraylength)));
-				long long* stack=MALLOC(sizeof(long long),maxtop=initialmaxtop,-'u',owner);
-				if(stack!=NULL){
-					sortstatistics.memoryallocation+=(sizeof(long long)*maxtop);
-					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
-					result=2; // the current amount of stack elements used
-					stack[0]=0; // i.e. the first index, which is 0 (l=lmin1+1)
-					stack[1]=arraylength-1; // i.e. the last index, which is arraylength-1
-					// it's better to store the number of elements in the stack instead of the top index
-					// so that the smallest value of top will be 0
-					unsigned long long top=2;
-					long long lmin1,l,h,pmin1,p,pplus1;
-					Mvalue** values=_array->values;
-					sortstatistics.fieldreferences++;
-					// as long as there are two elements on the stack
-					while(top>1){ // two or more elements on the stack
-						h=stack[--top];
-						l=stack[--top];
-						p=apartition(values,l,h);
-						sortstatistics.pointerassignments+=3;sortstatistics.fieldreferences+=2;
-						//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
-						sortstatistics.pointertests++;
-						if(p>l+1){
-							if(top>=maxtop){
-								if(report)
-									output("Expanding the stack.\n");
-								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
-								if(NULL==stack){
-									result=M_FALSE;
-									q2outputandcollect("%s%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,maxtop+initialmaxtop);
-									break;
-								}
-								sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
-								maxtop+=initialmaxtop;
-								if(report)
-									output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+				outputMessage(NULL,"Sorting an array of %zd elements with quicksort.\n",arraylength);
+			unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(arraylength)));
+			long long* stack=MALLOC(sizeof(long long),maxtop=initialmaxtop,-'u',owner);
+			if(stack!=NULL){
+				sortstatistics.memoryallocation+=(sizeof(long long)*maxtop);
+				if(report)
+					outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
+				result=2; // the current amount of stack elements used
+				stack[0]=0; // i.e. the first index, which is 0 (l=lmin1+1)
+				stack[1]=arraylength-1; // i.e. the last index, which is arraylength-1
+				// it's better to store the number of elements in the stack instead of the top index
+				// so that the smallest value of top will be 0
+				unsigned long long top=2;
+				long long lmin1,l,h,pmin1,p,pplus1;
+				Mvalue** values=_array->values;
+				sortstatistics.fieldreferences++;
+				// as long as there are two elements on the stack
+				while(top>1){ // two or more elements on the stack
+					h=stack[--top];
+					l=stack[--top];
+					p=apartition(values,l,h);
+					sortstatistics.pointerassignments+=3;sortstatistics.fieldreferences+=2;
+					//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
+					sortstatistics.pointertests++;
+					if(p>l+1){
+						if(top>=maxtop){
+							if(report)
+								outputMessage(NULL,"Expanding the stack.\n");
+							stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
+							if(NULL==stack){
+								result=M_FALSE;
+								outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
+								break;
 							}
-							stack[top++]=l;
-							stack[top++]=p-1;
-							sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
-							if(top>result)result=top;
+							sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
+							maxtop+=initialmaxtop;
+							if(report)
+								outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 						}
-						if(p+1<h){
-							if(top>=maxtop){
-								if(report)
-									output("Expanding the stack.\n");
-								stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
-								if(NULL==stack){
-									result=M_FALSE;
-									q2outputandcollect("%s%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,maxtop+initialmaxtop);
-									break;
-								}
-								sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
-								maxtop+=initialmaxtop;
-								if(report)
-									output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
-							}
-							stack[top++]=p+1;
-							stack[top++]=h;
-							sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
-							if(top>result)result=top;
-						}
+						stack[top++]=l;
+						stack[top++]=p-1;
+						sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
+						if(top>result)result=top;
 					}
-					if(report)
-						output("Freeing the quicksort stack.\n");
-					FREE_DISOWNED(stack,maxtop,-'u',owner);
-					if(report)
-						output("Quicksort stack freed.\n");
-				}else{
-					result=M_FALSE;
-					outputError("Not enough memory for the stack to sort the array with quicksort");
+					if(p+1<h){
+						if(top>=maxtop){
+							if(report)
+								outputMessage(NULL,"Expanding the stack.\n");
+							stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
+							if(NULL==stack){
+								result=M_FALSE;
+								outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
+								break;
+							}
+							sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
+							maxtop+=initialmaxtop;
+							if(report)
+								outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+						}
+						stack[top++]=p+1;
+						stack[top++]=h;
+						sortstatistics.fieldassignments+=2;sortstatistics.pointerreferences+=2;
+						if(top>result)result=top;
+					}
 				}
+				if(report)
+					outputMessage(NULL,"Freeing the quicksort stack.\n");
+				FREE_DISOWNED(stack,maxtop,-'u',owner);
+				if(report)
+					outputMessage(NULL,"Quicksort stack freed.\n");
+			}else{
+				result=M_FALSE;
+				outputError("Not enough memory for the stack to sort the array with quicksort");
+			}
 		}
 		if(result>0)
-			output("Duration of array sorting by quicksort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
+			outputMessage(NULL,"Duration of array sorting by quicksort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
 	}
 	return result;
 }
@@ -11828,7 +11845,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 			if(listelement!=_list->_last){ // at least two items
 				// we need a stack of integers with the same size as the list length
 				if(report)
-					output("Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
+					outputMessage(NULL,"Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
 				// MDH@02NOV2020: best to use CALLOC not calloc
 				// MDH@03NOV2020: if there are many many list elements allocating all at once is an issue
 				//				how about re-allocating in
@@ -11836,7 +11853,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 				Mlistelement** stack=MALLOC(sizeof(Mlistelement*),maxtop=initialmaxtop,-'l',owner);
 				if(stack!=NULL){
 					sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*maxtop);
-					if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
+					if(report)outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
 					stack[0]=NULL; // i.e. the first lmin1
 					stack[1]=_list->_last;
@@ -11860,15 +11877,15 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 							sortstatistics.fieldtests+=2;
 							if(pmin1->index>l->index){
 								if(top>=maxtop){
-									if(report)output("Expanding the stack.\n");
+									if(report)outputMessage(NULL,"Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
 									if(NULL==stack){
-										q2outputandcollect("%s%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,maxtop+initialmaxtop);
+										outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
 										break;
 									}
 									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);
 									maxtop+=initialmaxtop;
-									if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+									if(report)outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 								}
 								stack[top++]=lmin1;
 								stack[top++]=pmin1;
@@ -11887,7 +11904,9 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 									if(report)output("Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
 									if(NULL==stack){
-										q2outputandcollect("%s%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,maxtop+initialmaxtop);break;}
+										outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
+										break;
+									}
 									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);									
 									maxtop+=initialmaxtop;
 									if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
@@ -14130,7 +14149,7 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 							group="";
 						// I suppose that when the function returns NULL, we can't group
 						if(group!=NULL){
-							if(report){outputValue("Group of '",listelementValue,"'");output(": '%s'.\n",group);}
+							if(report){q2outputValue("Group of '",listelementValue,"'");output(": '%s'.\n",group);}
 							Mmapelement* groupMapelement=getMapelement(_groupMap,group);
 							if(NULL==groupMapelement){ // the given group is not yet present
 								Mlist* groupList=owned_list(__list("Mlgroup"),owner);
@@ -14143,13 +14162,13 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 										//		   value wrapping a copy of the (currently) empty list
 										//		   as a result groupListValue's reference count will still be 1
 										if(appendedToMap(_groupMap,owner,group,groupListValue)!=M_TRUE){
-											q2outputandcollect("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+											q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
 											q2outputValue("Failed to register '",listelementValue,"' in group");
 											q2outputandcollect(" '%s'.\n",group);
 											// NOTE groupListValue will be freed by the gc, along with its list (groupList)
 										}else{ // success
 											groupMapelement=getMapelement(_groupMap,group);
-											if(report)output("New group list registered.\n");
+											if(report)outputMessage(NULL,"New group list registered.\n");
 										}
 									}else // groupList is not bound in a group list value, so we have to free it ourselves
 										outputError("Failed to wrap a group list");
@@ -14178,16 +14197,16 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 								if(report)output("Number of elements in group list: %zd.\n",groupList->numberOfElements);
 								long long groupListelementIndex=appendedToList(groupList,owner,listelementValue,M_LL_INVALID);
 								if(groupListelementIndex<=0){
-									q2outputandcollect("%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+									q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
 									q2outputValue("Failed to register '",listelementValue,"'");
-									q2outputandcollect(" in group '%s'.\n",group);	
+									q2outputandcollect(" in group '%s'.\n",group);
 								}else
 								if(report)
 									output("Index in group list with %zd elements: %lld.\n",groupList->numberOfElements,groupListelementIndex);
 							}else
 								outputError("Failed to obtain the group list");							
 						}else{
-							q2outputandcollect("%s%s",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
+							q2outputandcollect("%s",M_WARNING_PREFIX);output("%s",M_MESSAGE_PREFIX);
 							q2outputValue("'",listelementValue,"' was not grouped.\n");
 						}
 						listelement=listelement->_next;
@@ -14386,10 +14405,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(locale!=NULL){
 		char* newlocale=setlocale(LC_ALL,locale);
 		if(NULL==newlocale)
-			output("%sFailed to use proposed locale '%s'!",M_ERROR_PREFIX,locale);
+			outputMessage(M_ERROR_PREFIX,"Failed to use proposed locale '%s'!\n",locale);
 		else
 		if(strcmp(locale,newlocale)==0)
-			q2outputandcollect("%s%sProposed locale '%s' not accepted. Still using '%s' as locale.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,locale,newlocale);
+			outputMessage(M_ERROR_PREFIX,"Proposed locale '%s' not accepted. Still using '%s' as locale.\n",locale,newlocale);
 	}
 
 	//reportNumberOfAllocations("shellInitialized 2");
@@ -14552,14 +14571,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}*/
 			// create and add PI and E constants!!!
 #ifdef M_PI
-			output("Long double PI is predefined in the math standard library!\n");
+			q2outputandcollect("Long double PI is predefined in the math standard library!\n");
 #else
 			output("Long double PI is not predefined!\n");
 #endif
 			Mvalue* PI_value=NULL;
 			long double acosl_1=acosl(-1);
 			if(M_LD_PI!=acosl_1){
-				output("%s%sLong double constant PI (%.*Lf) replaced by acosl(-1) (%.*Lf).\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX,33,M_LD_PI,33,acosl_1);
+				outputMessage(M_WARNING_PREFIX,"Long double constant PI (%.*Lf) replaced by acosl(-1) (%.*Lf).\n",33,M_LD_PI,33,acosl_1);
 				PI_value=_getFloatValue(acosl_1);
 			}else{
 				output("Long double constant PI (%.*Lf) equals acosl(-1) (%.*Lf)!\n",33,M_LD_PI,33,acosl_1);
@@ -14581,17 +14600,17 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 
 #ifdef M_E
-			output("Long double E is predefined in the math standard library!\n");
+			q2outputandcollect("Long double E is predefined in the math standard library!\n");
 #else
 			output("Long double E is not predefined!\n");
 #endif
 			Mvalue* E_value=NULL;
 			long double expl1=expl(1);
 			if(M_LD_E!=expl1){
-				output("%s%sLong double constant E (%.*Lf) replaced by expl(1) (%.*Lf).\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX,33,M_LD_E,33,expl1);
+				outputMessage(M_WARNING_PREFIX,"Long double constant E (%.*Lf) replaced by expl(1) (%.*Lf).\n",33,M_LD_E,33,expl1);
 				E_value=_getFloatValue(expl1);
 			}else{
-				output("Long double constant E (%.*Lf) equals expl(1) (%.*Lf)!\n",33,M_LD_E,33,expl1);
+				q2outputandcollect("Long double constant E (%.*Lf) equals expl(1) (%.*Lf)!\n",33,M_LD_E,33,expl1);
 				E_value=_getFloatValue(M_LD_E);
 			}
 			if(NULL==E_value){
@@ -14634,12 +14653,12 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(NULL==localesettingsValue)outputWarning("Failed to obtain the current locale settings value");
 			// the locale settings variable will be created as immutable, so once set it cannot be changed itself (although the map can be!!!)
 			if(!addVariable(_Menvironment,owner,M_LOCALE_SETTINGS_VARIABLE_NAME,VT_MAP,true)){
-				q2outputandcollect("%s%sFailed to register '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
+				outputMessage(M_ERROR_PREFIX,"Failed to register '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
 			if(!setValue(_Menvironment,M_LOCALE_SETTINGS_VARIABLE_NAME,localesettingsValue)){
 				//////free_value(E_value);
-				q2outputandcollect("%s%sFailed to initialize '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
+				outputMessage(M_ERROR_PREFIX,"Failed to initialize '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
 
@@ -15518,7 +15537,7 @@ Mblock* endBlock(){
 			///}
 			return environmentValue->value._environment;
 		}
-		/*
+		///asterisk
 		// we need to consume the block commands and append them to the parent
 		Mlist* blockCommandList=environment->blockCommandList;
 		if(blockCommandList!=NULL){
