@@ -25,8 +25,8 @@ extern unsigned long long M_MODULE_DEBUGGING;
 extern char const * const M_MODULE_DEBUG_CHARACTERS; // MDH@05DEC2020: as defined in Mmodule.h
 
 // the constants are defined in Mshell.c
-extern char const* const M_ERROR_PREFIX;
-extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual info prefix text to use
+extern const char* const M_ERROR_PREFIX;
+//extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual info prefix text to use
 extern const char* const M_WARNING_PREFIX; // used in Mexecution.c as well (defined there as extern!!!)
 extern const char* const M_BUG_PREFIX; // MDH@05NOV2019: for reporting bugs
 extern const char* const M_RESULT_PREFIX; // MDH@28AUG2024: for reporting command results
@@ -2993,7 +2993,7 @@ void recommentCommand(Mtoken* endCommentToken){
 				if(prevToken!=NULL){
 					token->next=prevToken;
 					if(prevToken->type!=TT_COMMENT)
-						output("%s%sA disconnected non-comment token of type %s encountered.\n",M_BUG_PREFIX,M_MESSAGE_PREFIX,TOKENTYPE_STRING[prevToken->type]);
+						outputMessage(M_BUG_PREFIX,"A disconnected non-comment token of type %s encountered.\n",TOKENTYPE_STRING[prevToken->type]);
 				}else
 					outputBug("Removed tokens cannot be reinserted");
 			}
@@ -3098,7 +3098,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		output("%s",string(_commandText));
 		FREE_STRING(_commandText,owner);
 	}else
-		output("%s%sFailed to obtain the command text.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("Failed to obtain the command text");
 	output(" = ");
 
 	// if the result is a null value, show the NULL_value
@@ -3124,8 +3124,8 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		FREE_STRING(_resultText,owner);
 	}else
 		string_append_char(_commandResultText,'?'); ///q2collect("%s\n","Failed to obtain the result text");
-	if(!addMessageOfType(string(_commandResultText),M_RESULT_PREFIX))
-		output("%s%sFailed to register the result message.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+	if(!outputMessage(M_RESULT_PREFIX,"%s",string(_commandResultText)))
+		outputError("Failed to register the result message");
 	FREE_STRING(_commandResultText,owner);
 	/*
 	Mstring* _doneShowingResultTimestamp=owned_string(_getTimestamp(NULL),owner);
@@ -6267,7 +6267,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 	if(M_value!=NULL){
 		if(amVerboseDebugging())output("Adding variable '%s'.\n",M_VARIABLE_NAME);
 		if(!addVariable(_Menvironment,owner_executionenvironment,M_VARIABLE_NAME,VT_LIST,true)){
-			output("%sFailed to add variable '%s'.\n",M_WARNING_PREFIX,M_VARIABLE_NAME);
+			outputMessage(M_WARNING_PREFIX,"Failed to add variable '%s'.\n",M_VARIABLE_NAME);
 			errorflags|=1;
 		}else
 		if(!setVariable(_Menvironment,M_VARIABLE_NAME,M_value)){
