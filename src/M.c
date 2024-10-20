@@ -3124,7 +3124,8 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		FREE_STRING(_resultText,owner);
 	}else
 		string_append_char(_commandResultText,'?'); ///q2collect("%s\n","Failed to obtain the result text");
-	if(!outputMessage(M_RESULT_PREFIX,"%s",string(_commandResultText)))
+	// we need to collect the result so it ends up as registered message, but not output it
+	if(!collectMessage(M_RESULT_PREFIX,"%s",string(_commandResultText)))
 		outputError("Failed to register the result message");
 	FREE_STRING(_commandResultText,owner);
 	/*

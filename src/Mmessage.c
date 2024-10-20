@@ -1102,7 +1102,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 					////////printf("%s",outputText);
 					char* newlinePosition=strchr(outputText,'\n');
 					if(newlinePosition!=NULL)
-						collectLine(newlinePosition,true);
+						collectLine(newlinePosition,false);
 					break;
 				}
 				outputSize+=64;
@@ -1195,6 +1195,71 @@ size_t outputMessage(char const * const messageType,char const * const fmt,...){
 	}
 	// finish by outputting and collecting a newline (which of course will collect the line!!!!!)
 	return written+q2newline(true);
+}
+
+/**
+ * @brief collects a single message of type \p messageType
+ * @details this is the recommended method to output a message, which delegates to the q2... methods
+ *          most of its code is also present in q2outputandcollect() and perhaps should be delegated to a common method
+ * @param messageType 
+ * @param fmt 
+ * @param ... 
+ * @return size_t 
+ */
+size_t collectMessage(char const * const messageType,char const * const fmt,...){
+	// ASSERT assumes no pending message current, and no newlines inside the message!!!
+	// NOTE does not append periods at the end of the message!!!
+	size_t written=0;
+	if(messageType!=NULL&&*messageType){
+		// TODO this is going to be a problem, since q2outputandcollect doesn't output immediately
+		//      so we can't output M_MESSAGE_PREFIX 
+		written+=q2collect("%s",messageType);
+		/* not collecting the message prefix itself so it won't become part of the message itself (although it is written to output)
+		if(M_MESSAGE_PREFIX!=NULL&&*M_MESSAGE_PREFIX)
+			written+=output("%s",M_MESSAGE_PREFIX); // output the message type followed by the message prefix
+		*/
+	}
+	// the next part is similar to what q2outputandcollect() does
+	if(fmt!=NULL&&strlen(fmt)>0){
+		/* 1. output
+		va_list args;va_start(args,fmt);int count=vprintf(fmt,args);va_end(args);if(count>0)written+=count;
+		*/
+		// 2. collect
+		if(outputText!=NULL){
+			do{
+			  va_list args;
+  			va_start(args,fmt);
+			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+				va_end(args);
+				if(count<=0){
+					//////outputText[outputLength]='\0'; // just in case
+					printf("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output format error!");
+					break;
+				}
+				if(outputLength+count<outputSize){ // success
+					written+=count;
+					outputLength+=count; // new start
+					/* not here because assuming the message does not contain newline characters!!!
+					// if we have a full line output that full line
+					////////printf("%s",outputText);
+					char* newlinePosition=strchr(outputText,'\n');
+					if(newlinePosition!=NULL)
+						collectLine(newlinePosition,true);
+					*/
+					break;
+				}
+				outputSize+=64;
+				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				if(NULL==newOutputText){
+					output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output memory error");
+					break;
+				}
+				outputText=newOutputText;
+			}while(true);
+		}
+	}
+	// finish by outputting and collecting a newline (which of course will collect the line!!!!!)
+	return written+q2newline(false);
 }
 
 bool outputCollectorInitialized(){

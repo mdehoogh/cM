@@ -60,6 +60,7 @@ size_t q2newline(bool echoToOutput);
 // MDH@20SEP2024: most convenient to use outputMessage() to output a single message of a specific type
 //                that outputError/Bug/Warning can delegate to
 size_t outputMessage(char const * const messageType,char const * const fmt,...);
+size_t collectMessage(char const * const messageType,char const * const fmt,...);
 
 bool outputCollectorInitialized();
 
