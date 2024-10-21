@@ -108,14 +108,18 @@ static int16_t _tznset(char* tzn){
  * @return Mtime* the M time represented by \p iso8601, NULL on failure
  */
 static Mtime* _parsedTime(char const * const iso8601,char const * const tzuser){Mallocationowner owner=getOwner(__LINE__);
-	if(NULL==iso8601)return NULL;
-	size_t l=strlen(iso8601);
-	if(l==0){outputError("Missing ISO8601 timestamp");return NULL;}
+	///if(NULL==iso8601)return NULL;
+	size_t l=(iso8601!=NULL?strlen(iso8601):0);
+	if(l==0){outputError("Missing or incorrect ISO8601 timestamp");return NULL;}
+	outputMessage(M_INFO_PREFIX,"Parsing ISO8601 timestamp '%s'.",iso8601);
 	char* Tpos=strchr(iso8601,'T'); // should always be there!!!
-	if(NULL==Tpos){outputMessage(M_ERROR_PREFIX,"Missing time in ISO8601 timestamp '%s'.",iso8601);return NULL;}
+	if(NULL==Tpos){outputMessage(M_ERROR_PREFIX,"Missing time of day in ISO8601 timestamp '%s'.",iso8601);return NULL;}
+	///outputMessage(M_INFO_PREFIX,"Parsing ISO8601 timestamp '%s'.",iso8601);
 	Mtime* _calendarTime=NULL; // what we will return
 	char *tz=NULL,*tzenv=NULL;
-	output("Parsing ISO8601 timestamp '%s'%s.",iso8601);if(tzuser)output(" in timezone '%s'",tzuser);output(".\n");
+	output("Parsing ISO8601 timestamp '%s'",iso8601);
+	if(tzuser!=NULL&&*tzuser)output(" in timezone '%s'",tzuser);
+	output(".\n");
 	// source: https://stackoverflow.com/questions/26895428/how-do-i-parse-an-iso-8601-date-with-optional-milliseconds-to-a-struct-tm-in-c
 	// if there's NO timezone information assume that local timezone is intended!!!!
 	// MDH@14DEC2020: if the following combination persists no time can be constructed!!!!
@@ -384,6 +388,13 @@ Mvalue* Mcalendartime(Mvalue* _timeValue,Mvalue* _tznValue){Mallocationowner own
 
 // MDH@11DEC2020: allowing to pass in the tz to use (if _timetextValue does not contain timezone information)
 // MDH@16DEC2020: debugging the parsing process of composing the iso8601 text representation from the timetext presented
+/**
+ * @brief returns the integer stored in text \p intt in * \p i  
+ * @details stops as soon as the text character is not an ASCII digit
+ * @param intt the text representing the integer
+ * @param i the pointer to where to store the represented integer
+ * @return char* the first position in intt after the retrieved integer
+ */
 static char* readint(char const * const intt,int * i){
 	// skip trailing blanks
 	char* t=intt;
@@ -395,7 +406,7 @@ static char* readint(char const * const intt,int * i){
 	while((*t)>=48&&(*t)<=57){ // a digit character
 		if(*i==INT_MIN)*i=0;else (*i)*=10;
 		(*i)+=(*t)-48; // increment with digit
-		output("After processing '%c': %d.\n",*t,*i);
+		///output("After processing '%c': %d.\n",*t,*i);
 		t++; // next character
 	}
 	if((*i)!=INT_MIN)if(negative)*i=-(*i); // make negative
@@ -469,20 +480,26 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner ow
 									}
 									c=*t;
 									if(c=='T'||c=='-'||c=='+'){ // there's a timezone part
+										outputMessage(M_INFO_PREFIX,"Parsing timezone offset '%s'.",t);
 										t++;
 										t=readint(t,&tzh);
 										if((*t)&&(tzh!=INT_MIN)){
 											t++;
 											t=readint(t,&tzm);
 										}
+										outputMessage(M_INFO_PREFIX,"Timezone offset parsed!");
 									}else
-									if(c=='Z')
+									if(c=='Z'){
 										tzh=0;
+										outputMessage(M_INFO_PREFIX,"Parsing UTC timestamp '%s'.",timetext);
+									}
 								}
 							}
 						}
 						if(year!=INT_MIN&&month!=INT_MIN&&monthday!=INT_MIN){
-							char iso8601[yearcharacters+15+(tzh==INT_MIN?6:1)+1];
+							size_t iso8601characters=yearcharacters+15+(tzh!=INT_MIN?6:1)+1;
+							outputMessage(M_INFO_PREFIX,"Constructing ISO8601 time string of maximum length %zu.",iso8601characters);
+							char iso8601[iso8601characters];
 							if(tzh>=0){ // a non-negative timezone offset
 								if(tzh==0&&tzm==0)
 									sprintf(iso8601,"%d-%02d-%02dT%02d:%02d:%02dZ",year,month,monthday,hour,minute,second);
@@ -494,6 +511,7 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner ow
 							else // undefined timezone offset
 								sprintf(iso8601,"%d-%02d-%02dT%02d:%02d:%02d",year,month,monthday,hour,minute,second);
 							if(string_append(_iso8601,iso8601))complete=true;
+							outputMessage(M_INFO_PREFIX,"Parsed to iso8601 text: '%s'.",iso8601);
 						}
 					}
 					/* replacing:
@@ -620,8 +638,10 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner ow
 					}else
 							outputError("No digits in calendar datetime text");
 					*/
-					if(complete)
+					if(complete){
+						outputMessage(M_INFO_PREFIX,"ISO8501 timestamp: '%s'.",string(_iso8601));
 						result=_getValueOfTime(_parsedTime(string(_iso8601),(_tznValue&&_tznValue->type==VT_TEXT?_tznValue->value._text->_c:NULL)));
+					}
 					FREE_STRING(_iso8601,owner);
 				}else
 					outputError("Failed to initialize the ISO8601 datetime text");

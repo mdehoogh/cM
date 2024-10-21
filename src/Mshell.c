@@ -15064,7 +15064,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!registerNoArgumentFunction(_Menvironment,owner,"gettimezone",Mgettimezone)
 				||!registerFunction(_Menvironment,owner,"settimezone",Msettimezone,1,(char*[]){"timezone(text)"},NULL)
 				||!registerFunction(_Menvironment,owner,"calendartime",Mcalendartime,1,(char*[]){"time(integer)"},NULL)
-				||!registerFunction(_Menvironment,owner,"time",Mparsetime,1,(char*[]){"calendar time"},NULL)){
+				||!registerFunction(_Menvironment,owner,"time",Mparsetime,2,(char*[]){"calendar time","timezone(text)"},NULL)){
 				outputError("Failed to register the time functions");
 				return NULL;
 			}
