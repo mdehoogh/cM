@@ -13,6 +13,7 @@ extern const char* const M_INFO_PREFIX;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
 extern const char* const M_BUG_PREFIX;
+extern const char* const M_RESULT_PREFIX;
 extern const char* const M_MESSAGE_PREFIX;
 /////extern const char* const M_RESULT_PREFIX="RESULT: "; // MDH@28AUG2024: for results
 
@@ -834,7 +835,7 @@ void freeMessageCounts(MessageCounts* messageCounts){
 // MDH@06AUG2024: what if we pass all output through outputf() instead of directly through output() so we can process it
 static char* outputText=NULL; // where we're going to collect the output texts
 static size_t outputLength,outputSize; // the part currently occupied of outputText
-static size_t errorPrefixLength,bugPrefixLength,warningPrefixLength;
+static size_t errorPrefixLength,bugPrefixLength,warningPrefixLength,resultPrefixLength;
 char **warnings=NULL,**errors=NULL,**bugs=NULL;
 static void registerWarning(){
 	if(!addMessageOfType(outputText+warningPrefixLength,M_WARNING_PREFIX))
@@ -847,6 +848,10 @@ static void registerError(){
 static void registerBug(){
 	if(!addMessageOfType(outputText+bugPrefixLength,M_BUG_PREFIX))
 		outputSystemError("Failed to register a bug!");
+}
+static void registerResult(){
+	if(!addMessageOfType(outputText+resultPrefixLength,M_RESULT_PREFIX))
+		outputSystemError("Failed to register a result!");
 }
 static void registerMessage(){
 	if(!addMessageOfType(outputText,""))
@@ -864,6 +869,9 @@ static void collectLine(char* newlinePosition,bool echoToOutput){
 	////////output("Collecting line '%s'.\n",outputText);
 	if(echoToOutput)output("%s%c",outputText,'\n');
 	// now we can check whether outputText is an error, bug or warning
+	if(strncmp(M_RESULT_PREFIX,outputText,resultPrefixLength)==0){
+		registerResult();
+	}else
 	if(strncmp(M_ERROR_PREFIX,outputText,errorPrefixLength)==0){
 		registerError();
 	}else
@@ -1267,6 +1275,7 @@ bool outputCollectorInitialized(){
 	errorPrefixLength=strlen(M_ERROR_PREFIX);
 	bugPrefixLength=strlen(M_BUG_PREFIX);
 	warningPrefixLength=strlen(M_WARNING_PREFIX);
+	resultPrefixLength=strlen(M_RESULT_PREFIX);
 	outputLength=0;outputSize=256;
 	outputText=calloc(256,sizeof(char)); // should suffice
 	return(outputText!=NULL);
