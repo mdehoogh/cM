@@ -405,7 +405,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 									}
 								}else{
 									Marray* tablerowValueArray=tablerowValue->value._array;
-									output("Number of column elements: %zu.\n",tablerowValueArray->numberOfElements);
+									///output("Number of column elements: %zu.\n",tablerowValueArray->numberOfElements);
 									for(int columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
 										Mstring* _cellText=(columnIndex<tablerowValueArray->numberOfElements
 																				?owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner)
@@ -421,8 +421,10 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 							}
 							tableListelement=tableListelement->_next;
 						}while(tableListelement!=NULL&&++rowIndex<=table->numberOfElements);
+						/* DEBUG
 						for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++)
 							output("Column #%zu length: %zu.\n",columnIndex,_columnLengths[columnIndex]);
+						*/
 						// ready to show the cells
 						cellIndex=0;
 						written+=newline();

@@ -14441,9 +14441,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(NULL==outputTokenFunction)outputWarning("No output token function!");else outputInfo("Output token function set!");
 	if(NULL==reoutputTokenFunction)outputWarning("No reoutput token function!");else outputInfo("Reoutput token function set!");
 	if(NULL==updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");else outputInfo("Update last token auto completion text function set!");
-	if(NULL==outputCommandInfoFunction)output("%sNo output command info function!",M_WARNING_PREFIX);else outputInfo("Output command info function set!");
+	if(NULL==outputCommandInfoFunction)outputWarning("No output command info function!");else outputInfo("Output command info function set!");
 
-	outputWarning("Dit is een test");
+	///outputWarning("Dit is een test");
 	//reportNumberOfAllocations("shellInitialized 6");
 
 	long long decimalprecision=getDP();

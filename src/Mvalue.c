@@ -8158,6 +8158,6 @@ Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
 		messageCountsValue=getMessageCountsValue(_messageCounts);
 		freeMessageCounts(_messageCounts);
 	}else
-		output("%sFailed to extract the message counts.\n",M_ERROR_PREFIX);
+		outputError("Failed to extract the message counts");
 	return messageCountsValue;
 }

@@ -1066,7 +1066,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){Mal
 			exponentText++; // point to the first character of the exponent
 			_exponent=owned_biginteger(__biginteger(),owner); // need it before calling mp_read_radix()
 			if(_exponent!=NULL&&(mp_read_radix(MP_INT_POINTER(_exponent),exponentText,10)!=MP_OKAY)){
-				output("%sFailed to extract the exponent from its text representation '%s'.\n",M_ERROR_PREFIX,exponentText);
+				outputMessage(M_ERROR_PREFIX,"Failed to extract the exponent from its text representation '%s'.\n",exponentText);
 				FREE_BIGINTEGER(_exponent,owner);
 				_exponent=NULL;
 			}else
@@ -1155,7 +1155,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){Mal
 				}
 				FREE_BIGINTEGER(_decimalPartBiginteger,owner);
 			}else
-				output("%sInteger part of rational text '%s' invalid.\n",M_ERROR_PREFIX,decimalText);
+				outputMessage(M_ERROR_PREFIX,"Integer part of rational text '%s' invalid.\n",decimalText);
 			// if we haven't got a rational that binded _numerator and _denominator free both of them
 			FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner);
 		}
@@ -1344,7 +1344,11 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 					_rational->normalized=(!_rational->den||isBigintegerOne(_rational->num)); // if either numerator or denominator is NULL assume normalized!!!
 					if(normalize&&!_rational->normalized){
 						if(amVerboseDebugging())outputRational("Rational before normalization: ",_rational,".\n");
-						if(!normalizeRational(_rational,owner)){output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",_rational,".\n");} // normalize the rational if we are supposed to
+						if(!normalizeRational(_rational,owner)){
+							// TODO q2...
+							output("%s",M_ERROR_PREFIX);
+							outputRational("Failed to normalize rational ",_rational,".\n");
+						} // normalize the rational if we are supposed to
 						if(_denominator&&!_rational->normalized)outputError("Failed to normalize a rational");else 
 						if(amVerboseDebugging())outputRational("Rational after normalization: ",_rational,".\n");
 					}else
@@ -1512,7 +1516,10 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){Mallocationowner owner=g
 			if(absnum!=NULL){
 				if(mp_div(MP_INT_POINTER(absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
 					FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
-					output("%sFailed to divide numerator",M_ERROR_PREFIX);outputBiginteger(" ",absnum," ");outputBiginteger("by denominator ",_rational->den,NULL);output(".\n");
+					output("%sFailed to divide numerator",M_ERROR_PREFIX);
+					outputBiginteger(" ",absnum," ");
+					outputBiginteger("by denominator ",_rational->den,NULL);
+					output(".\n");
 				}else
 				if(neg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
 					FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
