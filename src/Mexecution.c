@@ -28,6 +28,7 @@ static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_EXECUT
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
+extern const char* const M_INFO_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const char* const M_UNDEFINED_VALUE_TEXT; // TODO might be called M_NULL_VALUETEXT though
 extern const mpd_context_t* _decimalContext;
@@ -1457,7 +1458,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 					if(failure>0){
 						FREE_STRING(_mpintText,owner);_mpintText=NULL;
 						switch(failure){
-							case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",M_ERROR_PREFIX,arepsize);break;
+							case 1:outputMessage(M_ERROR_PREFIX,"Failed to initialize the length of the big integer text representation to %d.",arepsize);break;
 							case 2:outputError("Failed to determine the big integer representation");break;
 							case 3:outputError("Failed to sync the length of the big integer representation");break;
 							case 4:outputError("Failed to remove the trailing zeroes from the big integer representation.");break;
@@ -1466,14 +1467,15 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 						}
 					}
 				}else
-					output("%sCan't store more than %u characters in a string.\n",M_ERROR_PREFIX,SIZE_MAX);
+					outputMessage(M_ERROR_PREFIX,"Can't store more than %u characters in a string.",SIZE_MAX);
 			}else
 				outputError("Couldn't determine the size of a big integer");
-			if(then)output("Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
+			if(then)
+				outputMessage(M_INFO_PREFIX,"Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
 		}else
 				outputError("No big integer to represent");
 	}else
-		output("%sFailed to create a text for storing the representation of a big integer.\n",M_ERROR_PREFIX);
+		outputError("Failed to create a text for storing the representation of a big integer");
 	///outputChar('H');
 	return disowned_string(_mpintText,owner);
 }
@@ -2310,9 +2312,9 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
 		}
 		if(stat_errno!=file->staterrno){ // some change
 			if(file->staterrno)
-				output("%s%s (error code: %d) updating the status information of file '%s'.\n",M_ERROR_PREFIX,strerror(file->staterrno),file->staterrno,string(file->_name));
+				outputMessage(M_ERROR_PREFIX,"%s (error code: %d) updating the status information of file '%s'.",strerror(file->staterrno),file->staterrno,string(file->_name));
 			else
-				output("The status information of file '%s' updated successfully.\n",string(file->_name));
+				outputMessage(M_INFO_PREFIX,"The status information of file '%s' updated successfully.",string(file->_name));
 		}
 	}else
 	if(file!=NULL)
@@ -2339,18 +2341,18 @@ bool closeFile(Mfile* const _file,bool report){
 	if(NULL==_file->_name){outputWarning("File has no name");return true;} // must be closed
 	//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 	if(_file->_f==NULL){
-		output("%sFile '%s' already closed.\n",M_WARNING_PREFIX,string(_file->_name));
+		outputMessage(M_WARNING_PREFIX,"File '%s' already closed.",string(_file->_name));
 		return true;
 	} // already closed
 	if(report)
-		output("Closing file '%s'.\n",string(_file->_name));
+		outputMessage(M_INFO_PREFIX,"Closing file '%s'.\n",string(_file->_name));
 	if(fclose(_file->_f)==0){ // success
 		_file->_f=NULL;
 		if(report)
-			output("'%s' closed.\n",string(_file->_name));
+			outputMessage(M_INFO_PREFIX,"'%s' closed.\n",string(_file->_name));
 		return true;
 	}
-	output("%sFailed to close '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+	outputMessage(M_ERROR_PREFIX,"Failed to close '%s'.",string(_file->_name));
 	return false;
 }
 /**
@@ -2415,23 +2417,23 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report){
 					if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner_file,1));
 					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);
 					if(updateStatsErrorCode){ // updating stat failed
-						output("%sFailed to update the stats of file '%s' in mode '%s' (error code: %d).\n",M_ERROR_PREFIX,string(_file->_name),_file->mode,updateStatsErrorCode);
+						outputMessage(M_ERROR_PREFIX,"Failed to update the stats of file '%s' in mode '%s' (error code: %d).",string(_file->_name),_file->mode,updateStatsErrorCode);
 						// perhaps we should never do the following???? although somehow we are using _file->_stat for certain purposes!!!
 						FREE_DISOWNED_1(_file->_stat,'f',owner_file);
 						_file->_stat=NULL;
 					}else
 					if(report)
-						output("Stats of file '%s' updated.\n",string(_file->_name));
+						outputMessage(M_INFO_PREFIX,"Stats of file '%s' updated.\n",string(_file->_name));
 						*/
 				}else
-					output("%sFailed to open file '%s'.\n",M_ERROR_PREFIX,string(_file->_name));
+					outputMessage(M_ERROR_PREFIX,"Failed to open file '%s'.",string(_file->_name));
 			}else
 			if(_file->staterrno==0)
-				output("Can't open a '%s': it is a directory!\n",M_ERROR_PREFIX,string(_file->_name));
+				outputMessage(M_ERROR_PREFIX,"Can't open a '%s': it is a directory!",string(_file->_name));
 			else
-				output("%sFile '%s' already opened!\n",M_WARNING_PREFIX,string(_file->_name));
+				outputMessage(M_WARNING_PREFIX,"File '%s' already opened!",string(_file->_name));
 		}else
-			output("%s'%s' already open!\n",M_WARNING_PREFIX,string(_file->_name));
+			outputMessage(M_WARNING_PREFIX,"'%s' already open!",string(_file->_name));
 	}
 }
 

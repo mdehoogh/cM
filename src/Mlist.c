@@ -7,6 +7,7 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_LIST,
 extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 extern long double M_LD_NAN;
 extern char const * const M_ERROR_PREFIX;
+extern char const * const M_MESSAGE_PREFIX;
 
 // iterator support
 // NOTE for a list use getListIterator() to obtain a valid list iterator (which guarantees that it's actually an iterator pointer being passed in)
@@ -302,7 +303,7 @@ Mvalue* removedFromList(Mlist* list,Mallocationowner owner_list,long long listIn
 			}else
 				outputError("Cannot remove a list element: the list is immutable");
 		}else
-			output("%sInvalid list index %lld.\n",M_ERROR_PREFIX,listIndex);
+			outputMessage(M_ERROR_PREFIX,"Invalid list index %lld.",listIndex);
 	}else
 		outputError("No list to remove from");
 	return removedValue;
@@ -355,7 +356,8 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
 										if(removedFromListValue!=NULL&&appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID)<=0)
 											outputError("Failed to append a removed list element");
 									}else{
-										output("%s",M_ERROR_PREFIX);outputValue("'",indexArray->values[arrayIndex],"' cannot be used as index integer in removing list elements.\n");
+										q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+										q2outputValue("'",indexArray->values[arrayIndex],"' cannot be used as index integer in removing list elements.\n");
 									}
 									arrayIndex++;
 								}

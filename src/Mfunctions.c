@@ -9,6 +9,8 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_FUNCT
 
 extern char const * const VALUETYPENAMES[];
 extern char const * const M_ERROR_PREFIX;
+extern char const * const M_INFO_PREFIX;
+extern char const * const M_MESSAGE_PREFIX;
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_NEGATIVE,M_POSITIVE;
 extern const long double M_LD_NAN,M_LD_PI;
 extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
@@ -110,8 +112,9 @@ static Mbiginteger* _getRoundedDecimalInteger(Mdecimal* _decimal){Mallocationown
 					long long dll=decimal2long(_roundDecimal);
 					_roundedDecimalInteger=owned_biginteger(_getBiginteger(dll),owner);
 				}else{
-					output("%s",M_ERROR_PREFIX);outputDecimal("Failed to round decimal '",_decimal,"'");
-					output(" (status: %.8x).\n",status);
+					q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+					outputDecimal("Failed to round decimal '",_decimal,"'"); // are we going to force wrap the decimal?? outputDecimal
+					q2outputandcollect(" (status: %.8x).\n",status);
 				}
 				FREE_DECIMAL(_roundDecimal,owner);
 			}
@@ -1005,18 +1008,21 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 									}
 									// if one of the separators was found, firstsepstr will point to the first character of that separator, and by zero'ing the character there the split text will be correctly appended
 									if(firstsepstr)*firstsepstr='\0'; // replace the first character of the separator by the end of text, so textStart will contain the split text
-									if(!string_append(_splitText,textStart)){output("%sFailed to collect split text '%s'.\n",M_ERROR_PREFIX,textStart);break;}
+									if(!string_append(_splitText,textStart)){
+										outputMessage(M_ERROR_PREFIX,"Failed to collect split text '%s'.",textStart);
+										break;
+									}
 									// ready to append _splitText to the split text list
 									Mtext* splitText=owned_text(_getText(string(_splitText)),owner);
 									if(splitText!=NULL){
 										Mvalue* splitTextValue=_getValueOfText(disowned_text(splitText,owner));
 										if(splitTextValue!=NULL){
 											if(appendedToList(_splitTextList,owner,splitTextValue,M_LL_INVALID)<=0)
-												output("%sFailed to add split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+												outputMessage(M_ERROR_PREFIX,"Failed to add split text '%s'.",string(_splitText));
 										}else
-											output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+											outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 									}else 
-										output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+										outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 									if(!firstsepstr)break;
 									string_setlength(_splitText,1); // re-use _splitText!!!
 									textStart=firstsepstr+firstseplength; // start looking for the next separator starting at strlen(*separator) further
@@ -1024,7 +1030,10 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 								/* replacing:
 								char c;
 								while((c=**_text)){
-									if(!string_append_char(_splitText,c)){output("%sFailed to collect split character '%c'.\n",M_ERROR_PREFIX,c);break;}
+									if(!string_append_char(_splitText,c)){
+										outputMessage(M_ERROR_PREFIX,"Failed to collect split character '%c'.",c);
+										break;
+									}
 									// if _splitText ends with one of the separators, we cut it off and break
 									separatorindex=separatorcount;
 									while(--separatorindex>=0&&!string_endswith(_splitText,separators[separatorindex]));
@@ -1039,21 +1048,21 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 									Mvalue* splitTextValue=_getValueOfText(disowned_text(splitText,owner));
 									if(splitTextValue){
 										if(appendedToList(_splitTextList,owner,splitTextValue,M_LL_INVALID)<=0)
-											output("%sFailed to add split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+											outputMessage(M_ERROR_PREFIX,"Failed to add split text '%s'.",string(_splitText));
 									}else
-										output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+										outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 								}else 
-									output("%sFailed to wrap split text '%s'.\n",M_ERROR_PREFIX,string(_splitText));
+									outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 								*/
 								FREE_STRING(_splitText,owner); // freed!!!!
 							}else 
-								output("%sFailed to collect characters from text to split '%s'.",M_ERROR_PREFIX,*_text);
+								outputMessage(M_ERROR_PREFIX,"Failed to collect characters from text to split '%s'.",*_text);
 							Mvalue* _splitTextListValue=_getValueOfList(disowned_list(_splitTextList,owner));
 							// NOTE if appending fails the gc should take care of freeing this value, and the contained list!!!!
 							if(appendedToList(_splitTextsList,owner,_splitTextListValue,M_LL_INVALID)<=0)
-								output("%sFailed to append the list of split texts of '%s'.\n",M_ERROR_PREFIX,*_text);
+								outputMessage(M_ERROR_PREFIX,"Failed to append the list of split texts of '%s'.",*_text);
 						}else
-							output("%sUnable to create the list to store the split parts of '%s'.",M_ERROR_PREFIX,*_text);
+							outputMessage(M_ERROR_PREFIX,"Unable to create the list to store the split parts of '%s'.",*_text);
 					}
 					_text++;
 				}while(--textindex>0);
@@ -1201,7 +1210,8 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		_finalmultiplier=owned_biginteger(_getBigintegerCopy(_value->value._biginteger),owner);
 	}
 	if(NULL==_finalmultiplier){
-		output("%s",M_ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");
+		q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+		q2outputValue("Failed to convert '",_value,"' to a big integer!\n");
 		return NULL;
 	}
 	if(amVerboseDebugging())
@@ -1401,7 +1411,7 @@ Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
 			while(--count>=0){assignValue(valueholder,Mrand());valueholder++;}
 			return _getValueOfArray(disowned_array(_randarray,owner));
 		}
-		output("%sFailed to create an array to hold %lld random rational numbers in [0,1).\n",M_ERROR_PREFIX,count);
+		outputMessage(M_ERROR_PREFIX,"Failed to create an array to hold %lld random rational numbers in [0,1).",count);
 		/* replacing:
 		Mlist* _randList=owned_list(__list("Mrands"),owner);
 		while(--count>=0&&appendedToList(_randList,owner,Mrand(),M_LL_INVALID)>0);
@@ -1432,12 +1442,12 @@ Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue){Mallocationowner owner=
 				}
 				return _getValueOfArray(disowned_array(_randarray,owner));
 			}
-			output("%sFailed to create an array to hold %lld random integer numbers in [0,%lld).\n",M_ERROR_PREFIX,count,upper);
+			outputMessage(M_ERROR_PREFIX,"Failed to create an array to hold %lld random integer numbers in [0,%lld).",count,upper);
 		}else
 		if(upper<=0)
-			output("%s%llu should be positive",M_ERROR_PREFIX,upper);
+			outputMessage(M_ERROR_PREFIX,"%llu should be positive.",upper);
 		else
-			output("%s%lld should not exceed %lu.",M_ERROR_PREFIX,upper,RAND_MAX);
+			outputMessage(M_ERROR_PREFIX,"%lld should not exceed %lu.",upper,RAND_MAX);
 	}
 	return NULL;
 }

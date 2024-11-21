@@ -28,7 +28,8 @@ extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with ea
 extern const char* const M_BUG_PREFIX;
 extern const char* const M_ERROR_PREFIX;
 extern const char* const M_WARNING_PREFIX;
-//extern const char* const M_MESSAGE_PREFIX;
+extern const char* const M_INFO_PREFIX;
+extern const char* const M_MESSAGE_PREFIX;
 extern const char * const VALUETYPENAMES[];
 extern const char * const M_LOCALE_SETTINGS_VARIABLE_NAME; // MDH@05DEC2020
 
@@ -75,9 +76,9 @@ size_t outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowne
 	size_t written=0;
 	Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
 	if(_environmentName!=NULL){
-		if(prefix!=NULL)written+=output("%s",prefix);
-		written+=output("%s",string(_environmentName));
-		if(suffix!=NULL)written+=output("%s",suffix);
+		if(prefix!=NULL)written+=q2outputandcollect("%s",prefix);
+		written+=q2outputandcollect("%s",string(_environmentName));
+		if(suffix!=NULL)written+=q2outputandcollect("%s",suffix);
 		FREE_STRING(_environmentName,owner);
 	}
 	return written;
@@ -283,7 +284,7 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
 		Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment));
 		if(_localVariableNamesListValue!=NULL&&appendedToMap(_variableNamesMap,owner,"",_localVariableNamesListValue)!=M_TRUE){
 			/// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
-			output("%sFailed to register the local variable names of '%s'.\n",M_ERROR_PREFIX,environment->_name);
+			outputMessage(M_ERROR_PREFIX,"Failed to register the local variable names of '%s'.",environment->_name);
 		}
 		if(environment->_parent){
 			// determine the variable names map of the parent environment and wrap it
@@ -291,7 +292,7 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
 			// if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
 			if(_parentVariableNamesMapValue!=NULL&&appendedToMap(_variableNamesMap,owner,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)!=M_TRUE){
 				/// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
-				output("%sFailed to register the variable names of the parent of '%s'.\n",M_ERROR_PREFIX,environment->_name);
+				outputMessage(M_ERROR_PREFIX,"Failed to register the variable names of the parent of '%s'.",environment->_name);
 			}
 		}
 		return disowned_map(_variableNamesMap,owner);
@@ -341,7 +342,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 									if(_columnNameText!=NULL){
 										_columnLengths[columnIndex]=string_length(_columnNameText);
 										/// replacing:
-										///columnLengths[columnIndex]=output("%s",string(_columnNameText));
+										///columnLengths[columnIndex]=q2outputandcollect("%s",string(_columnNameText));
 										///written+=columnLengths[columnIndex];
 										FREE_STRING(_columnNameText,owner);
 									}
@@ -369,7 +370,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 									if(_columnNameText!=NULL){
 										_columnLengths[columnIndex]=string_length(_columnNameText);
 										/// replacing:
-										///columnLengths[columnIndex]=output("%s",string(_columnNameText));
+										///columnLengths[columnIndex]=q2outputandcollect("%s",string(_columnNameText));
 										///written+=columnLengths[columnIndex];
 										FREE_STRING(_columnNameText,owner);
 									}
@@ -379,7 +380,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 							*/
 						}
 					}
-					output("Maximum number of columns: %zu.\n",maximumNumberOfColumns);
+					outputMessage(M_INFO_PREFIX,"Maximum number of columns: %zu.",maximumNumberOfColumns);
 					Mstring** _cells=(_columnLengths!=NULL?calloc(table->numberOfElements*maximumNumberOfColumns,sizeof(Mstring*)):NULL);
 					if(_cells!=NULL){
 						// collect the separate lines to store in _cells
@@ -427,14 +428,14 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 						*/
 						// ready to show the cells
 						cellIndex=0;
-						written+=newline();
+						written+=q2newline(true);
 						while(numberOfRows--){
 							for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
-								cellTextLength=output("%s",string(_cells[cellIndex++]));
+								cellTextLength=q2outputandcollect("%s",string(_cells[cellIndex++]));
 								written+=cellTextLength;
-								while(cellTextLength<=_columnLengths[columnIndex]){written+=outputChar(' ');cellTextLength++;}
+								while(cellTextLength<=_columnLengths[columnIndex]){written+=q2outputandcollect("%c",' ');cellTextLength++;}
 							}
-							written+=newline();
+							written+=q2newline(true);
 						}
 						/* replacing:
 						// ready to show the data rows 
@@ -453,10 +454,10 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 										Mlistelement* rowListelement=tablerowValueList->_first;
 										while(rowListelement!=NULL){
 											Mstring* _cellText=owned_string(_getValueText(rowListelement->_value,true,true),owner);
-											cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
+											cellLength=(_cellText!=NULL?q2outputandcollect("%s",string(_cellText)):0);
 											written+=cellLength;
 											if(columnIndex<maximumNumberOfColumns){
-												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
+												while(++cellLength<=columnLengths[columnIndex])written+=q2outputandcollect("%c",' ');
 											}else
 												written+=output("! ");
 											if(_cellText!=NULL)FREE_STRING(_cellText,owner);
@@ -470,7 +471,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 									}
 								}else
 								if(tablerowValue->type==VT_ARRAY){
-									////DEBUG output("Showing the array!\n");
+									////DEBUG q2outputandcollect("Showing the array!\n");
 									Mvalue* cellValue;
 									Marray* tablerowValueArray=tablerowValue->value._array;
 									if(tablerowValueArray!=NULL){
@@ -478,12 +479,12 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 										size_t numberOfColumns=tablerowValueArray->numberOfElements;
 										for(size_t columnIndex=0;columnIndex<numberOfColumns;++columnIndex){
 											Mstring* _cellText=owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner);
-											cellLength=(_cellText!=NULL?output("%s",string(_cellText)):0);
+											cellLength=(_cellText!=NULL?q2outputandcollect("%s",string(_cellText)):0);
 											written+=cellLength;
 											if(columnIndex<maximumNumberOfColumns){
-												while(++cellLength<=columnLengths[columnIndex])written+=outputChar(' ');
+												while(++cellLength<=columnLengths[columnIndex])written+=q2outputandcollect("%s",' ');
 											}else
-												written+=output("! ");
+												written+=q2outputandcollect("%s","! ");
 											if(_cellText!=NULL)FREE_STRING(_cellText,owner);
 										}
 									}
@@ -494,8 +495,8 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 						free(_columnLengths); // essential bro'
 						while(cellIndex)FREE_STRING(_cells[--cellIndex],owner); // essential to release all created Mstring's
 						free(_cells);
-						written+=newline(); // one newline() at the end!!
-					}else 
+						written+=q2newline(true); // one newline() at the end!!
+					}else
 						outputError("Failed to prepare for displaying the table header.");
 				}else 
 					outputError("Header of table not a list.");
@@ -635,18 +636,18 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwn
 								appendedToMap(_valuecountMap,owner,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_occupied*/));
 								appendedToMap(_valuecountMap,owner,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_freed*/));
 								if(appendedToMap(_valuecountsMap,owner,string(_allocationTypeText),_getValueOfMap(disowned_map(_valuecountMap,owner)))<=0)
-									output("%sFailed to store the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
+									outputMessage(M_ERROR_PREFIX,"Failed to store the allocation count map of '%c'.",_allocationTypes[i].type);
 							}else
-								output("%sFailed to create the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
+								outputMessage(M_ERROR_PREFIX,"Failed to create the allocation count map of '%c'.",_allocationTypes[i].type);
 						}
 						string_setlength(_allocationTypeText,0);
 					}
 				}
 				if(appendedToMap(_valuesMap,owner,"types",_getTextValue(string(_allocationTypeCharactersText)))<=0)
-					outputError("Failed to store the data type characters.");
+					outputError("Failed to store the data type characters");
 				if(_valuecountsMap){
 					if(appendedToMap(_valuesMap,owner,"counts",_getValueOfMap(disowned_map(_valuecountsMap,owner)))<=0){
-						outputError("Failed to store the data type counts.");
+						outputError("Failed to store the data type counts");
 						FREE_MAP(_valuecountsMap,owner);
 					}
 				}
@@ -679,7 +680,10 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwn
  * @return the M variable with name \p name in M environment \p environment
  */
 Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * /*const*/ name, bool report){ // MDH@10MAR2020: because we might want to cut off the last character name characters can not be const any more (between char and *)
-	if(NULL==name){if(report)logToOutputFile("%sNo variable name specified requesting the variable.\n",M_ERROR_PREFIX);return NULL;}
+	if(NULL==name){
+		if(report)outputError("No variable name specified requesting the variable");
+		return NULL;
+	}
 	// MDH@10MAR2020: taking care of variable names that end with @ which acts as dereference operator
 	size_t l=strlen(name);
 	// MDH@16APR2024: it's better to actually explicitly retrieve the variable map from the parent environment!! except that that map is NOT a variable itself
@@ -704,8 +708,8 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 			variable=getVariable(getValueEnvironment(_environment->_parent),propertySeparator+1,report);
 		}
 		//////// *nextPropertySeparator=M_PROPERTY_SEPARATOR_CHARACTER; // replacing: propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER;
-		if(NULL==variable){if(report)logToOutputFile("%sVariable not found!\n",M_ERROR_PREFIX);return NULL;}
-		if(NULL==variable->_value){if(report)logToOutputFile("Variable not set!\n",M_ERROR_PREFIX);return NULL;}
+		if(NULL==variable){outputMessage(M_ERROR_PREFIX,"Variable '%s' not found!",name);return NULL;}
+		if(NULL==variable->_value){outputMessage(M_ERROR_PREFIX,"Variable '%s' not set!",name);return NULL;}
 		Mvalue* value=variable->_value; // should be a map, list or array
 		while(value!=NULL&&nextPropertySeparator!=NULL){
 			//////outputValue("'",value,"'");
@@ -784,10 +788,11 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 	}
 	Mmap* variableMap=environment->_variableMap;
 	if(NULL==variableMap){
-		if(report)logToOutputFile("%sNo variables in environment to find '%s' in.\n",M_ERROR_PREFIX,name);
+		outputMessage(M_ERROR_PREFIX,"No variables in environment to find '%s' in.",name);
 		return NULL;
 	}
-	if(environment->_name!=NULL)if(report)logToOutputFile("Looking for variable '%s' in '%s'.\n",name,environment->_name->chars);
+	if(environment->_name!=NULL)
+		if(report)logToOutputFile("Looking for variable '%s' in '%s'.\n",name,environment->_name->chars);
 	///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
 	if(report)logToOutputFile("Iterating the variable map!\n");
 	Mmapelement* variableMapelement=variableMap->_first;
@@ -818,7 +823,7 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
 	// input valid
 	Menvironment* environment=(_environment!=NULL?_environment:getExecutionEnvironment());
 	Mmap* variableMap=(environment!=NULL?environment->_variableMap:NULL);
-	if(NULL==variableMap){output("%sNo variables in environment to find '%s' in.\n",M_ERROR_PREFIX,name);return NULL;}
+	if(NULL==variableMap){outputMessage(M_ERROR_PREFIX,"No variables in environment to find '%s' in.",name);return NULL;}
 	///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
 	Mmapelement* _variableMapelement=variableMap->_first;
 	// as long as variable is defined, and the variable's name is not equal to the given name, continue
@@ -834,7 +839,10 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
 	}
 	// MDH@20JUL2019: if found return
 	if(_variableMapelement!=NULL){
-		if(amVerboseDebugging()){output("Variable '%s' found in environment '%s'",name,environment->_name->chars);outputValue(" with value '",value,"'.\n");}
+		if(amVerboseDebugging()){
+			q2outputandcollect("Variable '%s' found in environment '%s'",name,environment->_name->chars);
+			q2outputValue(" with value '",value,"'.\n");
+		}
 		return _variableMapelement->_variable->_name->chars;
 	}
 	// if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
@@ -858,10 +866,10 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 		Mstring* p=result;
 		if(amDebugging())p=string_append_char(p,'m');
 		if(showcurlybraces)p=string_append_char(p,'{');
-		//////output("%s",string(p));
+		//////q2outputandcollect("%s",string(p));
 		Mmapelement* _mapelement=map->_first;
 		while(p!=NULL&&_mapelement!=NULL){
-			//////output("%s","start");
+			//////q2outputandcollect("%s","start");
 			bool hidevalue;
 			Mvariable* _mapVariable=_mapelement->_variable;
 			if(_mapVariable!=NULL){
@@ -879,12 +887,12 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 				if(!hidevalue){
 					// MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
 					if(showmissings||isValueUndefined(_mapVariable->_value)!=M_TRUE){
-						/////output("%s",string(p));
+						/////q2outputandcollect("%s",string(p));
 						p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
 						// MDH@24OCT2019: here we deviate from _getMapText() (see Mvalue.h/c) in that we try to find a constant with the same value (like PI or E or NULL)
 						char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name->chars,_mapVariable->_value);
 						if(NULL==constantWithValue){ // not a 'symbolic' value
-							/////output("%s",string(p));
+							/////q2outputandcollect("%s",string(p));
 							Mstring* _mapelementValueText=owned_string(_getValueText(_mapVariable->_value,false,true),owner); // free asap
 							/////output("Map element: %s",string(p));
 							// TODO technically NULL is also a value, so shouldn't be use the undefined value text????
@@ -899,11 +907,11 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 			}
 			_mapelement=_mapelement->_next;
 			if(_mapelement!=NULL)p=string_append(p,", "); // only when there's a next map element to process
-			////output("%s","next");
+			////q2outputandcollect("%s","next");
 		}
-		//////output("%s(%d)",string(p),string_length(p));
+		//////q2outputandcollect("%s(%d)",string(p),string_length(p));
 		if(showcurlybraces)p=string_append_char(p,'}');
-		//////output("%s",string(p));
+		//////q2outputandcollect("%s",string(p));
 		// if we failed, we have to free s here!!!
 		if(NULL==p){FREE_STRING(result,owner);return NULL;}
 	}
@@ -1212,9 +1220,9 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 							output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
 					}
 				}else
-					output("%sFailed to create a new map element for variable '%s'.",M_ERROR_PREFIX,name);
+					outputMessage(M_ERROR_PREFIX,"Failed to create a new map element for variable '%s'.",name);
 			}else
-				output("%sNo (environment) variable map to add variable '%s' to.\n",M_ERROR_PREFIX,name);
+				outputMessage(M_ERROR_PREFIX,"No (environment) variable map to add variable '%s' to.",name);
 		}
 		if(NULL==propertySeparator)return(_variable!=NULL?true:false); // if not a property reference we're done anyway (and the result depends on whether or not _variable is NULL)
 		// ASSERT some property reference, and we have to undo the '\0' character placement
@@ -1257,7 +1265,7 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 								output("Property '%s' added.\n",property);
 						}else{
 							FREECHARS(_variablename,owner); // _variablename NOT bound, so has to be freed
-							output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,property);
+							outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.",property);
 						}
 					}else{
 						_variable=NULL;
@@ -1265,7 +1273,7 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 					}
 				}else{ // failure
 					_variable=NULL;
-					output("%sFailed to create a new map element to store property '%s'.",M_ERROR_PREFIX,property);
+					outputMessage(M_ERROR_PREFIX,"Failed to create a new map element to store property '%s'.",property);
 				}
 			}else // property already exists
 				_variable=mapelement->_variable;
@@ -1277,10 +1285,15 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 		if(environment){
 			Mmap* map=(_variable&&_variable->_value&&_variable->_value->type==VT_MAP?_variable->_value->value._map:NULL);
 			bool result=false;
-			if(!map)output("%s'%s' does not hold a map value.",M_ERROR_PREFIX,name);else
-			if(map->immutable)output("%sCannot add a property to the immutable map stored in '%s'.",M_ERROR_PREFIX,name);else result=true; // TODO more specific please
+			if(!map)outputMessage(M_ERROR_PREFIX,"'%s' does not hold a map value.",name);else
+			if(map->immutable)outputMessage(M_ERROR_PREFIX,"Cannot add a property to the immutable map stored in '%s'.",name);
+			else result=true; // TODO more specific please
 			name[firstPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER;
-			if(result)if(!appendedToMap(map,firstPropertySeparator+1,NULL)){result=false;output("%sFailed to add property '%s'.",M_ERROR_PREFIX,firstPropertySeparator+1);}
+			if(result)
+			if(!appendedToMap(map,firstPropertySeparator+1,NULL)){
+				result=false;
+				outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.",firstPropertySeparator+1);
+			}
 			return result;
 		}
 		_variable=getVariable(environment,name,false);
@@ -1311,14 +1324,14 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 					}
 					outputErrorAndText("Failed to create a new map element for variable ",name);
 				}else
-					output("%sNo environment to add newly created variable %s to.\n",M_ERROR_PREFIX,name);
+					outputMessage(M_ERROR_PREFIX,"No environment to add newly created variable %s to.",name);
 				// ASSERT failed to link the variable to the variable map!!
 				free_variable(_variable,true); // MDH@02NOV2019: no value yet assigned so we can pass in the weak flag
 				outputErrorAndText("Failed to link variable ",name);
 			}else
 				outputErrorAndText("Failed to create variable ",name);
 		}else
-			if(amVerbose())output("%sWon't add existing variable '%s'\n.",M_WARNING_PREFIX,name);
+			if(amVerbose())outputMessage(M_WARNING_PREFIX,"Won't add existing variable '%s'.",name);
 		*/
 	}else
 		outputError("No variable name specified");
@@ -1377,16 +1390,18 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 				///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
 				return true; // releasing the value is my responsibility now...
 			}
-			output("%sCannot set the value of variable `%s`: the new value is of the wrong type.\n",M_ERROR_PREFIX,name);
+			outputMessage(M_ERROR_PREFIX,"Cannot set the value of variable `%s`: the new value is of the wrong type.",name);
 		}else
 		if(variable->_value!=NULL){
-			output("%sCannot change the value of variable '%s'",M_ERROR_PREFIX,name);
-			outputValue(" from \n",variable->_value,"\n");outputValue("to \n",_value,"\n");
-			output(": it is not mutable!\n");
+			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputandcollect("Cannot change the value of variable '%s'",name);
+			q2outputValue(" from \n",variable->_value,"\n");
+			q2outputValue("to \n",_value,"\n");
+			q2outputandcollect(": it is not mutable!\n");
 		}else
-			output("%sCannot initialize the value of variable '%s': it is not mutable!\n",M_ERROR_PREFIX,name);
+			outputMessage(M_ERROR_PREFIX,"Cannot initialize the value of variable '%s': it is not mutable!",name);
 	}else
-		output("%sCannot set the value of variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
+		outputMessage(M_ERROR_PREFIX,"Cannot set the value of variable '%s': it is unknown.",name);
 	return false;
 }/* VALIDATED */
 
@@ -1455,17 +1470,20 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 				}
 				return true; // releasing the value is my responsibility now...
 			}
-			output("%sCannot set variable '%s': the new value ",M_ERROR_PREFIX,name);
-			outputValue("(",_value,") is of the wrong type");output(" (%c).\n",getValueTypeCharacter(_value->type,isValueImmutable(_value)));
+			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputandcollect(" set variable '%s': the new value ",name);
+			q2outputValue("(",_value,") is of the wrong type");
+			q2outputandcollect(" (%c).\n",getValueTypeCharacter(_value->type,isValueImmutable(_value)));
 		}else
 		if(variable->_value!=NULL){
-			output("%sCannot change the value of variable '%s'",M_ERROR_PREFIX,name);
-			outputValue(" from '",variable->_value,"'");
-			outputValue(" to '",_value,"': it is not mutable.\n");
+			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputandcollect(" change the value of variable '%s'",name);
+			q2outputValue(" from '",variable->_value,"'");
+			q2outputValue(" to '",_value,"': it is not mutable.\n");
 		}else
-			output("%sCannot initialize the value of variable '%s': it is not mutable!\n",M_ERROR_PREFIX,name);
+			outputMessage(M_ERROR_PREFIX,"Cannot initialize the value of variable '%s': it is not mutable!",name);
 	}else
-		output("%sCannot set variable '%s': it is unknown to '%s'.\n",M_ERROR_PREFIX,name,(_environment?_environment:getExecutionEnvironment())->_name);
+		outputMessage(M_ERROR_PREFIX,"Cannot set variable '%s': it is unknown to '%s'.",name,(_environment?_environment:getExecutionEnvironment())->_name);
 	return false;
 }/* VALIDATED */
 
@@ -1487,13 +1505,13 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
 			if(variableValue!=_value){
 				long long index=appendedToList(variableValue->value._list,Msubowner(getValueOwner(),1),_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
 				if(index>0)return index;
-				output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",M_ERROR_PREFIX,name,(_value?_value->type:-1));
+				outputMessage(M_ERROR_PREFIX,"Failed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.",name,(_value?_value->type:-1));
 			}else
 				outputError("Circular reference not allowed");
 		}else
-			output("%sCannot append the value to variable '%s': it's value is not a list!\n",M_ERROR_PREFIX,name);
+			outputMessage(M_ERROR_PREFIX,"Cannot append the value to variable '%s': it's value is not a list!",name);
 	}else
-		output("%sCannot append the value to list variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
+		outputMessage(M_ERROR_PREFIX,"Cannot append the value to list variable '%s': it is unknown.",name);
 	return 0;
 }/* VALIDATED */
 
@@ -1507,7 +1525,7 @@ Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const 
 	if(NULL==_environment||NULL==name){outputError("No environment or name specified");return NULL;}
 	//DEBUGGINGoutput("Looking for the value of variable '%s' in environment '%s'.\n",name,string(_getEnvironmentName(_environment)));
 	Mvariable* variable=getVariable(_environment,name,false);
-	if(NULL==variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
+	if(NULL==variable){outputMessage(M_ERROR_PREFIX,"Variable '%s' not found.",name);return NULL;}
 	return variable->_value;
 }/* VALIDATED */
 
@@ -1521,7 +1539,7 @@ Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const 
 Mvalue** getValueHolder(Menvironment const * const _environment,char /*const*/ * const name){
 	if(NULL==_environment||NULL==name){outputError("No environment or name specified");return NULL;}
 	Mvariable* variable=getVariable(_environment,name,false);
-	if(NULL==variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
+	if(NULL==variable){outputMessage(M_ERROR_PREFIX,"Variable '%s' not found.",name);return NULL;}
 	return &(variable->_value);
 }/* VALIDATED */
 
@@ -1772,8 +1790,8 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
 	if(_environment!=NULL){
 		_function=getFunction(_environment,name); // check for a function with the given name in the given environment
 		if(NULL==_function&&_environment->_functionMap!=NULL){ // does not exist yet, and is registrable
-			if(amVerboseDebugging())
-				output("Registering function '%s'",name);
+			if(amVerbose())
+				q2outputandcollect("Registering function '%s'",name);
 			///////////_function->type=functionType;
 			/* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
 			// MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
@@ -1781,69 +1799,68 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
 			*/
 			Mstring* _functionName=owned_string(__string(),owner);
 			if(_functionName!=NULL){
-				if(amVerbose())outputChar('.'); // 1
+				if(amVerbose())q2outputandcollect("%c",'.'); // 1
 				Mstring* p=_functionName;
 				p=string_append(p,name);
 				if(p!=NULL){
 					if(amVerbose())outputChar('.'); // 2
 					_function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner); // create the function
 					if(_function!=NULL){
-						if(amVerbose())outputChar('.'); // 3
+						if(amVerbose())q2outputandcollect("%c",'.'); // 3
 						Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
 						if(_functionmapelement!=NULL){
-							if(amVerbose())outputChar('.'); // 4
+							if(amVerbose())q2outputandcollect("%c",'.'); // 4
 							// MDH@25JAN2023: the problem here probably is the ownership of the chars inside the _functionName!!!!
 							_functionmapelement->_name=(Mstring*)SUBOWNED(owned_string(disowned_string(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
 							// replacing: _functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
 							//////////output("\tOwner of the function map element name: '%s'.\n",getOwnerText(_functionmapelement->_name));
 							_functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
 							SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
-							if(amVerbose())outputChar('.'); // 5
+							if(amVerbose())q2outputandcollect("%c",'.'); // 5
 							Mfunctionmap* _functionmap=_environment->_functionMap;
 							Mfunctionmapelement* _lastFunctionmapelement=(_functionmap!=NULL?_functionmap->_last:NULL);
 							if(_lastFunctionmapelement!=NULL)_lastFunctionmapelement->_next=_functionmapelement;else _functionmap->_first=_functionmapelement;
 							_functionmap->_last=_functionmapelement;
 							_functionmap->numberOfFunctions++;
-							if(amVerbose())outputChar('.'); // 6
+							if(amVerbose())q2outputandcollect("%c",'.'); // 6
 							///////_function->_name=_functionName; // success!!!!!
 						}else{ // failure
 							p=NULL;
-							output("%sFailed to create the function map element of '%s'.",M_ERROR_PREFIX,name);
+							outputMessage(M_ERROR_PREFIX,"Failed to create the function map element of '%s'.",name);
 						}
 					}else{
 						p=NULL;
-						output("%sFailed to create function '%s'.",M_ERROR_PREFIX,name);
+						outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.",name);
 					}
 					if(NULL==p){
-						if(amVerbose())outputChar('!');
+						if(amVerbose())q2outputandcollect("%c",'!');
 						FREE_STRING(_functionName,owner);
 						_functionName=NULL;
-						if(amVerbose())outputChar('!');
+						if(amVerbose())q2outputandcollect("%c",'!');
 					}
 					// try to append it to the functionMap, if we succeed store _functioName in ->_name
 				}else
-					output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
+					outputMessage(M_ERROR_PREFIX,"Failed to store function name '%s'.",name);
 					// if we fail to register the name and/or the function with the environment free the function!!
 				if(NULL==_functionName){
 					if(_function!=NULL){
-						if(amVerbose())outputChar('!');
+						if(amVerbose())q2outputandcollect("%c",'!');
 							FREE_FUNCTION(_function,owner);_function=NULL;
-							if(amVerbose())outputChar('!');
+							if(amVerbose())q2outputandcollect("%c",'!');
 					}
 				}else
 				if(amVerbose())
-					output("%s"," done"); // 7
+					q2outputandcollect("%s"," done"); // 7
 			}else
 			if(NULL==_function)
-				output("%sFailed to create the function name to store '%s' in.",M_ERROR_PREFIX,name);
-			// if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
+				outputMessage(M_ERROR_PREFIX,"Failed to create the function name to store '%s' in.",name);
+			// if(!_function)outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.",name);
 		}else
-			output("%sNo function map in the environment to store '%s' in.",M_ERROR_PREFIX,name);
+			outputMessage(M_ERROR_PREFIX,"No function map in the environment to store '%s' in.",name);
 	}else
-		output("%sNo environment to search for function '%s'.",M_ERROR_PREFIX,name);
+		outputMessage(M_ERROR_PREFIX,"No environment to search for function '%s'.",name);
 	if(_function!=NULL)
-		if(amVerbose())
-			output("%s",".\n");
+		if(amVerbose())q2outputandcollect("%s",".\n");
 	return _function; /////// if _function is added to the environment successfully do not disown!!!! disowned_function(_function,owner); // MDH@24JAN2023: important to disown the returned function!!!
 }/* VALIDATED */
 
@@ -2022,7 +2039,7 @@ Mvalue* Meltype(Mvalue* compositeValue){
 		if(compositeValue->type==VT_TEXT){
 			variable=getVariable(NULL,compositeValue->value._text->_c,false);
 			if(variable==NULL){
-				output("%sCan't get the element type of non-existing variable '%s'!\n",M_ERROR_PREFIX,compositeValue->value._text->_c);
+				outputMessage(M_ERROR_PREFIX,"Can't get the element type of non-existing variable '%s'!",compositeValue->value._text->_c);
 				return NULL;
 			}
 		}else
@@ -2030,8 +2047,8 @@ Mvalue* Meltype(Mvalue* compositeValue){
 			variable=compositeValue->value._reference->variable;
 			// it's best NOT to create the variable if it does not yet exist although we could
 			if(NULL==variable){
-				output(M_ERROR_PREFIX);
-				outputValue("Cannot get the element type of a non-existing variable reference '",compositeValue,"'.\n");
+				q2outputandcollect(M_ERROR_PREFIX);
+				q2outputValue("Cannot get the element type of a non-existing variable reference '",compositeValue,"'.\n");
 				return NULL;
 			}
 		}
@@ -2054,8 +2071,8 @@ Mvalue* Meltype(Mvalue* compositeValue){
 										?IMMUTABLEVALUETYPECHARS[value->value._map->valuetype]
 										:MUTABLEVALUETYPECHARS[value->value._map->valuetype]),'\'');
 			}
-			output(M_ERROR_PREFIX);
-			outputValue("Cannot get the element type of '",value,"': it is not a map, array or list!\n");
+			q2outputandcollect(M_ERROR_PREFIX);
+			q2outputValue("Cannot get the element type of '",value,"': it is not a map, array or list!\n");
 			/* replacing:
 			// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
 			if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
@@ -2080,7 +2097,11 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 		char valuetypechar=valuetypeValue->value._text->_c[0]; // can be either lowercase or uppercase in both cases acceptable
 		char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
 		/* MDH@17AUG2023: best not to allow changing mutability
-		if(!mutablevaluetypechar){output("%s",M_ERROR_PREFIX);outputValue("Invalid value type specification '",valuetypeValue,"'.\n");return NULL;}
+		if(!mutablevaluetypechar){
+			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputValue("Invalid value type specification '",valuetypeValue,"'.\n");
+			return NULL;
+		}
 		long long immutable=(mutablevaluetypechar==valuetypechar?M_FALSE:M_TRUE); // if the same we received the mutable variant
 		*/
 		Mvaluetype valuetype=getCharacterOfMutableValueType(mutablevaluetypechar);
@@ -2089,7 +2110,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 		if(compositeValue->type==VT_TEXT){
 			variable=getVariable(NULL,compositeValue->value._text->_c,false);
 			if(variable==NULL){
-				output("%sCan't set the element type of non-existing variable '%s'!\n",M_ERROR_PREFIX,compositeValue->value._text->_c);
+				outputMessage(M_ERROR_PREFIX,"Can't set the element type of non-existing variable '%s'!",compositeValue->value._text->_c);
 				return NULL;
 			}
 		}else
@@ -2097,8 +2118,8 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 			variable=compositeValue->value._reference->variable;
 			// it's best NOT to create the variable if it does not yet exist although we could
 			if(NULL==variable){
-				output(M_ERROR_PREFIX);
-				outputValue("Cannot set the element type of an non-existing variable through reference '",compositeValue,"'.\n");
+				q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+				q2outputValue("Cannot set the element type of an non-existing variable through reference '",compositeValue,"'.\n");
 				return NULL;
 			}
 		}
@@ -2198,7 +2219,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 					{
 						variable=getVariable(NULL,compositeValue->value._text->_c,false);
 						if(variable==NULL)
-							output("%sCan't set the element type: '%s' is undefined!",M_ERROR_PREFIX,compositeValue->value._text->_c);
+							outputMessage(M_ERROR_PREFIX,"Can't set the element type: '%s' is undefined!",compositeValue->value._text->_c);
 						break;
 					}
 				case VT_REFERENCE:
@@ -2206,7 +2227,8 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 						variable=compositeValue->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
-							output("%s",M_ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",compositeValue,"'.\n");
+							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputValue("Cannot set the type of an non-existing variable through reference '",compositeValue,"'.\n");
 						}
 						break;
 					}
@@ -2216,7 +2238,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 			if(variable!=NULL){
 				if(variable->unlockCode<=0)
 					return Mseteltype(variable->_value,valuetypeValue);
-				output("%sCan't change the element type of the value of locked variable '%s'.",M_ERROR_PREFIX,variable->_name->chars);
+				outputMessage(M_ERROR_PREFIX,"Can't change the element type of the value of locked variable '%s'.",variable->_name->chars);
 			}
 		}
 	}*/
@@ -2524,8 +2546,8 @@ Mvalue* Mlock(Mvalue* variableNameValue){
 						variable=variableNameValue->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
-							output("%s",M_ERROR_PREFIX);
-							outputValue("Cannot unlock non-existing referenced variable '",variableNameValue,"'.\n");
+							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputValue("Cannot unlock non-existing referenced variable '",variableNameValue,"'.\n");
 						}
 						break;
 					}
@@ -2538,7 +2560,7 @@ Mvalue* Mlock(Mvalue* variableNameValue){
 					variable->unlockCode=1+rand();
 					return _getIntegerValue(variable->unlockCode);
 				}
-				output("Variable '%s' is already locked!\n",M_ERROR_PREFIX,variable->_name->chars);
+				outputMessage(M_ERROR_PREFIX,"Variable '%s' is already locked!",variable->_name->chars);
 			}
 		}
 	}
@@ -2603,8 +2625,8 @@ Mvalue* Munlock(Mvalue* variableNameValue,Mvalue* unlockCodeValue){
 								variable=variableNameValue->value._reference->variable;
 								// it's best NOT to create the variable if it does not yet exist although we could
 								if(NULL==variable){
-									output("%s",M_ERROR_PREFIX);
-									outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
+									q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+									q2outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
 								}
 								break;
 							}
@@ -2618,7 +2640,7 @@ Mvalue* Munlock(Mvalue* variableNameValue,Mvalue* unlockCodeValue){
 							result=M_TRUE;
 						}else{
 							result=M_FALSE;
-							output("%sUnlock code given (%lld) does not match the unlock code of variable '%s'.",M_ERROR_PREFIX,unlockCode,variable->_name->chars);
+							outputMessage(M_ERROR_PREFIX,"Unlock code given (%lld) does not match the unlock code of variable '%s'.",unlockCode,variable->_name->chars);
 						}
 					}else
 						outputError("Cannot unlock this type! Only variables and complex values can be (un)locked!");
@@ -2666,8 +2688,8 @@ Mvalue* Mlocked(Mvalue* variableNameValue){
 						variable=variableNameValue->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
-							output("%s",M_ERROR_PREFIX);
-							outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
+							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
 						}
 						break;
 					}
@@ -2696,7 +2718,11 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/)
 		char valuetypechar=valuetypeValue->value._text->_c[0]; // can be either lowercase or uppercase in both cases acceptable
 		char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
 		/* MDH@17AUG2023: best not to allow changing mutability
-		if(!mutablevaluetypechar){output("%s",M_ERROR_PREFIX);outputValue("Invalid value type specification '",valuetypeValue,"'.\n");return NULL;}
+		if(!mutablevaluetypechar){
+			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputValue("Invalid value type specification '",valuetypeValue,"'.\n");
+			return NULL;
+		}
 		long long immutable=(mutablevaluetypechar==valuetypechar?M_FALSE:M_TRUE); // if the same we received the mutable variant
 		*/
 		Mvaluetype valuetype=getCharacterOfMutableValueType(mutablevaluetypechar);
@@ -2765,10 +2791,15 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/)
 					{
 						variable=value->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
-						if(NULL==variable){output("%s",M_ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");}
+						if(NULL==variable){
+							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");
+						}
 						break;
 					}
-				default:outputError("Cannot set the type of values that are scalar or text (representing the name of a variable)");return NULL;
+				default:
+					outputError("Cannot set the type of values that are scalar or text (representing the name of a variable)");
+					return NULL;
 			}
 			result=M_FALSE;
 			if(variable!=NULL){
@@ -2779,9 +2810,9 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/)
 						variable->valuetype=valuetype; // update the value type
 						result=M_TRUE;
 					}else
-						output("%sUnable to change the value type of %s to '%c' when its value is of type '%c'.\n",M_ERROR_PREFIX,variable->_name,MUTABLEVALUETYPECHARS[valuetype],MUTABLEVALUETYPECHARS[variable->_value->type]);
+						outputMessage(M_ERROR_PREFIX,"Unable to change the value type of %s to '%c' when its value is of type '%c'.",variable->_name,MUTABLEVALUETYPECHARS[valuetype],MUTABLEVALUETYPECHARS[variable->_value->type]);
 				}else{
-					output("%sVariable '%s' already of the requested type!",M_WARNING_PREFIX,variable->_name->chars);
+					outputMessage(M_WARNING_PREFIX,"Variable '%s' already of the requested type!",variable->_name->chars);
 					result=M_TRUE;
 				}
 			}
@@ -2794,7 +2825,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/)
 						output("Variable '%s' is now %smutable.\n",(variable->unlockCode>0?"im":""));
 					return _getIntegerValue(variable->unlockCode);
 				}else
-					output("%sUnable to change the mutability of a value of type %s.\n",M_ERROR_PREFIX,VALUETYPENAMES[value->type]);
+					outputMessage(M_ERROR_PREFIX,"Unable to change the mutability of a value of type %s.",VALUETYPENAMES[value->type]);
 			}
 			*/
 		}
@@ -2854,7 +2885,7 @@ bool completedValueFunction(Menvironment* const _environment,Mallocationowner ow
 			if(amVerbose())output("Registered single value argument function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register single value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"%sFailed to register single value argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -2880,7 +2911,7 @@ bool completedFloatFunction(Menvironment* const _environment,Mallocationowner ow
 			if(amVerbose())output("Registered single real argument function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register single real argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register single real argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -2906,7 +2937,7 @@ bool completedIntegerFunction(Menvironment* const _environment,Mallocationowner 
 		   if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;	
 		}
-		output("%sFailed to register single integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register single integer argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -2933,7 +2964,7 @@ bool completedListFunction(Menvironment* const _environment,Mallocationowner own
 			if(amVerbose())output("Registered list function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register single list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register single list argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -2960,7 +2991,7 @@ bool completedMapFunction(Menvironment* const _environment,Mallocationowner owne
 			if(amVerbose())output("Registered map function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register single map argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register single map argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -2987,7 +3018,7 @@ bool completedListTextFunction(Menvironment* const _environment,Mallocationowner
 			if(amVerbose())output("Registered sort list|map function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register sort list|map function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register sort list|map function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3015,7 +3046,7 @@ bool completedTokenListFunction(Menvironment* const _environment,Mallocationowne
 				output("Registered token list function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register single token list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register single token list argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3042,7 +3073,7 @@ bool completedIntegerBooleanFunction(Menvironment* const _environment,Mallocatio
 			if(amVerbose())output("Registered integer boolean function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register integer boolean argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register integer boolean argument function '%s'.",functionName);
 	}
 	return false;
 }// NOT VALIDATED
@@ -3069,7 +3100,7 @@ bool completedListFunctionFunction(Menvironment* const _environment,Mallocationo
 			if(amVerbose())output("Registered list function function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register integer boolean argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register integer boolean argument function '%s'.",functionName);
 	}
 	return false;
 }// NOT VALIDATED
@@ -3095,7 +3126,7 @@ bool completedStringStringFunction(Menvironment* const _environment,Mallocationo
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register double string argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register double string argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3121,7 +3152,7 @@ bool completedFloatFloatFunction(Menvironment* const _environment,Mallocationown
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register double real argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register double real argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3146,7 +3177,7 @@ bool completedMapTokenFunction(Menvironment* const _environment,Mallocationowner
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register map token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register map token argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3172,7 +3203,7 @@ bool completedTokenTokenFunction(Menvironment* const _environment,Mallocationown
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register two token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register two token argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3198,7 +3229,7 @@ bool completedValueValueFunction(Menvironment* const _environment,Mallocationown
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register two value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register two value argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3224,7 +3255,7 @@ bool completedIntegerValueFunction(Menvironment* const _environment,Mallocationo
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register integer value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register integer value argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3250,7 +3281,7 @@ bool completedValueIntegerFunction(Menvironment* const _environment,Mallocationo
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register value integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register value integer argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3276,7 +3307,7 @@ bool completedListIndexFunction(Menvironment* const _environment,Mallocationowne
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register list index function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register list index function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3303,7 +3334,7 @@ bool completedListValueFunction(Menvironment* const _environment,Mallocationowne
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register list value function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register list value function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3329,7 +3360,7 @@ bool completedStringMapTokenFunction(Menvironment* const _environment,Mallocatio
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register string map token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register string map token argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3355,7 +3386,7 @@ bool completedListFunctionValueFunction(Menvironment* const _environment,Malloca
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register list function value function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register list function value function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3381,7 +3412,7 @@ bool completedMapMapListFunction(Menvironment* const _environment,Mallocationown
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register map map list function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register map map list function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3407,7 +3438,7 @@ bool completedValueTextValueFunction(Menvironment* const _environment,Mallocatio
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register a value text value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register a value text value argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3433,7 +3464,7 @@ bool completedValueValueValueFunction(Menvironment* const _environment,Mallocati
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register a value text value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register a value text value argument function '%s'.",functionName);
 	}
 	return false;
 }
@@ -3459,7 +3490,7 @@ bool completedListValueIntegerFunction(Menvironment* const _environment,Mallocat
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register list value integer function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register list value integer function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3485,7 +3516,7 @@ bool completedListValueIndexFunction(Menvironment* const _environment,Mallocatio
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register list value index function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register list value index function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3511,7 +3542,7 @@ bool completedThreeIntegersFunction(Menvironment* const _environment,Mallocation
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register three integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register three integer argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3541,7 +3572,7 @@ bool completedValueTokenTokenTokenFunction(Menvironment* const _environment,Mall
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register value three token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register value three token argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3567,7 +3598,7 @@ bool completedTokenTokenTokenTokenFunction(Menvironment* const _environment,Mall
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register four token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register four token argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3593,7 +3624,7 @@ bool completedTokenTokenTokenTokenTokenFunction(Menvironment* const _environment
 			if(amVerbose())output("Registered function '%s' completed.\n",functionName);
 			return true;
 		}
-		output("%sFailed to register five token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"Failed to register five token argument function '%s'.",functionName);
 	}
 	return false;
 }// VALIDATED
@@ -3619,7 +3650,8 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
  */
 unsigned long long getNumberOfFunctionCommands(char const * const functionName){
 	Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
-	if(NULL==function||function->type!=FT_USER){if(NULL==function)output("%sFunction '%s' not found.\n",M_ERROR_PREFIX,functionName);return -1;}
+	if(NULL==function||function->type!=FT_USER){
+	if(NULL==function)outputMessage(M_ERROR_PREFIX,"Function '%s' not found.",functionName);return -1;}
 	return (function->functionunion._userfunction->_bodyCommandList!=NULL?function->functionunion._userfunction->_bodyCommandList->numberOfElements:0);
 }
 
@@ -3690,17 +3722,20 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 					_function->_parameterMap=owned_map(disowned_map(_argumentMap,owner),Msubowner(owner_environment,2));
 				}
 				Mstring* _functionText=owned_string(_getFunctionText(_function,functionName),owner);
-				if(_functionText!=NULL){output("'%s' registered.\n",string(_functionText));FREE_STRING(_functionText,owner);} ///DEBUGGING
+				if(_functionText!=NULL){
+					outputMessage(M_INFO_PREFIX,"'%s' registered.\n",string(_functionText));
+					FREE_STRING(_functionText,owner);
+				} ///DEBUGGING
 				return true;
 			}
-			output("%sFailed to register internal function '%s'.\n",M_ERROR_PREFIX,functionName);
+			outputMessage(M_ERROR_PREFIX,"Failed to register internal function '%s'.",functionName);
 		}else
 		if(_argumentMap!=NULL){
-			output("%sFailed to create the argument map of internal function '%s'.\n",M_ERROR_PREFIX,functionName);
+			outputMessage(M_ERROR_PREFIX,"Failed to create the argument map of internal function '%s'.",functionName);
 			FREE_MAP(_argumentMap,owner);
 		}
 	}else
-		output("%sToo many arguments in internal function '%s' specfied!\n",M_BUG_PREFIX,functionName);
+		outputMessage(M_BUG_PREFIX,"Too many arguments in internal function '%s' specfied!",functionName);
 	return false;
 }
 
@@ -3715,11 +3750,11 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* _command,Mal
 				function->functionunion._userfunction->_bodyCommandList=__list("function body command list");
 			if(appendedToList(function->functionunion._userfunction->_bodyCommandList,Msubowner(getOwnerExecutionEnvironment(),4),_commandValue,M_LL_INVALID)>0)
 				return true;
-			output("%sFailed to add command to list of body of '%s'.\n",M_ERROR_PREFIX,functionName);
+			outputMessage(M_ERROR_PREFIX,"Failed to add command to list of body of '%s'.",functionName);
 		}else
-			output("%sFailed to wrap a command of function '%s'.\n",M_ERROR_PREFIX,functionName);
+			outputMessage(M_ERROR_PREFIX,"Failed to wrap a command of function '%s'.",functionName);
 	}else
-		output("%s'%s' does not represent a user function.\n",M_ERROR_PREFIX,functionName);
+		outputMessage(M_ERROR_PREFIX,"'%s' does not represent a user function.",functionName);
 	return false;
 }
 */
@@ -3836,11 +3871,11 @@ Mvalue* Msetlocale(Mvalue* _localeValue){Mallocationowner owner=getOwner(__LINE_
 					localeValue=_getTextValue(string(_locale));
 					if(localeValue){
 						if(!setVariable(NULL,M_LOCALE_SETTINGS_VARIABLE_NAME,localeValue)){
-							output("%sFailed to save the new current locale '%s'.\n",M_ERROR_PREFIX,locale);
+							outputMessage(M_ERROR_PREFIX,"Failed to save the new current locale '%s'.",locale);
 							localeValue=NULL; // TODO would this be OK?
 						}
 					}else
-						output("%sFailed to create the value of new current locale '%s'.",M_ERROR_PREFIX,locale);
+						outputMessage(M_ERROR_PREFIX,"Failed to create the value of new current locale '%s'.",locale);
 				}else
 					outputError("Failed to store the locale text");
 				FREE_STRING(_locale,owner);
@@ -3861,7 +3896,7 @@ Mvalue* Msetlocale(Mvalue* _localeValue){Mallocationowner owner=getOwner(__LINE_
 Mvalue* Mlocalesettings(){Mallocationowner owner=getOwner(__LINE__);
 	Mvariable* localeVariable=getVariable(getExecutionEnvironment(),M_LOCALE_SETTINGS_VARIABLE_NAME,false);
 	if(localeVariable!=NULL)return localeVariable->_value;
-	output("%sVariable %s not found",M_ERROR_PREFIX,M_LOCALE_SETTINGS_VARIABLE_NAME);
+	outputMessage(M_ERROR_PREFIX,"Variable %s not found.",M_LOCALE_SETTINGS_VARIABLE_NAME);
 	return NULL;
 }
 

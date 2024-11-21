@@ -23,7 +23,8 @@ char* _strdup(char const * const _c){Mallocationowner owner=getOwner(__LINE__);
 			size_t l=strlen(_c)+1;
 			_hc=MALLOC(sizeof(char),l,-'"',owner); // a single character
 			// replacing: char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
-			if(_hc!=NULL)memcpy(_hc,_c,sizeof(char)*l);else output("%sFailed to allocate memory to store '%s'.\n",M_ERROR_PREFIX,_c);
+			if(_hc!=NULL)memcpy(_hc,_c,sizeof(char)*l);
+			else outputMessage(M_ERROR_PREFIX,"Failed to allocate memory to store '%s'.",_c);
 			//*/
 			/* replacing:
 			char* _hc=strdup(_c);

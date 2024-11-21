@@ -269,14 +269,14 @@ Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getO
 				_lastDecimalcontextElement=decimalcontextElement;
 				return decimalcontextElement->_decimalcontext;
 			}
-			output("Failed to create the decimal context with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
+			outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context with precision " PRIu64 ".",prec);
 			// not bound!!!
 			disowned_decimalcontext(decimalcontextElement->_decimalcontext,owner);
 		}else
-			output("Failed to create the decimal context wrapper with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
+			outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context wrapper with precision " PRIu64 ".",prec);
 		FREE_DECIMALCONTEXTELEMENT(decimalcontextElement,owner);
 	}else
-		output("%sFailed to create the decimal context element with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
+		outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context element with precision " PRIu64 ".",prec);
 	return NULL;
 }
 
@@ -747,7 +747,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 	if(_decimalText!=NULL){
 		_decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating,mpd_context),owner);
 		if(_decimal==NULL)
-			output("%sFailed to parse decimal text '%s' of the corresponding rational",M_ERROR_PREFIX,string(_decimalText));
+			outputMessage(M_ERROR_PREFIX,"Failed to parse decimal text '%s' of the corresponding rational",string(_decimalText));
 		else 
 		if(amVerboseDebugging())
 			outputDecimal("Decimal of rational: '",_decimal,"'.\n");
@@ -836,7 +836,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
 					mpd_contexts[mpd_context_count++]=mpd_context;
 					if(amVerbose())output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
 				}else
-					output("%sFailed to return a decimal context with precision %u.\n",M_ERROR_PREFIX,decimalprecision);
+					outputMessage(M_ERROR_PREFIX,"Failed to return a decimal context with precision %u.",decimalprecision);
 			}else
 				outputError("Failed to create a new decimal context");
 		}
@@ -865,7 +865,7 @@ mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){ // MDH@20MAY2020:
 		if(_mpd!=NULL){
 			mpd_set_i64(_mpd,value,mpd_context);
 			if(_mpd->len==0){
-				output("%sFailed to create decimal with value " PRId64 ".\n",M_ERROR_PREFIX,value);
+				outputMessage(M_ERROR_PREFIX,"Failed to create decimal with value " PRId64 ".",value);
 				free_mpd(_mpd);
 				_mpd=NULL;
 			}
@@ -1232,12 +1232,12 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating,mpd_
 			mpd_qset_string(_textDecimal->mpd,decimalText,mpd_context_to_use,&status); // NOTE here we have to pass in the default decimal context
 			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_textDecimal,owner);
-				output("%sFailed to parse decimal '%s' (error status: %" PRIu32 ").\n",M_ERROR_PREFIX,decimalText,status);
+				outputMessage(M_ERROR_PREFIX,"Failed to parse decimal '%s' (error status: %" PRIu32 ").",decimalText,status);
 				return NULL;
 			} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
 		}else
 			outputError("Failed to create a decimal");
-		////////////if(!_textDecimal)output("%sFailed to create a decimal from '%s'.\n",M_ERROR_PREFIX,decimalText);
+		////////////if(!_textDecimal)outputMessage(M_ERROR_PREFIX,"Failed to create a decimal from '%s'.",decimalText);
 	}else
 		outputError("No decimal text to parse");
 	return disowned_decimal(_textDecimal,owner);
@@ -1653,7 +1653,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 					mult++;
 					if(mult==7)break;
 				}
-				if(mult<7)output("%sFailed to create %u out of 7 predefined (co)sines.\n",M_ERROR_PREFIX,6-mult);
+				if(mult<7)outputMessage(M_ERROR_PREFIX,"Failed to create %u out of 7 predefined (co)sines.",6-mult);
 				free_mpd(_sqrt2div2);free_mpd(_sqrt3div2);
 				// how about computing the CORDIC sines and cosines?????????
 				uint32_t iteration=0;
@@ -1663,7 +1663,10 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 				Msincoselement* _lastCordicElement=NULL;
 				while((status&0xEFBF)==0){
 					iteration++;
-					if(iteration==mpd_context->prec*10){outputInfo("Computation of CORDIC angles stopped when exceeding the maximum number of iterations.");break;}
+					if(iteration==mpd_context->prec*10){
+						outputInfo("Computation of CORDIC angles stopped when exceeding the maximum number of iterations.");
+						break;
+					}
 					mpd_qdiv_u32(_cordicangle,_cordicangle,2,mpd_context,&status); // divide the angle by 2
 					// we need the cosine to compute the sine of half the angle
 					// initially this cosine will equal _cos15 and we will use _cos15 to compute the new sine
@@ -1858,13 +1861,17 @@ mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const 
 		/* REMOVED decrementing the precision to use in computation again!!!
 		// return the precision so we can return a rounded result (TODO should we do that??????)
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2 as soon as all computations are done
-		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);else output("%sNo %ssine result to finalize.\n",M_ERROR_PREFIX,(sin?"":"co"));
+		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);
+		else outputMessage(M_ERROR_PREFIX,"No %ssine result to finalize.",(sin?"":"co"));
 		*/
 		if((status&0xEFBF)!=0){
-			output("%sSome error trying to compute the sine of a decimal.\n",M_ERROR_PREFIX);
+			outputError("Some error trying to compute the sine of a decimal");
 			free_mpd(_sinsquared);_sinsquared=NULL;
 		}else
-		if(_intermediateResult!=NULL){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");}
+		if(_intermediateResult!=NULL){
+			mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);
+			outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");
+		}
 		if(_intermediateResult!=NULL){
 			// _intermediateResult->mpd=NULL; // MDH@23MAY2020 added, but TODO not sure about this wasn't there before
 			FREE_DECIMAL(_intermediateResult,owner);
@@ -1986,12 +1993,16 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd
 		free_mpd(_prevsinsquared);
 		// return the precision so we can return a rounded result (TODO should we do that??????)
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2 as soon as all computations are done
-		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);else output("%sNo %ssine result to finalize.\n",M_ERROR_PREFIX,(sin?"":"co"));
+		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);
+		else outputMessage(M_ERROR_PREFIX,"No %ssine result to finalize",(sin?"":"co"));
 		if((status&0xEFBF)!=0){
-			output("%sSome error trying to compute the %ssine of a decimal.\n",M_ERROR_PREFIX,(sin?"":"co"));
+			outputMessage(M_ERROR_PREFIX,"Some error trying to compute the %ssine of a decimal.",(sin?"":"co"));
 			free_mpd(_sinsquared);_sinsquared=NULL;
 		}else
-		if(_intermediateResult!=NULL){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");}
+		if(_intermediateResult!=NULL){
+			mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);
+			outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");
+		}
 		if(_intermediateResult!=NULL){
 			// _intermediateResult->mpd=NULL; // MDH@23MAY2020: TODO should we do this?????????
 			FREE_DECIMAL(_intermediateResult,owner); // free verbose intermediate result decimal
@@ -3638,7 +3649,8 @@ long long isDecimalOne(Mdecimal const * const decimal){
 		// MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
 		uint32_t status=0;
 		int cmpresult=mpd_qcmp(decimal->mpd,getDecimalOne(),&status);
-		if((status&0xEFBF)==0)result=(cmpresult==0?M_TRUE:M_FALSE);else output("%sFailed to determine whether a decimal equals 1 (status: %" PRIu32 ").\n",M_ERROR_PREFIX,status);
+		if((status&0xEFBF)==0)result=(cmpresult==0?M_TRUE:M_FALSE);
+		else outputMessage(M_ERROR_PREFIX,"Failed to determine whether a decimal equals 1 (status: %" PRIu32 ").",status);
 	}
 	return result;
 }/* VALIDATED */

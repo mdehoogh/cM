@@ -76,7 +76,7 @@ bool pushMessageStream(FILE* stream,char const * const source,char const * const
 					_messageStreamStack=messageStream;
 				}else{
 					free(messageStream);messageStream=NULL;
-					output("%sFailed to register message stream '%s'.\n",M_ERROR_PREFIX,source);
+					outputMessage(M_ERROR_PREFIX,"Failed to register message stream '%s'.",source);
 				}
 			}
 		}
@@ -120,7 +120,7 @@ bool popAllMessageStreams(char const * const source){
 		while(messageStream!=NULL){
 			MessageStream* nextMessageStream=messageStream->next;
 			if(strcmp(messageStream->source,source)==0&&!removeMessageStream(messageStream)){
-				output("%sFailed to remove a message stream of source '%s'.\n",M_ERROR_PREFIX,source);
+				outputMessage(M_ERROR_PREFIX,"Failed to remove a message stream of source '%s'.",source);
 				break;
 			}
 			messageStream=nextMessageStream;
@@ -297,12 +297,12 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			messageNode->message=calloc(1,sizeof(Message));
 			if(NULL==messageNode->message){
 				free(messageNode);
-				output("%sFailed to allocate message.\n",M_ERROR_PREFIX);
+				outputError("Failed to allocate message");
 				return false;
 			}
 			messageNode->message->msg=strdup(messageText);
 			if(NULL==messageNode->message->msg){
-				output("%sFailed to store message.\n",M_ERROR_PREFIX);
+				outputError("Failed to store message");
 				free(messageNode->message);
 				free(messageNode);
 				return false;
@@ -320,7 +320,7 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			return true;
 		}
 	}else
-		output("%sFailed to register a message.\n",M_ERROR_PREFIX);
+		outputError("Failed to register a message");
 	return false;
 }
 // end message type lists helper functions
@@ -397,7 +397,7 @@ Messages* _getMessages(){
 				}else{
 					if(messages->types!=NULL)free(messages->types);
 					if(messages->messages!=NULL)free(messages->messages);
-					output("%sNo memory for messages.\n",M_ERROR_PREFIX);
+					outputError("No memory for messages");
 				}
 				//////free(messageTypeNodes);			
 			}else{
@@ -446,7 +446,7 @@ static void outputMessageCounts(MessageCounts const * const messageCounts){
 				,messageCounts->messagecounts[messageCountIndex].messageType,messageCounts->messagecounts[messageCountIndex].count);
 		}
 	}else
-		output("%s%sNo message counts defined to output!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+		outputError("No message counts defined to output!");
 }
 /**
  * @brief frees \p message
@@ -643,7 +643,7 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 			///output("Messages retrieved.\n");
 			return _messages;
 		}
-		output("Failed to allocate memory to store messages.\n",M_ERROR_PREFIX);
+		outputError("Failed to allocate memory to store messages");
 		freeMessages(_messages);
 	}
 	return NULL;
@@ -701,7 +701,7 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
 				///output("Messages retrieved.\n");
 				return messages;
 			}
-			output("Failed to allocate memory to store messages.\n",M_ERROR_PREFIX);
+			outputError("Failed to allocate memory to store messages");
 		}
 		free_messages(messages);
 	}
@@ -743,7 +743,7 @@ static void removeFilteredFromMessageTypeListNode(MessageTypeListNode * const me
 		messageTypeListNode->firstMessageNode=NULL;
 		messageTypeListNode->lastMessageNode=NULL;
 	}else
-		output("%sNot all messages of type '%s' removed!",M_ERROR_PREFIX,messageTypeListNode->messageType);
+		outputMessage(M_ERROR_PREFIX,"Not all messages of type '%s' removed!",messageTypeListNode->messageType);
 		*/
 }
 /**
@@ -771,9 +771,9 @@ long long removeMessages(MessageCounts const * const messageCounts){
 			messageTypeListNode=messageTypeListNode->next;
 		}
 		if(unremovedMessageCount>0)
-			output("%sFailed to remove %zu messages.\n",M_ERROR_PREFIX,unremovedMessageCount);
+			outputMessage(M_ERROR_PREFIX,"Failed to remove %zu messages.",unremovedMessageCount);
 	}else
-		output("No messages to remove!\n");
+		outputMessage(M_INFO_PREFIX,"No messages to remove!");
 	return unremovedMessageCount;
 }
 
@@ -892,7 +892,7 @@ static void collectLine(char* newlinePosition,bool echoToOutput){
 		// we have to move the remaining text up
 		*(outputText+outputLength)='\0';
 	}else
-		output("%sCan't shorten the length of the output buffer (%zu) by %zu.\n",M_ERROR_PREFIX,outputLength,shortened);
+		outputMessage(M_ERROR_PREFIX,"Can't shorten the length of the output buffer (%zu) by %zu.\n",outputLength,shortened);
 }
 
 /**
@@ -976,7 +976,7 @@ size_t outputError(char const * const error){
  */
 size_t outputMemoryError(char const * const memoryerror){
   if(NULL==memoryerror)return 0;
-	return q2outputandcollect("%s%s. Probable cause: out of memory!\n",M_ERROR_PREFIX,memoryerror);
+	return outputMessage(M_ERROR_PREFIX,"%s. Probable cause: out of memory!",memoryerror);
 }
 
 // MDH@05NOV2019: might come in handy to be able to report bugs
@@ -988,9 +988,12 @@ size_t outputMemoryError(char const * const memoryerror){
  */
 size_t outputErrorAndText(char const * const error,char const * const text){
 	size_t result=0;
-	if(error!=NULL)result=q2outputandcollect("%s%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX,error);
-	if(text!=NULL)result+=q2outputandcollect("%s",text);
-	return result+q2outputandcollect(".\n");
+	if(error!=NULL){
+		result=q2outputandcollect("%s",M_ERROR_PREFIX);result+=output("%s",M_MESSAGE_PREFIX);
+		result+=q2outputandcollect("%s. ",error);
+	}
+	if(text!=NULL)result+=q2outputandcollect("%s.",text);
+	return result+q2outputandcollect("\n");
 }
 
 /**
@@ -1300,7 +1303,7 @@ bool messageStreamsInitialized(char const * const source){
 	if(initializeOutputCollector())
 		output("Text output initialized!\n");
 	else
-		output("%sFailed to initialize text output.\n",M_ERROR_PREFIX);
+		outputError("Failed to initialize text output");
 	return(_messageStreamStack!=NULL||pushMessageStream(stdout,(source!=NULL?source:""),NULL)); // stdout is the principal output message stream
 }
 */
