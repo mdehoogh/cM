@@ -3,6 +3,7 @@
 extern unsigned long long M_MODULE_DEBUGGING;
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char * const M_ERROR_PREFIX;
+extern const char * const M_MESSAGE_PREFIX;
 extern const long double M_LD_NAN,M_LD_INF,M_LD_NEGINF; // MDH@23FEB2023: M_LD_INF and M_LD_NEGINF added and defined in Mshell.c as 1.0/0.0 and -1.0/0.0 resp.
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 
@@ -265,8 +266,10 @@ mp_err _qmul(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c))
-		{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+		if(!c->normalized&&!normalizeRational(c,owner_c)){
+			q2outputmessageprefix(M_ERROR_PREFIX);
+			outputRational("Failed to normalize rational ",c,".\n");
+		}
 	}
 	return status;
 }
@@ -291,8 +294,10 @@ mp_err _qmul_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c))
-		{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+		if(!c->normalized&&!normalizeRational(c,owner_c)){
+			q2outputmessageprefix(M_ERROR_PREFIX);
+			outputRational("Failed to normalize rational ",c,".\n");
+		}
 	}
 	return status;
 }
@@ -319,8 +324,10 @@ mp_err _qdiv(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c))
-		{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+		if(!c->normalized&&!normalizeRational(c,owner_c)){
+			q2outputmessageprefix(M_ERROR_PREFIX);
+			outputRational("Failed to normalize rational ",c,".\n");
+		}
 	}
 	return status;
 }
@@ -346,8 +353,10 @@ mp_err _qdiv_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c))
-		{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+		if(!c->normalized&&!normalizeRational(c,owner_c)){
+			q2outputmessageprefix(M_ERROR_PREFIX);
+			outputRational("Failed to normalize rational ",c,".\n");
+		}
 	}
 	return status;
 }
@@ -407,8 +416,10 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 					}
 					// if _num was not bound to c->num free _num here, otherwise leave it alone
 					if(c->num!=NULL){ // success
-						if(!c->normalized&&!normalizeRational(c,owner_c))
-						{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+						if(!c->normalized&&!normalizeRational(c,owner_c)){
+							q2outputmessageprefix(M_ERROR_PREFIX);
+							outputRational("Failed to normalize rational ",c,".\n");
+						}
 					}else{
 						FREE_BIGINTEGER(_num,owner);
 						outputError("Failed to compute the rational difference numerator");
@@ -435,8 +446,10 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 					c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 					c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
 					/////// not on pure rationals!!!! c->delta=_floatdifference(a->delta,b->delta);
-					if(!c->normalized&&!normalizeRational(c,owner_c))
-					{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+					if(!c->normalized&&!normalizeRational(c,owner_c)){
+						q2outputmessageprefix(M_ERROR_PREFIX);
+						outputRational("Failed to normalize rational ",c,".\n");
+					}
 				}
 			}
 		}
@@ -463,7 +476,7 @@ mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	if(status==MP_OKAY){
 		status=_bimul(a->den,b->den,&_den);owned_biginteger(_den,owner); // multiply denominators to become the result denominator
 		if(status!=MP_OKAY)
-			output("%sFailed to multiply the denominators of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
+			outputMessage(M_ERROR_PREFIX,"Failed to multiply the denominators of two rationals (error code: %d).",status);
 		else
 		if(amVerboseDebugging())
 			outputInfo("Denominators of two rationals multiplied");
@@ -479,7 +492,7 @@ mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	if(status==MP_OKAY){
 		status=_bimul(a->num,b->den,&_num1);owned_biginteger(_num1,owner);
 		if(status!=MP_OKAY)
-			output("%sFailed to multiply the numerator and denominator of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
+			outputMessage(M_ERROR_PREFIX,"Failed to multiply the numerator and denominator of two rationals (error code: %d).",status);
 		else
 		if(amVerboseDebugging())
 			outputInfo("Numerator and denominator of two rationals multiplied.");
@@ -487,7 +500,7 @@ mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	if(status==MP_OKAY){
 		status=_bimul(a->den,b->num,&_num2);owned_biginteger(_num2,owner);
 		if(status!=MP_OKAY)
-			output("%sFailed to multiply the denominator and numerator of two rationals (error code: %d).\n",M_ERROR_PREFIX,status); // multiply denominator of a with numerator of b for the min term of the result numerator
+			outputMessage(M_ERROR_PREFIX,"Failed to multiply the denominator and numerator of two rationals (error code: %d).",status); // multiply denominator of a with numerator of b for the min term of the result numerator
 		else
 		if(amVerboseDebugging())
 			outputInfo("Denominator and numerator of two rationals multiplied.");
@@ -495,7 +508,7 @@ mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	if(status==MP_OKAY){
 		status=_biadd(_num1,_num2,&_num);owned_biginteger(_num,owner);
 		if(status!=MP_OKAY)
-			output("%sFailed to add two rational numerators (error code: %d).",M_ERROR_PREFIX,status); // add the numerator parts
+			outputMessage(M_ERROR_PREFIX,"Failed to add two rational numerators (error code: %d).",status); // add the numerator parts
 		else
 		if(amVerboseDebugging())
 			outputInfo("Numerators of two rationals added.");
@@ -664,10 +677,10 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
 				}
 			}
 		}else
-			output("%sFailed to compute the pure sum of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
+			outputMessage(M_ERROR_PREFIX,"Failed to compute the pure sum of two rationals (error code: %d).",status);
 		if(status!=MP_OKAY){
 			FREE_RATIONAL(_rational,owner);_rational=NULL;
-			// output("%s",M_ERROR_PREFIX);
+			// q2outputmessageprefix(M_ERROR_PREFIX);
 			// outputRational("Failed to compute the sum of rational ",q1,NULL);
 			// outputRational(" and rational ",q2,".\n");
 		}
@@ -839,13 +852,13 @@ Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * cons
 				// if failed to compute the delta mark error
 				if(q1->delta!=NULL&&q2->delta!=NULL)if(_rational->delta==NULL){
 					status=MP_ERR;
-					output("%s",M_ERROR_PREFIX);
+					q2outputmessageprefix(M_ERROR_PREFIX);
 					outputRational("Failed to update the delta of the product of rational ",q1,NULL);
 					outputRational(" and ",q2,".\n");
 				}
 			}
 		}else{
-			output("%s",M_ERROR_PREFIX);
+			q2outputmessageprefix(M_ERROR_PREFIX);
 			outputRational("Failed to multiply rational ",q1,NULL);
 			outputRational(" and ",q2,".\n");
 		}
@@ -1008,7 +1021,9 @@ Mrational* _qsinorcos(Mrational const * const x,bool sin){Mallocationowner owner
 			}
 
 		}else{
-			output("%sFailed to initialize the result of computing the %ssine",M_ERROR_PREFIX,(sin?"":"co"));outputRational(" of '",x,"'.\n");
+			q2outputmessageprefix(M_ERROR_PREFIX);
+			q2outputandcollect("Failed to initialize the result of computing the %ssine",(sin?"":"co"));
+			outputRational(" of '",x,"'.\n");
 		}
 		if(_intermediateResult)FREE_RATIONAL(_intermediateResult,owner);
 		// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
@@ -1346,7 +1361,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 						if(amVerboseDebugging())outputRational("Rational before normalization: ",_rational,".\n");
 						if(!normalizeRational(_rational,owner)){
 							// TODO q2...
-							output("%s",M_ERROR_PREFIX);
+							q2outputmessageprefix(M_ERROR_PREFIX);
 							outputRational("Failed to normalize rational ",_rational,".\n");
 						} // normalize the rational if we are supposed to
 						if(_denominator&&!_rational->normalized)outputError("Failed to normalize a rational");else 
@@ -1516,10 +1531,10 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){Mallocationowner owner=g
 			if(absnum!=NULL){
 				if(mp_div(MP_INT_POINTER(absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
 					FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
-					output("%sFailed to divide numerator",M_ERROR_PREFIX);
-					outputBiginteger(" ",absnum," ");
-					outputBiginteger("by denominator ",_rational->den,NULL);
-					output(".\n");
+					q2outputmessageprefix(M_ERROR_PREFIX);
+					outputBiginteger("Failed to divide numerator ",absnum," ");
+					outputBiginteger("by denominator ",_rational->den,".");
+					q2newline(true);
 				}else
 				if(neg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
 					FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;

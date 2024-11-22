@@ -895,6 +895,10 @@ static void collectLine(char* newlinePosition,bool echoToOutput){
 		outputMessage(M_ERROR_PREFIX,"Can't shorten the length of the output buffer (%zu) by %zu.\n",outputLength,shortened);
 }
 
+size_t q2outputmessageprefix(char const * const messageprefix){
+	return(messageprefix!=NULL?q2outputandcollect("%s",messageprefix)+output("%s",M_MESSAGE_PREFIX):0);
+}
+
 /**
  * @brief outputs \p info prefixed with M_INFO_PREFIX, appending a period when not present in info
  * 
@@ -957,11 +961,8 @@ size_t outputError(char const * const error){
 	if(error!=NULL){
   	size_t l=strlen(error);
   	if(l>0){
-			if(M_ERROR_PREFIX!=NULL&&*M_ERROR_PREFIX){
-				q2outputandcollect("%s",M_ERROR_PREFIX);
-				output("%s",M_MESSAGE_PREFIX);
-			}
-  		result=q2outputandcollect("%s",error);
+			if(M_ERROR_PREFIX!=NULL&&*M_ERROR_PREFIX)result=q2outputmessageprefix(M_ERROR_PREFIX);
+  		result+=q2outputandcollect("%s",error);
     	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=q2outputandcollect("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
     	result+=q2outputandcollect("%c",'\n'); // replacing: newline();
 		}
@@ -989,7 +990,7 @@ size_t outputMemoryError(char const * const memoryerror){
 size_t outputErrorAndText(char const * const error,char const * const text){
 	size_t result=0;
 	if(error!=NULL){
-		result=q2outputandcollect("%s",M_ERROR_PREFIX);result+=output("%s",M_MESSAGE_PREFIX);
+		result=q2outputmessageprefix(M_ERROR_PREFIX);
 		result+=q2outputandcollect("%s. ",error);
 	}
 	if(text!=NULL)result+=q2outputandcollect("%s.",text);
@@ -1006,11 +1007,8 @@ size_t outputBug(char const * const bug){
 	if(bug!=NULL){
     size_t l=strlen(bug);
 		if(l>0){
-			if(M_BUG_PREFIX!=NULL&&*M_BUG_PREFIX){
-				q2outputandcollect("%s",M_BUG_PREFIX);
-				output("%s",M_MESSAGE_PREFIX);
-			}
-			result=q2outputandcollect("%s",bug);
+			if(M_BUG_PREFIX!=NULL&&*M_BUG_PREFIX)result=q2outputmessageprefix(M_BUG_PREFIX);
+			result+=q2outputandcollect("%s",bug);
 			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=q2outputandcollect("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
 			result+=q2outputandcollect("%c",'\n'); //newline();
 		}
@@ -1033,6 +1031,21 @@ int kbhit(){
 }
 
 /**
+ * @brief reports an output message format error
+ * 
+ */
+static void reportOutputMessageFormatError(){
+	output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output message format error!");
+}
+/**
+ * @brief outputs an output message memory error
+ * 
+ */
+static void reportOutputMessageMemoryError(){
+	output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output message memory error!");
+}
+
+/**
  * @brief collects without outputting formatted text
  * 
  * @param fmt 
@@ -1052,7 +1065,7 @@ size_t q2collect(char const * const fmt,...){
 				///output("Count: %d",count);
 				if(count<=0){
 					///////outputText[outputLength]='\0'; // just in case
-					output("%s%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output format error!");
+					reportOutputMessageFormatError();
 					break;
 				}
 				if(outputLength+count<outputSize){ // success
@@ -1074,7 +1087,7 @@ size_t q2collect(char const * const fmt,...){
 				outputSize+=64;
 				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
 				if(NULL==newOutputText){
-					output("%s%s%s",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output memory error");
+					reportOutputMessageMemoryError();
 					break;
 				}
 				outputText=newOutputText;
@@ -1112,7 +1125,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 				va_end(args);
 				if(count<=0){
 					//////outputText[outputLength]='\0'; // just in case
-					printf("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output format error!");
+					reportOutputMessageFormatError();
 					break;
 				}
 				if(outputLength+count<outputSize){ // success
@@ -1127,7 +1140,7 @@ size_t q2outputandcollect(char const * const fmt,...){
 				outputSize+=64;
 				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
 				if(NULL==newOutputText){
-					printf("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output memory error");
+					reportOutputMessageMemoryError();
 					break;
 				}
 				outputText=newOutputText;
@@ -1187,7 +1200,7 @@ size_t outputMessage(char const * const messageType,char const * const fmt,...){
 				va_end(args);
 				if(count<=0){
 					//////outputText[outputLength]='\0'; // just in case
-					printf("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output format error!");
+					reportOutputMessageFormatError();
 					break;
 				}
 				if(outputLength+count<outputSize){ // success
@@ -1205,7 +1218,7 @@ size_t outputMessage(char const * const messageType,char const * const fmt,...){
 				outputSize+=64;
 				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
 				if(NULL==newOutputText){
-					output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output memory error");
+					reportOutputMessageMemoryError();
 					break;
 				}
 				outputText=newOutputText;
@@ -1252,7 +1265,7 @@ size_t collectMessage(char const * const messageType,char const * const fmt,...)
 				va_end(args);
 				if(count<=0){
 					//////outputText[outputLength]='\0'; // just in case
-					printf("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output format error!");
+					reportOutputMessageFormatError();
 					break;
 				}
 				if(outputLength+count<outputSize){ // success
@@ -1270,7 +1283,7 @@ size_t collectMessage(char const * const messageType,char const * const fmt,...)
 				outputSize+=64;
 				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
 				if(NULL==newOutputText){
-					output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output memory error");
+					reportOutputMessageMemoryError();
 					break;
 				}
 				outputText=newOutputText;

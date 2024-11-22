@@ -204,7 +204,7 @@ static Mtime* _parsedTime(char const * const iso8601,char const * const tzuser){
 				if(tzsec==INT16_MIN)output("DST flag: %i.\n",timestamp.tm_isdst);
 			}else{
 				if(tz!=NULL)
-					outputMessage(M_ERROR_PREFIX,"Failed to compute the time represented by '%s' in timezone '%s'.",M_ERROR_PREFIX,iso8601,tz);
+					outputMessage(M_ERROR_PREFIX,"Failed to compute the time represented by '%s' in timezone '%s'.",iso8601,tz);
 				else
 					outputMessage(M_ERROR_PREFIX,"Failed to compute the time represented by '%s'",iso8601);
 			}
@@ -233,7 +233,7 @@ static Mtime* _parsedTime(char const * const iso8601,char const * const tzuser){
 			}
 			/* replacing:
 			int reset=(tzenv?setenv("TZ",tzenv,1):unsetenv("TZ"));
-			if(reset!=0)output("%sFailed to %s%s as system-defined timezone.\n",M_ERROR_PREFIX,(tzenv?"restore ":"clear"),(tzenv?tzenv:""));else output("System-defined timezone %s%s.\n",(tzenv?tzenv:""),(tzenv?" restored":"cleared"));
+			if(reset!=0)outputMessage(M_ERROR_PREFIX,"Failed to %s%s as system-defined timezone.",(tzenv?"restore ":"clear"),(tzenv?tzenv:""));else output("System-defined timezone %s%s.\n",(tzenv?tzenv:""),(tzenv?" restored":"cleared"));
 			*/
 		}/*else
 			output("No user-defined timezone to unregister.\n");*/

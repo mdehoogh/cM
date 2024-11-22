@@ -635,7 +635,7 @@ long long string_freadline(Mstring * const str,FILE* const file, unsigned char c
 			/// MDH@22MAY2024: not doing this anymore, this is left to the calling method (typically fReadLine() and fReadLines() in Mvalue.c)
 			////if(resetPosition)	// essential to return to the start of the following line (of which part may have been read)
 			////	if(fseek(file,1L-EOLNchars,SEEK_CUR))
-			////		output("%sFailed to move the file cursor %lld positions back.\n",M_ERROR_PREFIX,1L-EOLNchars); // replacing: (charsRead-charsOnLine));
+			////		outputMessage(M_ERROR_PREFIX,"Failed to move the file cursor %lld positions back.",1L-EOLNchars); // replacing: (charsRead-charsOnLine));
 			///else{
 			///	output("Moved the file cursor %lld positions back.\n",EOLNchars);
 			///	if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
@@ -657,7 +657,7 @@ long long string_freadline(Mstring * const str,FILE* const file, unsigned char c
 		if(!feof(file)&&numberOfAvailableCharacterPositions>0){ // not all characters we wanted to read read but not due to end-of-file
 			/*
 			int fileError=ferror(file);
-			output("%sOnly %llu out of %llu characters read from unfinished text file (error code: %d).\n",M_ERROR_PREFIX,numberOfCharsRead,leftInBlock,fileError);
+			outputMessage(M_ERROR_PREFIX,"Only %llu out of %llu characters read from unfinished text file (error code: %d).",numberOfCharsRead,leftInBlock,fileError);
 			*/
 			return 2;
 		}

@@ -64,6 +64,8 @@ size_t collectMessage(char const * const messageType,char const * const fmt,...)
 
 bool outputCollectorInitialized();
 
+size_t q2outputmessageprefix(char const * const messageprefix);
+
 // might copy these to Moutput.c/h and create queued versions
 // MDH@19AUG2024: changed to queued (collected) versions because we want these messages collected as well!!!
 size_t outputInfo(char const * const info); // replacing outputLine in all modules

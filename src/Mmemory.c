@@ -49,12 +49,12 @@ long long _strtoll(char* _c,long long invalid){
 	long long ll=strtoll(_c,&eptr,0); // assume decimal (TODO allow other representations as well)
 	if(!ll){
 		if (errno==EINVAL){
-			//output("%sFailed to convert '%s' to an integer.\n",M_WARNING_PREFIX,_c);
+			//outputMessage(M_WARNING_PREFIX,"Failed to convert '%s' to an integer.",_c);
 			return invalid;
 		}
 		/* If the value provided was out of range, display a warning message */
 		if (errno==ERANGE){
-			output("%sThe integer represented by '%s' is out of range.\n",M_WARNING_PREFIX,_c);
+			outputMessage(M_WARNING_PREFIX,"The integer represented by '%s' is out of range.",_c);
 			return invalid;
 		}
 	}

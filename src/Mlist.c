@@ -356,7 +356,7 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
 										if(removedFromListValue!=NULL&&appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID)<=0)
 											outputError("Failed to append a removed list element");
 									}else{
-										q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+										q2outputmessageprefix(M_ERROR_PREFIX);
 										q2outputValue("'",indexArray->values[arrayIndex],"' cannot be used as index integer in removing list elements.\n");
 									}
 									arrayIndex++;

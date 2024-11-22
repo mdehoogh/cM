@@ -3036,7 +3036,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 			removeLastUserInputCommandToken();
 			if(NULL==_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishCommandToken(_userInputCommand->_lastToken);
 		}
-		//output("%sInvalid command indicator: %d.\n",M_ERROR_PREFIX,aValidCommandIndicator);
+		//outputMessage(M_ERROR_PREFIX,"Invalid command indicator: %d.",aValidCommandIndicator);
 		return false;
 	}
 
@@ -3684,12 +3684,12 @@ bool removeFirstSuggestedCharacter(char inputChar){
 				char firstManualFeedForwardCharacter=string_char(_manualFeedforwardText,0);
 				if(inputChar!='\0'&&inputChar!=firstManualFeedForwardCharacter){
 					result=false;
-					logToOutputFile("%s%sFirst manual feed forward character '%c' does not match the consumed suggested character '%c'.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,firstManualFeedForwardCharacter,inputChar);
+					outputMessage(M_ERROR_PREFIX,"First manual feed forward character '%c' does not match the consumed suggested character '%c'.",firstManualFeedForwardCharacter,inputChar);
 				}else{
 					char manualFeedForwardCharacterRemoved=string_removed_char(_manualFeedforwardText,0);
 					if(manualFeedForwardCharacterRemoved=='\0'||(manualFeedForwardCharacterRemoved!=inputChar&&inputChar!='\0')){
 						result=false;
-						logToOutputFile("%sFailed to remove the first manual feed forward character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter);
+						outputMessage(M_ERROR_PREFIX,"Failed to remove the first manual feed forward character '%c'.",firstManualFeedForwardCharacter);
 					}else
 						sourceRemoved=!string_length(_manualFeedforwardText);
 				}
@@ -3719,12 +3719,12 @@ bool removeFirstSuggestedCharacter(char inputChar){
 				char firstImmediateFeedforwardCharacter=string_char(_immediateFeedforwardText,0);
 				if(inputChar!='\0'&&inputChar!=firstImmediateFeedforwardCharacter){
 					result=false;
-					logToOutputFile("%s%sFirst immediate feed forward character '%c' does not match the input character '%c'.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,firstImmediateFeedforwardCharacter,inputChar);
+					outputMessage(M_ERROR_PREFIX,"%sFirst immediate feed forward character '%c' does not match the input character '%c'.",M_MESSAGE_PREFIX,firstImmediateFeedforwardCharacter,inputChar);
 				}else{
 					char immediateFeedforwardCharacterRemoved=string_removed_char(_immediateFeedforwardText,0);
 					if(immediateFeedforwardCharacterRemoved=='\0'||(inputChar!='\0'&&immediateFeedforwardCharacterRemoved!=inputChar)){
 						result=false;
-						logToOutputFile("%s%sFailed to remove the first immediate feed forward character '%c'.",M_ERROR_PREFIX,M_MESSAGE_PREFIX,firstImmediateFeedforwardCharacter);
+						outputMessage(M_ERROR_PREFIX,"%sFailed to remove the first immediate feed forward character '%c'.",M_MESSAGE_PREFIX,firstImmediateFeedforwardCharacter);
 					}else
 						sourceRemoved=!string_length(_immediateFeedforwardText);
 				}
@@ -3747,12 +3747,12 @@ bool removeFirstSuggestedCharacter(char inputChar){
 		char firstManualFeedForwardCharacter=string_char(_manualFeedforwardText,0);
 		if(inputChar!='\0'&&inputChar!=firstManualFeedForwardCharacter){
 			result=false;
-			logToOutputFile("%sFirst manual feed forward character '%c' does not match the consumed suggested character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter,inputChar);
+			outputMessage(M_ERROR_PREFIX,"First manual feed forward character '%c' does not match the consumed suggested character '%c'.",firstManualFeedForwardCharacter,inputChar);
 		}else{
 			char manualFeedForwardCharacterRemoved=string_removed_char(_manualFeedforwardText,0);
 			if(manualFeedForwardCharacterRemoved=='\0'||(manualFeedForwardCharacterRemoved!=inputChar&&inputChar!='\0')){
 				result=false;
-				logToOutputFile("%sFailed to remove the first manual feed forward character '%c'.",M_ERROR_PREFIX,firstManualFeedForwardCharacter);
+				outputMessage(M_ERROR_PREFIX,"Failed to remove the first manual feed forward character '%c'.",firstManualFeedForwardCharacter);
 			}
 		}
 	}else
@@ -3766,7 +3766,7 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			char identifierContinuationCharacterRemoved=firstIdentifierContinuationCharacterRemoved();
 			if(identifierContinuationCharacterRemoved=='\0'||(firstIdentifierContinuationCharacter!=inputChar&&inputChar!='\0')){
 				result=false;
-				logToOutputFile("%sFailed to remove the first identifier continuation character '%c'!",firstIdentifierContinuationCharacter);
+				outputMessage(M_ERROR_PREFIX,"Failed to remove the first identifier continuation character '%c'!",firstIdentifierContinuationCharacter);
 			}
 		}
 	}else
@@ -3774,12 +3774,12 @@ bool removeFirstSuggestedCharacter(char inputChar){
 		char firstImmediateFeedforwardCharacter=string_char(_immediateFeedforwardText,0);
 		if(inputChar!='\0'&&inputChar!=firstImmediateFeedforwardCharacter){
 			result=false;
-			logToOutputFile("%sFirst immediate feed forward character '%c' does not match the input character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter,inputChar);
+			outputMessage(M_ERROR_PREFIX,"First immediate feed forward character '%c' does not match the input character '%c'.",firstImmediateFeedforwardCharacter,inputChar);
 		}else{
 			char immediateFeedforwardCharacterRemoved=string_removed_char(_immediateFeedforwardText,0);
 			if(immediateFeedforwardCharacterRemoved=='\0'||(inputChar!='\0'&&immediateFeedforwardCharacterRemoved!=inputChar)){
 				result=false;
-				logToOutputFile("%sFailed to remove the first immediate feed forward character '%c'.",M_ERROR_PREFIX,firstImmediateFeedforwardCharacter);
+				outputMessage(M_ERROR_PREFIX,"Failed to remove the first immediate feed forward character '%c'.",firstImmediateFeedforwardCharacter);
 			}
 		}
 	}else
@@ -3787,14 +3787,14 @@ bool removeFirstSuggestedCharacter(char inputChar){
 		char firstExpectedCharacter=string_last_char(_expectedCharacterStack);
 		if(inputChar!='\0'&&inputChar!=firstExpectedCharacter){
 			result=false;
-			logToOutputFile("First expected character '%c' does not match the consumed suggested character '%c'.",firstExpectedCharacter,inputChar);
+			outputMessage(M_ERROR_PREFIX,"First expected character '%c' does not match the consumed suggested character '%c'.",firstExpectedCharacter,inputChar);
 		}else{
 			string_declength(_expectedCharacterStack); // this way nothing can go wrong
 			///replacing:
 			///char expectedCharacterRemoved=firstExpectedCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
 			///if(expectedCharacterRemoved=='\0'||(inputChar!='\0'&&expectedCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
 			///	result=false;
-			///	logToOutputFile("%sFailed to remove the first expected character '%c'.",firstExpectedCharacter);
+			///	outputMessage(M_ERROR_PREFIX,"Failed to remove the first expected character '%c'.",firstExpectedCharacter);
 			///}
 		}
 	}
@@ -3806,21 +3806,21 @@ bool removeFirstSuggestedCharacter(char inputChar){
 	///	char firstAutoCompletionCharacter=string_char(_autoCompletionText,0); // NOTE __not__ using getFirstAutoCompletionCharacter anymore!!!!
 	///	if(inputChar!='\0'&&inputChar!=firstAutoCompletionCharacter){
 	///		result=false;
-	///		logToOutputFile("First auto completion character '%c' does not match the consumed suggested character '%c'.",firstAutoCompletionCharacter,inputChar);
+	///		outputMessage(M_ERROR_PREFIX,"First auto completion character '%c' does not match the consumed suggested character '%c'.",firstAutoCompletionCharacter,inputChar);
 	///	}else{
 	///		char autocompletionCharacterRemoved=firstAutoCompletionCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
 	///		if(autocompletionCharacterRemoved=='\0'||(inputChar!='\0'&&autocompletionCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
 	///			result=false;
-	///			logToOutputFile("%sFailed to remove the first auto completion character '%c'.",firstAutoCompletionCharacter);
+	///			outputMessage(M_ERROR_PREFIX,"Failed to remove the first auto completion character '%c'.",firstAutoCompletionCharacter);
 	///		}
 	///	}
 	///}
 	else{
 		result=false;
 		if(inputChar!='\0')
-			logToOutputFile("%sSuggested input character '%c' not consumed!",M_ERROR_PREFIX,inputChar);
+			outputMessage(M_ERROR_PREFIX,"Suggested input character '%c' not consumed!",inputChar);
 		else
-			logToOutputFile("%sFailed to find (and consume) the first suggested character!",M_ERROR_PREFIX);
+			outputError("Failed to find (and consume) the first suggested character!");
 	}
 	*/
 	return result;
@@ -5802,7 +5802,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 								if(completeInputFileErrorCode==0)
 // 									inputFileCompleted=true;
 // 								else
-// 									output("%sThe shell command to complete the Python input file failed with error code %d.\n",M_ERROR_PREFIX,completeInputFileErrorCode);
+// 									outputMessage(M_ERROR_PREFIX,"The shell command to complete the Python input file failed with error code %d.",completeInputFileErrorCode);
 // 							}else
 // 								outputError("Failed to create the complete input file shell command");
 // 							FREE_STRING(completeInputFileCommandText,owner);
@@ -5855,7 +5855,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 														outputValue("Writing the flush output buffer python code '",flushOutputBufferValue,"'.\n");
 // 														long long flushOutputBufferValueNotWritten=getValueInteger(Mfwrite(pythonInputfileValue,flushOutputBufferValue));
 // 														if(flushOutputBufferValueNotWritten>0)
-// 															output("%sFailed to write %lld flush output buffer characters.\n",M_ERROR_PREFIX,flushOutputBufferValueNotWritten);
+// 															outputMessage(M_ERROR_PREFIX,"Failed to write %lld flush output buffer characters.",flushOutputBufferValueNotWritten);
 // 														else
 // 														if(flushOutputBufferValueNotWritten==M_LL_INVALID)
 // 															outputError("Failed to write the flush output buffer python code");
@@ -5872,7 +5872,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 												if(notWrittenToPythonInputFile==M_LL_INVALID)
 // 													outputError("Failed to write the python text to execute");
 // 												else
-// 													output("%sFailed to write %lld python input code characters to the python input file.\n",M_ERROR_PREFIX,notWrittenToPythonInputFile);
+// 													outputMessage(M_ERROR_PREFIX,"Failed to write %lld python input code characters to the python input file.",notWrittenToPythonInputFile);
 // 											}
 // 										}else{ // not wrapped input file 
 // 											free_file(pythonInputfile);
@@ -5905,7 +5905,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 								//////output("Output file '%s' created.\n",string(outputFile->_name));
 // 								Mvalue* outputFileValue=_getValueOfFile(disowned_file(outputFile,owner));
 // 								if(outputFileValue!=NULL){
-// 									outputValue("Processing Python output file '",outputFileValue,"'.\n");
+// 									q2outputValue("Processing Python output file '",outputFileValue,"'.\n");
 // 									// I suggest reading one line at a time using mfreadline() so we won't read the line separators
 // 									// which would f*ck up Mevalfunction 
 // 									Mlist* evaluatedLinesList=owned_list(__list("python"),owner);
@@ -5921,7 +5921,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 														assignValue(&prevOutputFileLineValue,outputFileLineValue);
 // 												}else // register any line in the output file!!!
 // 												if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/outputFileLineValue/*)*/,lineIndex)<=0)
-// 													output("Failed to register line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+// 													outputMessage("Failed to register line #%lld of the python output file.",lineIndex);
 // 												// we should NOT evaluate the read line here, that's basically up to the caller
 // 											}
 // 											outputFileLineValue=mfreadline(outputFileValue);
@@ -5929,7 +5929,7 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 										// if we have remember the last valid line that's the result line to return!!!
 // 										if(prevOutputFileLineValue!=NULL)
 // 											if(appendedToList(evaluatedLinesList,owner,/*Mevalfunction(*/prevOutputFileLineValue/*)*/,lineIndex)<=0)
-// 												output("Failed to register the result at line #%lld of the python output file.\n",M_ERROR_PREFIX,lineIndex);
+// 												outputMessage("Failed to register the result at line #%lld of the python output file.",lineIndex);
 // 										// let's close the output file
 // 										if(getValueInteger(Mfclose(outputFileValue))!=M_TRUE)
 // 											outputWarning("Failed to close the python output file");
@@ -5952,9 +5952,9 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 // 							outputError("Failed to execute the Python script file");
 // 					}
 // 				}else
-// 					output("%sFailed to initialize the Python script file (error code %d).\n",M_ERROR_PREFIX,initializeHeaderPythonInputFileErrorCode);
+// 					outputMessage("Failed to initialize the Python script file (error code %d).",initializeHeaderPythonInputFileErrorCode);
 // 			}else
-// 				outputError("Failed to construct the header of the Python script file");	
+// 				outputError("Failed to construct the header of the Python script file");
 // 			FREE_STRING(initializeHeaderPythonInputFileText,owner);
 // 		}
 // 	}

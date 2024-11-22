@@ -37,7 +37,7 @@ Mvalue* Msystemvariables(){Mallocationowner owner=getOwner(__LINE__);
 							Mvalue* _environValue=_getTextValue(string(_environText));
 							*_equalpos='\0'; // dangerous!!!!
 							if(appendedToMap(_environMap,owner,*_environ,_environValue)!=M_TRUE)
-									output("%sFailed to store system variable '%s'.",M_ERROR_PREFIX,*_environ);
+									outputMessage(M_ERROR_PREFIX,"Failed to store system variable '%s'.",*_environ);
 							*_equalpos='='; // restored
 						}else
 							outputError("Failed to remember the value of a system environment variable");
@@ -82,7 +82,7 @@ Mvalue* Msetenv(Mvalue* _systemVariableValue,Mvalue* _value){Mallocationowner ow
 				if(value!=NULL){
 					// NOTE if value is NULL setenv will definitely fail
 					if(setenv(systemVariable,value,1)!=0)
-						output("%sFailed to set system variable '%s'.\n",M_ERROR_PREFIX,systemVariable);
+						outputMessage(M_ERROR_PREFIX,"Failed to set system variable '%s'.",systemVariable);
 				}else
 					outputError("Can't remove the system variable this way: use unsetenv() instead");
 			}else
@@ -115,7 +115,7 @@ Mvalue* Munsetenv(Mvalue* _systemVariableValue){Mallocationowner owner=getOwner(
 		if(systemVariable!=NULL){
 			if(unsetenv(systemVariable)!=0){
 				result=M_FALSE;
-				output("Failed to unset system variable '%s'.\n",M_ERROR_PREFIX,systemVariable);
+				outputMessage(M_ERROR_PREFIX,"Failed to unset system variable '%s'.",systemVariable);
 			}else
 				result=M_TRUE;
 		}
@@ -140,16 +140,16 @@ Mvalue* Mputenv(Mvalue* _systemVariableValue,Mvalue* _value){Mallocationowner ow
 					if(_propertyText!=NULL){
 						if(string_append_char(_propertyText,'=')&&string_append(_propertyText,_value->value._text->_c)){
 							if(putenv(string(_propertyText))!=0)
-								output("%sFailed to set system variable '%s' to '%s'.\n",M_ERROR_PREFIX,systemVariable,_value->value._text->_c);
+								outputMessage(M_ERROR_PREFIX,"Failed to set system variable '%s' to '%s'.",systemVariable,_value->value._text->_c);
 						}else 
 							outputError("Failed to initialize the new system variable value");
 					}else
 						outputError("Failed to create the new system variable value");
 				}else 
-					output("%sValue of system variable not of type text.\n",M_ERROR_PREFIX,systemVariable);
+					outputMessage(M_ERROR_PREFIX,"Value of system variable not of type text.",systemVariable);
 			}else // intending to remove it
 			if(unsetenv(systemVariable)!=0)
-				output("%sFailed to remove system variable '%s'.\n",M_ERROR_PREFIX,systemVariable);
+				outputMessage(M_ERROR_PREFIX,"Failed to remove system variable '%s'.",systemVariable);
 			return _getValueOfText(_getSingleQuotedText(getenv(systemVariable)));
 		}
 	}

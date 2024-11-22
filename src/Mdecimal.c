@@ -3706,7 +3706,7 @@ Mdecimal* _getDecimalSqrt(Mdecimal const * const decimal){Mallocationowner owner
 		// TODO if decimal has a certain precision shouldn't the decimal context exist?????
 		Mdecimalcontext* decimalcontext=getDecimalcontext(decimal->prec);
 		if(NULL==decimalcontext){
-			output("%sNon-existing decimal context with precision %d.\n",M_WARNING_PREFIX,decimal->prec);
+			outputMessage(M_WARNING_PREFIX,"Non-existing decimal context with precision %d.",decimal->prec);
 			decimalcontext=M_DECIMALCONTEXT;
 		}
 		Mdecimal* _result=owned_decimal(__decimal(decimalcontext->mpd_context,0,0),owner);

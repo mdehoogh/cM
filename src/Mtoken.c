@@ -71,7 +71,7 @@ Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
  */
 size_t getTokenSignificantCharacterCount(Mtoken const * const token){
 	if(token)return token->significantCharacterCount;
-	output("%sCan't return the number of significant characters of an undefined token.\n",M_BUG_PREFIX);
+	outputBug("Can't return the number of significant characters of an undefined token.");
 	return SIZE_T_MAX; // which is the best value to return to indicate invalid input
 }
 /**
@@ -87,7 +87,7 @@ bool setTokenSignificantCharacterCount(Mtoken * const token,size_t significantCh
 		token->significantCharacterCount=significantCharacterCount;
 		return(token->significantCharacterCount==significantCharacterCount);
 	}
-	output("%sCan't set the number of significant characters of an undefined token.\n",M_BUG_PREFIX);
+	outputBug("Can't set the number of significant characters of an undefined token.");
 	return false;
 }
 
@@ -128,7 +128,7 @@ Mstring* _getTokenText(Mtoken const * const token){
  */
 bool isTokenUnfinished(Mtoken const * const token){
 	if(token)return(token->significantCharacterCount==0);
-	output("%sCan't determine whether an undefined token is unfinished.",M_BUG_PREFIX);
+	outputBug("Can't determine whether an undefined token is unfinished.");
 	return false;
 }
 /**
@@ -140,7 +140,7 @@ bool isTokenUnfinished(Mtoken const * const token){
  */
 bool isTokenFinished(Mtoken const * const token){
 	if(token)return(token->significantCharacterCount>0);
-	output("%sCan't determine whether an undefined token is finished.",M_BUG_PREFIX);
+	outputBug("Can't determine whether an undefined token is finished.");
 	return false;
 }
 /**
@@ -153,13 +153,13 @@ void finishToken(Mtoken * const token){
 		token->significantCharacterCount=string_length(token->text);
 		logToOutputFile("Finishing token '%s'!\n",string(token->text));
 	}
-	else output("%sCan't finish an undefined token.",M_BUG_PREFIX);
+	else outputBug("Can't finish an undefined token.");
 }
 /**
  * @brief unfinishes the M token pointed to by \p token by setting its number of significant characters to 0
  * 
  * @param token the pointer to the M token
  */void unfinishToken(Mtoken * const token){
-	if(token)token->significantCharacterCount=0;
-	else output("%sCan't finish an undefined token.",M_BUG_PREFIX);
+	if(token!=NULL)token->significantCharacterCount=0;
+	else outputBug("Can't finish an undefined token.");
 }

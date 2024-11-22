@@ -1393,7 +1393,7 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 			outputMessage(M_ERROR_PREFIX,"Cannot set the value of variable `%s`: the new value is of the wrong type.",name);
 		}else
 		if(variable->_value!=NULL){
-			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputandcollect("Cannot change the value of variable '%s'",name);
 			q2outputValue(" from \n",variable->_value,"\n");
 			q2outputValue("to \n",_value,"\n");
@@ -1470,13 +1470,13 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 				}
 				return true; // releasing the value is my responsibility now...
 			}
-			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputandcollect(" set variable '%s': the new value ",name);
 			q2outputValue("(",_value,") is of the wrong type");
 			q2outputandcollect(" (%c).\n",getValueTypeCharacter(_value->type,isValueImmutable(_value)));
 		}else
 		if(variable->_value!=NULL){
-			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputandcollect(" change the value of variable '%s'",name);
 			q2outputValue(" from '",variable->_value,"'");
 			q2outputValue(" to '",_value,"': it is not mutable.\n");
@@ -2098,7 +2098,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 		char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
 		/* MDH@17AUG2023: best not to allow changing mutability
 		if(!mutablevaluetypechar){
-			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputValue("Invalid value type specification '",valuetypeValue,"'.\n");
 			return NULL;
 		}
@@ -2118,7 +2118,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 			variable=compositeValue->value._reference->variable;
 			// it's best NOT to create the variable if it does not yet exist although we could
 			if(NULL==variable){
-				q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+				q2outputmessageprefix(M_ERROR_PREFIX);
 				q2outputValue("Cannot set the element type of an non-existing variable through reference '",compositeValue,"'.\n");
 				return NULL;
 			}
@@ -2227,7 +2227,7 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 						variable=compositeValue->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
-							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputValue("Cannot set the type of an non-existing variable through reference '",compositeValue,"'.\n");
 						}
 						break;
@@ -2546,7 +2546,7 @@ Mvalue* Mlock(Mvalue* variableNameValue){
 						variable=variableNameValue->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
-							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputValue("Cannot unlock non-existing referenced variable '",variableNameValue,"'.\n");
 						}
 						break;
@@ -2625,7 +2625,7 @@ Mvalue* Munlock(Mvalue* variableNameValue,Mvalue* unlockCodeValue){
 								variable=variableNameValue->value._reference->variable;
 								// it's best NOT to create the variable if it does not yet exist although we could
 								if(NULL==variable){
-									q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+									q2outputmessageprefix(M_ERROR_PREFIX);
 									q2outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
 								}
 								break;
@@ -2688,7 +2688,7 @@ Mvalue* Mlocked(Mvalue* variableNameValue){
 						variable=variableNameValue->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
-							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputValue("Cannot unlock a non-existing variable through reference '",variableNameValue,"'.\n");
 						}
 						break;
@@ -2719,7 +2719,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/)
 		char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
 		/* MDH@17AUG2023: best not to allow changing mutability
 		if(!mutablevaluetypechar){
-			q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputValue("Invalid value type specification '",valuetypeValue,"'.\n");
 			return NULL;
 		}
@@ -2792,7 +2792,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/)
 						variable=value->value._reference->variable;
 						// it's best NOT to create the variable if it does not yet exist although we could
 						if(NULL==variable){
-							q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");
 						}
 						break;

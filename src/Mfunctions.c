@@ -112,7 +112,7 @@ static Mbiginteger* _getRoundedDecimalInteger(Mdecimal* _decimal){Mallocationown
 					long long dll=decimal2long(_roundDecimal);
 					_roundedDecimalInteger=owned_biginteger(_getBiginteger(dll),owner);
 				}else{
-					q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+					q2outputmessageprefix(M_ERROR_PREFIX);
 					outputDecimal("Failed to round decimal '",_decimal,"'"); // are we going to force wrap the decimal?? outputDecimal
 					q2outputandcollect(" (status: %.8x).\n",status);
 				}
@@ -1210,7 +1210,7 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		_finalmultiplier=owned_biginteger(_getBigintegerCopy(_value->value._biginteger),owner);
 	}
 	if(NULL==_finalmultiplier){
-		q2outputandcollect("%s",M_ERROR_PREFIX);output("%s",M_MESSAGE_PREFIX);
+		q2outputmessageprefix(M_ERROR_PREFIX);
 		q2outputValue("Failed to convert '",_value,"' to a big integer!\n");
 		return NULL;
 	}

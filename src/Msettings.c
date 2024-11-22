@@ -5,6 +5,7 @@ extern unsigned long long M_MODULE_DEBUGGING;
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_SETTINGS,id};}
 
 extern char const * const M_ERROR_PREFIX;
+extern char const * const M_INFO_PREFIX;
 
 // Edit flags
 /**
@@ -163,8 +164,11 @@ void setAcceptinghistorycommand(bool newAcceptinghistorycommand){
 void activateWrapmode(){
 	int result=0;
 	// result=system(wrapping?"tput smam":"tput rmam"); 
-	outputControlText(wrapping?"?7h":"?7l"); // 7h used to be 6l doesn't seem to work though, 6h === 7l????
-	if(result)output("%sFailed to %s wrapping",M_ERROR_PREFIX,(wrapping?"activate":"deactivate"));else output("Will %swrap!\n",(wrapping?"":"not "));
+	result=outputControlText(wrapping?"?7h":"?7l"); // 7h used to be 6l doesn't seem to work though, 6h === 7l????
+	if(result)
+		outputMessage(M_ERROR_PREFIX,"Failed to %s wrapping.",(wrapping?"activate":"deactivate"));
+	else 
+		outputMessage(M_INFO_PREFIX,"Will %swrap!",(wrapping?"":"not "));
 }
 // M settings
 /**
