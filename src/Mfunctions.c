@@ -114,12 +114,12 @@ static Mbiginteger* _getRoundedDecimalInteger(Mdecimal* _decimal){Mallocationown
 				}else{
 					q2outputmessageprefix(M_ERROR_PREFIX);
 					q2outputDecimal("Failed to round decimal '",_decimal,"'"); // are we going to force wrap the decimal?? outputDecimal
-					q2outputandcollect(" (status: %.8x).\n",status);
+					q2output(" (status: %.8x).\n",status);
 				}
 				FREE_DECIMAL(_roundDecimal,owner);
 			}
 		}else
-			outputError("No context available for rounding a decimal");
+			q2outputError("No context available for rounding a decimal");
 	}
 	return disowned_biginteger(_roundedDecimalInteger,owner); 
 }
@@ -155,7 +155,7 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(amVerbose()){
 			q2outputValue("Applying sin() to '",_value,"' of type ");
-			q2outputandcollect("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
+			q2output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
 		}
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
@@ -173,7 +173,7 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 			Mdecimal *_numeratorDecimal=__decimal(_decimalContext,0,0),*_denominatorDecimal=__decimal(_decimalContext,1,0),*_multiplierDecimal=__decimal(_decimalContext,0,0);
 			Mdecimal *_piDecimal=pi_decimal(NULL);
 			if(_sineDecimal&&_qDecimal&&_twoDecimal&&_squareDividedByPiDecimal&&_numeratorDecimal&&_denominatorDecimal&&_multiplierDecimal&&_2nplus1Decimal&&_dividedByPiDecimal&&_piDecimal){
-				if(amVerbose())outputInfo("Ready to compute the sine of a decimal.");
+				if(amVerbose())q2outputInfo("Ready to compute the sine of a decimal.");
 				// to use the product formula I found on internet at matrixlab-examples.com I need to compute (x/pi)^2, I suppose I need to subtract 2*pi until the result is between -pi and pi
 				// so if we divide the input by pi we get a value that should be between -1 and 1, so we have to divide it by pi and use the remainder
 				Mdecimal* _decimal=_value->value._decimal;
@@ -181,7 +181,7 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 				int neg=mpd_isnegative(_decimal->mpd);
 				Mdecimal* _negatedDecimal=(neg?__adecimal():_decimal);if(!_negatedDecimal)status=1;else if(neg)mpd_qcopy_negate(_negatedDecimal->mpd,_decimal->mpd,&status);
 				if((status&0xEFBF)==0){
-					if(amVerbose())outputInfo("Determining the normalized decimal to use as argument of the sine approximation.");
+					if(amVerbose())q2outputInfo("Determining the normalized decimal to use as argument of the sine approximation.");
 					// NOTE the remainder is the starting value of the sine approximation
 					mpd_qdivmod(_qDecimal->mpd,_sineDecimal->mpd,_negatedDecimal->mpd,_piDecimal->mpd,_decimalContext,&status);
 					if((status&0xEFBF)==0){
@@ -198,7 +198,7 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 								// the initial value of the sine decimal is the product of _negatedDecimal and the square of _dividedByPiRemainderDecimal
 								mpd_qmul(_squareDividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_decimalContext,&status);
 								if((status&0xEFBF)==0){
-									/////////if(amVerbose())outputInfo("Product multiplier numerator subcomputed.");
+									/////////if(amVerbose())q2outputInfo("Product multiplier numerator subcomputed.");
 									mpd_qsub(_numeratorDecimal->mpd,_denominatorDecimal->mpd,_squareDividedByPiDecimal->mpd,_decimalContext,&status);
 									if((status&0xEFBF)==0){
 										if(amVerbose())q2outputDecimal("Multiplier: '",_numeratorDecimal,"' -> ");
@@ -207,7 +207,7 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 										///////////////if(amVerbose())q2outputDecimal("Second approximation to the sine: '",_sineDecimal,"'.\n");
 										int64_t count=M_LL_MAX;
 										while((status&0xEFBF)==0){
-											if(--count==0){outputInfo("Maximum number of iterations exceeded!");break;}
+											if(--count==0){q2outputInfo("Maximum number of iterations exceeded!");break;}
 											if(amVerbose())q2outputDecimal("Sine approximation: '",_sineDecimal,"'.\n");
 											mpd_qadd(_2nplus1Decimal->mpd,_2nplus1Decimal->mpd,_twoDecimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break; // add 2 to 2n+1 to get 2(n+1)+1 so becoming 3, 5, 7, ....
 											// add _2nplus1Decimal to the numerator and denominator
@@ -235,7 +235,7 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 				if(neg)free_decimal(_negatedDecimal); // the negatedDecimal we created should be released
 				// alternatively we can get the sign first because sin(x)=-sin(-x), so if x is negative, we determine -x and determine the remainder of x/pi which will be in (0,1) as we want it to ()
 			}else
-				outputError("Failed to create at least one of the help decimal in computing the sine of a decimal");
+				q2outputError("Failed to create at least one of the help decimal in computing the sine of a decimal");
 			// free all help decimals
 			free_decimal(_piDecimal);
 			free_decimal(_2nplus1Decimal);
@@ -260,7 +260,7 @@ Mvalue* Mcordicsin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
 		if(amVerbose()){
 			q2outputValue("Applying cordicsin() to '",_value,"' of type ");
-			q2outputandcollect("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
+			q2output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
 		}
 		/* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
@@ -283,7 +283,7 @@ Mvalue* Mcordiccos(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value){
 		if(amVerbose()){
 			q2outputValue("Applying cordiccos() to '",_value,"' of type ");
-			q2outputandcollect("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
+			q2output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
 		}
 		/* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
@@ -406,7 +406,7 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 				mpd_qexp(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
 				if(status&0xEFBF){
 					FREE_DECIMAL(_result,owner);_result=NULL;
-					outputError("Failed to apply the exp function to a decimal");
+					q2outputError("Failed to apply the exp function to a decimal");
 					outputDecimalStatus(status);
 				}
 			}
@@ -461,7 +461,7 @@ Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 				mpd_qln(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
 				if(status&0xEFBF){
 					FREE_DECIMAL(_result,owner);_result=NULL;
-					outputError("Failed to compute the natural logarithm of a decimal");
+					q2outputError("Failed to compute the natural logarithm of a decimal");
 					outputDecimalStatus(status);
 				}
 			}
@@ -492,7 +492,7 @@ Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 				mpd_qlog10(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
 				if(status&0xEFBF){
 					FREE_DECIMAL(_result,owner);_result=NULL;
-					outputError("Failed to compute the base 10 logarithm of a decimal");
+					q2outputError("Failed to compute the base 10 logarithm of a decimal");
 					outputDecimalStatus(status);
 				}
 			}
@@ -825,7 +825,7 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 					};break;
 				case VT_BYTES:
 					if(_value->value._string!=NULL){
-						if(NULL==string_setlength(_value->value._string,newlength))outputError("Failed to change the length of a bytes sequence");
+						if(NULL==string_setlength(_value->value._string,newlength))q2outputError("Failed to change the length of a bytes sequence");
 						result=string_length(_value->value._string);
 					}
 					break;
@@ -899,14 +899,14 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 									}while(textindex>0);
 								}else{
 									*textcount=0;
-									outputError("Failed to allocate memory for storing texts");
+									q2outputError("Failed to allocate memory for storing texts");
 								}
 							}else
-								outputBug("Missing array values");
+								q2outputBug("Missing array values");
 						}
 					}
 				}else 
-					outputBug("Missing value array");
+					q2outputBug("Missing value array");
 			}else
 			if(textsValue->type==VT_LIST){
 				Mlist* textList=textsValue->value._list;
@@ -920,7 +920,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 							unsigned long long textindex=0;
 							Mlistelement* listelement=textList->_first;
 							while(listelement!=NULL){
-								if(textindex>=*textcount){outputBug("Number of elements of list incorrect trying to split texts");break;}
+								if(textindex>=*textcount){q2outputBug("Number of elements of list incorrect trying to split texts");break;}
 								Mstring* _valueText=owned_string(_getValueText(listelement->_value,true,true),owner);
 								if(_valueText!=NULL){
 									_texts[textindex++]=OWNED(_strdup(string(_valueText)),Msubowner(owner,1));
@@ -931,11 +931,11 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 							}
 						}else{
 							*textcount=0;
-							outputError("Failed to allocate memory for storing texts");
+							q2outputError("Failed to allocate memory for storing texts");
 						}
 					}
 				}else 
-					outputBug("Missing value list");
+					q2outputBug("Missing value list");
 			}else
 			if(textsValue->type==VT_TEXT){ // only a single text!
 				if(textsValue->value._text!=NULL){
@@ -945,13 +945,13 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 						output("Duplicating '%s'.\n",textsValue->value._text->_c);
 						_texts[0]=OWNED(_strdup(textsValue->value._text->_c),Msubowner(owner,1));
 					}else 
-						outputError("Failed to allocate memory for storing the text to split");
+						q2outputError("Failed to allocate memory for storing the text to split");
 				}else 
-					outputBug("Missing value text");
+					q2outputBug("Missing value text");
 			}else 
-				outputError("Cannot split a value that is not a text (or list and array with texts)");
+				q2outputError("Cannot split a value that is not a text (or list and array with texts)");
 			if(_texts!=NULL)return DISOWNED(_texts,owner);
-			outputError("Failed to extract text(s)");
+			q2outputError("Failed to extract text(s)");
 		}
 	}
 	return NULL;
@@ -1018,7 +1018,7 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 									// if one of the separators was found, firstsepstr will point to the first character of that separator, and by zero'ing the character there the split text will be correctly appended
 									if(firstsepstr)*firstsepstr='\0'; // replace the first character of the separator by the end of text, so textStart will contain the split text
 									if(!string_append(_splitText,textStart)){
-										outputMessage(M_ERROR_PREFIX,"Failed to collect split text '%s'.",textStart);
+										q2outputMessage(M_ERROR_PREFIX,"Failed to collect split text '%s'.",textStart);
 										break;
 									}
 									// ready to append _splitText to the split text list
@@ -1027,11 +1027,11 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 										Mvalue* splitTextValue=_getValueOfText(disowned_text(splitText,owner));
 										if(splitTextValue!=NULL){
 											if(appendedToList(_splitTextList,owner,splitTextValue,M_LL_INVALID)<=0)
-												outputMessage(M_ERROR_PREFIX,"Failed to add split text '%s'.",string(_splitText));
+												q2outputMessage(M_ERROR_PREFIX,"Failed to add split text '%s'.",string(_splitText));
 										}else
-											outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
+											q2outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 									}else 
-										outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
+										q2outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 									if(!firstsepstr)break;
 									string_setlength(_splitText,1); // re-use _splitText!!!
 									textStart=firstsepstr+firstseplength; // start looking for the next separator starting at strlen(*separator) further
@@ -1040,7 +1040,7 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 								char c;
 								while((c=**_text)){
 									if(!string_append_char(_splitText,c)){
-										outputMessage(M_ERROR_PREFIX,"Failed to collect split character '%c'.",c);
+										q2outputMessage(M_ERROR_PREFIX,"Failed to collect split character '%c'.",c);
 										break;
 									}
 									// if _splitText ends with one of the separators, we cut it off and break
@@ -1057,30 +1057,30 @@ static Mlist* splits(char** const texts,unsigned long long textcount,char** cons
 									Mvalue* splitTextValue=_getValueOfText(disowned_text(splitText,owner));
 									if(splitTextValue){
 										if(appendedToList(_splitTextList,owner,splitTextValue,M_LL_INVALID)<=0)
-											outputMessage(M_ERROR_PREFIX,"Failed to add split text '%s'.",string(_splitText));
+											q2outputMessage(M_ERROR_PREFIX,"Failed to add split text '%s'.",string(_splitText));
 									}else
-										outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
+										q2outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 								}else 
-									outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
+									q2outputMessage(M_ERROR_PREFIX,"Failed to wrap split text '%s'.",string(_splitText));
 								*/
 								FREE_STRING(_splitText,owner); // freed!!!!
 							}else 
-								outputMessage(M_ERROR_PREFIX,"Failed to collect characters from text to split '%s'.",*_text);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to collect characters from text to split '%s'.",*_text);
 							Mvalue* _splitTextListValue=_getValueOfList(disowned_list(_splitTextList,owner));
 							// NOTE if appending fails the gc should take care of freeing this value, and the contained list!!!!
 							if(appendedToList(_splitTextsList,owner,_splitTextListValue,M_LL_INVALID)<=0)
-								outputMessage(M_ERROR_PREFIX,"Failed to append the list of split texts of '%s'.",*_text);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to append the list of split texts of '%s'.",*_text);
 						}else
-							outputMessage(M_ERROR_PREFIX,"Unable to create the list to store the split parts of '%s'.",*_text);
+							q2outputMessage(M_ERROR_PREFIX,"Unable to create the list to store the split parts of '%s'.",*_text);
 					}
 					_text++;
 				}while(--textindex>0);
 			}
 			return disowned_list(_splitTextsList,owner);
 		}
-		outputError("Failed to create the split text list");
+		q2outputError("Failed to create the split text list");
 	}else 
-		outputError("Input to the split function undefined or incomplete");
+		q2outputError("Input to the split function undefined or incomplete");
 	return NULL;
 }
 /**
@@ -1139,7 +1139,7 @@ Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperVa
 			}
 			if(_textValue->type==VT_ARRAY){
 				Marray* _splitTextsArray=owned_array(_getArray("Msplit",_splitTextsList->numberOfElements,NULL),owner);
-				if(NULL==_splitTextsArray){outputError("Not enough memory to return the split texts in an array");return _getValueOfList(disowned_list(_splitTextsList,owner));}
+				if(NULL==_splitTextsArray){q2outputError("Not enough memory to return the split texts in an array");return _getValueOfList(disowned_list(_splitTextsList,owner));}
 				// move the values in the split text list over to splitTextArray
 				unsigned long long splittextindex=0;
 				Mlistelement* splitTextsListelement=_splitTextsList->_first;
@@ -1150,7 +1150,7 @@ Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperVa
 					splitTextsListelement=splitTextsListelement->_next;
 					splitTextsArrayelement++;
 				}
-				if(splitTextsListelement!=NULL)outputBug("Number of split text list elements incorrect");
+				if(splitTextsListelement!=NULL)q2outputBug("Number of split text list elements incorrect");
 				FREE_LIST(_splitTextsList,owner); // no need for the list anymore after moving its values over to the split text array
 				return _getValueOfArray(disowned_array(_splitTextsArray,owner));
 			}
@@ -1196,7 +1196,7 @@ Mvalue* Mfacd(Mvalue* _value){
 Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value){
 		if(amVerboseDebugging())
-			outputInfo("No argument to factorial() function!");
+			q2outputInfo("No argument to factorial() function!");
 		return NULL;
 	}
 	if(amVerboseDebugging())
@@ -1210,13 +1210,13 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	Mbiginteger* _finalmultiplier=NULL;
 	if(_value->type==VT_INTEGER){
 		if(_value->value._integer->ll<0)
-		{outputError("Invalid (negative) integer argument to factorial() function");return NULL;}
+		{q2outputError("Invalid (negative) integer argument to factorial() function");return NULL;}
 		if(_value->value._integer->ll<3)
 			return _getIntegerValue(_value->value._integer->ll);
 		_finalmultiplier=owned_biginteger(_getBiginteger(_value->value._integer->ll),owner);
 	}else{
 		if(mp_isneg(MP_INT_POINTER(_value->value._biginteger)))
-		{outputError("Invalid (negative) big integer argument to factorial() function");return NULL;}
+		{q2outputError("Invalid (negative) big integer argument to factorial() function");return NULL;}
 		if(mp_cmp(MP_INT_POINTER(_value->value._biginteger),MP_INT_POINTER(getBigintegerThree()))==MP_LT)
 			return _getValueOfBiginteger(_getBigintegerCopy(_value->value._biginteger));
 		_finalmultiplier=owned_biginteger(_getBigintegerCopy(_value->value._biginteger),owner);
@@ -1237,19 +1237,19 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		if(_multiplier!=NULL){
 			while(mp_cmp(MP_INT_POINTER(_multiplier),MP_INT_POINTER(_finalmultiplier))==MP_LT){
 				if(mp_incr(MP_INT_POINTER(_multiplier))!=MP_OKAY)
-				{outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
+				{q2outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
 				if(mp_mul(MP_INT_POINTER(_result),MP_INT_POINTER(_multiplier),MP_INT_POINTER(_result))!=MP_OKAY)
-				{outputError("Failed to multiply a big integer");_result=NULL;break;}
+				{q2outputError("Failed to multiply a big integer");_result=NULL;break;}
 				//////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
 			}
 			// get rid of intermediate big integers
 			FREE_BIGINTEGER(_multiplier,owner);
 		}else		
-			outputError("Failed to create big integer 3");
+			q2outputError("Failed to create big integer 3");
 		if(amVerboseDebugging())
 			{q2outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);}
 	}else
-		outputError("Failed to create big integer 6");
+		q2outputError("Failed to create big integer 6");
 	FREE_BIGINTEGER(_finalmultiplier,owner);
 	if(amVerboseDebugging())
 		q2outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
@@ -1345,9 +1345,9 @@ Mvalue* Mrand(){Mallocationowner owner=getOwner(__LINE__); // to return a random
 			if(_rational!=NULL)return _getValueOfRational(disowned_rational(_rational,owner));
 			FREE_BIGINTEGER(_num,owner); // not bound to the returned rational
 		}else
-			outputError("Failed to create the numerator of the rational random number");
+			q2outputError("Failed to create the numerator of the rational random number");
 	}else
-		outputError("Failed to create the numerator of the rational random number");
+		q2outputError("Failed to create the numerator of the rational random number");
 	return NULL;
 }
 /**
@@ -1375,12 +1375,12 @@ static long long randominteger(long long upper){Mallocationowner owner=getOwner(
 							r=biginteger2long(_biginteger);
 							FREE_BIGINTEGER(_biginteger,owner);
 						}else
-							outputError("Failed to determine the integer part of the rational random number");
+							q2outputError("Failed to determine the integer part of the rational random number");
 					}
 				}
 				if(_rational!=NULL)FREE_RATIONAL(_rational,owner);else FREE_BIGINTEGER(_num,owner);
 			}else
-				outputError("Failed to create the random rational numerator");
+				q2outputError("Failed to create the random rational numerator");
 		}
 		if(_mult!=NULL)FREE_BIGINTEGER(_mult,owner);if(_rand!=NULL)FREE_BIGINTEGER(_rand,owner);
 	}
@@ -1423,7 +1423,7 @@ Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
 			while(--count>=0){assignValue(valueholder,Mrand());valueholder++;}
 			return _getValueOfArray(disowned_array(_randarray,owner));
 		}
-		outputMessage(M_ERROR_PREFIX,"Failed to create an array to hold %lld random rational numbers in [0,1).",count);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create an array to hold %lld random rational numbers in [0,1).",count);
 		/* replacing:
 		Mlist* _randList=owned_list(__list("Mrands"),owner);
 		while(--count>=0&&appendedToList(_randList,owner,Mrand(),M_LL_INVALID)>0);
@@ -1454,12 +1454,12 @@ Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue){Mallocationowner owner=
 				}
 				return _getValueOfArray(disowned_array(_randarray,owner));
 			}
-			outputMessage(M_ERROR_PREFIX,"Failed to create an array to hold %lld random integer numbers in [0,%lld).",count,upper);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to create an array to hold %lld random integer numbers in [0,%lld).",count,upper);
 		}else
 		if(upper<=0)
-			outputMessage(M_ERROR_PREFIX,"%llu should be positive.",upper);
+			q2outputMessage(M_ERROR_PREFIX,"%llu should be positive.",upper);
 		else
-			outputMessage(M_ERROR_PREFIX,"%lld should not exceed %lu.",upper,RAND_MAX);
+			q2outputMessage(M_ERROR_PREFIX,"%lld should not exceed %lu.",upper,RAND_MAX);
 	}
 	return NULL;
 }

@@ -80,9 +80,9 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 				result=isRationalNegative(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
@@ -100,9 +100,9 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 				result=isDecimalNegative(_decimalDifference);
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return result;
@@ -204,11 +204,11 @@ long long isANumericMatrix(Marray* array,bool update){
 								break;
 						}	
 						// if not broken out of the loop due to not matching array element
-						if(elementIndex==0)dimensionsLeft=-1;else outputError("Not all row elements numeric");
+						if(elementIndex==0)dimensionsLeft=-1;else q2outputError("Not all row elements numeric");
 					}else
-						outputError("Not all array elements in the first matrix row are numeric");
+						q2outputError("Not all array elements in the first matrix row are numeric");
 				}else
-					outputError("Not a two-dimensional array");
+					q2outputError("Not a two-dimensional array");
 			}
 			if(dimensionsLeft==-1)
 				if(update)
@@ -282,7 +282,7 @@ static Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner own
 			// TODO perhaps _getArray takes care of this??????
 			if(_matrixproductRowValue->value._array->valuetype!=productValuetype){
 				_matrixproductRowValue->value._array->valuetype=productValuetype;
-				outputBug("_getArray() does not assign the right element value type!");
+				q2outputBug("_getArray() does not assign the right element value type!");
 			}
 			Marray* _matrixproduct=owned_array(_getArray(NULL,array1rows,_matrixproductRowValue),owner);
 			if(_matrixproduct!=NULL){
@@ -294,14 +294,14 @@ static Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner own
 					for(long long colIndex=0;colIndex<array2columns;colIndex++){
 						Mvalue* sumproductValue=productRowArrayValues[colIndex]; // which will be zero!!!
 						for(long long elementIndex=0;elementIndex<array1cols;elementIndex++){
-							q2outputandcollect("Adding the product of ");
+							q2output("Adding the product of ");
 							q2outputValue(NULL,rowArrayValues[elementIndex],NULL);
-							q2outputandcollect(" and ");
+							q2output(" and ");
 							q2outputValue(NULL,array2->values[elementIndex]->value._array->values[colIndex],NULL);
 							q2outputValue(" to ",sumproductValue,".\n");
 							sumproductValue=Madd(sumproductValue,Mmultiply(rowArrayValues[elementIndex],array2->values[elementIndex]->value._array->values[colIndex]));
 						}
-						q2outputandcollect("Product value at cell (%lld,%lld)",rowIndex,colIndex);
+						q2output("Product value at cell (%lld,%lld)",rowIndex,colIndex);
 						q2outputValue(": ",sumproductValue,".\n");
 						assignValue(&productRowArrayValues[colIndex],sumproductValue);
 					}
@@ -309,9 +309,9 @@ static Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner own
 				return disowned_array(_matrixproduct,owner);
 			}
 		}
-		outputError("Failed to create the product matrix");
+		q2outputError("Failed to create the product matrix");
 	}else
-		outputError("Matrices cannot be multiplied: the number of rows and columns do not match");
+		q2outputError("Matrices cannot be multiplied: the number of rows and columns do not match");
 	return NULL;
 }
 
@@ -480,17 +480,17 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
 					// step 4
 					*/
 				}else
-					outputError("Failed to create a unity matrix");
+					q2outputError("Failed to create a unity matrix");
 				FREE_ARRAY(diagonalOfOnes,owner); // not bound in unityMatrix, so requires freeing
 			}else
-				outputError("Failed to create a unity matrix");
+				q2outputError("Failed to create a unity matrix");
 			FREE_ARRAY(_arrayCopy,owner);
 			if(unityMatrix!=NULL)return unityMatrix;
-			outputError("Failed to invert the matrix");
+			q2outputError("Failed to invert the matrix");
 		}else
-			outputError("Failed to copy the matrix to invert");
+			q2outputError("Failed to copy the matrix to invert");
 	}else
-		outputError("Can't invert a non-square matrix");
+		q2outputError("Can't invert a non-square matrix");
 	return NULL;
 }
 
@@ -522,14 +522,14 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		if(resultString!=NULL){
 			if(string_append_char(resultString,_value1->value._text->presuffix)!=NULL){
 				while(--multiplier>=0){
-					if(NULL==string_append(resultString,_value1->value._text->_c)){outputError("Failed to replicate text");break;}
+					if(NULL==string_append(resultString,_value1->value._text->_c)){q2outputError("Failed to replicate text");break;}
 				}
 				resultValue=_getValueOfText(_getText(string(resultString)));
 			}else
-				outputError("Failed to initialize result text");
+				q2outputError("Failed to initialize result text");
 			FREE_STRING(resultString,owner);
 		}else
-			outputError("Failed to create the result text");
+			q2outputError("Failed to create the result text");
 		return resultValue;
 	}else
 	if(_value2->type==VT_TEXT){
@@ -540,14 +540,14 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		if(resultString!=NULL){
 			if(string_append_char(resultString,_value2->value._text->presuffix)!=NULL){
 				while(--multiplier>=0){
-					if(NULL==string_append(resultString,_value2->value._text->_c)){outputError("Failed to replicate text");break;}
+					if(NULL==string_append(resultString,_value2->value._text->_c)){q2outputError("Failed to replicate text");break;}
 				}
 				resultValue=_getValueOfText(_getText(string(resultString)));
 			}else
-				outputError("Failed to initialize result text");
+				q2outputError("Failed to initialize result text");
 			FREE_STRING(resultString,owner);
 		}else
-			outputError("Failed to create the result text");
+			q2outputError("Failed to create the result text");
 		return resultValue;
 	}
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
@@ -576,7 +576,7 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			if(amVerboseDebugging())
 			{q2outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -587,7 +587,7 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			long long llproduct=getBigintegerInteger(_productBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llproduct!=M_LL_INVALID){FREE_BIGINTEGER(_productBiginteger,owner);return _getIntegerValue(llproduct);}
-			outputWarning("Small integer product out of range, will continue using big integer product.");
+			q2outputWarning("Small integer product out of range, will continue using big integer product.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_productBiginteger,owner));
 	}
@@ -604,14 +604,14 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){q2outputBiginteger("Multiplying big integers '",_biginteger1,"'");q2outputBiginteger(" and '",_biginteger2,"'.\n");}
 			_productBiginteger=__biginteger();
-			if(!_productBiginteger)outputError("Failed to create the product big integer");else
+			if(!_productBiginteger)q2outputError("Failed to create the product big integer");else
 			if(mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){
-				FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
+				FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;q2outputError("Failed to multiply two big integers");
 			}else
 			if(amVerbose())q2outputBiginteger("Big integer product: '",_productBiginteger,"'.\n");
 			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		}else
-			outputError("Failed to create two helper big integers");
+			q2outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getValueOfBiginteger(disowned_biginteger(_productBiginteger,true);
 	}
@@ -764,7 +764,7 @@ Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue){Mallocati
 					// if it does the two-dimensional array is marked as being a matrix
 					// (this will force keeping the matrix a matrix (yet to be implemented though))
 					if(fillValue->value._array!=NULL&&isANumericMatrix(fillValue->value._array,true)!=M_TRUE)
-						outputError("Argument does not represent an all numeric two-dimensional array");
+						q2outputError("Argument does not represent an all numeric two-dimensional array");
 					// I'm going to be lenient in even returning rowsValue
 					return fillValue;
 				}else{ // rowsValue indicates the number of rows each to get the values in fillValue
@@ -779,20 +779,20 @@ Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue){Mallocati
 							Marray* rowsArray=OWNED_ARRAY(_getArray(NULL,numberOfRows,colsValue),owner);
 							if(rowsArray!=NULL){
 								if(!isANumericMatrix(rowsArray,true))
-									outputError("Two-dimensional array not a (numeric) matrix!");
+									q2outputError("Two-dimensional array not a (numeric) matrix!");
 								return _getValueOfArray(DISOWNED_ARRAY(rowsArray,owner));
 							}
 						}else
-							outputError("No initial row value specified!");
+							q2outputError("No initial row value specified!");
 					}else{ // multiple columns
 						Mvalue* initialRowValue=_getValueOfArray(_getArray(NULL,numberOfCols,fillValue));
 						Marray* _array=OWNED_ARRAY(_getArray(NULL,numberOfRows,initialRowValue),owner);
 						if(isNumeric(fillValue))_array->numberOfDimensionsLeft=1; // mark as matrix
-						else outputError("The resulting two-dimensional array cannot be used as a matrix");
+						else q2outputError("The resulting two-dimensional array cannot be used as a matrix");
 						return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
 					}
 				}else
-					outputError("Missing number of matrix rows");
+					q2outputError("Missing number of matrix rows");
 			}
 		}else
 		if(numberOfRows>0&&numberOfCols>0){
@@ -800,12 +800,12 @@ Mvalue* Mmatrix(Mvalue* rowsValue,Mvalue* colsValue,Mvalue* fillValue){Mallocati
 			Marray* _array=OWNED_ARRAY(_getArray(NULL,numberOfRows,initialRowValue),owner);
 			// TODO DONE is a two-dimensional arrays of NULLs numeric????? I guess not!!!
 			//////if(isNumeric(fillValue))_array->numberOfDimensionsLeft=1;else // mark as matrix
-			outputError("The resulting two-dimensional array with NULL values cannot be used as a matrix");
+			q2outputError("The resulting two-dimensional array with NULL values cannot be used as a matrix");
 			return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
 		}else
-			outputError("Missing number of matrix rows and/or columns");
+			q2outputError("Missing number of matrix rows and/or columns");
 	}else
-		outputError("The matrix rows and/or columns argument do not represent a positive integer");
+		q2outputError("The matrix rows and/or columns argument do not represent a positive integer");
 	return NULL;
 }
 
@@ -824,7 +824,7 @@ Mvalue* Mmatrixproduct(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=g
 		Marray* _product=OWNED_ARRAY(matrixproduct(_value1->value._array,_value2->value._array),owner);
 		return _getValueOfArray(DISOWNED_ARRAY(_product,owner));
 	}
-	outputError("Not all arguments of matrix multiplication are numeric matrices");
+	q2outputError("Not all arguments of matrix multiplication are numeric matrices");
 	return NULL;
 }
 
@@ -840,7 +840,7 @@ Mvalue* Mmatrixinverse(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__)
 		Marray* _inverse=OWNED_ARRAY(matrixinverse(_value->value._array),owner);
 		if(_inverse!=NULL)return _getValueOfArray(DISOWNED_ARRAY(_inverse,owner));
 	}else
-		outputError("Argument of matrix inverse not a numeric matrix");
+		q2outputError("Argument of matrix inverse not a numeric matrix");
 	return NULL;
 }
 
@@ -856,7 +856,7 @@ Mvalue* Mmatrixdiagonal(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__
 		Marray* _diagonalmatrix=OWNED_ARRAY(diagonalmatrix(_value->value._array->values,_value->value._array->numberOfElements),owner);
 		return _getValueOfArray(DISOWNED_ARRAY(_diagonalmatrix,owner));
 	}
-	outputError("Argument to the diagonal matrix function not an array");
+	q2outputError("Argument to the diagonal matrix function not an array");
 	return NULL;
 }	
 
@@ -878,7 +878,7 @@ Mvalue* Mmatrixtranspose(Mvalue* _value){Mallocationowner owner=getOwner(__LINE_
 			Mvalue* row=_getValueOfArray(_getArray(NULL,numberOfRows,NULL));
 			if(row!=NULL){
 				Marray* _array=OWNED_ARRAY(_getArray(NULL,numberOfColumns,row),owner);
-				if(NULL==_array){outputError("Failed to initialize the transpose");return NULL;}
+				if(NULL==_array){q2outputError("Failed to initialize the transpose");return NULL;}
 				_array->numberOfDimensionsLeft=array->numberOfDimensionsLeft; // TODO should we do this?????
 				// transpose _array
 				// NOTE we're simply exchanging the pointers (and not using assignValue!!!)
@@ -891,11 +891,11 @@ Mvalue* Mmatrixtranspose(Mvalue* _value){Mallocationowner owner=getOwner(__LINE_
 				}
 				return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
 			}else
-				outputError("Argument to the transpose function not a square matrix");
+				q2outputError("Argument to the transpose function not a square matrix");
 		}else
-			outputError("Argument to the transpose function not a matrix");
+			q2outputError("Argument to the transpose function not a matrix");
 	}else
-		outputError("Argument to the matrix transpose function not an array");
+		q2outputError("Argument to the matrix transpose function not an array");
 	return NULL;
 }	
 
@@ -919,11 +919,11 @@ Mvalue* Mmatrixtrace(Mvalue* _value){
 					assignValue(&traceValue,Madd(traceValue,arrayRows[numberOfRows]->value._array->values[numberOfRows]));
 				return traceValue;
 			}else
-				outputError("Argument to the transpose function not a square matrix");
+				q2outputError("Argument to the transpose function not a square matrix");
 		}else
-			outputError("Argument to the transpose function not a matrix");
+			q2outputError("Argument to the transpose function not a matrix");
 	}else
-		outputError("Argument to the matrix transpose function not an array");
+		q2outputError("Argument to the matrix transpose function not an array");
 	return NULL;
 }
 
@@ -971,10 +971,10 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 						while(1){ // replacing: i<numberOfRows
 							if(i>=numberOfRows||c[i]<i){
 								//if(amVerbose()){
-									q2outputandcollect("\tUpdated determinant after %s product #%lld",(neg?"subtracting":"adding"),++count);
+									q2output("\tUpdated determinant after %s product #%lld",(neg?"subtracting":"adding"),++count);
 									q2outputValue(" (",cumproduct[numberOfRows-1],") of cells");
 									for(long long permIndex=0;permIndex<numberOfRows;permIndex++)
-										q2outputandcollect(" (%lld,%lld)",permutation[permIndex],permIndex);
+										q2output(" (%lld,%lld)",permutation[permIndex],permIndex);
 									q2outputValue(": ",determinantValue,"\n");
 								//}
 								if(i>=numberOfRows)break;
@@ -1034,7 +1034,7 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 						*/
 						// using Heap's algorithm to generate all permutations of the row indices of each cell to use
 					}else
-						outputError("Failed to initialize the determinant");
+						q2outputError("Failed to initialize the determinant");
 				}
 				if(amVerbose())
 					q2outputValue("Determinant: ",determinantValue,"\n");
@@ -1046,10 +1046,10 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 				FREE_DISOWNED(cumproduct,numberOfRows,'X',owner);
 				return determinantValue;
 			}else
-				outputError("Argument to the transpose function not a square matrix");
+				q2outputError("Argument to the transpose function not a square matrix");
 		}else
-			outputError("Argument to the transpose function not a matrix");
+			q2outputError("Argument to the transpose function not a matrix");
 	}else
-		outputError("Argument to the matrix transpose function not an array");
+		q2outputError("Argument to the matrix transpose function not an array");
 	return NULL;
 }

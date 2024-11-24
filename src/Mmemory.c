@@ -24,7 +24,7 @@ char* _strdup(char const * const _c){Mallocationowner owner=getOwner(__LINE__);
 			_hc=MALLOC(sizeof(char),l,-'"',owner); // a single character
 			// replacing: char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
 			if(_hc!=NULL)memcpy(_hc,_c,sizeof(char)*l);
-			else outputMessage(M_ERROR_PREFIX,"Failed to allocate memory to store '%s'.",_c);
+			else q2outputMessage(M_ERROR_PREFIX,"Failed to allocate memory to store '%s'.",_c);
 			//*/
 			/* replacing:
 			char* _hc=strdup(_c);
@@ -49,12 +49,12 @@ long long _strtoll(char* _c,long long invalid){
 	long long ll=strtoll(_c,&eptr,0); // assume decimal (TODO allow other representations as well)
 	if(!ll){
 		if (errno==EINVAL){
-			//outputMessage(M_WARNING_PREFIX,"Failed to convert '%s' to an integer.",_c);
+			//q2outputMessage(M_WARNING_PREFIX,"Failed to convert '%s' to an integer.",_c);
 			return invalid;
 		}
 		/* If the value provided was out of range, display a warning message */
 		if (errno==ERANGE){
-			outputMessage(M_WARNING_PREFIX,"The integer represented by '%s' is out of range.",_c);
+			q2outputMessage(M_WARNING_PREFIX,"The integer represented by '%s' is out of range.",_c);
 			return invalid;
 		}
 	}

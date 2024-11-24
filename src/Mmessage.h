@@ -55,12 +55,12 @@ char* setMessageId(char const * const messageId); // echoes the messageId
 
 // MDH@07AUG2024: for logging any text to either output and/or collect (that may contain any message types)
 size_t q2collect(char const * const fmt,...);
-size_t q2outputandcollect(char const * const fmt,...);
+size_t q2output(char const * const fmt,...);
 size_t q2newline(bool echoToOutput);
-// MDH@20SEP2024: most convenient to use outputMessage() to output a single message of a specific type
+// MDH@20SEP2024: most convenient to use q2outputMessage() to output a single message of a specific type
 //                that outputError/Bug/Warning can delegate to
-size_t outputMessage(char const * const messageType,char const * const fmt,...);
-size_t collectMessage(char const * const messageType,char const * const fmt,...);
+size_t q2outputMessage(char const * const messageType,char const * const fmt,...);
+size_t q2collectMessage(char const * const messageType,char const * const fmt,...);
 
 bool outputCollectorInitialized();
 
@@ -68,15 +68,15 @@ size_t q2outputmessageprefix(char const * const messageprefix);
 
 // might copy these to Moutput.c/h and create queued versions
 // MDH@19AUG2024: changed to queued (collected) versions because we want these messages collected as well!!!
-size_t outputInfo(char const * const info); // replacing outputLine in all modules
+size_t q2outputInfo(char const * const info); // replacing outputLine in all modules
 
-size_t outputWarning(char const * const warning);
+size_t q2outputWarning(char const * const warning);
 
-size_t outputError(char const * const error);
+size_t q2outputError(char const * const error);
 size_t outputErrorAndText(char const * const error,char const * const text);
 // MDH@05NOV2019: some special error reporting (typically bugs and out of memory problems)
 size_t outputMemoryError(char const * const memoryerror);
 
-size_t outputBug(char const * const bug);
+size_t q2outputBug(char const * const bug);
 
 int kbhit();

@@ -15,7 +15,7 @@ Mbiginteger* _getNegatedBiginteger(Mbiginteger const * const biginteger){Malloca
 	if(biginteger==NULL)return NULL;
 	Mbiginteger* _bineg=OWNED(__biginteger(),owner);
 	if(_bineg!=NULL&&mp_neg(MP_INT_POINTER(biginteger),MP_INT_POINTER(_bineg))!=MP_OKAY)
-	{FREE_BIGINTEGER(_bineg,owner);outputError("Failed to negate a big integer");return NULL;}
+	{FREE_BIGINTEGER(_bineg,owner);q2outputError("Failed to negate a big integer");return NULL;}
 	return DISOWNED(_bineg,owner);
 }
 /**
@@ -29,7 +29,7 @@ long long getBigintegerSign(Mbiginteger const * const biginteger){
 	long long result=(mp_iszero(MP_INT_POINTER(biginteger))==MP_YES?M_ZERO:(mp_isneg(MP_INT_POINTER(biginteger))==MP_YES?M_NEGATIVE:M_POSITIVE)); // OOPS, comparing with MP_YES essential!!!
 	if(amVerboseDebugging()){
 		q2outputBiginteger("Sign of big integer '",biginteger,"':");
-		q2outputandcollect("%lld.\n",result);
+		q2output("%lld.\n",result);
 	}
 	return result;
 }

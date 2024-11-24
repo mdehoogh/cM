@@ -80,7 +80,7 @@ Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,lo
 void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,size_t size,long long count,signed char type){
 	// typically the caller would need to tell us the current number of characters stored in _chars
 	// ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
-	if(NULL==_chars){outputWarning("No Mchars to free");return;}
+	if(NULL==_chars){q2outputWarning("No Mchars to free");return;}
 	FREE(_chars,count,(type>0?-type:type)/*,owner_chars*/); // obtain ownership and free
 }
 
@@ -105,7 +105,7 @@ Mchars* _getChars(unsigned char const * const chars){Mallocationowner owner=getO
 			// if I'm the owner, I return a _chars disowned, otherwise I am returning as is because I never was the owner to start with
 			return disowned_chars(_chars,owner);
 		}
-		outputError("Failed to store the characters");
+		q2outputError("Failed to store the characters");
 	}
 	return NULL;
 }
@@ -124,7 +124,7 @@ Mchars* _getReversedChars(unsigned char const * const chars){Mallocationowner ow
 				// if I'm the owner, I return a _chars disowned, otherwise I am returning as is because I never was the owner to start with
 				return disowned_chars(_chars,owner);
 			}
-			outputError("Failed to store the characters");
+			q2outputError("Failed to store the characters");
 		}
 	}
 	return _chars;

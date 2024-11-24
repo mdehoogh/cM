@@ -109,16 +109,16 @@ Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner o
 				long long arrayLength=getValueInteger(_array->values[--numberOfDimensions]);
 				if(arrayLength>0){
 					if(amVerbose()){
-						q2outputandcollect("Filling %lld elements of array",arrayLength);
+						q2output("Filling %lld elements of array",arrayLength);
 						q2outputValue(" with ",fillValue,".\n");
 					}
 					_result=owned_array(_getArray("marray",arrayLength,fillValue),owner);
 					if(_array!=NULL){
 						fillValue=_getValueOfArray(disowned_array(_result,owner));
 					}else
-						outputError("Failed to create (sub)array");
+						q2outputError("Failed to create (sub)array");
 				}else
-					outputError("Invalid (sub)array length");
+					q2outputError("Invalid (sub)array length");
 			}
 			return fillValue;
 			/* replacing:
@@ -145,9 +145,9 @@ Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner o
 						if(_result!=NULL)
 							fillValue=_getValueOfArray(disowned_array(_result,owner));
 						else
-							outputError("Failed to create (sub)array");
+							q2outputError("Failed to create (sub)array");
 					}else
-						outputError("Invalid (sub)array length");
+						q2outputError("Invalid (sub)array length");
 					listelement=listelement->_next;
 				}
 				FREE_LIST(_reversedList,owner);
@@ -169,7 +169,7 @@ Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner o
 			if(length>=0){
 				Marray* _result=owned_array(_getArray("marray",length,fill_value),owner);
 				if(_result!=NULL)return _getValueOfArray(disowned_array(_result,owner));
-				outputError("Failed to create array");
+				q2outputError("Failed to create array");
 			}
 		}
 	}

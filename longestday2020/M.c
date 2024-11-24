@@ -305,7 +305,7 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){Mallocationowner owner=
 }
 void outputFunctions(){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _functionsText=owned_string(_getFunctionMapText(getExecutionEnvironment()->_functionMap),owner);
-	if(!_functionsText){outputError("Failed to create the output. Possible cause: out of memory.");return;}
+	if(!_functionsText){q2outputError("Failed to create the output. Possible cause: out of memory.");return;}
 	output("\nFunctions: %s.\n",string(_functionsText));
 	FREE_STRING(_functionsText,owner);
 }/* VALIDATED */
@@ -313,7 +313,7 @@ void outputVariables(){Mallocationowner owner=getOwner(__LINE__);
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
 	// MDH@24OCT2019: now using _getVariableMapText() instead of _getMapText() because the former is environment aware and can show the symbols with the same value (if any)
 	Mstring* _variablesText=owned_string(_getVariableMapText(getExecutionEnvironment(),false,false,true,false),owner); // do NOT show the hidden variables!!!
-	if(!_variablesText){outputError("Failed to create the output. Possible cause: out of memory.");return;}
+	if(!_variablesText){q2outputError("Failed to create the output. Possible cause: out of memory.");return;}
 	output("\nVariables: %s.\n",string(_variablesText));
 	FREE_STRING(_variablesText,owner);
 }/* VALIDATED */
@@ -1062,7 +1062,7 @@ void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
 				output("Dynamically allocated memory: %llu bytes.\n",_allocationTypeSizes[1]);
 			free(_allocationTypeSizes);
 		}else
-			outputError("No memory allocation information available!");
+			q2outputError("No memory allocation information available!");
 	}else{ // verbose information will also show all the current allocation marks
 		output("Dynamic memory allocation:\n");
 		outputAllocationTypeMarks("\t");
@@ -1131,7 +1131,7 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 				allocationTypeSizeIndex+=numberOfAllocationMarks;
 			}
 		}else
-			outputError("Failed to obtain (and output) the incremental memory usage.");
+			q2outputError("Failed to obtain (and output) the incremental memory usage.");
 		free(_allocationTypeSizes); // MDH@25MAY2020 TODO we should know the type though!!!
 	}
 	return numberOfAllocationMarks;
@@ -1139,7 +1139,7 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 
 // MDH@30OCT2019 END
 void promptForUserInput(){
-	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
+	free_userinputline();if(_userinputline)q2outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode();
 	resetOutputColor();
 	newline();
@@ -1224,7 +1224,7 @@ void outputStatus(char inputChar,char inputCharType){Mallocationowner owner=getO
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Manual feed forward: '%s' | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(_userInputCommand->_lastToken!=NULL?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),getUserInputLength(),getCommandLength(),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	FREE_STRING(_separatedBehindCursorText,owner);
-	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
+	//////q2outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
 void outputDebugInfo(){Mallocationowner owner=getOwner(__LINE__);
 	////////printf("[%u,%u]",getUserInputLength(),getCommandLength());
@@ -1232,7 +1232,7 @@ void outputDebugInfo(){Mallocationowner owner=getOwner(__LINE__);
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'.",getUserInputLength(),getCommandLength(),(_userInputCommand&&_userInputCommand->_lastToken?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	FREE_STRING(_separatedBehindCursorText,owner);
-	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
+	//////q2outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
 
 /*
@@ -1301,7 +1301,7 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!comma
 		if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,owner_currentFunctionBodyInput,_commandToEvaluateTokenValue,M_LL_INVALID)>0)
 			command->_firstToken=NULL;
 	}
-	outputError("Failed to add the command to the body of the function");
+	q2outputError("Failed to add the command to the body of the function");
 	return false;
 }
 // tokenizer constants moved over to Mshell.h
@@ -1738,7 +1738,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 
 	allocationMarksAdded=0;
 	if(amVerbose()){
-		if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
+		if(allocationMarkAdded())allocationMarksAdded++;else q2outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
 	}
 
 	if(amDebugging())
@@ -1757,7 +1757,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show
 	
 	Mstring* _showResultTimestamp=owned_string(_getTimestamp(NULL),owner);
-	if(_showResultTimestamp){outputToFile("@",string(_showResultTimestamp),":\n");FREE_STRING(_showResultTimestamp,owner);}else outputError("Failed to obtain a timestamp");
+	if(_showResultTimestamp){outputToFile("@",string(_showResultTimestamp),":\n");FREE_STRING(_showResultTimestamp,owner);}else q2outputError("Failed to obtain a timestamp");
 	
 	echoToOutputFile();
 
@@ -1771,7 +1771,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	newline(); // outputValueColored() doesn't do that!!
 	
 	Mstring* _doneShowingResultTimestamp=owned_string(_getTimestamp(NULL),owner);
-	if(_doneShowingResultTimestamp){outputToFile(">",string(_doneShowingResultTimestamp),"\n");FREE_STRING(_doneShowingResultTimestamp,owner);}else outputError("Failed to obtain a timestamp");
+	if(_doneShowingResultTimestamp){outputToFile(">",string(_doneShowingResultTimestamp),"\n");FREE_STRING(_doneShowingResultTimestamp,owner);}else q2outputError("Failed to obtain a timestamp");
 	
 	dontEchoToOutputFile();
 
@@ -1780,14 +1780,14 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	///// outputValueColored() does do this (and should): resetOutputColor();
 	if(written>1000)if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating);/////////else output("less than 1 ms.");
 
-	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputInfo("Result released!"); // TODO do we need to do this?????
+	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())q2outputInfo("Result released!"); // TODO do we need to do this?????
 
-	///////if(amVerbose())outputInfo("Command to release!");
+	///////if(amVerbose())q2outputInfo("Command to release!");
 
 	if(amDebugging())
 		output("Number of allocated/freed formula elements after evaluating the command: (%llu,%llu).\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 
-	////////if(amVerbose())outputInfo("Command released!");
+	////////if(amVerbose())q2outputInfo("Command released!");
 	return true;
 
 }
@@ -1841,7 +1841,7 @@ void outputValues(){Mallocationowner owner=getOwner(__LINE__);
 		outputTable(_valuesTable);
 		FREE_LIST(_valuesTable,owner);
 	}else
-		outputError("No values table to output.");
+		q2outputError("No values table to output.");
 }
 /*
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
@@ -1859,7 +1859,7 @@ char* removedRestOfCommand(){
 				freeToken(token); // we'll free all the token starting at the successor of _userInputCommand->_lastToken
 				_userInputCommand->_lastToken->next=NULL;
 			}
-			outputInfo("Rest of command: '%s'.",string(restOfCommand));
+			q2outputInfo("Rest of command: '%s'.",string(restOfCommand));
 			return string(restOfCommand);
 		}
 	}
@@ -2182,11 +2182,11 @@ void createUserInputCommand(){
 	/* replacing: 
 	_userInputCommand->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION,true,true);
 	setLastUserInputCommandToken(_userInputCommand->_firstToken); // so updating identifierContinuationIsDirty is guaranteed!!!
-	if(!_userInputCommand->_firstToken)outputError("Failed to create a new command");else _userInputCommand->_firstToken->expr=NULL;
+	if(!_userInputCommand->_firstToken)q2outputError("Failed to create a new command");else _userInputCommand->_firstToken->expr=NULL;
 	*/
 	/* replacing:
 	_userInputCommand->_lastToken=_userInputCommand->_firstToken=_getToken(NULL,TT_EXPRESSION);
-	if(!_userInputCommand->_firstToken){outputError("Failed to create a new command");return;}
+	if(!_userInputCommand->_firstToken){q2outputError("Failed to create a new command");return;}
 	setLastTokenType(TT_EXPRESSION,true); // MDH@23SEP2019: endOfInput set to true, although we know there will be no feed forward on an expression
 	////////// removing: removeInitializations(); // MDH@06AUG2019: ready for new initializations at the start of a new command
 	// MDH@27MAY2019: NO let's just keep expr NULL!!!
@@ -2200,7 +2200,7 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	//        it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
 	Mcommand* _newUserInputCommand=owned_command(_getNewCommand(false),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
-	if(!_newUserInputCommand){outputError("Failed to duplicate the current user input command");return false;}
+	if(!_newUserInputCommand){q2outputError("Failed to duplicate the current user input command");return false;}
 	
 	// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
 	if(amVerboseDebugging())inputInfo("Preparing the user input command for editing.");
@@ -2223,7 +2223,7 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 			if(_tokenToCopy->expr)
 				_userInputCommand->_lastToken->expr=_userInputCommand->_lastToken->expr->expr;
 			else
-				outputInfo("BUG: End of argument list or map encountered, but not started.");
+				q2outputInfo("BUG: End of argument list or map encountered, but not started.");
 		}
 		*/
 
@@ -2349,7 +2349,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 			reoutputToken(lastCommandToken);
 			inputInfo("'%s' considered to be an existing variable.",_identifierName);
-			//////////outputInfo("Variable redrawn!");
+			//////////q2outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019: I suppose when TT_VARIABLE changes to TT_NEW_VARIABLE later on, an equal sign might be added!!!
 			/* MDH@20SEP2019 replacing:
@@ -2809,27 +2809,27 @@ bool registerCommandEvaluation(char const * const commandText,Mvalue* evaluation
 					if(appendedToMap(commandresultValue->value._map,owner_map,"v",evaluationresultValue)>0){
 						if(appendedToList(M_list,owner_M_list,commandresultValue,M_LL_INVALID)>0)
 							return true;
-						outputError("Failed to append the command result to the result list.");
+						q2outputError("Failed to append the command result to the result list.");
 						if(removedFromMap(commandresultValue->value._map,owner_map,"v")<=0)
-							outputBug("Failed to remove the result value text from the failed command result registration.");
+							q2outputBug("Failed to remove the result value text from the failed command result registration.");
 					}else
-						outputError("Failed to append the command result text and result to the result list.");
+						q2outputError("Failed to append the command result text and result to the result list.");
 					// DONE:TODO remove from the map again
 					if(removedFromMap(commandresultValue->value._map,owner_map,"c")<=0)
-						outputBug("Failed to remove the command text from the failed command result registration.");
+						q2outputBug("Failed to remove the command text from the failed command result registration.");
 				}
 				// we may expect _commandTextValue to be repossed by the garbage collector as the text failed to be stored
 				// NOTE with commandresultValue not appended to M_list we assume it will be garbage collected!!!!
 			}
 		}
-		outputError("Failed to remember the command and its result value text.");
+		q2outputError("Failed to remember the command and its result value text.");
 	}
 	return false;
 }
 
 Mvalue* Mvariables(){//Mallocationowner owner=getOwner(__LINE__);
 	if(amVerbose())
-		outputInfo("Getting the variables!");
+		q2outputInfo("Getting the variables!");
 	// returning the names of the local variables (including the hidden ones)
 	// NOTE _getVariableNamesMap() always requires a non NULL environment to start with
 	return _getValueOfMap(_getVariableNamesMap(getExecutionEnvironment()));
@@ -2838,7 +2838,7 @@ Mvalue* Mvariables(){//Mallocationowner owner=getOwner(__LINE__);
 // MDH@25NOV2019: what about returning a table??? which is a list
 Mvalue* Mvalues(Mvalue* variableNamesValue){//Mallocationowner owner=getOwner(__LINE__);
 	if(amVerbose())
-		outputInfo("Getting the values!");
+		q2outputInfo("Getting the values!");
 	// MDH@25NOV2019: requesting the table allows for better reproduction
 	//                TODO instead of the table return the text representation of the table (which is easier to inspect!!!)
 	return _getValueOfList(_getValuesTable(variableNamesValue));
@@ -2927,7 +2927,7 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner
 				  Mvalue* _pathValue=_getTextValue(path);
 				  if(!_pathValue)continue;
 				  if(appendedToList(_commandOutputList,owner,_pathValue,M_LL_INVALID)<=0){
-					  outputError("Not all output retrieved!");
+					  q2outputError("Not all output retrieved!");
 					  break;
 				  }
 			}
@@ -2972,7 +2972,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 			output("Variable '%s' initialized.\n",M_VARIABLE_NAME); 
 	}else{
 		errorflags|=4;
-		outputWarning("Failed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!");
+		q2outputWarning("Failed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!");
 	}
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
@@ -2987,31 +2987,31 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 
 	if(!completedFunction(_getFunction(_Menvironment,owner_executionenvironment,"variables"),"variables",Mvariables)){
 		errorflags|=16;
-		outputWarning("Failed to register the variables() function");
+		q2outputWarning("Failed to register the variables() function");
 	}
 	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"values"),"values",Mvalues)){
 		errorflags|=32;
-		outputWarning("Failed to register the values() function");
+		q2outputWarning("Failed to register the values() function");
 	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"in"),"in",Min)){
 		errorflags|=64;
-		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
+		q2outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
 	}
 	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"os"),"os",MexecuteOSCommand)){
 		errorflags|=128;
-		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
+		q2outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	// color functions
 	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"bc"),"bc",Mbc)){
 		errorflags|=256;
-		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
+		q2outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
 	}
     if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"tc"),"tc",Mtc)){
 		errorflags|=512;
-		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
+		q2outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	return errorflags;
@@ -3035,29 +3035,29 @@ void reset(){Mallocationowner owner=getOwner(__LINE__);
 					}
 					if(commandCount==0)break;
 				}
-				if(numberOfOriginalCommandsFreed>0)output("Number of original commands freed: %llu.\n",numberOfOriginalCommandsFreed);else outputWarning("No original commands freed");
+				if(numberOfOriginalCommandsFreed>0)output("Number of original commands freed: %llu.\n",numberOfOriginalCommandsFreed);else q2outputWarning("No original commands freed");
 			}
 			if(commandBlocks>0){FREE_DISOWNED(_registeredcommands,commandBlocks*COMMAND_BLOCKSIZE,'C',owner_registeredcommands);commandBlocks=0;} // free all (disowned!!!!!) allocated command blocks
 			_registeredcommands=NULL; // MDH@18JUN2020: makes sense to do this as well
-			outputInfo("All commands deleted!");
+			q2outputInfo("All commands deleted!");
 			// MDH@18JUN2020: also remove all the items in the command result 
 			if(M_value){
 				Mvalue* clearValue=Mclear(M_value);
-				if(isValueZero(clearValue))output("Command result history cleared...\n");else if(isValueNegative(clearValue))outputWarning("Command result history not completely cleared...");
+				if(isValueZero(clearValue))output("Command result history cleared...\n");else if(isValueNegative(clearValue))q2outputWarning("Command result history not completely cleared...");
 			}
 		}else
-			outputInfo("Deleting commands canceled by user!");
+			q2outputInfo("Deleting commands canceled by user!");
 		if(c==27)while(inputCharRead(&c)); // clear the input buffer
 	}else
-		outputInfo("No commands to delete!");
+		q2outputInfo("No commands to delete!");
 #ifndef __PRODUCTION__
 	/* MDH@18JUN2020: let's NOT reset the allocation management on reset()
 	////syncallocations();
 	// Mstring* _hms=owned_string(_getTimestamp("%H:%M:%S"),owner);
 	if(resetAllocationManagement())
-		outputInfo("Allocation management reset.");
+		q2outputInfo("Allocation management reset.");
 	else
-		outputWarning("Failed to reset allocation management.");
+		q2outputWarning("Failed to reset allocation management.");
 	// FREE_STRING(_hms,owner);
 	*/
 #endif
@@ -3073,7 +3073,7 @@ bool interactiveSessionInitialized(){
 		inputCharRead(&answer);
 		if(answer!='Y'||answer!='y')return false;
 	}
-	outputInfo("Ready for an interactive session.");
+	q2outputInfo("Ready for an interactive session.");
 	return true;
 }
 // MDH@27FEB2020: called from within main() only, so can be placed directly in front of main (and separated into a separate M.c or better Minterpreter.c or Mcli.c)
@@ -3085,7 +3085,7 @@ bool preparedForUserInput(){
 	if(result)
 		output("Window dimensions: %dx%d.\n",getNumberOfWindowTextColumns(),getNumberOfWindowTextLines());
 	else
-		outputWarning("Failed to obtain the window dimensions.");
+		q2outputWarning("Failed to obtain the window dimensions.");
 	setbuf(stdout,NULL);
 	return true;
 }
@@ -3122,12 +3122,12 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 static Mstring* _separator=NULL;Mallocationowner owner_separator=(Mallocationowner){MODULE_ID,__LINE__,1};
 void showSeparatorLine(){
 	int columns=getCurrentNumberOfWindowTextColumns();
-	if(columns<=0){outputWarning("No number of columns");return;}
+	if(columns<=0){q2outputWarning("No number of columns");return;}
 	if(!_separator){_separator=owned_string(__string(),owner_separator);
-	if(!_separator){outputError("No separator!");return;}}
+	if(!_separator){q2outputError("No separator!");return;}}
 	// output("Number of columns: %d.\n",columns);
 	size_t separatorlength=string_length(_separator);
-	if(separatorlength<3*columns)if(!string_setlength(_separator,3*columns/*,owner_separator*/)){outputError("Failed to resize the separator.");return;}; // MDH@23APR2020: prudent to ascertain that the text is sufficient long enough to contain the separator characters
+	if(separatorlength<3*columns)if(!string_setlength(_separator,3*columns/*,owner_separator*/)){q2outputError("Failed to resize the separator.");return;}; // MDH@23APR2020: prudent to ascertain that the text is sufficient long enough to contain the separator characters
 	// output("Expanding the separator!");
 	while(separatorlength<3*columns){string_setchars(_separator,separatorlength,"\u2500");separatorlength+=3;} // ascertain that the separator contains the separator characters
 	// output("Separator expanded!");
@@ -3161,7 +3161,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 		output("%sFailed to initialize memory allocation management!",M_ERROR_PREFIX);
 		exit(1);
 	}
-	outputInfo("Dynamic memory allocation management initialized!");
+	q2outputInfo("Dynamic memory allocation management initialized!");
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
@@ -3189,33 +3189,33 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 	// BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!	
 	if(!preparedForUserInput()){
-		outputError("Failed to initialize the user session.");
+		q2outputError("Failed to initialize the user session.");
 		resetOutputColor();
 		exit(2);
 	}
-	outputInfo("User session initialized.");
+	q2outputInfo("User session initialized.");
 
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),inputCharRead,inputInfo,inputError,outputToken,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
-		outputError("Failed to initialize the M shell!");
+		q2outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);
 	}
-	outputInfo("Shell initialized.");
+	q2outputInfo("Shell initialized.");
 	if(_settingsCharacterText)FREE_STRING(_settingsCharacterText,owner);
 
 	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
 
 	// prepare an interactive session
 	if(!interactiveSessionInitialized()){
-		outputError("Failed to initialize the interactive session.");
+		q2outputError("Failed to initialize the interactive session.");
 		resetOutputColor();
 		exit(2);
 	}
 
 	resetOutputColor(); // just in case
-	outputInfo("Welcome to M.");
+	q2outputInfo("Welcome to M.");
 	newline();
 	output("Version: %s - Build: %s - Date: %s.\n",M_VERSION,M_BUILD,M_DATE);
 	newline();
@@ -3232,7 +3232,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 		output("Predefined variables: %s.\n",string(predefinedVariableNames));
 		FREE_STRING(predefinedVariableNames,owner); // no get rid of it!!!
 	}else
-		outputInfo("No predefined variables!");
+		q2outputInfo("No predefined variables!");
 	//////////output("Number of predefined variables: %d.",getNumberOfVariables(mEnvironment));
 	
 	// initialize commands and input mode
@@ -3244,17 +3244,17 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 	inputMode=IM_COMMAND; // TODO should this go into promptForUserInput()?
 
 	// TODO shouldn't we do this in initEnvironment? (or its alternative initM() yet to be created)
-	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);if(!_immediateFeedforwardText)outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
-	_suggestedText=owned_string(__string(),owner_suggestedText);if(!_suggestedText)outputError("Failed to allow suggested text");
+	_immediateFeedforwardText=owned_string(__string(),owner_immediateFeedforwardText);if(!_immediateFeedforwardText)q2outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
+	_suggestedText=owned_string(__string(),owner_suggestedText);if(!_suggestedText)q2outputError("Failed to allow suggested text");
 	/* do not initialize _manualFeedforwardText because there's now a difference between manual feed forward being NULL or empty (not blocking vs blocking identifier continuation)
-	_manualFeedforwardText=__string();if(!_manualFeedforwardText)outputError("Failed to allow manual feed forward");
+	_manualFeedforwardText=__string();if(!_manualFeedforwardText)q2outputError("Failed to allow manual feed forward");
 	*/
 	
 	char inputChar,inputCharType;
 
-	outputInfo("");
-	outputInfo("Use Ctrl-Z to exit M immediately at any time.");
-	outputInfo("In any mode press the Enter key on an empty line to switch modes.");
+	q2outputInfo("");
+	q2outputInfo("Use Ctrl-Z to exit M immediately at any time.");
+	q2outputInfo("In any mode press the Enter key on an empty line to switch modes.");
 
 	// let's mark the allocations BEFORE we start looping
 
@@ -3269,18 +3269,18 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 					outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");
 					FREE_STRING(_sessionStartTimestamp,owner);
 				}else
-					outputBug("Failed to obtain a session start timestamp.");
+					q2outputBug("Failed to obtain a session start timestamp.");
 				output("Session information will be written to %s.\n",string(_outputFilename));
 			}else
 				output("%sFailed to open %s for writing session information to.\n",M_ERROR_PREFIX,string(_outputFilename));
 		}else
-			outputError("No session log will be written, due to failing to compose the output filename.");
+			q2outputError("No session log will be written, due to failing to compose the output filename.");
 		FREE_STRING(_outputFilename,owner);
 	}
 
 	if(getNumberOfAllocationMarks()==0){
 		if(!allocationMarkAdded()){
-			outputError("Failed to create the first allocation mark!");
+			q2outputError("Failed to create the first allocation mark!");
 			exit(3);
 		}
 	}
@@ -3716,7 +3716,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 									/*
 									else
 									if(!commandDown())
-										outputInfo("%s","No previous command!");
+										q2outputInfo("%s","No previous command!");
 									*/
 								}else
 								if(inputChar==66){ // down arrow
@@ -3732,7 +3732,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 									/*
 									else
 									if(!commandUp())
-										outputInfo("%s","No next command!");
+										q2outputInfo("%s","No next command!");
 									*/
 								}else
 								if(inputChar==67){ // right arrow
@@ -4072,21 +4072,21 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 					newline();
 					// let's mark the allocation directly behind evaluating the command
 					if(allocationMarksAdded>0){
-						if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
+						if(allocationMarkAdded())allocationMarksAdded++;else q2outputError("Failed to mark the allocations after evaluating the command.");
 					}
 					// TODO the next part should be improved, as it is getting a bit messy
 					Mstring* _userInputCommandText=owned_string(_getCommandText(false),owner); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
 					if(!commandEvaluated){
 						if(string_length(_userInputCommandText)==0){
 							clearCommand();
-							outputInfo("Nothing to evaluate!");
+							q2outputInfo("Nothing to evaluate!");
 						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
-							outputInfo("Please complete, correct or cancel the command.");
+							q2outputInfo("Please complete, correct or cancel the command.");
 						FREE_STRING(_userInputCommandText,owner); // freed!
 						continue;
 					}
 					resetOutputColor();
-					if(amVerbose())outputInfo("Command evaluated!");
+					if(amVerbose())q2outputInfo("Command evaluated!");
 					deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					// MDH@18JUN2020: if the current command is not an original command 
@@ -4094,16 +4094,16 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(commandIndex==0){ // a new command being registered!!!
 							FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
-							outputError("Failed to register the command! Probable cause: out of memory");
+							q2outputError("Failed to register the command! Probable cause: out of memory");
 						}else
-							outputError("Failed to register the command again! Probable cause: out of memory");
+							q2outputError("Failed to register the command again! Probable cause: out of memory");
 					}else{
-						if(amVerboseDebugging())outputInfo("Command registered!");
+						if(amVerboseDebugging())q2outputInfo("Command registered!");
 						if(M_value){
 							// perhaps we should store the command text not the command itself?????
 							// NOTE prepend a single quote is essential to get the text enquoted!!!
 							if(!string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
-								outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
+								q2outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
 							else
 							if(amVerboseDebugging())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
 						}
@@ -4115,26 +4115,26 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 					// garbage collection: remove any values not used anymore...
 					// if(amDebugging())
-					if(amVerbose())outputInfo("Removing unreferenced values.");
+					if(amVerbose())q2outputInfo("Removing unreferenced values.");
 					size_t removedValueCount=getNumberOfRemovedValues(amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
 					if(amVerbose())
-					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
+					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else q2outputInfo("No garbage collected values.");}
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
-					if(getFirstFunctionBodyRequest()&&!startFunctionBodyInput())outputError("Failed to start requesting the body of a new function");
+					if(getFirstFunctionBodyRequest()&&!startFunctionBodyInput())q2outputError("Failed to start requesting the body of a new function");
 
 					// MDH@12MAY2020: output two incremental out
 					if(allocationMarksAdded>0){
 						outputTotalMemoryUsage();
-						if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)outputError("Not all command allocation marks output.");
+						if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)q2outputError("Not all command allocation marks output.");
 						while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
 					}
 
 				}else{
 					// MDH@14AUG2019: if a user presses Enter when there's no command but still feedforwardText it looses feedforwardText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)
 					//                NOTE that I might consider keeping feedforwardText, so it will be redisplayed when the user returns to the command mode
-					switchToControlMode(NULL); // replacing: if(getNumberOfSuggestedCharacters()==0)switchToControlMode(NULL);else outputError("Still suggested text");
+					switchToControlMode(NULL); // replacing: if(getNumberOfSuggestedCharacters()==0)switchToControlMode(NULL);else q2outputError("Still suggested text");
 				}
 			}else
 			if(inputMode==IM_SHELL){
@@ -4146,7 +4146,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 				switchToCommandMode();
 		}
 		showSeparatorLine();
-		if(!allocationMarkAdded())outputError("Failed to add a new memory allocation mark.");
+		if(!allocationMarkAdded())q2outputError("Failed to add a new memory allocation mark.");
 	}
 	// 'normal' exit
 	exit(0);

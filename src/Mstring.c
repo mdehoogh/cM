@@ -587,7 +587,7 @@ long long string_freadline(Mstring * const str,FILE* const file, unsigned char c
 		// as long as we cannot put the NUL character in, append a new block
 		while(numberOfAvailableCharacterPositions<=0){
 			if(!string_blockappended(str)){ // failed to allocate a new block
-				/////////outputError("Failed to allocate memory preparing to read a text line");
+				/////////q2outputError("Failed to allocate memory preparing to read a text line");
 				return 1; // out of memory
 			}
 			numberOfAvailableCharacterPositions+=M_BLOCK_CHARACTERS; // TODO should this be M_BLOCK_CHARACTERS?????
@@ -635,10 +635,10 @@ long long string_freadline(Mstring * const str,FILE* const file, unsigned char c
 			/// MDH@22MAY2024: not doing this anymore, this is left to the calling method (typically fReadLine() and fReadLines() in Mvalue.c)
 			////if(resetPosition)	// essential to return to the start of the following line (of which part may have been read)
 			////	if(fseek(file,1L-EOLNchars,SEEK_CUR))
-			////		outputMessage(M_ERROR_PREFIX,"Failed to move the file cursor %lld positions back.",1L-EOLNchars); // replacing: (charsRead-charsOnLine));
+			////		q2outputMessage(M_ERROR_PREFIX,"Failed to move the file cursor %lld positions back.",1L-EOLNchars); // replacing: (charsRead-charsOnLine));
 			///else{
 			///	output("Moved the file cursor %lld positions back.\n",EOLNchars);
-			///	if(fgetpos(file,&fpos))outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
+			///	if(fgetpos(file,&fpos))q2outputError("Failed to determine the file position");else output("Current file position: %lld.\n",fpos);
 			///}
 			// is there a CR in front of it?
 			if(numberOfStrChars>1&&*(insertPosition-1)=='\r')numberOfStrChars--;
@@ -657,7 +657,7 @@ long long string_freadline(Mstring * const str,FILE* const file, unsigned char c
 		if(!feof(file)&&numberOfAvailableCharacterPositions>0){ // not all characters we wanted to read read but not due to end-of-file
 			/*
 			int fileError=ferror(file);
-			outputMessage(M_ERROR_PREFIX,"Only %llu out of %llu characters read from unfinished text file (error code: %d).",numberOfCharsRead,leftInBlock,fileError);
+			q2outputMessage(M_ERROR_PREFIX,"Only %llu out of %llu characters read from unfinished text file (error code: %d).",numberOfCharsRead,leftInBlock,fileError);
 			*/
 			return 2;
 		}
@@ -697,7 +697,7 @@ long long string_characters_moved(Mstring* const str,size_t oldPosition,size_t n
 			return numberOfCharsToMove;
 		}
 		// this is truely something that should never happen (and it won't given we ascertain that we force a NUL character at the end of the string)
-		outputBug("No end position found moving characters!");
+		q2outputBug("No end position found moving characters!");
 	}
 	return M_LL_INVALID; // invalid input
 }

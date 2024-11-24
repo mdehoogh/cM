@@ -336,11 +336,11 @@ bool registerVariables(Menvironment * environment,Mallocationowner owner_environ
 				// if(strlen(variableName)>0){
 					// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
 					if(!addVariable(environment,owner_environment,variableName,variableMapelementVariable->valuetype,false)){
-						outputMessage(M_ERROR_PREFIX,"Failed to add variable '%s' as local variable.\n",variableName);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to add variable '%s' as local variable.\n",variableName);
 						return false;
 					}
 					if(!setValue(environment,variableName,variableMapelementVariable->_value)){
-						outputMessage(M_ERROR_PREFIX,"Failed to initialize local variable '%s'.\n",variableName);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to initialize local variable '%s'.\n",variableName);
 						return false;
 					}
 					if(amVerboseDebugging())
@@ -390,7 +390,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 	Menvironment* _functionExecutionEnvironment=owned_environment(_getNewEnvironment(),owner); // free asap
 	if(_functionExecutionEnvironment!=NULL){
 		if(amVerboseDebugging())
-			outputInfo("Registering the name of the function execution environment");
+			q2outputInfo("Registering the name of the function execution environment");
 		_functionExecutionEnvironment->_name=owned_chars(_getChars(functionName),Msubowner(owner,1)); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
@@ -401,32 +401,32 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		// 2. make the definition environment the parent of the function execution environment
 		assignValue(&_functionExecutionEnvironment->_parent,_function->_definitionEnvironmentValue); // MDH@03FEB2020 replacing: _functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
 		if(amVerboseDebugging())
-			outputInfo("Parent of function execution environment set to the function definition environment");
+			q2outputInfo("Parent of function execution environment set to the function definition environment");
 		// 3. create the argument map fields as variables in the function execution environment
 		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,owner,_argumentMap,M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME);
 		if(functionExecutionEnvironmentInitialized){
 			if(amVerboseDebugging())
-				outputInfo("Function execution environment initialized");
+				q2outputInfo("Function execution environment initialized");
 			// add the function itself variable $_ so a function can call itself without knowing the name is is stored under or passed elsewhere
 			if(!addVariable(_functionExecutionEnvironment,owner,"$_",VT_FUNCTION,true)||!setValue(_functionExecutionEnvironment,"$_",_getValueOfFunction(_function))){
-				outputError("Failed to add the this variable to the function execution environment");
+				q2outputError("Failed to add the this variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else
 			// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
 			if(!addVariable(_functionExecutionEnvironment,owner,"$",VT_UNDEFINED,false)){
-				outputError("Failed to add the result variable to the function execution environment");
+				q2outputError("Failed to add the result variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else // also add the function exit flag variable (with name ! which cannot be set in the code because it is an invalid name)
 			/* MDH@10JAN2021: no need to use the ! exit flag variable anymore (now replaced by the immutable flag of the result variable)
 			if(!addVariable(_functionExecutionEnvironment,owner,"!",VT_UNDEFINED,false)){
-				outputError("Failed to add the exit flag variable to the function execution environment");
+				q2outputError("Failed to add the exit flag variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else // MDH@22OCT2020: fail-through code that will add a list that would normally contain the additional arguments in a function call which we force to be present always this way
 			*/
 			if(!addVariable(_functionExecutionEnvironment,owner,M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME,VT_LIST,false))
-				outputInfo("Failed to add the additional arguments list variable to the function execution environment");
+				q2outputInfo("Failed to add the additional arguments list variable to the function execution environment");
 		}else
-			outputError("Failed to initialize the function execution environment.");
+			q2outputError("Failed to initialize the function execution environment.");
 		if(functionExecutionEnvironmentInitialized)return disowned_environment(_functionExecutionEnvironment,owner);
 		// ASSERT function execution environment NOT initialized
 		FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
@@ -538,37 +538,37 @@ static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
  */
 static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommandToken,TokenType expressionTokenTypeToIgnore,bool report){
 
-	if(NULL==lastCommandToken){if(report)outputError("Empty command");return 0;}
+	if(NULL==lastCommandToken){if(report)q2outputError("Empty command");return 0;}
 	
 	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
 	//	in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
-	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
+	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)q2outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
 
 	// MDH@28FEB2020: if the current last command token is an error do NOT remove, but let the caller handle it!!!!
-	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Command is erroneous.");return -1;}
+	if(lastCommandToken->type==TT_ERROR){if(report)q2outputError("Command is erroneous.");return -1;}
 	/* replacing:
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
 	if(lastCommandToken&&lastCommandToken->type==TT_ERROR){unfinishToken(lastCommandToken);lastCommandToken=removedLastCommandToken(command);return false;}
 
-	{if(report)outputError("Can't evaluate erroneous command");if(!removedLastCommandToken(command)){if(report)outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
+	{if(report)q2outputError("Can't evaluate erroneous command");if(!removedLastCommandToken(command)){if(report)q2outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
 
 	lastCommandToken=command->_lastToken;
 	*/
 
 	// 3. if the last token is an operator of sorts the command is incomplete
-	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return -2;}
+	if(lastCommandToken->type<=8){if(report)q2outputError("Value behind operator at end of command missing");return -2;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
 	//				BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
 	//					this actually means that if expr is NULL there's one parentheses too many!!!
 	/*
-	if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
-	if(_userInputCommand->_lastToken->expr!=_userInputCommand->_firstToken){outputError("Not enough parentheses!");return false;}
+	if(!_userInputCommand->_lastToken->expr){q2outputError("Too many parentheses!");return false;}
+	if(_userInputCommand->_lastToken->expr!=_userInputCommand->_firstToken){q2outputError("Not enough parentheses!");return false;}
 	*/
 	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
 	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
-	//////////// already noticed while entering the expression!!!!: if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
+	//////////// already noticed while entering the expression!!!!: if(!_userInputCommand->_lastToken->expr){q2outputError("Too many parentheses!");return false;}
 	Mtoken* expressionToken=lastCommandToken->expr; // the token pointed to by the last command token
 	if(expressionToken!=NULL)
 		if(lastCommandToken->type==TT_END_OF_LIST||lastCommandToken->type==TT_END_OF_FUNCTION_CALL||lastCommandToken->type==TT_END_OF_MAP)
@@ -591,13 +591,13 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 		// if we're not supposed to ignore this expression type, check it
 		if(expressionToken->type!=expressionTokenTypeToIgnore)
 		switch(expressionToken->type){
-			case TT_LIST:{outputError("Missing end of list");return -3;}
-			case TT_FUNCTION_CALL:{if(report)outputError("Missing end of function call");return -4;}
-			case TT_MAP:{if(report)outputError("Missing end of map");return -5;}
+			case TT_LIST:{q2outputError("Missing end of list");return -3;}
+			case TT_FUNCTION_CALL:{if(report)q2outputError("Missing end of function call");return -4;}
+			case TT_MAP:{if(report)q2outputError("Missing end of map");return -5;}
 			default:
 				{
 					if(report)
-						outputMessage(M_ERROR_PREFIX,"Unknown expression with first token of type %s left unfinished.\n",TOKENTYPE_STRING[expressionToken->expr->type]);
+						q2outputMessage(M_ERROR_PREFIX,"Unknown expression with first token of type %s left unfinished.\n",TOKENTYPE_STRING[expressionToken->expr->type]);
 					return -6;
 				}
 		}
@@ -605,7 +605,7 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 		// MDH@23JUL2019: we can now be very strict
 		//				the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
 		if(_userInputCommand->_lastToken->expr->type!=TT_EXPRESSION||(string_length(_userInputCommand->_lastToken->expr->text)&&string_char(_userInputCommand->_lastToken->expr->text,0)!=' ')){
-			outputError("Incomplete command");
+			q2outputError("Incomplete command");
 			return false;
 		}
 		*/
@@ -613,10 +613,10 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 		// this is allowed if this token ends something that points to NULL
 		if((_userInputCommand->_lastToken->type!=TT_END_OF_LIST&&_userInputCommand->_lastToken->type!=TT_END_OF_FUNCTION_CALL&&_userInputCommand->_lastToken->type!=TT_END_OF_MAP)||_userInputCommand->_lastToken->expr->expr){
 			switch(_userInputCommand->_lastToken->expr->expr->type){
-				case TT_LIST:outputError("Missing end of list.");break;
-				case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
-				case TT_MAP:outputError("Missing end of map!");break;
-				default:outputError("Not enough parentheses.");break;
+				case TT_LIST:q2outputError("Missing end of list.");break;
+				case TT_FUNCTION_CALL:q2outputError("Missing end of function call!");break;
+				case TT_MAP:q2outputError("Missing end of map!");break;
+				default:q2outputError("Not enough parentheses.");break;
 			}
 			return false;
 		}
@@ -625,12 +625,12 @@ static int8_t isAValidLastCommandTokenIndicator(Mtoken const * const lastCommand
 
 	// 4. can't end with function of function call
 	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
-	if(lastCommandToken->type==TT_FUNCTION){if(report)outputError("Function call missing at end of command");return -7;}
-	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)outputError("Unfinished function call");return -8;}
-	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)outputError("Unfinished list");return -9;}
-	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)outputError("Unfinished string literal");return -10;}
-	if(lastCommandToken->type==TT_EXPRESSION){if(report)outputError("Unfinished expression");return -11;}
-	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return -12;}
+	if(lastCommandToken->type==TT_FUNCTION){if(report)q2outputError("Function call missing at end of command");return -7;}
+	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)q2outputError("Unfinished function call");return -8;}
+	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)q2outputError("Unfinished list");return -9;}
+	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)q2outputError("Unfinished string literal");return -10;}
+	if(lastCommandToken->type==TT_EXPRESSION){if(report)q2outputError("Unfinished expression");return -11;}
+	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)q2outputError("Unfinished map");return -12;}
 	
 	return 1;
 }
@@ -668,7 +668,7 @@ Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command
 int8_t isAValidCommandIndicator(Mcommand const * const command/*,Mallocationowner owner_command*/,bool report){
 	// MDH@28JUN2023: SHOULD NOT CHANGE command, for now we can solve this by only allowing removal when report is true
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(NULL==command||NULL==command->_firstToken)return 0; // replacing: {if(report)outputError("Undefined or empty command");return 0;}
+	if(NULL==command||NULL==command->_firstToken)return 0; // replacing: {if(report)q2outputError("Undefined or empty command");return 0;}
 	Mtoken* lastCommandToken=command->_lastToken;
 	// MDH@11JUL2023: changed if into while to 'remove' all trailing comments
 	while(lastCommandToken!=NULL&&lastCommandToken->type==TT_COMMENT){
@@ -698,7 +698,7 @@ static Mvalue* getCommandValue(Mcommand const * const command/*,Mallocationowner
 	if(aValidCommandIndicator<=0)return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerboseDebugging())
-		outputInfo("Evaluating...");
+		q2outputInfo("Evaluating...");
 	return getValueOfExpression(getExecutionEnvironment()->_name->chars,commandType,(TokenType[]){},0);
 }
 
@@ -721,7 +721,7 @@ long long getDP(){
 	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
 	long long dp=(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
-	if(dp==M_LL_INVALID)outputBug("No default decimal context active!");
+	if(dp==M_LL_INVALID)q2outputBug("No default decimal context active!");
 	return dp;
 }
 // MDH@18OCT2019: if someone wants to know about the decimal context
@@ -780,11 +780,11 @@ Mvalue* Msetdp(Mvalue* value){
 	if(value->type==VT_BIGINTEGER)
 		decimalprecision=biginteger2long(value->value._biginteger);
 	if(decimalprecision==M_LL_INVALID){
-		outputError("Requested decimal precision not an integer");
+		q2outputError("Requested decimal precision not an integer");
 		return NULL;
 	}
 	if(decimalprecision<6){
-		outputMessage(M_ERROR_PREFIX,"Requested decimal precision (%llu) not activated: it should at least be 6.\n",decimalprecision);
+		q2outputMessage(M_ERROR_PREFIX,"Requested decimal precision (%llu) not activated: it should at least be 6.\n",decimalprecision);
 		return NULL;
 	}
 	// if I fail to create the associated decimal context, no go
@@ -794,7 +794,7 @@ Mvalue* Msetdp(Mvalue* value){
 		M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
 		////DP_value->value._integer->ll=_decimalContext->prec;
 	}else
-		outputMessage(M_ERROR_PREFIX,"Active decimal context not replaced: failed to create a decimal context with precision %llu.\n",decimalprecision);
+		q2outputMessage(M_ERROR_PREFIX,"Active decimal context not replaced: failed to create a decimal context with precision %llu.\n",decimalprecision);
 	return _getIntegerValue(olddecimalprecision);
 }
 
@@ -899,13 +899,13 @@ Mvalue* Mwhilefunction(Mvalue* _whileTokenlistValue){
 						}
 					}
 				}else
-					outputBug("First while token list element not a token");
+					q2outputBug("First while token list element not a token");
 			}else
-				outputBug("Missing while token list condition");
+				q2outputBug("Missing while token list condition");
 		}else
-			outputError("A while loop takes a condition and at least one loop expression");
+			q2outputError("A while loop takes a condition and at least one loop expression");
 	}else
-		outputBug("While loop arguments not a list");
+		q2outputBug("While loop arguments not a list");
 	return _result;
 }
 /* replacing the previous implementation
@@ -977,14 +977,14 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 								if(expressionValue!=NULL){
 									if(expressionValue->type==VT_MAP){
 										if(!registerVariables(_doEnvironment,getValueDataOwner(),expressionValue->value._map,NULL))
-											outputError("Failed to initialize the do function call environment!");
+											q2outputError("Failed to initialize the do function call environment!");
 									}else
-										outputWarning("Local variables of do function call not defined in a map!\n");
+										q2outputWarning("Local variables of do function call not defined in a map!\n");
 								}
 							}else
 							if(tokenExpressionValue->type==VT_MAP)
 								if(!registerVariables(_doEnvironment,getValueDataOwner(),tokenExpressionValue->value._map,NULL))
-									outputError("Failed to initialize the do function call environment!");
+									q2outputError("Failed to initialize the do function call environment!");
 						}
 						// now ready to process the 'body'
 						tokenValueListelement=tokenValueListelement->_next; // skip the local variable map
@@ -1015,7 +1015,7 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 						free_environment(_doEnvironment);
 				}else{ // _doEnvironment bound to this function, so both disowned and free
 					FREE_ENVIRONMENT(_doEnvironment,owner); // MDH@17JUN2020: check if this should be here
-					outputError("Failed to create the do environment");
+					q2outputError("Failed to create the do environment");
 				}
 			}
 		}
@@ -1043,7 +1043,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 		(_bodyTokenValue!=NULL&&_bodyTokenValue->type==VT_TOKEN)&&
 		(NULL==_resultTokenValue||_resultTokenValue->type==VT_TOKEN)){
 		if(report){
-			q2outputandcollect("For loop:");
+			q2output("For loop:");
 			q2outputValue(" Initialization=",_initializationTokenValue,NULL);
 			q2outputValue(" Condition=",_conditionTokenValue,NULL);
 			q2outputValue(" Increment=",_incrementTokenValue,NULL);
@@ -1078,7 +1078,7 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 						// although perhaps we should exclude using $ and _ well especially _
 						// MDH@08NOV2019: a list is also allowed actually anything
 						if(initializationValue!=NULL&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,getOwnerExecutionEnvironment(),initializationValue->value._map,NULL)){
-							outputError("Failed to initialize the for loop local variables");
+							q2outputError("Failed to initialize the for loop local variables");
 							forEnvironmentInitialized=false;
 						}
 					}
@@ -1163,21 +1163,21 @@ Mvalue* Mforwithfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTok
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
 					if(report)
-						outputInfo("For loop environment popped.");
+						q2outputInfo("For loop environment popped.");
 				}else{
-					outputError("Failed to activate the for loop execution environment");
+					q2outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
 				}
 			}else
-				outputError("Failed to add or initialize the for loop result and counter local variables $ and _");
+				q2outputError("Failed to add or initialize the for loop result and counter local variables $ and _");
 			if(!forEnvironmentInitialized){
 				// FREE_ENVIRONMENT(_forEnvironment,owner); // have to free the environment myself
 				// if(amVerbose())
-				outputInfo("Uninitialized for loop environment discarded!");
+				q2outputInfo("Uninitialized for loop environment discarded!");
 			}
 			FREE_ENVIRONMENT(_forEnvironment,owner); // MDH@17JUN2020: TODO should this be here???
 		}else
-			outputError("Failed to create the for loop execution environment");
+			q2outputError("Failed to create the for loop execution environment");
 	}
 	return _result;
 }
@@ -1258,13 +1258,13 @@ Mvalue* Mforfunction(Mvalue* _forTokenlistValue){Mallocationowner owner=getOwner
 						}
 					}
 				}else
-					outputBug("For loop condition list element missing or not a token");
+					q2outputBug("For loop condition list element missing or not a token");
 			}else
-				outputBug("For loop increment list element missing or not a token");
+				q2outputBug("For loop increment list element missing or not a token");
 		}else
-			outputError("A for loop takes an initialization (possibly undefined), a condition (obligatory), an increment (possibly undefined) and at least one loop expression");
+			q2outputError("A for loop takes an initialization (possibly undefined), a condition (obligatory), an increment (possibly undefined) and at least one loop expression");
 	}else
-		outputBug("For loop arguments not a list");
+		q2outputBug("For loop arguments not a list");
 	return _result;
 }
 
@@ -1330,7 +1330,7 @@ Mvalue* Mcreate(Mvalue* newVariablesValue){Mallocationowner owner=getOwner(__LIN
 					break;
 			}
 		}else
-			outputBug("Current environment vanished");
+			q2outputBug("Current environment vanished");
 	}
 	return _getIntegerValue(result);
 }
@@ -1386,19 +1386,19 @@ static long long pushInitializedEnvironment(Menvironment * const _withEnvironmen
 										withMap->numberOfElements++; // count one more
 									}
 								}else
-									outputMessage(M_ERROR_PREFIX,"Failed to copy the map attribute name '%s'.\n",localMapelementVariable->_name->chars);
+									q2outputMessage(M_ERROR_PREFIX,"Failed to copy the map attribute name '%s'.\n",localMapelementVariable->_name->chars);
 							}
 						}else
-							outputMessage(M_ERROR_PREFIX,"Failed to copy map attribute '%s'.\n",localMapelementVariable->_name->chars);
+							q2outputMessage(M_ERROR_PREFIX,"Failed to copy map attribute '%s'.\n",localMapelementVariable->_name->chars);
 						localMapelement=localMapelement->_next;
 					}
 					if(localMapelement!=NULL)
-						outputError("Not all with local variables registered");
+						q2outputError("Not all with local variables registered");
 				}
 				result=M_TRUE;
-				outputMessage(NULL,"Environment '%s' initialized.\n",_withEnvironment->_name->chars);
+				q2outputMessage(NULL,"Environment '%s' initialized.\n",_withEnvironment->_name->chars);
 			}else{
-				outputMessage(M_ERROR_PREFIX,"Failed to initialize environment '%s'.\n",_withEnvironment->_name->chars);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to initialize environment '%s'.\n",_withEnvironment->_name->chars);
 				free_environment(_withEnvironment);//////////_withEnvironment=NULL;
 			}
 		}
@@ -1411,14 +1411,14 @@ static long long pushInitializedEnvironment(Menvironment * const _withEnvironmen
 				// almost there
 				if(!pushExecutionEnvironment(disowned_environment(_withEnvironment,owner))){ // _withEnvironment not bound!!!
 					free_environment(_withEnvironment);//////////_withEnvironment=NULL;
-					outputMessage(M_ERROR_PREFIX,"Failed to initialize environment '%s'.",_withEnvironment->_name->chars);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to initialize environment '%s'.",_withEnvironment->_name->chars);
 				}else{
 					result=M_TRUE;
 					output("Environment '%s' initialized.\n",_withEnvironment->_name->chars);
 				}
 			}else
 			if(withNameMapelement!=NULL)
-				outputError("Failed to remove the environment name from the local variables map");	
+				q2outputError("Failed to remove the environment name from the local variables map");	
 		}
 		*/
 		if(result==M_FALSE&&_withEnvironment!=NULL){
@@ -1440,9 +1440,9 @@ static long long pushInitializedEnvironment(Menvironment * const _withEnvironmen
 		if(!withVariableMapelement){ // with environment successfully initialized
 		}else{
 			q2outputmessageprefix(M_ERROR_PREFIX);
-			q2outputandcollect("Failed to initialize %senvironment",(_withNameText?"":"the with "));
-			if(_withNameText)q2outputandcollect(" '%s'",string(_withNameText));
-			q2outputandcollect("%s",".\n");
+			q2output("Failed to initialize %senvironment",(_withNameText?"":"the with "));
+			if(_withNameText)q2output(" '%s'",string(_withNameText));
+			q2output("%s",".\n");
 		}
 		*/
 		if(_withNameText!=NULL)FREE_STRING(_withNameText,owner);
@@ -1482,7 +1482,7 @@ Mvalue* Mif(Mvalue* testValue,Mvalue* localsValue){Mallocationowner owner=getOwn
 					result=M_TRUE;
 			}else{ // _doEnvironment bound to this function, so both disowned and free
 				FREE_ENVIRONMENT(ifEnvironment,owner); // MDH@17JUN2020: check if this should be here
-				outputError("Failed to create the if environment");
+				q2outputError("Failed to create the if environment");
 			}
 		}
 	}
@@ -1895,7 +1895,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 			// MDH@20OCT2021 doing this fucks up the reoutputToken(): outputChar('*');
 		}
 		else // TODO what more can we do????
-			outputMessage(M_BUG_PREFIX,"Invalid identifier name '%s'.",_identifierName);
+			q2outputMessage(M_BUG_PREFIX,"Invalid identifier name '%s'.",_identifierName);
 	}
 	// replacing: functionToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
@@ -2103,7 +2103,7 @@ bool characterContinuesToken(Mtoken const * const token,char inputChar,char inpu
 	if(NULL==token)return false;
 	// MDH@11JUL2023: a comment no longer is automatically continued (since a newline character finishes it now)
 	if(token->type==TT_ERROR/*||token->type==TT_COMMENT*/){
-		outputMessage("'%c' always continues error token.",inputChar);
+		q2outputMessage("'%c' always continues error token.",inputChar);
 		return true;
 	}
 	// ASSERT token is not NULL and not an error // replacing: neither a error or a comment
@@ -2301,7 +2301,7 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 		}else
 		*/
 		if(newTokenType>=0&&(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||isTokenFinished(lastCommandToken))){
-			///////////if(amVerbose())outputInfo("!");/////(*inputInfoFunction)("New token!");
+			///////////if(amVerbose())q2outputInfo("!");/////(*inputInfoFunction)("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//				if we're in a binary operator and move to another binary operator type it's an extension
 			//				NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
@@ -2602,10 +2602,10 @@ static Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtok
 				popExecutionEnvironment(); // pop the eval environment we successfully pushed
 			}else{
 				free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
-				outputMessage(M_ERROR_PREFIX,"Unable to setup the evaluation of '%s'.\n",string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)));
+				q2outputMessage(M_ERROR_PREFIX,"Unable to setup the evaluation of '%s'.\n",string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,_commandText)));
 			}
 		}else
-			outputMessage(M_ERROR_PREFIX,"Failed to evaluate '%s'.\n",string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
+			q2outputMessage(M_ERROR_PREFIX,"Failed to evaluate '%s'.\n",string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
 		if(NULL==commandText&&_commandText!=NULL)free_string(_commandText);
 	}else
 		logToOutputFile("%s%sUnable to evaluate a subcommand!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
@@ -2641,7 +2641,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 				commandCharacterType=INPUTCHARACTERTYPES[commandCharacter];
 				newCommandToken=commandCharacterAppended(_command,commandCharacter,&commandCharacterType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
 				if(newCommandToken==NULL){
-					outputMessage(M_ERROR_PREFIX,"Failed to append command character '%c' parsing '%s'!\n",commandCharacter,commandText);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to append command character '%c' parsing '%s'!\n",commandCharacter,commandText);
 					break;
 				}
 				// MDH@28MAY2020: take over ownership of the new token returned
@@ -2685,10 +2685,10 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else{
 						free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
-						outputMessage(M_ERROR_PREFIX,"Unable to setup the evaluation of '%s'.",string(_evalValueText));
+						q2outputMessage(M_ERROR_PREFIX,"Unable to setup the evaluation of '%s'.",string(_evalValueText));
 					}
 				}else
-					outputMessage(M_ERROR_PREFIX,"Failed to evaluate '%s'.",string(_evalValueText));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to evaluate '%s'.",string(_evalValueText));
 			}
 			*/
 			FREE_COMMAND(_evalCommand,owner);
@@ -2715,7 +2715,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					_evalCommand->_lastToken=owned_token(newLastEvalCommandToken,Msubowner(owner,1)); // update our eval command's last token TODO do we need to test here????
 				if(!_evalCommand->_lastToken)break;
 			}
-			if(amVerbose())outputInfo("'.");
+			if(amVerbose())q2outputInfo("'.");
 			if(_evalCommand->_lastToken){
 				// just like with do() we have to evaluate the command in a subenvironment
 				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
@@ -2730,12 +2730,12 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					}else{
 						// MDH@27OCT2020: since pushing the (disowned) environment failed we should free it here (otherwise the gc will take care of freeing it)
 						free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
-						outputMessage(M_ERROR_PREFIX,"Unable to setup the evaluation of '%s'.",string(_evalValueText));
+						q2outputMessage(M_ERROR_PREFIX,"Unable to setup the evaluation of '%s'.",string(_evalValueText));
 					}
 				}else
-					outputMessage(M_ERROR_PREFIX,"Unable to evaluate '%s'.",string(_evalValueText));
+					q2outputMessage(M_ERROR_PREFIX,"Unable to evaluate '%s'.",string(_evalValueText));
 			}else
-				outputMessage(M_ERROR_PREFIX,"Unable to evaluate the invalid command '%s'.",string(_evalValueText));
+				q2outputMessage(M_ERROR_PREFIX,"Unable to evaluate the invalid command '%s'.",string(_evalValueText));
 			FREE_COMMAND(_evalCommand,owner); // clean up the command
 		}
 		*/
@@ -2924,7 +2924,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 						if(onInput)
 							(*inputInfoFunction)("Number of expected arguments: %lld.",numberOfExpectedArguments);
 						else
-							outputMessage(M_ERROR_PREFIX,"Number of expected arguments: %lld.",numberOfExpectedArguments);
+							q2outputMessage(M_ERROR_PREFIX,"Number of expected arguments: %lld.",numberOfExpectedArguments);
 					}else
 						if(onInput)
 							(*inputInfoFunction)("Number of expected arguments unknown!");
@@ -2955,7 +2955,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 						if(onInput)
 							(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
 						else
-							outputWarning("Cannot exceed the maximum number of 15 (nested) special function calls");
+							q2outputWarning("Cannot exceed the maximum number of 15 (nested) special function calls");
 				}
 			}
 			//////outputChar('H');
@@ -3034,7 +3034,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 										newTokenType=TT_ERROR; // TODO I suppose we could have a separate TT_BUG token type perhaps?????
 										logToOutputFile("Failed to push the local variables map!\n");
 										if(!onInput||inputErrorFunction)
-											if(onInput)(*inputErrorFunction)("Failed to register local variables!");else outputError("Failed to register local variables!");
+											if(onInput)(*inputErrorFunction)("Failed to register local variables!");else q2outputError("Failed to register local variables!");
 									}
 									// //////outputChar('E');
 								}else{ // it's not a map which it should be
@@ -3044,7 +3044,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 									if(onInput)
 										(*inputInfoFunction)("%s%sLocal variables argument does not evaluate to a map!",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
 									else 
-										outputWarning("Local variables argument does not evaluate to a map!");
+										q2outputWarning("Local variables argument does not evaluate to a map!");
 								}
 								// //////outputChar('G');
 							}
@@ -3055,7 +3055,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 							if(_token->expr->argument==-3){ // already reached the total number of expected arguments
 								newTokenType=TT_ERROR;
 								if(!onInput||inputErrorFunction)
-								if(onInput)(*inputErrorFunction)("Another argument not allowed.");// else outputError("Another argument not allowed");
+								if(onInput)(*inputErrorFunction)("Another argument not allowed.");// else q2outputError("Another argument not allowed");
 							}else{
 								_token->expr->argument=_token->expr->argument+1;
 								if(amVerboseDebugging())
@@ -3081,7 +3081,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 					newTokenType=TT_ERROR;
 					if(!onInput||inputErrorFunction)
 					if(onInput)(*inputErrorFunction)("Comma not allowed outside map, list, array or function call!");
-					else outputError("Comma not allowed outside map, list, array or function call");
+					else q2outputError("Comma not allowed outside map, list, array or function call");
 				}
 			}else
 			if(newTokenType==TT_LIST||newTokenType==TT_EXPRESSION)
@@ -3207,7 +3207,7 @@ static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInpu
 		if(onInput)
 			if(inputErrorFunction)(*inputErrorFunction)("Failed to create a new token.");else;
 		else
-			outputError("Failed to create a new token");
+			q2outputError("Failed to create a new token");
 		return NULL;
 	}
 	_token->type=newTokenType;
@@ -3232,7 +3232,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool on
 		if(tokenType!=TT_ERROR&&_newCommandToken->type==TT_ERROR){
 			if(onInput)
 				if(inputErrorFunction)(*inputErrorFunction)("Assumed new error token type corrected!\n");else;
-			//else outputError("Assumed new error token type corrected");
+			//else q2outputError("Assumed new error token type corrected");
 		}
 		setTokenType(_newCommandToken,tokenType);
 	}else
@@ -3240,7 +3240,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool on
 		if(onInput)
 			if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token.\n");else;
 		else
-			outputError("Failed to create a command token");
+			q2outputError("Failed to create a command token");
 	return disowned_token(_newCommandToken,owner);
 }
 
@@ -3417,10 +3417,10 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 Mrational* _qsum(Mrational* _rational1,Mrational* _rational2){
 	Mrational* _rational=__rational(); // we need a rational to hold the sum
 	if(_rational){
-		outputInfo("Adding two rationals.");
+		q2outputInfo("Adding two rationals.");
 		mp_err status=_qadd(_rational,_rational1,_rational2);
 		output("Two rationals added (status=%i).\n",status);
-		if(status!=MP_OKAY){FREE_RATIONAL(_rational);_rational=NULL;outputError("Failed to add two rationals");}else outputInfo("Two rationals added successfully."); // addition failed somehow...
+		if(status!=MP_OKAY){FREE_RATIONAL(_rational);_rational=NULL;q2outputError("Failed to add two rationals");}else q2outputInfo("Two rationals added successfully."); // addition failed somehow...
 	}
 	return _rational;
 }
@@ -3461,69 +3461,69 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Adding two decimals.");
+	///////q2outputInfo("Adding two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
-		if(status&0xEFBF){FREE_DECIMAL(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
+		if(status&0xEFBF){FREE_DECIMAL(_result);_result=NULL;q2outputError("Failed to compute the sum of two decimals.");}
 	}else
-		outputError("Failed to create the sum decimal");
+		q2outputError("Failed to create the sum decimal");
 	return _result;
 }
 Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Dividing two decimals.");
+	///////q2outputInfo("Dividing two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			FREE_DECIMAL(_result);_result=NULL;
-			outputError("Failed to compute the quotient of two decimals");
+			q2outputError("Failed to compute the quotient of two decimals");
 		}
 	}else 
-		outputError("Failed to create the quotient decimal");
+		q2outputError("Failed to create the quotient decimal");
 	return _result;
 }
 Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Multiplying two decimals.");
+	///////q2outputInfo("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			FREE_DECIMAL(_result);_result=NULL;
-			outputError("Failed to compute the product of two decimals");
+			q2outputError("Failed to compute the product of two decimals");
 		}
 	}else
-		outputError("Failed to create the product decimal");
+		q2outputError("Failed to create the product decimal");
 	return _result;
 }
 Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Multiplying two decimals.");
+	///////q2outputInfo("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			FREE_DECIMAL(_result);_result=NULL;
-			outputError("Failed to compute the difference of two decimals");
+			q2outputError("Failed to compute the difference of two decimals");
 		}
 	}else
-		outputError("Failed to create the difference decimal");
+		q2outputError("Failed to create the difference decimal");
 	return _result;
 }
 */
@@ -3558,13 +3558,13 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 		q2outputmessageprefix(M_ERROR_PREFIX);
 		q2outputValue("Argument '",value,"' to the pi() function should ");
 		if(numberOfRequestedDecimals==M_LL_INVALID)
-			q2outputandcollect("denote a valid small integer");
+			q2output("denote a valid small integer");
 		else
 		if(numberOfRequestedDecimals<=0)
-			q2outputandcollect("denote a positive integer");		
+			q2output("denote a positive integer");		
 		else
-			q2outputandcollect("at least equal 6");	
-		q2outputandcollect(", which it does not!\n");
+			q2output("at least equal 6");	
+		q2output(", which it does not!\n");
 		return NULL;
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
@@ -3627,14 +3627,14 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							Mbiginteger* _addendumNumerator=owned_biginteger(_getBiginteger(iter%2?-1:1),owner); // the numerator is either 1 or -1
 							if(NULL==_addendumNumerator){
 								FREE_BIGINTEGER(_addendumDenominator,owner);
-								outputMessage(M_ERROR_PREFIX,"Failed to set the addendum numerator at iteration %u.\n",iter);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to set the addendum numerator at iteration %u.\n",iter);
 								break;
 							}
 							// both _addendumNumerator and _addendumDenominator are now available to be bound in the rational
 							Mrational* _addendumRational=owned_rational(_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false),owner);
 							FREE_BIGINTEGER(_addendumNumerator,owner);
 							if(NULL==_addendumRational){ // failed to bind in the rational
-								outputMessage(M_ERROR_PREFIX,"Failed to compute the rational to add to the approximation of pi in step %u.",iter);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to compute the rational to add to the approximation of pi in step %u.",iter);
 								break;
 							}
 							// add the addendum to the current rational
@@ -3645,7 +3645,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							Mrational* _newRational=owned_rational(_getRationalSum(_rational,_addendumRational),owner); // _qsum replaced by _getRationalSum in Mrational.h/c
 							if(NULL==_newRational){
 								// we have to free the addendum numerator and denominator
-								outputMessage(M_ERROR_PREFIX,"Failed to add this addendum at step %u in approximating pi.\n",iter);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to add this addendum at step %u in approximating pi.\n",iter);
 								FREE_RATIONAL(_addendumRational,owner); // to free the addendum numerator and denominator bound to _addendumRational
 								break;
 							}
@@ -3655,7 +3655,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							Mbiginteger* _newAddendumDenominator=owned_biginteger(_Iadd(_addendumDenominator,_denominatorIncrement),owner);
 							if(NULL==_newAddendumDenominator){
 								// MDH@27MAY2020: FREE_BIGINTEGER(_addendumDenominator,owner); // won't be using this in the addendum rational
-								outputError("Failed to increment the addendum denominator");
+								q2outputError("Failed to increment the addendum denominator");
 								break;
 							}
 							if(amVerboseDebugging())
@@ -3678,7 +3678,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								q2outputBiginteger("New addendum denominator: ",_addendumDenominator,".\n");
 						}
 					}else{
-						outputError("Failed to initialize the addendum numerator and its increment value (2)");
+						q2outputError("Failed to initialize the addendum numerator and its increment value (2)");
 					}
 					// MDH@27MAY2020: free helper big integers
 					FREE_BIGINTEGER(_addendumDenominator,owner);
@@ -3723,7 +3723,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			if(amVerbose())
 				output("Computing %llu continued fractions of pi.\n",iter);
 			Mbiginteger* _bi3=owned_biginteger(_getBiginteger(3),owner);
-			if(NULL==_bi3){outputError("Failed to create big integer 3.");return NULL;}
+			if(NULL==_bi3){q2outputError("Failed to create big integer 3.");return NULL;}
 			Mrational* _rational=owned_rational(_getRational(_bi3,NULL,M_LD_NAN,false),owner);
 			FREE_BIGINTEGER(_bi3,owner);
 			if(_rational!=NULL){
@@ -3731,7 +3731,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					// working backwards starting with the last denominator quotient seems to be best
 					// in every step you have to compute i**2/6 the second term of the denominator
 					Mbiginteger* _bi6=owned_biginteger(_getBiginteger(6),owner);
-					if(NULL==_bi6){outputError("Failed to create big integer of 6.");return NULL;}
+					if(NULL==_bi6){q2outputError("Failed to create big integer of 6.");return NULL;}
 					Mrational* _denominatorRational=(_bi6!=NULL?owned_rational(_getRational(_bi6,NULL,M_LD_NAN,false),owner):NULL); // the final denominator equals 6
 					if(_denominatorRational!=NULL){
 						if(amVerbose())
@@ -3742,7 +3742,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							////////////if(amVerbose())output("Square numerator: %llu.",square);
 							Mbiginteger* _bigintegerSquare=owned_biginteger(_getBiginteger(square),owner);
 							if(NULL==_bigintegerSquare){
-								outputMessage(M_ERROR_PREFIX,"Failed to compute the big integer of square %llu.\n",square);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to compute the big integer of square %llu.\n",square);
 								break;
 							}
 							if(amVerbose())
@@ -3767,7 +3767,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						}
 					}
 					FREE_BIGINTEGER(_bi6,owner);
-					// MDH@27MAY2020: if(!_denominatorRational){outputError("Final denominator could not be computed");return NULL;}
+					// MDH@27MAY2020: if(!_denominatorRational){q2outputError("Final denominator could not be computed");return NULL;}
 					// NOTE: do NOT use the originals in inverting the denominator because those will be freed below so we need to pass in copies
 					Mrational* _inverseDenominatorRational=owned_rational(_getInverseRational(_denominatorRational),owner);
 					Mrational* _result=NULL;
@@ -3826,7 +3826,7 @@ for i in range(10000):
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
 Mvalue* getResult(Mvalue* indexValue){
-	if(amVerbose())outputInfo("Result requested!");
+	if(amVerbose())q2outputInfo("Result requested!");
 	if(!indexValue)return _resultListValue;
 	long long indexValueInteger=getValueInteger(indexValue); // NOTE all index values should be positive!!!
 	return (indexValueInteger>0?getValueAtIndex(_resultListValue->value._list,indexValueInteger):NULL); // TODO are we calling getResult anywhere????
@@ -3848,7 +3848,7 @@ Mvalue* l2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		Mmap* _map=owned_map(_getMapOfType(value->type),owner); // a strong map
 		if(NULL==_map)return NULL;
 		if(!listAppendedToMap(_map,owner,value->value._list))
-			outputError("Failed to append a list to a map")
+			q2outputError("Failed to append a list to a map")
 		; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 		_mapValue=_getValueOfMap(disowned_map(_map,owner)); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 	}
@@ -3868,7 +3868,7 @@ Mvalue* l2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		if(NULL==_maplist)return NULL;
 		// TODO check if we're passing the right 
 		if(!listAppendedToMaplist(_maplist,owner,value->value._list))
-			outputError("Failed to append a list to a map list")
+			q2outputError("Failed to append a list to a map list")
 		; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 		_maplistValue=_getValueOfList(disowned_list(_maplist,owner));
 	}
@@ -4186,9 +4186,9 @@ Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 										if(string_append(_mapvariablename,mapvariable->_name->chars)){
 											if(appendedToList(_list,owner,_getTextValue(string(_mapvariablename)),M_LL_INVALID)<=0
 												||appendedToList(_list,owner,mapvariable->_value,M_LL_INVALID)<=0)
-												outputError("Failed to either store a map key or value in the list");
+												q2outputError("Failed to either store a map key or value in the list");
 										}else
-											outputError("Failed to create the text to store the key in");
+											q2outputError("Failed to create the text to store the key in");
 										FREE_STRING(_mapvariablename,owner);
 									}
 								}
@@ -4197,7 +4197,7 @@ Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							}
 						}
 					}else
-						outputBug("Value map missing!");
+						q2outputBug("Value map missing!");
 				}else{ // a single value, to be wrapped in a list
 					if(appendedToList(_list,owner,value,M_LL_INVALID)<=0){
 						q2outputmessageprefix(M_ERROR_PREFIX);
@@ -4207,7 +4207,7 @@ Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			}
 			return _getValueOfList(disowned_list(_list,owner));
 		}
-		outputError("Failed to create the list");
+		q2outputError("Failed to create the list");
 	///}
 	return NULL;
 }
@@ -4234,15 +4234,15 @@ Mvalue* Mm(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						if(_key!=NULL){
 							if(appendedToMap(_map,owner,_key,listelement->_value)!=M_TRUE){
 								// TODO q2... herer?
-								outputMessage(M_ERROR_PREFIX,"Failed to append list element #%llu to the map.\n",listelement->index);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to append list element #%llu to the map.\n",listelement->index);
 							}
 							FREE_DISOWNED(_key,strlen(_key)+1,-'"',owner);
 						}else
-							outputError("Failed to create the list index element map key");
+							q2outputError("Failed to create the list index element map key");
 						listelement=listelement->_next;
 					}
 				}else
-					outputBug("Value list missing!");
+					q2outputBug("Value list missing!");
 			}else
 			if(value->type==VT_ARRAY){
 				Marray* array=value->value._array;
@@ -4256,22 +4256,22 @@ Mvalue* Mm(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							char* _key=OWNED(_getIntegerCharacters(++arrayindex),owner);
 							if(_key!=NULL){
 								if(appendedToMap(_map,owner,_key,*valueholder)!=M_TRUE)
-									outputMessage(M_ERROR_PREFIX,"Failed to append array element #%llu to the map.\n",arrayindex);
+									q2outputMessage(M_ERROR_PREFIX,"Failed to append array element #%llu to the map.\n",arrayindex);
 								FREE_DISOWNED(_key,strlen(_key)+1,-'"',owner);
 							}else
-								outputError("Failed to create the array index map key");
+								q2outputError("Failed to create the array index map key");
 							valueholder++;
 						}
 					}
 				}else
-					outputBug("Value array missing!");
+					q2outputBug("Value array missing!");
 			}else{
 				if(appendedToMap(_map,owner,"",value)!=M_TRUE)
-					outputError("Failed to wrap the value in a map");
+					q2outputError("Failed to wrap the value in a map");
 			}
 			return _getValueOfMap(disowned_map(_map,owner));
 		}
-		outputError("Failed to create the map");
+		q2outputError("Failed to create the map");
 	}
 	return NULL;
 }
@@ -4307,9 +4307,9 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					}
 					return _getValueOfArray(disowned_array(_array,owner));
 				}
-				outputError("Failed to create the array to store the list elements in");			
+				q2outputError("Failed to create the array to store the list elements in");			
 			}else
-				outputBug("No (value) list to convert to an array");
+				q2outputBug("No (value) list to convert to an array");
 		}else
 		if(value->type==VT_MAP){
 			Mmap* map=value->value._map;
@@ -4342,16 +4342,16 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					}
 					return _getValueOfArray(disowned_array(_array,owner));
 				}
-				outputMessage(M_ERROR_PREFIX,"Failed to create the array to store %llu map elements in.",maplength);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to create the array to store %llu map elements in.",maplength);
 			}else
-				outputBug("No (value) map to convert to an array!");
+				q2outputBug("No (value) map to convert to an array!");
 		}else{ // a single value, to be wrapped in an array
 			Marray* _array=owned_array(_getArray("Ma",1,NULL),owner);
 			if(_array!=NULL){
 				assignValue(_array->values,value); // pretty simple!
 				return _getValueOfArray(disowned_array(_array,owner));
 			}
-			outputError("Failed to create the array to wrap the value in");
+			q2outputError("Failed to create the array to wrap the value in");
 		}
 	}
 	return NULL;
@@ -4597,11 +4597,11 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 		if(_deltaRational!=NULL){
 			_purifiedRational=owned_rational(_getPureRationalSum(pureRational,_deltaRational),owner);
 			FREE_RATIONAL(_deltaRational,owner);
-			if(NULL==_purifiedRational)outputError("Failed to sum two pure rationals");
+			if(NULL==_purifiedRational)q2outputError("Failed to sum two pure rationals");
 		}else
-			outputError("Failed to rationalize a real");
+			q2outputError("Failed to rationalize a real");
 	}else
-		outputError("No base pure rational to use in purification");
+		q2outputError("No base pure rational to use in purification");
 	return disowned_rational(_purifiedRational,owner);
 }
 
@@ -4650,9 +4650,9 @@ Mvalue* Mq(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		/* replacing:
 		// create a copy of the numerator and denominator of the provided rational
 		Mbiginteger *_num=owned_biginteger(_getBigintegerCopy(rational->num),owner);
-		if(rational->num!=NULL&&_num==NULL){outputError("Failed to copy the rational numerator");return NULL;}
+		if(rational->num!=NULL&&_num==NULL){q2outputError("Failed to copy the rational numerator");return NULL;}
 		Mbiginteger *_den=owned_biginteger(_getBigintegerCopy(rational->den),owner);
-		if(rational->den!=NULL&&_den==NULL){outputError("Failed to copy the rational denominator");FREE_BIGINTEGER(_num,owner);return NULL;}
+		if(rational->den!=NULL&&_den==NULL){q2outputError("Failed to copy the rational denominator");FREE_BIGINTEGER(_num,owner);return NULL;}
 		Mrational* _pureRational=owned_rational(_getRational(_num,_den,M_LD_NAN,true),owner); // MDH@29MAR2023: _num can be NULL as well
 		*/
 		Mrational* _purifiedRational=NULL;
@@ -4660,10 +4660,10 @@ Mvalue* Mq(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			_purifiedRational=owned_rational(_getPurifiedRational(_pureRational,rationaldelta),owner);
 			FREE_RATIONAL(_pureRational,owner);
 		}else
-			outputError("Failed to create a pure rational");
+			q2outputError("Failed to create a pure rational");
 		if(NULL==_purifiedRational){ // failed to wrap the numerator and denominator (copy), so considered unbound, and so to be freed!!!!
 			// MDH@29MAR2023 removing (see above): FREE_BIGINTEGER(_num,owner);FREE_BIGINTEGER(_den,owner);
-			outputError("Failed to purify a rational");
+			q2outputError("Failed to purify a rational");
 			return value; // MDH@29MAR2023: better to return the value if we fail to purify it!!!
 		}
 		return _getValueOfRational(disowned_rational(_purifiedRational,owner));
@@ -4687,7 +4687,7 @@ Mvalue* Mf(Mvalue* value){
 	bool report=amVerboseDebugging(); //||(M_MODULE_DEBUGGING&MM_SHELL);
 	long double ld=M_LD_NAN;
 	if(report)
-	{q2outputValue("Converting '",value,"'");q2outputandcollect(" of type %s to a floating point value.\n",VALUETYPENAMES[value->type]);}
+	{q2outputValue("Converting '",value,"'");q2output(" of type %s to a floating point value.\n",VALUETYPENAMES[value->type]);}
 	switch(value->type){
 		case VT_INTEGER:ld=(long double)value->value._integer->ll;break;
 		case VT_BIGINTEGER:if(value->value._biginteger)ld=mp_get_long_double(value->value._biginteger);break;
@@ -4715,7 +4715,7 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(format!=NULL&&format->type!=VT_INTEG
 	Mstring* _valueText=owned_string(_getValueText(value,true,true),owner); // typically dequoted
 	if(_valueText!=NULL){
 		if(amVerbose())
-		{q2outputValue("Text representation of '",value,"' before formatting: ");q2outputandcollect("'%s'.\n",string(_valueText));}
+		{q2outputValue("Text representation of '",value,"' before formatting: ");q2output("'%s'.\n",string(_valueText));}
 		if(format!=NULL){
 			if(format->type==VT_INTEGER){
 				long long ll=format->value._integer->ll;
@@ -4731,10 +4731,10 @@ Mvalue* Mt(Mvalue* value,Mvalue* format){if(format!=NULL&&format->type!=VT_INTEG
 		}
 		if(string_insert_char(_valueText,0,(value->type==VT_TEXT?value->value._text->presuffix:'\''))){ // prepend a quote character otherwise we're in trouble in _getTextValue
 			if(amVerbose())
-				{q2outputValue("Text representation of '",value,"': ");q2outputandcollect("'%s'.\n",string(_valueText));}
+				{q2outputValue("Text representation of '",value,"': ");q2output("'%s'.\n",string(_valueText));}
 			_result=_getTextValue(string(_valueText));
 		}else
-			outputError("Failed to prepend a quote character to a text representation");
+			q2outputError("Failed to prepend a quote character to a text representation");
 		FREE_STRING(_valueText,owner);
 	}
 	return _result;
@@ -4856,7 +4856,7 @@ Mvalue* _functionAppliedToMap(Mmap* _map,OneArgumentFunction function,bool maint
 			while(numberOfMapElements-->0&&mapelement!=NULL){
 				Mvariable* variable=mapelement->_variable;
 				if(variable!=NULL&&!appendedToMap(_map,owner,variable->_name->chars,function(variable->_value))){
-					outputError("Failed to append a map element");break;
+					q2outputError("Failed to append a map element");break;
 				}
 				mapelement=mapelement->_next;
 			}
@@ -4929,7 +4929,7 @@ static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner o
 			listelement=listelement->_next;
 		}
 	}else 
-		outputError("Failed to initialize the concatenation result text");
+		q2outputError("Failed to initialize the concatenation result text");
 	return disowned_string(_concatenated,owner);
 }
 /**
@@ -4954,7 +4954,7 @@ Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(_
 			if(string_insert_char(_concat,0,'\''))
 				_concatValue=_getTextValue(string(_concat));
 			else 
-				outputError("Failed to construct the concatenation text");
+				q2outputError("Failed to construct the concatenation text");
 			FREE_STRING(_concat,owner);
 		}
 		if(_separator!=NULL)FREE_STRING(_separator,owner);
@@ -4998,12 +4998,12 @@ Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								if((status=mp_copy(MP_INT_POINTER(_fibonacciBiginteger),MP_INT_POINTER(_secondBiginteger)))!=MP_OKAY)break;
 							}
 						}else 
-							outputError("Failed to initialize the Fibonacci sequence");
+							q2outputError("Failed to initialize the Fibonacci sequence");
 						FREE_BIGINTEGER(_firstBiginteger,owner);FREE_BIGINTEGER(_secondBiginteger,owner);
 					}else // no additions
 						status=mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_fibonacciBiginteger));
 				}else
-					outputError("Failed to initialize the Fibonacci sum");
+					q2outputError("Failed to initialize the Fibonacci sum");
 				FREE_BIGINTEGER(_counterBiginteger,owner);
 			}
 		}
@@ -5073,16 +5073,16 @@ typedef struct Mexpressionvalue{
 // free_expressionvalue does NOT free the token as it will probably be passed on...
 void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 	if(_expressionvalue){
-		if(amVerbose())outputInfo("Releasing the result!");
+		if(amVerbose())q2outputInfo("Releasing the result!");
 		// MDH@03MAY2019: append the result value at the proper index (as indicated by the command index)
-		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_valuereference->_variable->_value,commandCount+1))outputInfo("ERROR: Failed to save the result.");else if(amVerbose())outputInfo("Result saved.");}
-		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))outputInfo("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputInfo("Result appended to the M list.");
+		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_valuereference->_variable->_value,commandCount+1))q2outputInfo("ERROR: Failed to save the result.");else if(amVerbose())q2outputInfo("Result saved.");}
+		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))q2outputInfo("ERROR: Failed to append the result to the M list.");else if(amVerbose())q2outputInfo("Result appended to the M list.");
 		//// NEVER free what does not have an underscore at the start!!!! FREE_TOKEN(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
 		////////output("Freeing expression!");
 		decrementReferenceCount(_expressionvalue->_valuereference->_variable->_value); // as where freeing _expressionvalue!!!!
 		free(_expressionvalue);
 	}else
-	if(amVerbose())outputInfo("No result to free!");
+	if(amVerbose())q2outputInfo("No result to free!");
 	
 }
 */
@@ -5145,9 +5145,9 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner
 	Mtoken* _tokenCopy=(_token!=NULL?owned_token(__token(),owner):NULL);
 	if(_tokenCopy!=NULL){
 		if(amVerbose()){
-			q2outputandcollect("Copying token '%s' of type '%s'.\n",string(_token->text),TOKENTYPE_STRING[_token->type]);
+			q2output("Copying token '%s' of type '%s'.\n",string(_token->text),TOKENTYPE_STRING[_token->type]);
 			if(_token->expr!=NULL)
-				q2outputandcollect("\tpointing to token '%s' of type '%s'.\n",string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]);
+				q2output("\tpointing to token '%s' of type '%s'.\n",string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]);
 		}
 		_tokenCopy->type=_token->type;
 		setTokenSignificantCharacterCount(_tokenCopy,getTokenSignificantCharacterCount(_token));
@@ -5178,7 +5178,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 	//				then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mlist* _list=owned_list(__list("getValueOfList"),owner);
 	if(NULL==_list){
-		outputError("Failed to create a list to return");
+		q2outputError("Failed to create a list to return");
 		return NULL;
 	}
 	_list->weak=weak;
@@ -5187,24 +5187,24 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	*/
 	if(_list->_first!=NULL||_list->_last!=NULL){
-		outputError("Supposedly empty list not initialized correctly");
+		q2outputError("Supposedly empty list not initialized correctly");
 		return NULL;
 	}
 	if(amVerboseDebugging())
-		outputMessage(NULL,"Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		q2outputMessage(NULL,"Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	unsigned long long listElementIndex=0;
 	uint32_t firstElementToNotEvaluate=(maximumNumberOfElements==0||numberOfElementsToNotEvaluate>maximumNumberOfElements?0:maximumNumberOfElements-numberOfElementsToNotEvaluate+1);
 	if(amVerboseDebugging())
-		outputMessage(NULL,"First element not to evaluate: %u.\n",firstElementToNotEvaluate);
+		q2outputMessage(NULL,"First element not to evaluate: %u.\n",firstElementToNotEvaluate);
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
 	while((expressionToken=nextEnvironmentExpressionToken())!=NULL){
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
 		if(amVerboseDebugging())
-			outputMessage(M_INFO_PREFIX,"Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			q2outputMessage(M_INFO_PREFIX,"Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		Mvalue* _listElementValue=NULL;
 		if(firstElementToNotEvaluate>0&&listElementIndex>=firstElementToNotEvaluate){ // copy the tokens in the argument
 			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
@@ -5213,11 +5213,11 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 			Mtoken* _firstUnevaluatedToken=owned_token(_getEvaluatableTokenCopy(expressionToken),owner);
 			if(_firstUnevaluatedToken!=NULL){
 				if(amVerboseDebugging())
-					q2outputandcollect("Evaluating special function call argument tokens:");
+					q2output("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 				while(unevaluatedToken!=NULL){
 					if(amVerboseDebugging())
-						q2outputandcollect(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
+						q2output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(NULL==expressionToken)break; // NOTE shouldn't happen though
 					if(NULL==expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
@@ -5237,7 +5237,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 		}
 		if(NULL==_listElementValue){
 			if(amVerboseDebugging())
-				outputMessage(NULL,"List element missing!");
+				q2outputMessage(NULL,"List element missing!");
 			continue;
 		} // undefined list elements should NEVER be added to the list
 		if(amVerboseDebugging())
@@ -5248,7 +5248,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
 			if(amVerboseDebugging())
-				outputMessage(NULL,"Appending list element #%llu.\n",listElementIndex);
+				q2outputMessage(NULL,"Appending list element #%llu.\n",listElementIndex);
 			long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex<=0){
@@ -5257,10 +5257,10 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 				break;
 			}
 			if(amVerboseDebugging())
-				outputMessage(M_INFO_PREFIX,"List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
+				q2outputMessage(M_INFO_PREFIX,"List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
 		}else
 		if(amVerboseDebugging())
-			outputMessage(NULL,"Maximum number of elements reached.\n");
+			q2outputMessage(NULL,"Maximum number of elements reached.\n");
 		if(NULL==expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
@@ -5330,7 +5330,7 @@ static Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 		if(NULL==expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(amVerboseDebugging())
-			outputMessage(M_INFO_PREFIX,"Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
+			q2outputMessage(M_INFO_PREFIX,"Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
 	Mvalue* _mapValue=_getValueOfMap(disowned_map(_map,owner));
 	if(amVerboseDebugging())
@@ -5379,7 +5379,7 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 								*/
 								functionEvaluationValue=functionBodyCommandValue; // store command evaluation result as function result
 								if(!setVariable(_functionExecutionEnvironment,"",functionEvaluationValue))
-									outputError("Failed to store the function command execution value");
+									q2outputError("Failed to store the function command execution value");
 								if(amVerbose())
 									q2outputValue("Function evaluation value so far: '",functionEvaluationValue,"'.\n");
 								functionBodyCommandListelement=functionBodyCommandListelement->_next;
@@ -5395,10 +5395,10 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 						return (functionResultValue!=NULL?functionResultValue:functionEvaluationValue);
 					}
 					// ASSERT failed to push the created function execution environment which also means it failed to be bound in a value, and thus I need to free it as it will not be garbage-collected like any value would
-					outputMessage(M_ERROR_PREFIX,"Failed to create the function execution environment of function '%s'.\n",functionName);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to create the function execution environment of function '%s'.\n",functionName);
 					FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 				}else
-					outputMessage(M_ERROR_PREFIX,"Failed to create the environment to execute function '%s'.\n",functionName);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to create the environment to execute function '%s'.\n",functionName);
 				return NULL;
 			}
 			break;
@@ -5409,7 +5409,7 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 		case FT_INTERNAL_ONE_ARGUMENT:
 			if(amVerboseDebugging()){
 				// TODO q2.. here?
-				q2outputandcollect("Applying one-argument function '%s'",functionName);
+				q2output("Applying one-argument function '%s'",functionName);
 				q2outputValue(" to '",_argumentMap->_first->_variable->_value,"'.\n");
 			}
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
@@ -5418,10 +5418,10 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
-					q2outputandcollect("Applying two-argument function '%s'",functionName);
+					q2output("Applying two-argument function '%s'",functionName);
 					if(_firstArgumentmapelement!=NULL)q2outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement!=NULL)q2outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
-					q2outputandcollect("%c",'.');
+					q2output("%c",'.');
 					q2newline(true);
 				}
 				return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
@@ -5433,11 +5433,11 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_next:NULL);
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
-					q2outputandcollect("Applying three-argument function '%s'",functionName);
+					q2output("Applying three-argument function '%s'",functionName);
 					if(_firstArgumentmapelement!=NULL)q2outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement!=NULL)q2outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
 					if(_thirdArgumentmapelement!=NULL)q2outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
-					q2outputandcollect("%c",'.');q2newline(true);
+					q2output("%c",'.');q2newline(true);
 				}
 				return (*_function->functionunion.threeArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
 																		,(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_variable->_value:NULL)
@@ -5450,12 +5450,12 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_next:NULL);
 				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement!=NULL?_thirdArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
-					q2outputandcollect("Applying four-argument function '%s'",functionName);
+					q2output("Applying four-argument function '%s'",functionName);
 					if(_firstArgumentmapelement!=NULL)q2outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement!=NULL)q2outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
 					if(_thirdArgumentmapelement!=NULL)q2outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
 					if(_fourthArgumentmapelement!=NULL)q2outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
-					q2outputandcollect("%c",'.');q2outputandcollect("%c",'\n');
+					q2output("%c",'.');q2output("%c",'\n');
 				}
 				return (*_function->functionunion.fourArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
 																		,(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_variable->_value:NULL)
@@ -5471,13 +5471,13 @@ static Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mm
 				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement!=NULL?_thirdArgumentmapelement->_next:NULL);
 				Mmapelement* _fifthArgumentmapelement=(_fourthArgumentmapelement!=NULL?_fourthArgumentmapelement->_next:NULL);
 				if(amVerboseDebugging()){
-					q2outputandcollect("Applying five-argument function '%s'",functionName);
+					q2output("Applying five-argument function '%s'",functionName);
 					if(_firstArgumentmapelement!=NULL)q2outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement!=NULL)q2outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
 					if(_thirdArgumentmapelement!=NULL)q2outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
 					if(_fourthArgumentmapelement!=NULL)q2outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
 					if(_fifthArgumentmapelement!=NULL)q2outputValue(" and '",_fifthArgumentmapelement->_variable->_value,"'");
-					q2outputandcollect("%c",'.');q2newline(true);
+					q2output("%c",'.');q2newline(true);
 				}
 				return (*_function->functionunion.fiveArgumentFunction)((_firstArgumentmapelement!=NULL?_firstArgumentmapelement->_variable->_value:NULL)
 																		,(_secondArgumentmapelement!=NULL?_secondArgumentmapelement->_variable->_value:NULL)
@@ -5557,10 +5557,10 @@ FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequ
  * @return FunctionBodyRequest* a new function body request with name \p functionName
  */
 static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
-	if(NULL==functionName||!strlen(functionName)){outputError("Invalid or missing function name");return NULL;} // invalid input
+	if(NULL==functionName||!strlen(functionName)){q2outputError("Invalid or missing function name");return NULL;} // invalid input
 	// ASSERT a 'valid' function name
 	if(getFunctionBodyRequest(functionName)!=NULL){
-		outputMessage(M_ERROR_PREFIX,"Duplicate function name '%s'.",functionName);
+		q2outputMessage(M_ERROR_PREFIX,"Duplicate function name '%s'.",functionName);
 		return NULL;
 	} // already have it
 	// technically it should not have been requested already (or exist)
@@ -5568,14 +5568,14 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 	if(_functionBodyRequest!=NULL){ 
 		// check for being disowned (originally we OWNED it immediately in creating it, but we got a bug saying it was not disowned!!!)
 		if(!Misdisowned(_functionBodyRequest))
-			outputBug("Function body request not currently disowned!");
+			q2outputBug("Function body request not currently disowned!");
 		if(_lastFunctionBodyRequest!=NULL)_lastFunctionBodyRequest->_next=_functionBodyRequest;
 		_lastFunctionBodyRequest=OWNED(_functionBodyRequest,owner_functionBodyRequest); // replace _lastFunctionBodyRequest taking over the ownership
 		if(NULL==_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
 		if(amVerbose())
-			outputMessage(NULL,"The request for the body of function '%s' was created.\n",functionName);
+			q2outputMessage(NULL,"The request for the body of function '%s' was created.\n",functionName);
 	}else
-		outputMessage(M_ERROR_PREFIX,"Failed to create the request for the body of function '%s'.\n",functionName);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create the request for the body of function '%s'.\n",functionName);
 	return _functionBodyRequest;
 }
 /**
@@ -5610,7 +5610,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 	_currentFunctionBodyInput=CALLOC_1(sizeof(FunctionBodyInput),'8',owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
 	// replacing: _currentFunctionBodyInput=OWNED(CALLOC_1(sizeof(FunctionBodyInput),'8',owner),owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
 	
-	if(NULL==_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
+	if(NULL==_currentFunctionBodyInput){q2outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName->chars);
 	if(function!=NULL&&function->type==FT_USER){
 		// it's better to put the next request in, so after finishing with this request we can do the following if any
@@ -5626,12 +5626,12 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		if(_functionExecutionEnvironment!=NULL){
 			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(disowned_environment(_functionExecutionEnvironment,owner)))return true;
-			outputError("Failed to register the function execution environment.");
+			q2outputError("Failed to register the function execution environment.");
 			FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 		}else
-			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
+			q2outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
-		outputMessage(M_ERROR_PREFIX,"Can't find function '%s' for accepting its body commands.\n",_functionBodyRequest->_functionName);
+		q2outputMessage(M_ERROR_PREFIX,"Can't find function '%s' for accepting its body commands.\n",_functionBodyRequest->_functionName);
 	FREE_DISOWNED_1(_currentFunctionBodyInput,'8',owner_currentFunctionBodyInput);
 	_currentFunctionBodyInput=NULL; // TODO is this a good idea then?????
 	return false;
@@ -5653,7 +5653,7 @@ bool startFunctionBodyInput(){
 	//						   now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
 	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
 	if(!functionBodyInputCreated)
-		outputMessage(M_ERROR_PREFIX,"Failed to honour the request to input the body of function '%s'.\n",_firstFunctionBodyRequest->_functionName);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to honour the request to input the body of function '%s'.\n",_firstFunctionBodyRequest->_functionName);
 	free_functionbodyrequest(_firstFunctionBodyRequest,owner_functionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request (if we succeed to request the function body input or not)
 	if(!functionBodyInputCreated){ // i.e. failed to start requesting for the body of the given function, so we should continue with the next one
 		// failed, so do the next one
@@ -5744,13 +5744,13 @@ void free_valuereference(Mvaluereference* _valuereference){
  * @param suffix 
  */
 void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* suffix){
-	if(prefix)q2outputandcollect("%s",prefix);
+	if(prefix)q2output("%s",prefix);
 	if(_valuereference!=NULL){
-		if(_valuereference->_name)q2outputandcollect("%s",_valuereference->_name);
+		if(_valuereference->_name)q2output("%s",_valuereference->_name);
 		if(_valuereference->_itemid)q2outputValue(NULL,_valuereference->_itemid,NULL);
 		if(_valuereference->_value)q2outputValue("='",_valuereference->_value,"'");
 	}
-	if(suffix!=NULL)q2outputandcollect("%s",suffix);
+	if(suffix!=NULL)q2output("%s",suffix);
 }
 // two essential methods for getting and setting referenced values
 // MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
@@ -5789,7 +5789,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
 						//				so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
 					}else
-						outputMessage(M_ERROR_PREFIX,"Referenced variable '%s' does not exist.\n",_valuereference->_name->chars+1);
+						q2outputMessage(M_ERROR_PREFIX,"Referenced variable '%s' does not exist.\n",_valuereference->_name->chars+1);
 				}else // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
 					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name->chars); // the value at the top level
@@ -5812,7 +5812,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 				Mvalue* *valueholder=&referencedValue; // MDH@07APR2020 replacing what we used in setReferencedValue(): getValueHolder(getExecutionEnvironment(),_valuereference->_name);
 				// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 				if(valueholder!=NULL&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
-					// if(amVerboseDebugging())outputInfo("************ Element(s) to set.");
+					// if(amVerboseDebugging())q2outputInfo("************ Element(s) to set.");
 					// let's get the first index/attribute name
 					Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@19JUN2020 not anymore: MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
@@ -5833,7 +5833,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								// if no value is defined, it is ignored TODO should we????
 								if(indexorattributenameListelementValue!=NULL){
 									if(report)
-									{q2outputValue("Type of index value '",indexorattributenameListelementValue,"': ");q2outputandcollect("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
+									{q2outputValue("Type of index value '",indexorattributenameListelementValue,"': ");q2output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 									// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 									// NOTE we need to check ALL valueholders
 									// for each list element value we're going to need numberOfValueholders elements in newValueholders BUT with nested lists we can't tell in advance how many so we might need to use REALLOC to do so
@@ -5884,7 +5884,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 														assignValue(valueholder,_getMapValue(VT_UNDEFINED,false,"getReferencedValue"));
 														if(amVerboseDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 													}
-													if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
+													if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;q2outputError("Failed to create a list or map.");}
 												}
 												// as soon as the list or map valueholder is created we can use it to get the new value reference IFF the value is of the right type, we have to ascertain that all copies are zero
 											}
@@ -5928,7 +5928,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																					if(NULL==newValueholder){
 																						if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)!=1)
-																							outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.\n",string(_attributenameText));
+																							q2outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.\n",string(_attributenameText));
 																						else
 																							newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																					}/*else{
@@ -5951,7 +5951,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
 																if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																	outputMessage(M_ERROR_PREFIX,"Failed to set map element #%zd.\n",valueholderIndex+numberOfNewValueholders);
+																	q2outputMessage(M_ERROR_PREFIX,"Failed to set map element #%zd.\n",valueholderIndex+numberOfNewValueholders);
 															}else
 															if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
@@ -5979,9 +5979,9 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																							if(listIndex>0){
 																								newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																								if(amDebugging())
-																									outputMessage(NULL,"List element at index #%zd retrieved.\n",listIndex);	
+																									q2outputMessage(NULL,"List element at index #%zd retrieved.\n",listIndex);	
 																							}else
-																								outputMessage(M_ERROR_PREFIX,"Failed to add list element at index '%lld'.\n",listIndex);
+																								q2outputMessage(M_ERROR_PREFIX,"Failed to add list element at index '%lld'.\n",listIndex);
 																						}
 																					}else
 																						newValueholder=NULL;
@@ -6013,7 +6013,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																outputMessage(M_ERROR_PREFIX,"Failed to set list element #%zd.\n",valueholderIndex+numberOfNewValueholders);
+																q2outputMessage(M_ERROR_PREFIX,"Failed to set list element #%zd.\n",valueholderIndex+numberOfNewValueholders);
 														}
 													}
 												}
@@ -6022,7 +6022,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											if(_flattenedIndexList->numberOfElements>1)numberOfValueholders*=_flattenedIndexList->numberOfElements; // because numberOfNewValueholders was consumed, we have to do it this way
 										}else{ // REALLOC failed
 											result=false;
-											outputError("Failed to reallocate the indexed value references");
+											q2outputError("Failed to reallocate the indexed value references");
 										}
 										numberOfNewValueholders=0; // MDH@19OCT2020: in any case zero numberOfNewValueholders (to ascertain that FREE below will use numberOfValueholders!!!!)
 									}
@@ -6044,11 +6044,11 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								int valueholderIndex=numberOfValueholders;
 								while(--valueholderIndex>=0){
 									if(report)
-									{q2outputandcollect("Storing value #%d: ",(valueholderIndex+1));q2outputValue(": ",*_valueholders[valueholderIndex],".\n");}
+									{q2output("Storing value #%d: ",(valueholderIndex+1));q2outputValue(": ",*_valueholders[valueholderIndex],".\n");}
 									if(_resultList!=NULL&&appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){
 										FREE_LIST(_resultList,owner);
 										_resultList=NULL;
-										outputMessage(M_ERROR_PREFIX,"Failed to store value #%d.",(valueholderIndex+1));
+										q2outputMessage(M_ERROR_PREFIX,"Failed to store value #%d.",(valueholderIndex+1));
 										break;
 									}
 								}
@@ -6056,7 +6056,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 							}else
 								referencedValue=*_valueholders[0];
 						}else
-							outputError("Failed to obtain the list of referenced values");
+							q2outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
 						if(_valueholders!=NULL){
 							// output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
@@ -6074,7 +6074,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 				while(referencedValue&&indexorattributenameListelement){
 					index++;
 					indexorattributenameListelementValue=indexorattributenameListelement->_value;
-					if(amVerbose()){q2outputandcollect("Determining the value at index element #%llu ",index);q2outputValue(" with value '",indexorattributenameListelementValue,"'.\n");}
+					if(amVerbose()){q2output("Determining the value at index element #%llu ",index);q2outputValue(" with value '",indexorattributenameListelementValue,"'.\n");}
 					// after extracting the value increment indexorattributenameListelement, so we can use continue
 					indexorattributenameListelement=indexorattributenameListelement->_next;
 					// if no value is defined, it is ignored TODO should we????
@@ -6119,7 +6119,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									q2outputmessageprefix(M_ERROR_PREFIX);
 									q2outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
 								}else
-									outputError("A zero index is not allowed");
+									q2outputError("A zero index is not allowed");
 							}
 						}else{
 							q2outputmessageprefix(M_ERROR_PREFIX);
@@ -6160,7 +6160,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 	if(_valuereference!=NULL&&_valuereference->_name!=NULL){
 		if(report)
 		{
-			q2outputandcollect("Setting the value reference of '%s",_valuereference->_name);
+			q2output("Setting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid!=NULL)q2outputValue(NULL,_valuereference->_itemid,NULL);
 			q2outputValue("' to '",_newValue,"'.\n");
 		}
@@ -6186,7 +6186,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				outputList("Looking for elements '",itemidList,"'.\n");
 				result=true;
 				if(report)
-					outputInfo("************ Element(s) to set.");
+					q2outputInfo("************ Element(s) to set.");
 				// let's get the first index/attribute name
 				Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
@@ -6206,7 +6206,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 							// if no value is defined, it is ignored TODO should we????
 							if(indexorattributenameListelementValue!=NULL){
 								if(report)
-									{q2outputValue("Type of index value '",indexorattributenameListelementValue,"': ");q2outputandcollect("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
+									{q2outputValue("Type of index value '",indexorattributenameListelementValue,"': ");q2output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 								// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 								// NOTE we need to check ALL valueholders
 								// for each list element value we're going to need numberOfValueholders elements in newValueholders BUT with nested lists we can't tell in advance how many so we might need to use REALLOC to do so
@@ -6261,7 +6261,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 													if(report)
 														output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 												}
-												if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
+												if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;q2outputError("Failed to create a list or map.");}
 											}
 											// as soon as the list or map valueholder is created we can use it to get the new value reference IFF the value is of the right type, we have to ascertain that all copies are zero
 										}
@@ -6294,7 +6294,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 															assignValue(_valueholders[valueholderIndex+numberOfNewValueholders],_getMapValue(VT_UNDEFINED,false));
 															if(amVerbose())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex+numberOfNewValueholders,_valuereference->_name);
 														}
-														if(isValueUndefined(*_valueholders[valueholderIndex+numberOfNewValueholders])!=M_FALSE){_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;outputError("Failed to create a list or map.");}
+														if(isValueUndefined(*_valueholders[valueholderIndex+numberOfNewValueholders])!=M_FALSE){_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;q2outputError("Failed to create a list or map.");}
 													}
 													*/
 													if((*valueholder)!=NULL){
@@ -6338,7 +6338,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																							if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
 																							{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																						}else
-																							outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.\n",_attributename);
+																							q2outputMessage(M_ERROR_PREFIX,"Failed to add property '%s'.\n",_attributename);
 																					}/*else{
 																						//FREE_DISOWNED_1(valueholders,'_');
 																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
@@ -6358,10 +6358,10 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																}
 																if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 																if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																	outputMessage(M_ERROR_PREFIX,"Failed to set map element #%zd.\n",valueholderIndex+numberOfNewValueholders);
+																	q2outputMessage(M_ERROR_PREFIX,"Failed to set map element #%zd.\n",valueholderIndex+numberOfNewValueholders);
 															}else{ // map is locked, and therefore immutable
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-																outputError("Map is locked, and therefore immutable!");
+																q2outputError("Map is locked, and therefore immutable!");
 															}
 														}else
 														if((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY){ // MDH@23NOV2020: either a list or an array being indexed
@@ -6402,13 +6402,13 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																							if(_assignedIndexList!=NULL&&appendedToList(_assignedIndexList,owner,_getIntegerValue(listIndex),M_LL_INVALID)<=0)
 																							{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																						}else
-																							outputMessage(M_ERROR_PREFIX,"Failed to add list element at index '%lld'.\n",listIndex);
+																							q2outputMessage(M_ERROR_PREFIX,"Failed to add list element at index '%lld'.\n",listIndex);
 																					}
 																				}else{ // MDH@23NOV2020: an array (and we're NOT going to create an element that's not there like we do with a list!!!!)
 																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
 																					if(report)
 																						if(newValueholder!=NULL)
-																							outputMessage(NULL,"New value holder reference value #%llu in array.\n",listIndex);
+																							q2outputMessage(NULL,"New value holder reference value #%llu in array.\n",listIndex);
 																				}
 																				//}else	newValueholder=NULL;
 																			}
@@ -6426,8 +6426,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																	if(_valueIndexList!=NULL)FREE_LIST(_valueIndexList,owner);
 																}else{
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-																	if(valueholderList!=NULL)outputError("List is locked, and therefore immutable!");else
-																	if(valueholderArray!=NULL)outputError("Array is locked, and therefore immutable!");
+																	if(valueholderList!=NULL)q2outputError("List is locked, and therefore immutable!");else
+																	if(valueholderArray!=NULL)q2outputError("Array is locked, and therefore immutable!");
 																}
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
@@ -6439,7 +6439,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 														}else
 															_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 														if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-															outputMessage(M_ERROR_PREFIX,"Failed to set list element #%zd.",valueholderIndex+numberOfNewValueholders);
+															q2outputMessage(M_ERROR_PREFIX,"Failed to set list element #%zd.",valueholderIndex+numberOfNewValueholders);
 													}
 												}
 											}
@@ -6456,14 +6456,14 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 												}else
 													FREE_LIST(_assignedIndexList,owner);
 											}else
-												outputBug("Failed to populate the assigned index list");
+												q2outputBug("Failed to populate the assigned index list");
 											flattenedIndexListelement=flattenedIndexListelement->_next;
 											// output("%c\n",'F'); // DEBUG
 										}
 										if(_flattenedIndexList->numberOfElements>1)numberOfValueholders*=_flattenedIndexList->numberOfElements; // because numberOfNewValueholders was consumed, we have to do it this way
 									}else{ // REALLOC failed
 										result=false;
-										outputError("Failed to reallocate the indexed value references");
+										q2outputError("Failed to reallocate the indexed value references");
 									}
 									numberOfNewValueholders=0; // MDH@19OCT2020: in both cases (whether realloc failed or not we can zero numberOfNewValueholders)
 								}
@@ -6477,7 +6477,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 											if(_rereversedIndexList!=NULL)
 												assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));
 											else 
-												outputBug("Failed to reverse an index list");
+												q2outputBug("Failed to reverse an index list");
 										}else // replace the value by the first value in the flattened index list
 											assignValue(&indexorattributenameListelement->_value,_flattenedIndexList->_first->_value);
 									}
@@ -6497,7 +6497,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					if(result){
 						long long valueholderIndex=numberOfValueholders;
 						if(report)
-						{q2outputandcollect("Setting %llu values",valueholderIndex);q2outputValue(" to '",_newValue,"'.\n");}
+						{q2output("Setting %llu values",valueholderIndex);q2outputValue(" to '",_newValue,"'.\n");}
 						while(--valueholderIndex>=0)if(_valueholders[valueholderIndex]!=NULL)assignValue(_valueholders[valueholderIndex],_newValue);
 						// output("Values set!\n"); // DEBUG
 					}
@@ -6505,7 +6505,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					if(result){
 						if(indexorattributenameListelementValue){ // this is the last 'index' which can be a property name or index or list of property names and indices!!!!
 							// if(amVerbose())
-							{q2outputValue("Type of the last index value '",indexorattributenameListelementValue,"': ");q2outputandcollect("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
+							{q2outputValue("Type of the last index value '",indexorattributenameListelementValue,"': ");q2output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 							Mlist* _flattenedIndexList=_getFlattenedList(indexorattributenameListelementValue,true);
 							size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 							if(numberOfNewValueholders>0){
@@ -6539,13 +6539,13 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 													}
 													if(isValueUndefined(*_valueholders[valueholderIndex+numberOfNewValueholders])!=M_FALSE){
 														_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-														outputMessage(M_ERROR_PREFIX,"Failed to create a list or map at index %zd.",valueholderIndex+numberOfNewValueholders);
+														q2outputMessage(M_ERROR_PREFIX,"Failed to create a list or map at index %zd.",valueholderIndex+numberOfNewValueholders);
 														break;
 													}
 												}
 											}
 											// MDH@30MAR2020: if a value holder was not set, we do not continue TODO or should we only do this when all are undefined??????
-											if(valueholderIndex>=0){result=false;outputError("Failed to create a list or map.");}
+											if(valueholderIndex>=0){result=false;q2outputError("Failed to create a list or map.");}
 										}
 										flattenedIndexListelement=flattenedIndexListelement->_next;
 									}
@@ -6555,11 +6555,11 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 							}
 							if(_flattenedIndexList)FREE_LIST(_flattenedIndexList);
 						}else
-							outputError("No index value.");
+							q2outputError("No index value.");
 					}
 					if(result){
 						// if(amDebugging())
-						{q2outputValue("Assigning ",indexorattributenameListelement->_value," to ");q2outputandcollect("%zd elements.\n",numberOfValueholders);}
+						{q2outputValue("Assigning ",indexorattributenameListelement->_value," to ");q2output("%zd elements.\n",numberOfValueholders);}
 						// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
 						int valueholderIndex=numberOfValueholders;
 						while(--valueholderIndex>=0){
@@ -6603,11 +6603,11 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				}else
 				if(isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type!=VT_LIST){
 					result=false;
-					outputError("No index/attribute name specified");
+					q2outputError("No index/attribute name specified");
 				}
 				*/
 			}else
-				outputMessage(M_ERROR_PREFIX,"Variable '%s' cannot be indexed: its value is not a list or a map.\n",_valuereference->_name);
+				q2outputMessage(M_ERROR_PREFIX,"Variable '%s' cannot be indexed: its value is not a list or a map.\n",_valuereference->_name);
 		}else{
 			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
 			//				the same way as happens when you use the defun internal function
@@ -6634,10 +6634,10 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					}
 				}
 				if(report)
-					outputInfo("Value set!");
+					q2outputInfo("Value set!");
 			}else{
 				q2outputmessageprefix(M_ERROR_PREFIX);
-				q2outputandcollect("Failed to %s variable '%s'",(variable?"set":"initialize"),variableName);
+				q2output("Failed to %s variable '%s'",(variable?"set":"initialize"),variableName);
 				q2outputValue(" to '",_newValue,"'.\n");
 			}
 		}
@@ -6656,7 +6656,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	if(amVerboseDebugging())
 	{
-		q2outputandcollect("Applying unary operator '%c'",operator);
+		q2output("Applying unary operator '%c'",operator);
 		if(_value!=NULL){q2outputValue(" to value '",_value,"'");output(" of type %u.",_value->type);}
 		q2newline(true);
 	}
@@ -6667,7 +6667,7 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 		case '!':result=Mnot(_value);break;
 		case '-':result=Mneg(_value);break;
 		case '+':result=_value;break;
-		default:outputError("Unknown unary operator!");
+		default:q2outputError("Unknown unary operator!");
 	}
 	/////if(!result)return NULL;
 	if(amVerboseDebugging())
@@ -6797,12 +6797,12 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						/* MDH@28OCT2020: defining user functions no longer 'special' function (calls)
 						if(!strcmp(_significantTokenText,DEFINEANONYMOUSFUNCTION_NAME)){
 							if(amVerboseDebugging())
-								outputInfo("Definition of an anonymous function encountered!");
+								q2outputInfo("Definition of an anonymous function encountered!");
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-1; // i.e. evaluate the first argument only in the current context
 						}else
 						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
 							if(amVerboseDebugging())
-								outputInfo("Definition of a user function encountered!");
+								q2outputInfo("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-2;	// i.e. evaluate the first two arguments only in the current context
 						}else
 						*/
@@ -6855,7 +6855,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
 								if(functionCallArgumentList!=NULL&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
-									outputMessage(M_ERROR_PREFIX,"Failed to create the to %s expression list.\n",string(_significantTokenText));
+									q2outputMessage(M_ERROR_PREFIX,"Failed to create the to %s expression list.\n",string(_significantTokenText));
 									FREE_LIST(functionCallArgumentList,owner);
 									functionCallArgumentList=NULL; // so nothing will get done!!
 								}
@@ -6889,7 +6889,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								if(definedFunctionName!=NULL){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
 							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
 							if(amVerboseDebugging())
-								{q2outputandcollect("Result of calling '%s'",_significantTokenText);q2outputValue(": '",functionCallValue,"'.\n");}
+								{q2output("Result of calling '%s'",_significantTokenText);q2outputValue(": '",functionCallValue,"'.\n");}
 							// if this was a call to the 'define user function' function
 							if(definedFunctionName!=NULL){ // MDH@02MAR2020: replacing: !strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
 								// is the result 1???
@@ -6906,9 +6906,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}else
 								if(strlen(definedFunctionName))
-									outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.\n",definedFunctionName);
+									q2outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.\n",definedFunctionName);
 								else
-									outputError("Name of function to create not defined.");
+									q2outputError("Name of function to create not defined.");
 							}
 							//////q2outputValue("Function call value '",functionCallValue,"'.\n");
 							_valueReference->_value=functionCallValue; // MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,functionCallValue);
@@ -6917,16 +6917,16 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
 							if(amVerboseDebugging()){
 								q2outputValue("Function call result value: '",_valueReference->_value,"'.\n");
-								outputInfo("Freeing the function argument map!");
+								q2outputInfo("Freeing the function argument map!");
 							}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
 							FREE_MAP(_functionCallArgumentMap,owner); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerboseDebugging())
-								outputInfo("Function argument map freed!");
+								q2outputInfo("Function argument map freed!");
 						}else
-							outputError("No function arguments");
+							q2outputError("No function arguments");
 					}else
-						outputMessage(M_ERROR_PREFIX,"Function '%s' unknown!\n",_significantTokenText);
+						q2outputMessage(M_ERROR_PREFIX,"Function '%s' unknown!\n",_significantTokenText);
 				}
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
@@ -6942,13 +6942,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),getOwnerExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
-					outputMessage(M_ERROR_PREFIX,"Failed to add%s variable '%s' to environment '%s'.\n",(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to add%s variable '%s' to environment '%s'.\n",(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					FREE_STRING(_environmentName,owner);
 					break; // NO retrieves the undefined value subsequently!!
 				}
 				if(amVerboseDebugging())
 					if(expressionToken->argument!=1&&expressionToken->envid)
-						outputMessage(M_WARNING_PREFIX,"Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
+						q2outputMessage(M_WARNING_PREFIX,"Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
 				// MDH@25MAR2020 allow indexing of new variables as well!!!! removing: if(expressionToken->type==TT_VARIABLE)
 				canbeindexedtheoretically=true;
@@ -6956,7 +6956,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				_valueReference->_name=owned_chars(_getChars(_significantTokenText),Msubowner(owner,1));
 				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerboseDebugging())
-					outputMessage(NULL,"Value reference variable name: '%s'.\n",_valueReference->_name->chars);
+					q2outputMessage(NULL,"Value reference variable name: '%s'.\n",_valueReference->_name->chars);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
 				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
@@ -6967,7 +6967,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					if(amVerbose()){output("Extracting the indices.\n");}
 					// MDH@02NOV2019 TODO should this be a weak or strong list????
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false); // typically allow for any number of indices (although perhaps we should check!!)
-					if(amVerbose()){q2outputandcollect("XXXXXXX Index value of list '%s'",_valueReference->_name);q2outputValue("'",indexListValue,"'.\n");}
+					if(amVerbose()){q2output("XXXXXXX Index value of list '%s'",_valueReference->_name);q2outputValue("'",indexListValue,"'.\n");}
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					if(amVerbose()){if(expressionToken){output("End of list index token: ");outputToken(expressionToken);}else output("No end of list index token!");outputChar('\n');}
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
@@ -6998,9 +6998,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						////
 					}else
 					if(indexListValue)
-						outputMessage(M_ERROR_PREFIX,"Index of variable '%s' not a list!",_valueReference->_name);
+						q2outputMessage(M_ERROR_PREFIX,"Index of variable '%s' not a list!",_valueReference->_name);
 					else
-						outputMessage(M_ERROR_PREFIX,"Index of variable '%s' undefined!\n",_valueReference->_name);	
+						q2outputMessage(M_ERROR_PREFIX,"Index of variable '%s' undefined!\n",_valueReference->_name);	
 				}else
 				if(amVerbose())output("Unindexed variable '%s'!\n",_valueReference->_name);
 				// MDH@29MAY2019: if we do NOT have an indexed value, retrieve the value...
@@ -7039,7 +7039,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(amVerboseDebugging())output("Integer part of decimal text: '%s'.\n",string(pRealText));
 						pRealText=string_append(pRealText,_realSignificantTokenText);
 						if(amVerboseDebugging())
-							outputInfo("Fractional part appended!");
+							q2outputInfo("Fractional part appended!");
 						if(strlen(_realSignificantTokenText)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
 						if(amVerboseDebugging())output("Parsing '%s' to a decimal.\n",string(pRealText));
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
@@ -7048,29 +7048,29 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
 						free(_realSignificantTokenText); // freed!!!
 						if(amVerboseDebugging())output("Real part string length: %u.\n",l);
-						if(getDP()<l)outputWarning("More decimals present in literal than expected. Rounding may occur.");
-						if(amVerboseDebugging())outputInfo("Decimal precision checked!");
+						if(getDP()<l)q2outputWarning("More decimals present in literal than expected. Rounding may occur.");
+						if(amVerboseDebugging())q2outputInfo("Decimal precision checked!");
 						Mdecimal* _decimal=owned_decimal(__decimal(get_default_mpd_context(),0,0),owner);
-						if(amVerboseDebugging())outputInfo("Decimal created!");
+						if(amVerboseDebugging())q2outputInfo("Decimal created!");
 						if(_decimal!=NULL){
 							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
-							if(amVerboseDebugging())outputInfo("Decimal initialized.");
+							if(amVerboseDebugging())q2outputInfo("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
 								assignValue(&_valueReference->_value,_getValueOfDecimal(disowned_decimal(_decimal,owner)));
 							else
 								outputErrorAndText("The decimal value of %s is undefined",string(pRealText));
 						}else
-							outputError("Failed to create a decimal");
+							q2outputError("Failed to create a decimal");
 						/* replacing:
 						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getValueOfRational(_rational));
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
-						if(amVerboseDebugging())outputInfo("Releasing decimal text.");
+						if(amVerboseDebugging())q2outputInfo("Releasing decimal text.");
 						FREE_STRING(_realText,owner);
-						if(amVerboseDebugging())outputInfo("Decimal text released.");
+						if(amVerboseDebugging())q2outputInfo("Decimal text released.");
 					}else
-						outputError("Failed to initialize the text representation of a decimal");
+						q2outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
@@ -7136,7 +7136,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					//                how about always mapping to an array??????
 					Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,0/* replacing: 1*/,0,false);
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-					if(amVerboseDebugging())outputInfo("Going to wrap the list extracted!");
+					if(amVerboseDebugging())q2outputInfo("Going to wrap the list extracted!");
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
 					// MDH@0.1.7.14+25JUN2023: we have to undo removing the reduction to a single value since (1+2) should return 3 not the array [3]
@@ -7152,8 +7152,8 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue),owner); // applying Ma to _expressionListValue removed!!!!
 					// the reference count of _expressionListValue should be 0 now!!!
 					if(_expressionListValue!=NULL&&_expressionListValue->count)
-						outputBug("Expression list value reference count not 0");
-					////////if(amVerboseDebugging())outputInfo("Extracted list wrapped!");
+						q2outputBug("Expression list value reference count not 0");
+					////////if(amVerboseDebugging())q2outputInfo("Extracted list wrapped!");
 				}
 				break;
 			default:
@@ -7162,12 +7162,12 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		if(_significantTokenText!=NULL)free(_significantTokenText); // free the (duplicated significant) token text
 		if(amVerboseDebugging()){
 			if(_valueReference){
-				outputInfo("Extracted reference:");
-				if(_valueReference->_name!=NULL)outputMessage(M_INFO_PREFIX,"\tName: '%s'.\n",_valueReference->_name);else outputInfo("\tNo name!");
-				if(_valueReference->_value!=NULL)q2outputValue("\tValue: '",_valueReference->_value,"'.\n");else outputInfo("\tNo value referenced!");
-				if(_valueReference->_itemid!=NULL)q2outputValue("\tIndex ids: ",_valueReference->_itemid,"'.\n");else outputInfo("\tNo item ids.");
+				q2outputInfo("Extracted reference:");
+				if(_valueReference->_name!=NULL)q2outputMessage(M_INFO_PREFIX,"\tName: '%s'.\n",_valueReference->_name);else q2outputInfo("\tNo name!");
+				if(_valueReference->_value!=NULL)q2outputValue("\tValue: '",_valueReference->_value,"'.\n");else q2outputInfo("\tNo value referenced!");
+				if(_valueReference->_itemid!=NULL)q2outputValue("\tIndex ids: ",_valueReference->_itemid,"'.\n");else q2outputInfo("\tNo item ids.");
 			}else
-				outputInfo("No value reference!");
+				q2outputInfo("No value reference!");
 		}
 
 		// MDH@17NOV2019: if indexing is theoretically possible, we should further check for indexes
@@ -7184,7 +7184,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				if(NULL==itemIdsList){
 					itemIdsList=owned_list(_getListOfType(VT_UNDEFINED),owner); // we know we're going to need to list
 					if(NULL==itemIdsList){
-						outputMessage(M_ERROR_PREFIX,"Failed to create a list to store the indices of '%s'.\n",_valueReference->_name);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to create a list to store the indices of '%s'.\n",_valueReference->_name);
 						break;
 					}
 				}
@@ -7202,13 +7202,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						Mlistelement* newItemIdListElement=(newItemIdsList!=NULL?newItemIdsList->_first:NULL);
 						while(newItemIdListElement!=NULL){
 							if(appendedToList(itemIdsList,owner,newItemIdListElement->_value,M_LL_INVALID)<=0){
-								outputError("Failed to append augmented item id.");
+								q2outputError("Failed to append augmented item id.");
 								// TODO can't break here?????
 							}
 							newItemIdListElement=newItemIdListElement->_next;
 						}
 					}else
-						outputBug("Item ids not a list.");
+						q2outputBug("Item ids not a list.");
 					// indexListValue will be removed by the garbage collector
 				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
 					// we have to wrap the property name inside a value as text
@@ -7219,14 +7219,14 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(index!=getNAI()){
 							Mvalue* indexValue=_getIntegerValue(index);
 							if(NULL==indexValue||appendedToList(itemIdsList,owner,indexValue,M_LL_INVALID)<=0){
-								outputMessage(M_ERROR_PREFIX,"Failed to add index '%s' to the index list of '%s'.\n",string(_propertyName),_valueReference->_name);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to add index '%s' to the index list of '%s'.\n",string(_propertyName),_valueReference->_name);
 								// TODO can't break here
 							}
 						}else
 						if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 							Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
 							if(NULL==propertyNameValue||appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)<=0){
-								outputMessage(M_ERROR_PREFIX,"Failed to add property name '%s' to the index list of '%s'.\n",string(_propertyName),_valueReference->_name);
+								q2outputMessage(M_ERROR_PREFIX,"Failed to add property name '%s' to the index list of '%s'.\n",string(_propertyName),_valueReference->_name);
 								// TODO can't break here
 							}
 						}
@@ -7262,7 +7262,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				unaryOperator=string_char(unaryOperators,--l);
 				referencedValue=getReferencedValue(_valueReference);
 				if(amVerboseDebugging())
-				{q2outputandcollect("Applying unary operators: '%c'",unaryOperator);q2outputValue(" to '",referencedValue,"'.\n");}
+				{q2output("Applying unary operators: '%c'",unaryOperator);q2outputValue(" to '",referencedValue,"'.\n");}
 				/////////////decrementReferenceCount(_valueReference->_value);
 				_valueReference->_value=applyUnaryOperator(unaryOperator,referencedValue); // MDH@17NOV2019 replacing: _valueReference->_value);
 				// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
@@ -7295,22 +7295,22 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				q2outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
 		}else
 		if(amVerboseDebugging())
-			outputInfo("No unary operators to apply!");
+			q2outputInfo("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=nextEnvironmentExpressionToken();
 
 	}
 
-	if(NULL==_valueReference){outputError("No value reference!");return NULL;} // MDH@09NOV2022: just-in-case
+	if(NULL==_valueReference){q2outputError("No value reference!");return NULL;} // MDH@09NOV2022: just-in-case
 
 	if(amVerboseDebugging())
 	{
 		if(_valueReference->_value!=NULL){
 			q2outputValue("Value result: '",_valueReference->_value,"'");
-			q2outputandcollect(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);
+			q2output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);
 		}else
-			outputInfo("No value result!");
+			q2outputInfo("No value result!");
 	}
 	
 	return disowned_valuereference(_valueReference,owner);
@@ -7446,11 +7446,11 @@ Mdecimal* _getDecimalPower(mpd_t* base,mpd_t* exponent,mpd_context_t* mpd_contex
 			uint32_t status=0;
 			mpd_qpow(_decimalPower->mpd,base,exponent,mpd_context,&status);
 			if((status&0xEFBF)!=0)
-			{outputError("Failed to apply the decimal power function");FREE_DECIMAL(_decimalPower,owner);_decimalPower=NULL;}
+			{q2outputError("Failed to apply the decimal power function");FREE_DECIMAL(_decimalPower,owner);_decimalPower=NULL;}
 		}else
-			outputError("Failed to create decimal power function result");
+			q2outputError("Failed to create decimal power function result");
 	}else
-		outputError("Insufficient input for computing a decimal power");
+		q2outputError("Insufficient input for computing a decimal power");
 	return disowned_decimal(_decimalPower,owner);
 }
 
@@ -7648,11 +7648,11 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 										mpd_qmul(_resultDecimal->mpd,_doublehalfresultDecimal->mpd,baseDecimal->mpd,mpd_context,&status);
 										if((status&0xEFBF)!=0){FREE_DECIMAL(_resultDecimal,owner);_resultDecimal=NULL;}
 									}else
-										outputError("Failed to create a decimal in computing the integer power of a decimal");
+										q2outputError("Failed to create a decimal in computing the integer power of a decimal");
 								}else
 									_resultDecimal=owned_decimal(_getDecimalCopy(_doublehalfresultDecimal),owner);
 							}else
-								outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
+								q2outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
 							FREE_DECIMAL(_doublehalfresultDecimal,owner);
 						}
 						FREE_DECIMAL(_halfresultDecimal,owner);
@@ -7788,7 +7788,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 									Mrational* _rational;
 									Mdecimal* _decimal;
 									while(++iter){
-										q2outputandcollect("Rational root approximation #%lld: ",iter);
+										q2output("Rational root approximation #%lld: ",iter);
 										q2outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,").\n");
 										// let's show the decimal representation of this value
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_pk),/*_getBigintegerCopy*/(_qk),M_LD_NAN,false),owner);
@@ -7796,32 +7796,32 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											_decimal=owned_decimal(_getRationalDecimal(_rational,NULL),owner);FREE_RATIONAL(_rational,owner);
 											if(_decimal!=NULL){q2outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
 										}
-										q2outputandcollect(".\n");
+										q2output(".\n");
 										// update the delta
 										q2outputBiginteger("\tNumerator ",_pk," to power");q2outputBiginteger(" ",rootDegreeBiginteger,":");
 										if(computeBigintegerPower(_pk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY)
-										{outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										{q2outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										q2outputBiginteger(" ",_pktothepowern,".\n");
 										q2outputBiginteger("\tDenominator ",_qk," to power");q2outputBiginteger(" ",rootDegreeBiginteger,":");
 										if(computeBigintegerPower(_qk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY)
-										{outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										{q2outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										q2outputBiginteger(" ",_qktothepowern,".\n");
 
 										/* replacing:
-										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
-										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
+										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){q2outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){q2outputError("Failed to compute the power of the denominator of the rational approximation");break;}
 										*/
 										if(NULL==q_a||NULL==_delta1||mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY)
-										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										q2outputBiginteger("\tDelta 1: ",_delta1,".\n");
 										if(NULL==p_a||NULL==_delta2||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY)
-										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										q2outputBiginteger("\tDelta 2: ",_delta2,".\n");
 										if(NULL==_delta2||NULL==_delta1||NULL==_distancenumerator||mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY)
-										{outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+										{q2outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
 										// we can compute the denominator of the distance as well which is q_a times _qktothepowern
 										if(NULL==_qktothepowern||NULL==q_a||NULL==_distancedenominator||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY)
-										{outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
+										{q2outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
 
 										q2outputBiginteger("\tDistance from (",_pk,"/");q2outputBiginteger(NULL,_qk,")");outputBiginteger("**",rootDegreeBiginteger," to ");
 										q2outputBiginteger("root argument (",p_a,"/");q2outputBiginteger(NULL,q_a,"): ");
@@ -7839,40 +7839,40 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(mp_iszero(MP_INT_POINTER(_distancenumerator)))break; // if delta is zero, exact hit (which I think can only happen when)
 										
 										if(mp_div(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_pk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_divremainder))!=MP_OKAY)
-										{outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
+										{q2outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
 										// update _pk (next) and _qk (next)
 										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextpk))!=MP_OKAY)
-										{outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
 										if(mp_add(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_nextpk))!=MP_OKAY)
-										{outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
 										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_nextqk))!=MP_OKAY)
-										{outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextqk))!=MP_OKAY)
-										{outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 										// that's neat isn't it?
 										// how about normalizing _pk and _qk here, which might help
 										if(mp_gcd(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd))!=MP_OKAY)
-										{outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
+										{q2outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
 										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_divremainder))!=MP_OKAY
 																	||mp_div(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_divremainder))!=MP_OKAY))
-										{outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
+										{q2outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
 
 										// do the bracketing here (on the next pk and qk) 
 										// ASSERT we have to ascertain that the denominator remains the same!!!!!
 										// the sign of distance numerator tells us on which side of the root we are
 										// how about using two big integers???? starting out with 
 										if(computeBigintegerPower(_nextpk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY)
-										{outputError("Failed to initialize the distance numerator for bracketing.");break;}
+										{q2outputError("Failed to initialize the distance numerator for bracketing.");break;}
 										if(computeBigintegerPower(_nextqk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY)
-										{outputError("Failed to initialize the distance denominator for bracketing.");break;}
+										{q2outputError("Failed to initialize the distance denominator for bracketing.");break;}
 										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY)
-										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY)
-										{outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY)
-										{outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
+										{q2outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
 										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY)
-										{outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
+										{q2outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
 										q2outputBiginteger("\n\tDistance of the next Newtonian approximation (",_nextpk,"/");
 										q2outputBiginteger(NULL,_nextqk,"):");
 										q2outputBiginteger("(",_distancenumerator,"/");
@@ -7881,7 +7881,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pkonthisside))==MP_OKAY
 													&&mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pkontheotherside))==MP_OKAY
 													&&mp_copy(MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_distanceonthisside))==MP_OKAY){
-											q2outputandcollect("\tWill use the Newtonian approximation to bracket the rational root with two successive rationals");
+											q2output("\tWill use the Newtonian approximation to bracket the rational root with two successive rationals");
 											q2outputBiginteger(" with denominator ",_nextqk,".\n");
 											/* show the starting point of bracketing!!!
 											q2outputBiginteger("\tBracketing initialized starting at (",_nextpk,"/");q2outputBiginteger(NULL,_nextqk,")");
@@ -7920,29 +7920,29 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 												outputChar('.');
 											}
 											// how about showing the brackets
-											q2outputandcollect("\n\tNumber of bracketing iterations=%llu - number of halving iterations=%llu.\n",bracketingiterations,halvingiterations);
+											q2output("\n\tNumber of bracketing iterations=%llu - number of halving iterations=%llu.\n",bracketingiterations,halvingiterations);
 											q2outputBiginteger("\tNumerator of approximation on this side of the root: ",_pkonthisside,NULL);q2outputBiginteger(" with distance ",_distanceonthisside,".\n");
 											q2outputBiginteger("\tNumerator of approximation on the other side of the root: ",_pkontheotherside,NULL);q2outputBiginteger(" with distance ",_distanceontheotherside,".\n");
 											// we need the one with a negative distance
 											if(mp_copy((mp_isneg(MP_INT_POINTER(_distanceontheotherside))?MP_INT_POINTER(_pkontheotherside):MP_INT_POINTER(_pkonthisside)),MP_INT_POINTER(_nextpk))!=MP_OKAY)break;
 											q2outputBiginteger("\tAccepted approximation numerator from bracketing: ",_nextpk,".\n");
 										}else
-											outputError("\tFailed to perform rational root bracketing.");
+											q2outputError("\tFailed to perform rational root bracketing.");
 
 										// what's the change in approximation?
 										if(mp_mul(MP_INT_POINTER(_pk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_num))!=MP_OKAY)
-										{outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
+										{q2outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
 										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_num1))!=MP_OKAY)
-										{outputError("Failed to initialize the change to the rational root approximation");break;}
+										{q2outputError("Failed to initialize the change to the rational root approximation");break;}
 										if(mp_sub(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY)
-										{outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
+										{q2outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
 										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk),MP_INT_POINTER(_den))!=MP_OKAY)
-										{outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
+										{q2outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
 										if(mp_gcd(MP_INT_POINTER(_num),MP_INT_POINTER(_den),MP_INT_POINTER(_gcd))!=MP_OKAY)
-										{outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
 										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_num),MP_INT_POINTER(_gcd),MP_INT_POINTER(_num),MP_INT_POINTER(_divremainder))!=MP_OKAY
 											||mp_div(MP_INT_POINTER(_den),MP_INT_POINTER(_gcd),MP_INT_POINTER(_den),MP_INT_POINTER(_divremainder))!=MP_OKAY))
-										{outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
 										output("\tChange in rational approximation: ",iter);q2outputBiginteger("(",_num,NULL);q2outputBiginteger("/",_den,")");
 										bool decimalprecisionreached=false;
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_num),/*_getBigintegerCopy*/(_den),M_LD_NAN,false),owner);
@@ -7963,9 +7963,9 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											if(c==3)break;
 										}
 										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pk))!=MP_OKAY)
-										{outputError("Failed to update the numerator of the rational root approximation");break;}
+										{q2outputError("Failed to update the numerator of the rational root approximation");break;}
 										if(mp_copy(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk))!=MP_OKAY)
-										{outputError("Failed to update the denominator of the rational root approximation");break;}
+										{q2outputError("Failed to update the denominator of the rational root approximation");break;}
 
 									}
 									FREE_BIGINTEGER(_pktothepowern,owner);
@@ -7996,14 +7996,14 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 								_rationalBigintegerRootRational=owned_rational(_getRational(_pk,_qk,M_LD_NAN,true),owner);
 							}
 						}else
-							outputError("Failed to initialize the rational root approximation");
+							q2outputError("Failed to initialize the rational root approximation");
 					}else
-						outputError("Failed to initialize the rational rational root approximation");
+						q2outputError("Failed to initialize the rational rational root approximation");
 					if(NULL==rootArgumentRational->den)FREE_BIGINTEGER(q_a,owner); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
 					// take care of freeing the result numerator and denominator when we do not have a rational root rational
 					if(NULL==_rationalBigintegerRootRational){FREE_BIGINTEGER(_pk,owner);FREE_BIGINTEGER(_qk,owner);}
 				}else
-					outputError("The root degree is too large (which should never happen though, as it should have been prevented)");
+					q2outputError("The root degree is too large (which should never happen though, as it should have been prevented)");
 			}else
 				_rationalBigintegerRootRational=owned_rational(_getRationalCopy(rootArgumentRational),owner);
 		}else // the root degree equals 0
@@ -8049,7 +8049,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 							,*_nextBigintegerRootDecimal=owned_decimal(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
 					if(_bigintegerRootDecimal!=NULL&&_nextBigintegerRootDecimal!=NULL){
 						if(amVerbose())
-						outputInfo("Root computation result decimals created...");
+						q2outputInfo("Root computation result decimals created...");
 						uint32_t status=0;
 						// let's determine on which side of one the root argument is located!!!!
 						int rootArgumentComparison=mpd_qcmp(_rootArgumentDecimal->mpd,_bigintegerRootDecimal->mpd,&status);
@@ -8064,22 +8064,22 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 							Mdecimal* _rootDegreeMinus1Decimal=owned_decimal(__decimal(mpd_context,0,0),owner); /////_getDecimalCopy(_rootDegreeDecimal);
 							if(_rootDegreeMinus1Decimal!=NULL){
 								if(amVerbose())
-								outputInfo("Root computation helper decimal created...");
+								q2outputInfo("Root computation helper decimal created...");
 								// can't I use getDecimalOne() here?????? apparently not!!
 								mpd_t* _decimalOne=__mpd(mpd_context,1);
 								mpd_qsub(_rootDegreeMinus1Decimal->mpd,_rootDegreeDecimal->mpd,_decimalOne,mpd_context,&status);
 								free_mpd(_decimalOne);
 								if((status&0xEFBF)==0){
 									if(amVerbose())
-									outputInfo("Root computation helper decimal initialized...");
+									q2outputInfo("Root computation helper decimal initialized...");
 									// we need the root degree minus 1 as big integer as well
 									Mbiginteger* _rootDegreeMinus1Biginteger=owned_biginteger(_getBigintegerCopy(rootDegreeBiginteger),owner);
 									if(_rootDegreeMinus1Biginteger!=NULL){
 										if(amVerbose())
-										outputInfo("Root computation helper big integer created...");
+										q2outputInfo("Root computation helper big integer created...");
 										if(mp_decr(MP_INT_POINTER(_rootDegreeMinus1Biginteger))==MP_OKAY){
 											if(amVerbose())
-											outputInfo("Root computation helper big integer initialized...");
+											q2outputInfo("Root computation helper big integer initialized...");
 											// we need a product, a quotient and an addition help decimal
 											/*
 											Mdecimal *_distance=__decimal(mpd_context,0,0),*_prevdistance=__decimal(mpd_context,0,0);
@@ -8091,7 +8091,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 											// initial value of the quotient denominator that we need for checking whether we're done and in the computation
 											if(/*_distance&&_prevdistance&&*/_product!=NULL&&_quotient!=NULL&&_productplusquotient!=NULL&&_power!=NULL){
 												if(amVerbose())
-												outputInfo("Root computation helper decimals created...");
+												q2outputInfo("Root computation helper decimals created...");
 												// ready to rock 'n' roll, eh iterate
 												// NOTE iterating until the next value is the same wasn't working, it might be better to compute the power value itself and to compare with the root argument value, if match stop!!
 												unsigned long long iter=0;
@@ -8113,7 +8113,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													// if the distance hasn't changed we're done (as we noticed the distance won't be zero in general)
 													if(mpd_qcmp(_distance->mpd,_prevdistance->mpd,&status)==0)break; // a match, so done
 													free_mpd(_prevdistance->mpd);_prevdistance->mpd=mpd_qncopy(_distance->mpd);
-													if(!_prevdistance->mpd){outputError("Failed to copy the distance!");break;}
+													if(!_prevdistance->mpd){q2outputError("Failed to copy the distance!");break;}
 													*/
 													// replacing: if(mpd_iszero(_distance->mpd))break;
 													// if the product of the quotient denominator and the root decimal equals the root argument
@@ -8142,7 +8142,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													free_mpd(_bigintegerRootDecimal->mpd);_bigintegerRootDecimal->mpd=mpd_qncopy(_nextBigintegerRootDecimal->mpd);
 												}
 												if((status&0xEFBF)!=0){
-													outputMessage(M_ERROR_PREFIX,"Root computation ended with error code " PRIu32 ".\n",status);
+													q2outputMessage(M_ERROR_PREFIX,"Root computation ended with error code " PRIu32 ".\n",status);
 													FREE_DECIMAL(_bigintegerRootDecimal,owner);
 												}else{
 													_bigintegerRootValue=_getValueOfDecimal(disowned_decimal(_bigintegerRootDecimal,owner));
@@ -8150,7 +8150,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 														q2outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
 												}
 											}else
-												outputError("Failed to create helper decimals in computing a root decimal");
+												q2outputError("Failed to create helper decimals in computing a root decimal");
 											/*
 											FREE_DECIMAL(_distance);FREE_DECIMAL(_prevdistance);
 											*/
@@ -8159,35 +8159,35 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 											FREE_DECIMAL(_productplusquotient,owner);
 											FREE_DECIMAL(_power,owner);
 										}else
-											outputError("Failed to compute a helper big integer in computing a root decimal");
+											q2outputError("Failed to compute a helper big integer in computing a root decimal");
 										FREE_BIGINTEGER(_rootDegreeMinus1Biginteger,owner);
 										if(amVerbose())
-										outputInfo("Root computation helper big integer released...");
+										q2outputInfo("Root computation helper big integer released...");
 									}else
-										outputError("Failed to copy the root degree in computing a root decimal");
+										q2outputError("Failed to copy the root degree in computing a root decimal");
 								}else
-									outputError("Failed to compute a helper decimal in computing a root decimal");
+									q2outputError("Failed to compute a helper decimal in computing a root decimal");
 							}else
-								outputError("Failed to create a helper decimal in computing a root decimal");
+								q2outputError("Failed to create a helper decimal in computing a root decimal");
 							FREE_DECIMAL(_rootDegreeMinus1Decimal,owner);
 							if(amVerbose())
-							outputInfo("Root computation helper decimal released...");
+							q2outputInfo("Root computation helper decimal released...");
 						}else
 						if(rootArgumentComparison)
-							outputError("Failed to initialize the result of the root computation to the square root");
+							q2outputError("Failed to initialize the result of the root computation to the square root");
 						else // wrap the result (which is 1)
 							_bigintegerRootValue=_getValueOfDecimal(disowned_decimal(_bigintegerRootDecimal,owner));
 					}
 					FREE_DECIMAL(_nextBigintegerRootDecimal,owner);
 					FREE_DECIMAL(_rootDegreeDecimal,owner);
 					if(amVerbose())
-					outputInfo("Root computation degree decimal released...");
+					q2outputInfo("Root computation degree decimal released...");
 				}else{
 					q2outputmessageprefix(M_ERROR_PREFIX);
 					q2outputBiginteger("Failed to convert root degree '",rootDegreeBiginteger,"' to a decimal.\n");
 				}
 			}else
-				outputError("Failed to create a decimal context for computing a decimal root");
+				q2outputError("Failed to create a decimal context for computing a decimal root");
 			if(rootArgumentValue->type!=VT_DECIMAL)FREE_DECIMAL(_rootArgumentDecimal,owner);
 		}else{
 			q2outputmessageprefix(M_ERROR_PREFIX);
@@ -8238,22 +8238,22 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 			if(amVerbose())
 				{q2outputBiginteger("Power: '",_powerBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: if the base is integer, we're going to try to return a small integer
 		if(smallinteger1){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
-			if(amVerbose())outputInfo("Will try to convert the big integer result back to a small integer.");
+			if(amVerbose())q2outputInfo("Will try to convert the big integer result back to a small integer.");
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			long long llpower=getBigintegerInteger(_powerBiginteger);
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llpower!=M_LL_INVALID){
-				if(amVerbose())outputInfo("Will remove the big integer exponentiation result!");
+				if(amVerbose())q2outputInfo("Will remove the big integer exponentiation result!");
 				FREE_BIGINTEGER(_powerBiginteger,owner);
-				if(amVerbose())outputInfo("Returning the small integer equivalent of the big integer exponentation result.");
+				if(amVerbose())q2outputInfo("Returning the small integer equivalent of the big integer exponentation result.");
 				return _getIntegerValue(llpower);
 			}
-			outputWarning("Small integer exponentation result out of range, will continue using the big integer exponentiation result.");
+			q2outputWarning("Small integer exponentation result out of range, will continue using the big integer exponentiation result.");
 		}
 		///////q2outputBiginteger("Exponentation result: '",_powerBiginteger,"'.\n");
 		return _getValueOfBiginteger(disowned_biginteger(_powerBiginteger,owner));
@@ -8347,7 +8347,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 								q2outputValue("Rational exponent root of ",_rootArgumentValue,NULL);q2outputValue(": ",_rootValue,".\n");
 								*/
 							}else
-								outputError("Failed to determine the integer and fractional part of a rational exponent");
+								q2outputError("Failed to determine the integer and fractional part of a rational exponent");
 							FREE_BIGINTEGER(_integerdividend,owner);FREE_BIGINTEGER(_remainder,owner);
 						}else // the numerator equals the denominator meaning that _value1 is the value to return
 							_rootValue=_value1;
@@ -8365,7 +8365,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						if(_returnValue!=NULL)_returnValue=Mreciprocal(_returnValue);
 					}
 				}else
-					outputError("Failed to reverse the sign of the rational exponent");
+					q2outputError("Failed to reverse the sign of the rational exponent");
 				if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_exponentRational,owner);
 			}else{ // not integer based exponent (so if the exponent is a decimal is does not have a repeating part), so use decimals
 				// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
@@ -8376,11 +8376,11 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 				if(_baseDecimal!=NULL&&_exponentDecimal!=NULL){
 					Mdecimal* _powerDecimal=NULL;
 					mpd_context_t* mpd_context=getContextOfDecimals(_baseDecimal,_exponentDecimal);
-					if(NULL==mpd_context)outputError("No decimal context for use in the power function");
+					if(NULL==mpd_context)q2outputError("No decimal context for use in the power function");
 					// the decimal library has a function to compute the power of two decimals and we can use that for most of the value pairs
 					// if either has a repeating part we have a problem
 					if(_baseDecimal->repeating>0){
-						if(amVerbose())outputInfo("Computing the power of a rational.");
+						if(amVerbose())q2outputInfo("Computing the power of a rational.");
 						// the result is the quotient of the power of the numerator divided by the power of the denominator of the associated rational
 						Mrational* _baseRational=getValueRational(_value1);if(_value1->type!=VT_RATIONAL)owned_rational(_baseRational,owner);
 						Mdecimal* _baseNumDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->num,mpd_context),owner);
@@ -8393,9 +8393,9 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 							uint32_t status=0;
 							mpd_qdiv(_powerDecimal->mpd,_numPowerDecimal->mpd,_denPowerDecimal->mpd,mpd_context,&status);
 							if((status&0xEFBF)!=0)
-							{outputError("Failed to divide the numerator and denominator powers");FREE_DECIMAL(_powerDecimal,owner);_powerDecimal=NULL;}
+							{q2outputError("Failed to divide the numerator and denominator powers");FREE_DECIMAL(_powerDecimal,owner);_powerDecimal=NULL;}
 						}else
-							outputError("Failed to create the decimal result of applying the power function to a rational");
+							q2outputError("Failed to create the decimal result of applying the power function to a rational");
 						FREE_DECIMAL(_baseNumDecimal,owner);
 						FREE_DECIMAL(_baseDenDecimal,owner);
 						FREE_DECIMAL(_numPowerDecimal,owner);
@@ -8403,10 +8403,10 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_baseRational,owner);
 					}else{ // base and exponent decimals is true
 						_powerDecimal=owned_decimal(_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
-						outputInfo("Power decimal computed!");
+						q2outputInfo("Power decimal computed!");
 						// if the exponent is integer typed, the base type determines what to return
 					}
-					if(_powerDecimal)_returnValue=_getValueOfDecimal(disowned_decimal(_powerDecimal,owner));else outputError("Failed to create the power function result decimal");
+					if(_powerDecimal)_returnValue=_getValueOfDecimal(disowned_decimal(_powerDecimal,owner));else q2outputError("Failed to create the power function result decimal");
 				}
 				// if the originals weren't decimals, free the created decimals!!!!
 				if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_baseDecimal,owner);
@@ -8460,14 +8460,14 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 						if(exponentOf10==0)
 							_rational=_getRational(_numerator,_getBigintegerCopy(_value1->value._rational->den),getReal(_value1->value._rational->delta),true,true);
 						else
-							outputError("Failed to multiply the numerator of the rational by an integer power of 10.");
+							q2outputError("Failed to multiply the numerator of the rational by an integer power of 10.");
 					}else{
 						Mbiginteger* _denominator=(!_value1->value._rational->den?_getBiginteger(1):_getBigintegerCopy(_value1->value._rational->den));
 						while(exponentOf10<0)if(mp_mul(_denominator,_biginteger10,_denominator)==MP_OKAY)exponentOf10++;else break;
 						if(exponentOf10==0)
 							_rational=_getRational(_getBigintegerCopy(_value1->value._rational->num),_denominator,getReal(_value1->value._rational->delta),true,true);
 						else
-							outputError("Failed to multiply the denominator of the rational by an integer power of 10.");
+							q2outputError("Failed to multiply the denominator of the rational by an integer power of 10.");
 					}
 					FREE_BIGINTEGER(_biginteger10);
 				}
@@ -8519,7 +8519,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 			{FREE_BIGINTEGER(_integerquotientBiginteger,owner);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){q2outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1){
 			/////q2outputBiginteger("Freeing '",_biginteger1,"'.\n");
 			FREE_BIGINTEGER(_biginteger1,owner);
@@ -8541,7 +8541,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 				FREE_BIGINTEGER(_integerquotientBiginteger,owner);
 				return _getIntegerValue(llintegerquotient);
 			}
-			outputWarning("Small integer integer quotient out of range, will continue using big integer integer quotient.");
+			q2outputWarning("Small integer integer quotient out of range, will continue using big integer integer quotient.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_integerquotientBiginteger,owner));
 	}
@@ -8566,10 +8566,10 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 						FREE_BIGINTEGER(_integerremainderBiginteger);
 					}
 				}else 
-					outputError("Failed to create the integer divide result big integer");
+					q2outputError("Failed to create the integer divide result big integer");
 			}
 		}else 
-			outputError("Failed to create two helper big integers");
+			q2outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getValueOfBiginteger(disowned_biginteger(_integerdivideBiginteger,true);
 	}
@@ -8665,7 +8665,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 			if(amVerbose())
 				{q2outputBiginteger(" - Integer division remainder: '",_moduloBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -8676,7 +8676,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 			long long llmodulo=getBigintegerInteger(_moduloBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llmodulo!=M_LL_INVALID){FREE_BIGINTEGER(_moduloBiginteger,owner);return _getIntegerValue(llmodulo);}
-			outputWarning("Small integer quotient remainder out of range, will continue using big integer quotient remainder.");
+			q2outputWarning("Small integer quotient remainder out of range, will continue using big integer quotient remainder.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_moduloBiginteger,owner));
 	}
@@ -8797,7 +8797,7 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_xorbiginteger,owner));
 		}else
-			outputError("Failed to create the xor result big integer");
+			q2outputError("Failed to create the xor result big integer");
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -8830,7 +8830,7 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_bitwiseandbiginteger,owner));
 		}else
-			outputError("Failed to create the bitwise and result big integer");
+			q2outputError("Failed to create the bitwise and result big integer");
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -8864,7 +8864,7 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_bitwiseorbiginteger,owner));
 		}else
-			outputError("Failed to create the bitwise or result big integer");
+			q2outputError("Failed to create the bitwise or result big integer");
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -8990,12 +8990,12 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 								mp_zero(MP_INT_POINTER(_biginteger2));
 							}else
 							if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
-								outputError("Failed to subtract shift left maximum");
+								q2outputError("Failed to subtract shift left maximum");
 								FREE_BIGINTEGER(_biginteger,owner);
 								_biginteger=NULL;
 							}
 							if(_biginteger!=NULL&&mp_div_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
-								outputError("Failed to shift right");
+								q2outputError("Failed to shift right");
 								FREE_BIGINTEGER(_biginteger,owner);
 								_biginteger=NULL;
 							}
@@ -9012,12 +9012,12 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 							mp_zero(MP_INT_POINTER(_biginteger2));
 						}else
 						if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
-							outputError("Failed to subtract shift left maximum");
+							q2outputError("Failed to subtract shift left maximum");
 							FREE_BIGINTEGER(_biginteger,owner);
 							_biginteger=NULL;
 						}
 						if(_biginteger!=NULL&&mp_mul_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger))!=MP_OKAY){
-							outputError("Failed to shift left");
+							q2outputError("Failed to shift left");
 							FREE_BIGINTEGER(_biginteger,owner);
 							_biginteger=NULL;
 						}
@@ -9056,13 +9056,13 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				// TODO q2... here?
 				Mstring* _bigintegerValueText=owned_string(_getValueText(_value1,true,true),owner);
 				if(_bigintegerValueText!=NULL){
-					outputMessage(M_ERROR_PREFIX,"Failed to shift '%s' to the left.\n",_bigintegerValueText);		
+					q2outputMessage(M_ERROR_PREFIX,"Failed to shift '%s' to the left.\n",_bigintegerValueText);		
 					FREE_STRING(_bigintegerValueText,owner);
 				}
 			}else 
-				outputError("Failed to shift left a big integer");
+				q2outputError("Failed to shift left a big integer");
 		}else
-			outputError("Failed to create the shift left result big integer");
+			q2outputError("Failed to create the shift left result big integer");
 		return _getValueOfBiginteger(disowned_biginteger(_shiftleftBiginteger,owner));
 	}
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
@@ -9080,14 +9080,14 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 					if(NULL==_shiftleftRational->den)_shiftleftRational->den=_getBiginteger(1); // force having a non NULL denominator before trying to shift it
 					if(_shiftleftRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftleftRational->den),-shiftleftinteger,MP_INT_POINTER(_shiftleftRational->den))!=MP_OKAY){
 						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
-						outputError("Failed to half a rational");
+						q2outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftleftRational!=NULL){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational,owner);}
 				}else{ 
 					if(mp_mul_2d(MP_INT_POINTER(_shiftleftRational->num),shiftleftinteger,MP_INT_POINTER(_shiftleftRational->num))!=MP_OKAY){
 						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
-						outputError("Failed to double a rational");
+						q2outputError("Failed to double a rational");
 					}
 				}
 				if(_shiftleftRational!=NULL){
@@ -9098,10 +9098,10 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 					}
 				}
 			}else 
-				outputError("Failed to copy a rational");
+				q2outputError("Failed to copy a rational");
 			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		}else 
-			outputError("Failed to convert a decimal to a rational");
+			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftleftRational,owner));
 	}
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
@@ -9110,9 +9110,9 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		if(_shiftleftDecimal!=NULL){
 			uint32_t status=0;
 			if(_shiftleftDecimal>0)mpd_qshiftr(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,shiftleftinteger,&status);else mpd_qshiftl(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,-shiftleftinteger,&status);
-			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftleftDecimal,owner);_shiftleftDecimal=NULL;outputError("Failed to shift a decimal to the left");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftleftDecimal,owner);_shiftleftDecimal=NULL;q2outputError("Failed to shift a decimal to the left");}
 		}else 
-			outputError("Failed to copy a decimal");
+			q2outputError("Failed to copy a decimal");
 		return _getValueOfDecimal(disowned_decimal(_shiftleftDecimal,owner));
 	}
 	return NULL;
@@ -9165,12 +9165,12 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 								mp_zero(MP_INT_POINTER(_biginteger2));
 							}else
 							if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
-								outputError("Failed to subtract shift left maximum");
+								q2outputError("Failed to subtract shift left maximum");
 								FREE_BIGINTEGER(_biginteger,owner);
 								_biginteger=NULL;
 							}
 							if(_biginteger!=NULL&&mp_mul_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger))!=MP_OKAY){
-								outputError("Failed to shift left");
+								q2outputError("Failed to shift left");
 								FREE_BIGINTEGER(_biginteger,owner);
 								_biginteger=NULL;
 							}
@@ -9187,12 +9187,12 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 							mp_zero(MP_INT_POINTER(_biginteger2));
 						}else
 						if(mp_sub(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_intmaxbiginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
-							outputError("Failed to subtract shift right maximum");
+							q2outputError("Failed to subtract shift right maximum");
 							FREE_BIGINTEGER(_biginteger,owner);
 							_biginteger=NULL;
 						}
 						if(_biginteger!=NULL&&mp_div_2d(MP_INT_POINTER(_biginteger1),integer2,MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
-							outputError("Failed to shift right");
+							q2outputError("Failed to shift right");
 							FREE_BIGINTEGER(_biginteger,owner);
 							_biginteger=NULL;
 						}
@@ -9228,9 +9228,9 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				q2outputmessageprefix(M_ERROR_PREFIX);
 				q2outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
 			}else
-				outputError("Failed to shift right a big integer");
+				q2outputError("Failed to shift right a big integer");
 		}else
-			outputError("Failed to create the shift right result big integer");
+			q2outputError("Failed to create the shift right result big integer");
 		return _getValueOfBiginteger(disowned_biginteger(_shiftrightBiginteger,owner));
 		/* replacing:
 		// what we shift by should fit in int64_t!!!!
@@ -9240,7 +9240,7 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 				if(_biginteger1){
 					if(amVerbose())
-					{q2outputBiginteger("Shifting big integer '",_biginteger1,"' left");q2outputandcollect(" by %" PRIi64 ".\n",shr);}
+					{q2outputBiginteger("Shifting big integer '",_biginteger1,"' left");q2output(" by %" PRIi64 ".\n",shr);}
 					if((shr>0?mp_div_2d(_biginteger1,shr,_biginteger1,NULL):mp_mul_2d(_biginteger1,-shr,_biginteger1))==MP_OKAY)return _getValueOfBiginteger(disowned_biginteger(_biginteger1,true);
 					q2outputmessageprefix(M_ERROR_PREFIX);
 					q2outputBiginteger("Failed to shift '",_biginteger1,"' to the right.\n");			
@@ -9248,7 +9248,7 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				}
 			}
 		}else
-			outputError("Number of shift positions too large");
+			q2outputError("Number of shift positions too large");
 		*/
 	}
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
@@ -9266,14 +9266,14 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 					if(NULL==_shiftrightRational->den)_shiftrightRational->den=OWNED(_getBiginteger(1),owner); // force having a non NULL denominator before trying to shift it
 					if(_shiftrightRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftrightRational->den),shiftrightinteger,MP_INT_POINTER(_shiftrightRational->den))!=MP_OKAY){
 						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
-						outputError("Failed to half a rational");
+						q2outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftrightRational!=NULL){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational,owner);}
 				}else{ // naughty boy (or girl for that matter)...
 					if(mp_mul_2d(MP_INT_POINTER(_shiftrightRational->num),-shiftrightinteger,MP_INT_POINTER(_shiftrightRational->num))!=MP_OKAY){
 						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
-						outputError("Failed to double a rational");
+						q2outputError("Failed to double a rational");
 					}
 				}
 				if(_shiftrightRational!=NULL){
@@ -9284,10 +9284,10 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 					}
 				}
 			}else 
-				outputError("Failed to copy a rational");
+				q2outputError("Failed to copy a rational");
 			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		}else 
-			outputError("Failed to convert a decimal to a rational");
+			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftrightRational,owner));
 	}
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
@@ -9298,9 +9298,9 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 			if(_shiftrightDecimal>0)mpd_qshiftr(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,shiftrightinteger,&status);
 			else mpd_qshiftl(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,-shiftrightinteger,&status);
 			if((status&0xEFBF)!=0)
-			{FREE_DECIMAL(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;outputError("Failed to shift a decimal to the right");}
+			{FREE_DECIMAL(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;q2outputError("Failed to shift a decimal to the right");}
 		}else 
-			outputError("Failed to copy a decimal");
+			q2outputError("Failed to copy a decimal");
 		return _getValueOfDecimal(disowned_decimal(_shiftrightDecimal,owner));
 	}
 	return NULL;
@@ -9365,9 +9365,9 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				result=not(isRationalNegative(_rationalDifference));
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
@@ -9385,9 +9385,9 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				result=not(isDecimalNegative(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return result;
@@ -9449,9 +9449,9 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 				result=not(isRationalNegative(_rationalDifference));
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
@@ -9469,9 +9469,9 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 				result=not(isDecimalNegative(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return result;
@@ -9536,9 +9536,9 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 				result=not(isRationalZero(_rationalDifference)); 
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
@@ -9556,9 +9556,9 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 				result=not(isDecimalZero(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return result;
@@ -9622,9 +9622,9 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 				result=isRationalZero(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
@@ -9642,9 +9642,9 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 				result=isDecimalZero(_decimalDifference);
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return result;
@@ -9722,9 +9722,9 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 				result=not(isRationalPositive(_rationalDifference)); // i.e. if difference is NOT positive, we should return M_TRUE
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return result;
@@ -9742,9 +9742,9 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 				result=not(isDecimalPositive(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return result;
@@ -9804,24 +9804,24 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 						while(integerrangeValue!=NULL){
 							// determine whether this value does not exceed the last value
 							long long inrange=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
-							if(inrange==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
+							if(inrange==M_LL_INVALID){q2outputError("Unable to determine whether the integer is inside the integer range");break;}
 							if(inrange==M_FALSE)break; // not in range
 							if(appendedToList(_scalarRangeList,owner,integerrangeValue,M_LL_INVALID)<=0)
-							{FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
+							{FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;q2outputError("Failed to add an integer to an integer range");break;}
 							// determine the next value to insert into the integer range
 							if(*up)rangeInteger++;else rangeInteger--;
 							integerrangeValue=_getIntegerValue(rangeInteger);
 						}
 					}else
-						outputError("Failed to initialize the first candidate range integer");
+						q2outputError("Failed to initialize the first candidate range integer");
 				}else
-					outputError("Failed to extract the lower bound of the integer range");
+					q2outputError("Failed to extract the lower bound of the integer range");
 			}else
-				outputError("Failed to determine the first integer range value");
+				q2outputError("Failed to determine the first integer range value");
 		}else
-			outputError("Unable to determine whether to go up or down in the integer range");
+			q2outputError("Unable to determine whether to go up or down in the integer range");
 	}else
-		outputError("Failed to create a list to store the integer range");
+		q2outputError("Failed to create a list to store the integer range");
 	return disowned_list(_scalarRangeList,owner);
 }
 // MDH@25NOV2020: preferable to store the range elements in an array
@@ -9841,7 +9841,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 		if(direction!=M_LL_INVALID){
 			*up=(direction==M_TRUE);
 			if(report)
-			{q2outputValue("'",firstRangeValue,"' is ");q2outputandcollect("%s",(*up?"smaller than or equal to":"larger than"));q2outputValue(" '",lastRangeValue,"'.\n");}
+			{q2outputValue("'",firstRangeValue,"' is ");q2output("%s",(*up?"smaller than or equal to":"larger than"));q2outputValue(" '",lastRangeValue,"'.\n");}
 			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
 			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
 			Mvalue* firstIntegerRangeValue=(*up?Mceil(firstRangeValue):Mfloor(firstRangeValue));
@@ -9861,7 +9861,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 						long long lastRangeInteger=getValueInteger(lastIntegerRangeValue);
 						if(lastRangeInteger==M_LL_INVALID)return NULL;
 						if(report)
-							q2outputandcollect("Determining all %s integers in [%lld,%lld].\n",(*up?"decreasing":"increasing"),rangeInteger,lastRangeInteger);
+							q2output("Determining all %s integers in [%lld,%lld].\n",(*up?"decreasing":"increasing"),rangeInteger,lastRangeInteger);
 						unsigned long long arraylength=(*up
 							?(lastRangeInteger>=rangeInteger?1+(lastRangeInteger-rangeInteger):0)
 							:(rangeInteger>=lastRangeInteger?1+(rangeInteger-lastRangeInteger):0));
@@ -9879,17 +9879,17 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 								}
 							}
 						}else 
-							outputError("Failed to create the range array");
+							q2outputError("Failed to create the range array");
 					}else
-						outputError("Failed to initialize the first candidate range integer");
+						q2outputError("Failed to initialize the first candidate range integer");
 				}else
-					outputError("Failed to extract the lower bound of the integer range");
+					q2outputError("Failed to extract the lower bound of the integer range");
 			}else
-				outputError("Failed to determine the first integer range value");
+				q2outputError("Failed to determine the first integer range value");
 		}else
-			outputError("Unable to determine whether to go up or down in the integer range");
+			q2outputError("Unable to determine whether to go up or down in the integer range");
 	}else
-		outputError("Start or end of range not defined");
+		q2outputError("Start or end of range not defined");
 	return(_scalarRangeArray?disowned_array(_scalarRangeArray,owner):NULL);
 }
 
@@ -9906,27 +9906,27 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 Mvalue* Mrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationowner owner=getOwner(__LINE__);
 	// at least a fromValue decimal value is required
 	Mvalue *stepDecimalValue=Md(stepValue,NULL);
-	if(NULL==stepDecimalValue&&stepValue!=NULL){outputError("Increment not numeric");return NULL;}
+	if(NULL==stepDecimalValue&&stepValue!=NULL){q2outputError("Increment not numeric");return NULL;}
 	Mdecimal* stepDecimal=(stepDecimalValue!=NULL?stepDecimalValue->value._decimal:NULL);
 	long long stepDecimalSign=M_LL_INVALID;
 	if(stepDecimal!=NULL){ // check the sign to be either positive or negative!!
 		stepDecimalSign=getDecimalSign(stepDecimal);
-		if(stepDecimalSign==M_ZERO){outputError("Zero increment to range()");return NULL;}
+		if(stepDecimalSign==M_ZERO){q2outputError("Zero increment to range()");return NULL;}
 	}
 	Mvalue *fromDecimalValue=Md(fromValue,NULL),*toDecimalValue=Md(toValue,NULL);
 	// if we do not have a step decimal value (which might be the case if stepValue is NULL)
-	if(NULL==fromDecimalValue||NULL==toDecimalValue){outputError("Missing or incomplete arguments to range()");return NULL;}
+	if(NULL==fromDecimalValue||NULL==toDecimalValue){q2outputError("Missing or incomplete arguments to range()");return NULL;}
 	Mdecimal *toDecimal=toDecimalValue->value._decimal,*fromDecimal=fromDecimalValue->value._decimal;
 	Mdecimal *_rangeDecimal=owned_decimal(_getDecimalDifference(toDecimal,fromDecimal),owner);
-	if(NULL==_rangeDecimal){outputError("Failed to compute the range");return NULL;}
+	if(NULL==_rangeDecimal){q2outputError("Failed to compute the range");return NULL;}
 	// check the sign
 	long long rangeSign=getDecimalSign(_rangeDecimal);
 	FREE_DECIMAL(_rangeDecimal,owner);
-	if(stepDecimalSign!=M_LL_INVALID&&rangeSign!=M_ZERO)if(rangeSign!=stepDecimalSign){outputError("Increment has the wrong sign");return NULL;}
+	if(stepDecimalSign!=M_LL_INVALID&&rangeSign!=M_ZERO)if(rangeSign!=stepDecimalSign){q2outputError("Increment has the wrong sign");return NULL;}
 	Mlist* _rangeList=owned_list(_getListOfType(VT_UNDEFINED),owner);
-	if(NULL==_rangeList){outputError("Failed to create range list");return NULL;}
+	if(NULL==_rangeList){q2outputError("Failed to create range list");return NULL;}
 	// add fromDecimal to start with
-	if(appendedToList(_rangeList,owner,fromValue,M_LL_INVALID)<0){FREE_LIST(_rangeList,owner);outputError("Failed to initialize the list of range values");return NULL;}
+	if(appendedToList(_rangeList,owner,fromValue,M_LL_INVALID)<0){FREE_LIST(_rangeList,owner);q2outputError("Failed to initialize the list of range values");return NULL;}
 	if(rangeSign==M_POSITIVE||rangeSign==M_NEGATIVE){
 		// instead of a step decimal (see Mdrange) we need a step value
 		// and it makes sense to make it have the same type
@@ -9935,19 +9935,19 @@ Mvalue* Mrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationo
 			Mvalue* lastRangeValue=fromValue;
 			while(1){
 				Mvalue* nextRangeValue=Madd(lastRangeValue,stepValue);
-				if(NULL==nextRangeValue){outputError("Failed to complete the range of values");break;}
+				if(NULL==nextRangeValue){q2outputError("Failed to complete the range of values");break;}
 				// if _nextRangeDecimal is above (or below) toDecimal we do NOT add it
 				Mvalue* deltaValue=Msubtract(nextRangeValue,toValue);
-				if(NULL==deltaValue){outputError("Failed to check a new range value");break;}
+				if(NULL==deltaValue){q2outputError("Failed to check a new range value");break;}
 				long long deltaSign=getValueInteger(Msign(deltaValue));
 				if(deltaSign==rangeSign||appendedToList(_rangeList,owner,nextRangeValue,M_LL_INVALID)<0){
-					if(deltaSign!=rangeSign)outputError("Failed to complete the list of range values");
+					if(deltaSign!=rangeSign)q2outputError("Failed to complete the list of range values");
 					break;
 				}
 				lastRangeValue=nextRangeValue;
 			}
 		}else
-			outputError("Failed to initialize the unit increment");
+			q2outputError("Failed to initialize the unit increment");
 	}
 	return _getValueOfList(disowned_list(_rangeList,owner));
 }
@@ -9965,27 +9965,27 @@ Mvalue* Mrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationo
 Mvalue* Mdrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocationowner owner=getOwner(__LINE__);
 	// at least a fromValue decimal value is required
 	Mvalue *stepDecimalValue=Md(stepValue,NULL);
-	if(NULL==stepDecimalValue&&stepValue!=NULL){outputError("Increment not numeric");return NULL;}
+	if(NULL==stepDecimalValue&&stepValue!=NULL){q2outputError("Increment not numeric");return NULL;}
 	Mdecimal* stepDecimal=(stepDecimalValue!=NULL?stepDecimalValue->value._decimal:NULL);
 	long long stepDecimalSign=M_LL_INVALID;
 	if(stepDecimal!=NULL){ // check the sign to be either positive or negative!!
 		stepDecimalSign=getDecimalSign(stepDecimal);
-		if(stepDecimalSign==M_ZERO){outputError("Zero increment to rangevalues()");return NULL;}
+		if(stepDecimalSign==M_ZERO){q2outputError("Zero increment to rangevalues()");return NULL;}
 	}
 	Mvalue *fromDecimalValue=Md(fromValue,NULL),*toDecimalValue=Md(toValue,NULL);
 	// if we do not have a step decimal value (which might be the case if stepValue is NULL)
-	if(NULL==fromDecimalValue||NULL==toDecimalValue){outputError("Missing or incomplete arguments to rangevalues()");return NULL;}
+	if(NULL==fromDecimalValue||NULL==toDecimalValue){q2outputError("Missing or incomplete arguments to rangevalues()");return NULL;}
 	Mdecimal *toDecimal=toDecimalValue->value._decimal,*fromDecimal=fromDecimalValue->value._decimal;
 	Mdecimal *_rangeDecimal=owned_decimal(_getDecimalDifference(toDecimal,fromDecimal),owner);
-	if(NULL==_rangeDecimal){outputError("Failed to compute the range");return NULL;}
+	if(NULL==_rangeDecimal){q2outputError("Failed to compute the range");return NULL;}
 	// check the sign
 	long long rangeSign=getDecimalSign(_rangeDecimal);
 	FREE_DECIMAL(_rangeDecimal,owner);
-	if(stepDecimalSign!=M_LL_INVALID&&rangeSign!=M_ZERO)if(rangeSign!=stepDecimalSign){outputError("Increment has the wrong sign");return NULL;}
+	if(stepDecimalSign!=M_LL_INVALID&&rangeSign!=M_ZERO)if(rangeSign!=stepDecimalSign){q2outputError("Increment has the wrong sign");return NULL;}
 	Mlist* _rangeList=owned_list(_getListOfType(VT_DECIMAL),owner);
-	if(NULL==_rangeList){outputError("Failed to create range list");return NULL;}
+	if(NULL==_rangeList){q2outputError("Failed to create range list");return NULL;}
 	// add fromDecimal to start with
-	if(appendedToList(_rangeList,owner,fromDecimalValue,M_LL_INVALID)<0){FREE_LIST(_rangeList,owner);outputError("Failed to initialize the list of range values");return NULL;}
+	if(appendedToList(_rangeList,owner,fromDecimalValue,M_LL_INVALID)<0){FREE_LIST(_rangeList,owner);q2outputError("Failed to initialize the list of range values");return NULL;}
 	if(rangeSign==M_POSITIVE||rangeSign==M_NEGATIVE){
 		Mdecimal* _stepDecimal=stepDecimal; // the step decimal to use that we create if stepDecimal is NULL
 		if(NULL==_stepDecimal){
@@ -9996,15 +9996,15 @@ Mvalue* Mdrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocation
 			Mdecimal* lastRangeDecimal=fromDecimal;
 			while(1){
 				Mdecimal* _nextRangeDecimal=owned_decimal(_getDecimalSum(lastRangeDecimal,_stepDecimal),owner);
-				if(NULL==_nextRangeDecimal){outputError("Failed to complete the range of values");break;}
+				if(NULL==_nextRangeDecimal){q2outputError("Failed to complete the range of values");break;}
 				// if _nextRangeDecimal is above (or below) toDecimal we do NOT add it
 				Mdecimal* _deltaDecimal=owned_decimal(_getDecimalDifference(_nextRangeDecimal,toDecimal),owner);
-				if(NULL==_deltaDecimal){outputError("Failed to check a new range value");break;}
+				if(NULL==_deltaDecimal){q2outputError("Failed to check a new range value");break;}
 				long long deltaSign=getDecimalSign(_deltaDecimal);
 				FREE_DECIMAL(_deltaDecimal,owner);
 				if(deltaSign==rangeSign||appendedToList(_rangeList,owner,_getValueOfDecimal(disowned_decimal(_nextRangeDecimal,owner)),M_LL_INVALID)<0){
 					FREE_DECIMAL(_nextRangeDecimal,owner);
-					if(deltaSign!=rangeSign)outputError("Failed to complete the list of range values");
+					if(deltaSign!=rangeSign)q2outputError("Failed to complete the list of range values");
 					break;
 				}
 				lastRangeDecimal=_nextRangeDecimal;
@@ -10012,7 +10012,7 @@ Mvalue* Mdrange(Mvalue* fromValue,Mvalue* toValue,Mvalue* stepValue){Mallocation
 			// free _stepDecimal if we created it here
 			if(stepDecimal==NULL)FREE_DECIMAL(_stepDecimal,owner);
 		}else
-			outputError("Failed to initialize the unit increment");
+			q2outputError("Failed to initialize the unit increment");
 	}
 	return _getValueOfList(disowned_list(_rangeList,owner));
 }
@@ -10163,7 +10163,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	if(_value1!=NULL&&_value2!=NULL){
 		if(amVerboseDebugging()){
 			q2outputValue("Computing '",_value1,NULL);
-			q2outputandcollect("' %s '",operator);
+			q2output("' %s '",operator);
 			q2outputValue(NULL,_value2,"'.\n");
 		}
 		switch(operator[0]){
@@ -10186,13 +10186,13 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '=' :result=Mequalto(_value1,_value2);break;
 			case ':' :result=Mirange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:
-				outputMessage(M_ERROR_PREFIX,"Unknown binary operator '%s'.\n",operator);
+				q2outputMessage(M_ERROR_PREFIX,"Unknown binary operator '%s'.\n",operator);
 		}
 		if(amVerboseDebugging()){
 			if(result)
 				q2outputValue("Result of applying binary operator: '",result,"'.\n");
 			else
-				outputInfo("No result!");
+				q2outputInfo("No result!");
 		}
 	}
 	return result;
@@ -10253,7 +10253,7 @@ Mformulaelement* __formulaelement(char* source){Mallocationowner owner=getOwner(
 	if(_formulaelement){
 		output("FORMULA ELEMENT %s ALLOCATED: %zd:%zd.\n",source,getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 	}else
-		outputMessage(M_ERROR_PREFIX,"Failed to create formula element '%s'.",source);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create formula element '%s'.",source);
 	*/
 	return DISOWNED(_formulaelement,owner);
 }
@@ -10294,7 +10294,7 @@ char* getSignificantTokenText(Mtoken* token){
 		tokenTextLength=string_length(tokenText);
 		firstInsignificantTokenCharacter=string_char(tokenText,token->significantCharacterCount);
 		if(!string_shorten(tokenText,expressionToken->significantCharacterCount)){
-			outputError("Failed to shorten token text");
+			q2outputError("Failed to shorten token text");
 			return NULL;
 		}
 	}
@@ -10415,11 +10415,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 								Mlistelement* newItemIdListElement=newItemIdsList->_first;
 								while(newItemIdListElement){
 									if(!appendedToList(itemIdsList,newItemIdListElement->_value,M_LL_INVALID))
-										outputError("Failed to append augmented item id.");
+										q2outputError("Failed to append augmented item id.");
 									newItemIdListElement=newItemIdListElement->_next;
 								}
 							}else 
-								outputBug("Item ids not a list.");
+								q2outputBug("Item ids not a list.");
 							// indexListValue will be removed by the garbage collector
 						}else // no item id yet, so the same way as is done before set _itemid to the index list value
 							assignValue(&operandValueReference->_itemid,indexListValue);
@@ -10434,23 +10434,23 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			// MDH@16MAY2019: can't end an expression with an operator BRO'
 			if(expressionToken!=NULL){
 				if(amVerboseDebugging())
-					outputMessage(NULL,"Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+					q2outputMessage(NULL,"Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				endTokenTypeIndex=endTokenTypeCount;
 				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
 				if(endTokenTypeIndex){
 					if(amVerboseDebugging())
-						outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
+						q2outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
 					break;
 				}
 				if(amVerboseDebugging())
-					outputInfo(" NO");
+					q2outputInfo(" NO");
 
 				if(amVerboseDebugging())
-					outputMessage(NULL,"Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+					q2outputMessage(NULL,"Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
 				_formulaelement->_operator=owned_string(_getSignificantTokenText(expressionToken),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
 				if(NULL==_formulaelement->_operator){
-					outputMessage(M_ERROR_PREFIX,"Failed to copy operator '%s'.\n",string(expressionToken->text));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to copy operator '%s'.\n",string(expressionToken->text));
 					break;
 				}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
@@ -10468,14 +10468,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement->_next=OWNED(__formulaelement("successor"),owner); // MDH@08JUN2020: similar to all other formula elements this one needs to be owned by me as well otherwise I won't be able to free it myself
 				_formulaelement=_formulaelement->_next;
 				if(NULL==_formulaelement){
-					outputError("Failed to create a new formula element.");
+					q2outputError("Failed to create a new formula element.");
 					break;
 				}
 				formulaElementCount++;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
 			if(amVerboseDebugging())
-				outputInfo("No further formula elements!");
+				q2outputInfo("No further formula elements!");
 		}
 
 		// evaluate the formula
@@ -10483,7 +10483,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			if(amVerboseDebugging()){
 				q2outputValue("First formula value: '",formula->_operand->_value,"'.\n");
-				q2outputandcollect("Number of formula elements: %zd.\n",formulaElementCount);
+				q2output("Number of formula elements: %zd.\n",formulaElementCount);
 			}
 
 			// skip all assignments
@@ -10505,12 +10505,12 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					/*
 					if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 						Mstring* _environmentName=_getExecutionEnvironmentName();
-						outputMessage(M_ERROR_PREFIX,"Failed to add%s variable '%s' to environment '%s'.",(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
+						q2outputMessage(M_ERROR_PREFIX,"Failed to add%s variable '%s' to environment '%s'.",(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 						FREE_STRING(_environmentName);
 						break; // NO retrieves the undefined value subsequently!!
 					}
 					if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)
-						outputMessage(M_WARNING_PREFIX,"Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
+						q2outputMessage(M_WARNING_PREFIX,"Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 					*/
 					_lastAssignmentFormulaelement=_formulaelement;
 					numberOfAssignments++;
@@ -10561,7 +10561,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						FREE_DISOWNED_1(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
 						formulaElementCount--; // one less to free!!!
 					}else
-						outputInfo("No formula element to free!");
+						q2outputInfo("No formula element to free!");
 					*/
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
 					if(_formulaelement->_prev!=NULL)_formulaelement=_formulaelement->_prev;
@@ -10591,7 +10591,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					q2outputValue("Result: '",_result,"'.\n");
 					allocated=getAllocationTypeOccupied('4',0);
 					freed=getAllocationTypeFreed('4',0);
-					q2outputandcollect("Type '4' AFTER: allocated: %zd - freed: %zd - left to free: %zd\n",allocated,freed,formulaElementCount);
+					q2output("Type '4' AFTER: allocated: %zd - freed: %zd - left to free: %zd\n",allocated,freed,formulaElementCount);
 				}
 
 			// perform assignments right-to-left (which is a little problematic though)
@@ -10648,7 +10648,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			// the expression value is the value of the first operand!!!
 			if(amVerboseDebugging())
-			{q2outputValue("Storing '",_result,"'");q2outputandcollect(" as value of expression '%s'.\n",info);}
+			{q2outputValue("Storing '",_result,"'");q2output(" as value of expression '%s'.\n",info);}
 			
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
@@ -10679,13 +10679,13 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			newline();
 			*/
 			if(amVerboseDebugging())
-				outputInfo("Formula elements freed.");
+				q2outputInfo("Formula elements freed.");
 		}else
 		if(amVerboseDebugging())
 			output("No result of expression '%s' to store.",info);
 	}
 	if(amVerboseDebugging())
-	{q2outputandcollect("'%s' expression evaluates to",info);q2outputValue(": '",_expressionValue,"'.\n");}
+	{q2output("'%s' expression evaluates to",info);q2outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 
@@ -10705,10 +10705,10 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 		result=M_FALSE;
 		Mmap* localMap=(_localMapValue!=NULL?_localMapValue->value._map:NULL);
 		if(NULL==localMap)
-			outputWarning("No with (local) variables defined!");
+			q2outputWarning("No with (local) variables defined!");
 		else
 		if(localMap->numberOfElements==0)
-			outputWarning("With map empty!");
+			q2outputWarning("With map empty!");
 		Menvironment* _withEnvironment=owned_environment(__environment(),owner);
 		if(_withEnvironment!=NULL){
 			if(report)
@@ -10729,7 +10729,7 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 					// almost there
 					if(!pushExecutionEnvironment(disowned_environment(_withEnvironment,owner))){ // _withEnvironment not bound!!!
 						free_environment(_withEnvironment);_withEnvironment=NULL;
-						outputMessage(M_ERROR_PREFIX,"Failed to register %senvironment",(_withNameText?"":"the with "));
+						q2outputMessage(M_ERROR_PREFIX,"Failed to register %senvironment",(_withNameText?"":"the with "));
 						if(_withNameText!=NULL)output(" '%s'",string(_withNameText));
 						output(".\n");
 					}else{
@@ -10739,7 +10739,7 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 					}
 				}else
 				if(withNameMapelement!=NULL)
-					outputError("Failed to remove the with environment name from the local variables map");	
+					q2outputError("Failed to remove the with environment name from the local variables map");	
 			}
 			if(result==M_FALSE&&_withEnvironment!=NULL){
 				if(report)
@@ -10761,15 +10761,15 @@ Mvalue* Mwith(Mvalue* _localMapValue){Mallocationowner owner=getOwner(__LINE__);
 			///if(!withVariableMapelement){ // with environment successfully initialized
 			///}else{
 			///	q2outputmessageprefix(M_ERROR_PREFIX);
-			/// q2outputandcollect("Failed to initialize %senvironment",(_withNameText?"":"the with "));
-			///	if(_withNameText)q2outputandcollect(" '%s'",string(_withNameText));
-			///	q2outputandcollect("%s",".\n");
+			/// q2output("Failed to initialize %senvironment",(_withNameText?"":"the with "));
+			///	if(_withNameText)q2output(" '%s'",string(_withNameText));
+			///	q2output("%s",".\n");
 			///}
 			if(_withNameText!=NULL)FREE_STRING(_withNameText,owner);
 			*/
 		}
 	}else
-		outputError("With argument not a (local variable) map!");
+		q2outputError("With argument not a (local variable) map!");
 	return _getIntegerValue(result);
 }
 // MDH@23DEC2020: you can decide now to return whatever you want (from the current environment)
@@ -10784,14 +10784,14 @@ Mvalue* Mendwith(Mvalue* _returnValue){Mallocationowner owner=getOwner(__LINE__)
 	// let's make endwith return a copy of the variable map of the environment we're going to pop!!!
 	// TODO we should check whether there's a with environment active!!!!!!!!
 	if(NULL==getEnvironmentParent(getExecutionEnvironment())){
-		outputError("No (with) environment to end.");
+		q2outputError("No (with) environment to end.");
 		return NULL;
 	}
 	Mmap* _resultMap=NULL;
 	if(_returnValue==NULL){ // no return value specified
 		_resultMap=owned_map(_getMapCopy(getExecutionEnvironment()->_variableMap),owner);
 		if(NULL==_resultMap)
-			outputError("Failed to return the with environment variable map");
+			q2outputError("Failed to return the with environment variable map");
 	}
 	popExecutionEnvironment();
 	return(_resultMap!=NULL?_getValueOfMap(disowned_map(_resultMap,owner)):_returnValue);
@@ -10842,18 +10842,18 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 		bodyCommandList=_parameterMapValue->value._list;
 	}else{ // first argument not a list, so should be a map (if defined)
 		if(_parameterMapValue!=NULL){
-			if(_parameterMapValue->type!=VT_MAP){outputError("Parameters of function not defined in a map");return NULL;}
+			if(_parameterMapValue->type!=VT_MAP){q2outputError("Parameters of function not defined in a map");return NULL;}
 			parameterMap=_parameterMapValue->value._map;
 		}
 		if(_localMapValue!=NULL&&_localMapValue->type==VT_LIST){
 			bodyCommandList=_bodyValue->value._list;		
 		}else{ // second argument not a list, so should be a map
 			if(_localMapValue!=NULL){
-				if(_localMapValue->type!=VT_MAP){outputError("Local variables of function not defined in a map");return NULL;}
+				if(_localMapValue->type!=VT_MAP){q2outputError("Local variables of function not defined in a map");return NULL;}
 				localMap=_localMapValue->value._map;
 			}
 			if(_bodyValue!=NULL){
-				if(_bodyValue->type!=VT_LIST){outputError("Body of function not defined in a list");return NULL;}
+				if(_bodyValue->type!=VT_LIST){q2outputError("Body of function not defined in a list");return NULL;}
 				bodyCommandList=_bodyValue->value._list;
 			}
 		}
@@ -10866,20 +10866,20 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 		{outputMap("Processing the declaration of a function with parameters ",parameterMap," and ");outputMap("local variables ",localMap,".\n");}
 		Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'F',owner); // TODO check why I need to use F here
 		if(_function!=NULL){
-			if(report)outputInfo("Function created.");
+			if(report)q2outputInfo("Function created.");
 
 			// MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
 			//				so we have to make a copy of the parameter map
 			if(parameterMap!=NULL)
 				_function->_parameterMap=owned_map(_getMapCopy(parameterMap),Msubowner(owner,1)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
 			else
-			if(report)outputInfo("No parameters registered.");
+			if(report)q2outputInfo("No parameters registered.");
 
 			// MDH@29OCT2020: the local map is stored with the user function (and not the function because system functions do not need explicitly defined local variables)
 			if(localMap!=NULL)
 				_userfunction->_localMap=owned_map(_getMapCopy(localMap),Msubowner(owner,2)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
 			else
-			if(report)outputInfo("No local variables registered.");
+			if(report)q2outputInfo("No local variables registered.");
 
 			_function->functionunion._userfunction=_userfunction; // NOTE already owned at the right level
 
@@ -10942,8 +10942,8 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 											}
 											FREE_STRING(_bodyCommandText,owner);
 											// if we either do not have a command, or inputChar is still nonzero
-											if(NULL==_command){outputError("Failed to create a body command");break;}
-											if(inputChar){outputError("Failed to parse a body command");break;}
+											if(NULL==_command){q2outputError("Failed to create a body command");break;}
+											if(inputChar){q2outputError("Failed to parse a body command");break;}
 											if(!commandContinued){ // command not continued on the next line, therefore we should register the command
 												// if the command is somehow invalid we should abort, and discard the result, this is done by ascertaining tokenValue to be NULL
 												bool aValidCommandIndicator=isAValidCommandIndicator(_command/*,owner*/,false);
@@ -10954,7 +10954,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 													if(tokenValue!=NULL)_command->_firstToken=NULL;
 													if(tokenValue!=NULL&&appendedToList(_userfunction->_bodyCommandList,owner,tokenValue,M_LL_INVALID)<=0)tokenValue=NULL; // by doing this, after freeing the command below, we'll break and _command will be NULL and recognized as error below
 													// we need to free the command anyway, to ascertain that the next command text will start with a new command altogether
-													if(NULL==tokenValue){outputError("Failed to store the body command!");break;} // storing the command somehow failed, therefore _command will not be NULL and therefore indicate erroneous body command parsing
+													if(NULL==tokenValue){q2outputError("Failed to store the body command!");break;} // storing the command somehow failed, therefore _command will not be NULL and therefore indicate erroneous body command parsing
 												}
 												// prepare for parsing the next command text
 												FREE_COMMAND(_command,owner);_command=NULL;
@@ -10977,31 +10977,31 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 								FREE_COMMAND(_command,owner);
 								FREE_LIST(_userfunction->_bodyCommandList,owner);
 								_userfunction->_bodyCommandList=NULL;
-								outputWarning("Function body discarded because of parsing errors");
+								q2outputWarning("Function body discarded because of parsing errors");
 							}else
 							if(report)output("Number of commands in the body: %zd.\n",_userfunction->_bodyCommandList->numberOfElements);
 						}else
-							outputError("Failed to initialize the argument and local variables map");
+							q2outputError("Failed to initialize the argument and local variables map");
 					}else
-						outputError("Failed to store the inline command as body of an anonymous function");
+						q2outputError("Failed to store the inline command as body of an anonymous function");
 				}else
-					outputWarning("No commands in body");
+					q2outputWarning("No commands in body");
 			// replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
 			}
 			// return the result of applying the function to the default parameter map NO NO NO the function wrapped in a value
 			_functionValue=_getValueOfFunction(disowned_function(_function,owner));
-			if(report)outputInfo("Anonymous function value wrapped");
+			if(report)q2outputInfo("Anonymous function value wrapped");
 		}else{
-			outputError("Failed to create an anonymous function");
+			q2outputError("Failed to create an anonymous function");
 			FREE_USERFUNCTION(_userfunction,owner);
 		}
 	}else
-		outputError("Failed to create the anonymous user function");
+		q2outputError("Failed to create the anonymous user function");
 
 	if(NULL==_functionValue)
-		outputError("Failed to create an anonymous function");
+		q2outputError("Failed to create an anonymous function");
 	else
-	if(report)outputInfo("Anonymous function created!");
+	if(report)q2outputInfo("Anonymous function created!");
 	return _functionValue;
 }
 // might make the following obsolete (defun)
@@ -11027,7 +11027,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 				if(_bodyTokenValue!=NULL){
 					_userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
 					if(NULL==_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
-						outputMessage(M_ERROR_PREFIX,"Failed to store the inline command as body of function definition of '%s'.\n",functionName->_c);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to store the inline command as body of function definition of '%s'.\n",functionName->_c);
 					// replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
 				}
 				//////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
@@ -11045,15 +11045,15 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 					return _getIntegerValue(1);
 				}
 				///////////free_value(_userfunctionValue); // freed
-				outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.\n",functionName);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to create function '%s'.\n",functionName);
 				///////}
 			}
 		}else
-			outputError("Invalid user function name, parameter map or body");
+			q2outputError("Invalid user function name, parameter map or body");
 	}else{
-		if(NULL==_nameValue)outputError("No name defined of function");
-		if(NULL==_parameterMapValue)outputError("No (formal) parameter map defined for function");
-		////////if(!_bodyTokenValue)outputError("No body (expression) defined of function");
+		if(NULL==_nameValue)q2outputError("No name defined of function");
+		if(NULL==_parameterMapValue)q2outputError("No (formal) parameter map defined for function");
+		////////if(!_bodyTokenValue)q2outputError("No body (expression) defined of function");
 	}
 	return _getIntegerValue(0); // indicating failure...
 }/*VALIDATED */
@@ -11169,21 +11169,21 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 					if(countValue!=NULL){
 						// if(report)
 						{
-							q2outputandcollect("Correlation constituent parts:");
+							q2output("Correlation constituent parts:");
 							q2outputValue(" Count=",countValue,NULL);
-							q2outputandcollect(" | X:");outputValue(" sum=",sum1,NULL);q2outputValue(" - ssq=",ssq1,NULL);
-							q2outputandcollect(" | Y:");outputValue(" sum=",sum2,NULL);q2outputValue(" - ssq=",ssq2,NULL);
+							q2output(" | X:");outputValue(" sum=",sum1,NULL);q2outputValue(" - ssq=",ssq1,NULL);
+							q2output(" | Y:");outputValue(" sum=",sum2,NULL);q2outputValue(" - ssq=",ssq2,NULL);
 							q2outputValue(" | X*Y: sum=",sum12,".\n");
 						}
 						Mvalue* numerator=Msubtract(sum12,Mdivide(Mmultiply(sum1,sum2),countValue));
 						Mvalue* denominator=Msqrt(Mmultiply(Msubtract(ssq1,Mdivide(Mmultiply(sum1,sum1),countValue)),Msubtract(ssq2,Mdivide(Mmultiply(sum2,sum2),countValue))));
 						return Mdivide(numerator,denominator);
 					}else
-						outputError("Failed to wrap the sample count in computing a correlation coefficient");
+						q2outputError("Failed to wrap the sample count in computing a correlation coefficient");
 				}
 			}else{
 				q2outputmessageprefix(M_WARNING_PREFIX);
-				q2outputandcollect("%s","Cannot compute the correlation between ");
+				q2output("%s","Cannot compute the correlation between ");
 				q2outputValue("'",_sequence1Value,"' and ");
 				q2outputValue("'",_sequence2Value,"' as they do not have the same number of elements.\n");
 			}
@@ -11256,15 +11256,15 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 																	q2outputValue("Failed to store correlation coefficient '",corr,"'.\n");
 																}
 															}else 
-																outputError("Failed to compute a correlation coefficient");
+																q2outputError("Failed to compute a correlation coefficient");
 														}
 													}
 												}else{
-													outputError("Failed to create a list to store correlations");
+													q2outputError("Failed to create a list to store correlations");
 													free_list(_nextcorrsList);
 												}
 											}else
-												outputError("Failed to create a list to store computed correlation coefficients");
+												q2outputError("Failed to create a list to store computed correlation coefficients");
 										}
 										// most convenient to use Mstats 
 										Mvalue* valuestatsMapValue=Mstats(value);
@@ -11305,7 +11305,7 @@ static Mmap* _getStatsMap(Miterator* iterator){Mallocationowner owner=getOwner(_
 		if(valuetype==VT_UNDEFINED)
 			_statsMap=owned_map(_getSampleStatisticsMap(iterator),owner);
 		else
-			outputMessage(M_ERROR_PREFIX,"Invalid iterator value type '%s' in computing statistics.\n",VALUETYPENAMES[valuetype]);
+			q2outputMessage(M_ERROR_PREFIX,"Invalid iterator value type '%s' in computing statistics.\n",VALUETYPENAMES[valuetype]);
 	}
 	return disowned_map(_statsMap,owner);
 }
@@ -11335,19 +11335,19 @@ Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
 					output("All values in the list should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
 				*/
 			}else 
-				outputBug("Missing value list!");
+				q2outputBug("Missing value list!");
 		}else
 		if(sequenceValue->type==VT_ARRAY){
 			Marray* array=sequenceValue->value._array;
 			if(array!=NULL)
 				iterator=getArrayiterator(array);
 			else
-				outputBug("Missing value array!");
+				q2outputBug("Missing value array!");
 		}
 		if(iterator.next!=NULL)
 			_statsMap=owned_map(_getStatsMap(&iterator),owner);
 	}else
-		outputError("No sample list to compute statistics of");
+		q2outputError("No sample list to compute statistics of");
 	return(_statsMap?_getValueOfMap(disowned_map(_statsMap,owner)):NULL);
 }
 
@@ -11414,11 +11414,11 @@ Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccum
 				}
 				FREE_LIST(_reduceFunctionArgumentList,owner);
 			}else
-				outputError("Failed to create the reduce function argument list");
+				q2outputError("Failed to create the reduce function argument list");
 		}else
-			outputError("No reduce function specified");
+			q2outputError("No reduce function specified");
 	}else
-		outputError("No list to reduce specified.");
+		q2outputError("No list to reduce specified.");
 	return _accumulatedValue;
 }
 /**
@@ -11455,7 +11455,7 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
 								if(report){outputMap("Result of applying the map function to '",_mapFunctionArgumentMap,"'");q2outputValue(": '",_mapFunctionValue,"'.\n");}
 								FREE_MAP(_mapFunctionArgumentMap,owner);
 								// if we fail to add the result of applying the map function, we report that but we do not break, the length of the result list should be the same as that of the input list
-								if(appendedToList(_mapList,owner,_mapFunctionValue,listelementIndex)<=0)outputError("Failed to add the result of applying the map function");
+								if(appendedToList(_mapList,owner,_mapFunctionValue,listelementIndex)<=0)q2outputError("Failed to add the result of applying the map function");
 								listelement=listelement->_next;
 								if(NULL==listelement)break;
 								if(appendedToList(_mapFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
@@ -11467,14 +11467,14 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
 					_mapValue=_getValueOfList(disowned_list(_mapList,owner));
 					if(NULL==_mapValue)free_list(_mapList); // if not bound (but already disowned) free the list myself
 				}else
-					outputError("Failed to create the map result list");
+					q2outputError("Failed to create the map result list");
 				FREE_LIST(_mapFunctionArgumentList,owner);
 			}else
-				outputError("Failed to create the map function argument list");
+				q2outputError("Failed to create the map function argument list");
 		}else
-			outputError("No map function specified");
+			q2outputError("No map function specified");
 	}else
-		outputError("No list to map specified.");
+		q2outputError("No list to map specified.");
 	return _mapValue;
 }
 /**
@@ -11518,7 +11518,7 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 								// now the question is whether or not the filter function returned something that can be tested for being M_TRUE
 								// I guess when the filter function value is positive let consider the list value valid
 								if(isValuePositive(_filterFunctionValue)==M_TRUE&&appendedToList(_filterList,owner,listelement->_value,M_LL_INVALID)<=0){
-									outputError("Failed to add the result of applying the filter function");
+									q2outputError("Failed to add the result of applying the filter function");
 									break;
 								}
 								listelement=listelement->_next;
@@ -11530,11 +11530,11 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 						}
 						FREE_LIST(_filterFunctionArgumentList,owner);
 					}else
-						outputError("Failed to create the filter function argument list");
+						q2outputError("Failed to create the filter function argument list");
 				}else{ // no filter function specified 
 					do{
 						if(appendedToList(_filterList,owner,listelement->_value,M_LL_INVALID)<=0)
-							outputMessage(M_ERROR_PREFIX,"Failed to append a filter list element #%llu.\n",listelement->index);
+							q2outputMessage(M_ERROR_PREFIX,"Failed to append a filter list element #%llu.\n",listelement->index);
 						listelement=listelement->_next;
 					}while(listelement);
 				}
@@ -11542,9 +11542,9 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 			_filterValue=_getValueOfList(disowned_list(_filterList,owner));
 			if(NULL==_filterValue)free_list(_filterList); // if not bound (but already disowned) free the list myself
 		}else
-			outputError("Failed to create the filter result list");
+			q2outputError("Failed to create the filter result list");
 	}else
-		outputError("No list to filter specified");
+		q2outputError("No list to filter specified");
 	return _filterValue;
 }
 // NOTE how does foreach compare to map???? as it seems that foreach does not return a value as opposed to map
@@ -11592,13 +11592,13 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 				}
 				FREE_LIST(_foreachFunctionArgumentList,owner);
 			}else
-				outputError("Failed to create the foreach function argument list");
+				q2outputError("Failed to create the foreach function argument list");
 
 		}else{ // no function, simply return the number of elements in the list
 			foreachCount=0;while(listelement){foreachCount++;listelement=listelement->_next;}
 		}
 	}else
-		outputError("No list to foreach specified.");
+		q2outputError("No list to foreach specified.");
 	return _getIntegerValue(foreachCount);
 }
 
@@ -11716,13 +11716,13 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 		unsigned long long arraylength=_array->numberOfElements;
 		if(arraylength>1){ // things to compare
 			if(report)
-				outputMessage(NULL,"Sorting an array of %zd elements with quicksort.\n",arraylength);
+				q2outputMessage(NULL,"Sorting an array of %zd elements with quicksort.\n",arraylength);
 			unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(arraylength)));
 			long long* stack=MALLOC(sizeof(long long),maxtop=initialmaxtop,-'u',owner);
 			if(stack!=NULL){
 				sortstatistics.memoryallocation+=(sizeof(long long)*maxtop);
 				if(report)
-					outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
+					q2outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
 				result=2; // the current amount of stack elements used
 				stack[0]=0; // i.e. the first index, which is 0 (l=lmin1+1)
 				stack[1]=arraylength-1; // i.e. the last index, which is arraylength-1
@@ -11738,22 +11738,22 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 					l=stack[--top];
 					p=apartition(values,l,h);
 					sortstatistics.pointerassignments+=3;sortstatistics.fieldreferences+=2;
-					//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
+					//if(!p){result=M_FALSE;q2outputError("Failed to partition");break;}
 					sortstatistics.pointertests++;
 					if(p>l+1){
 						if(top>=maxtop){
 							if(report)
-								outputMessage(NULL,"Expanding the stack.\n");
+								q2outputMessage(NULL,"Expanding the stack.\n");
 							stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
 							if(NULL==stack){
 								result=M_FALSE;
-								outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
+								q2outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
 								break;
 							}
 							sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
 							maxtop+=initialmaxtop;
 							if(report)
-								outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+								q2outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 						}
 						stack[top++]=l;
 						stack[top++]=p-1;
@@ -11763,17 +11763,17 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 					if(p+1<h){
 						if(top>=maxtop){
 							if(report)
-								outputMessage(NULL,"Expanding the stack.\n");
+								q2outputMessage(NULL,"Expanding the stack.\n");
 							stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(long long),-'u');
 							if(NULL==stack){
 								result=M_FALSE;
-								outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
+								q2outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
 								break;
 							}
 							sortstatistics.memoryallocation+=(sizeof(long long)*initialmaxtop);
 							maxtop+=initialmaxtop;
 							if(report)
-								outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+								q2outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 						}
 						stack[top++]=p+1;
 						stack[top++]=h;
@@ -11782,17 +11782,17 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 					}
 				}
 				if(report)
-					outputMessage(NULL,"Freeing the quicksort stack.\n");
+					q2outputMessage(NULL,"Freeing the quicksort stack.\n");
 				FREE_DISOWNED(stack,maxtop,-'u',owner);
 				if(report)
-					outputMessage(NULL,"Quicksort stack freed.\n");
+					q2outputMessage(NULL,"Quicksort stack freed.\n");
 			}else{
 				result=M_FALSE;
-				outputError("Not enough memory for the stack to sort the array with quicksort");
+				q2outputError("Not enough memory for the stack to sort the array with quicksort");
 			}
 		}
 		if(result>0)
-			outputMessage(NULL,"Duration of array sorting by quicksort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
+			q2outputMessage(NULL,"Duration of array sorting by quicksort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
 	}
 	return result;
 }
@@ -11893,7 +11893,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 			if(listelement!=_list->_last){ // at least two items
 				// we need a stack of integers with the same size as the list length
 				if(report)
-					outputMessage(NULL,"Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
+					q2outputMessage(NULL,"Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
 				// MDH@02NOV2020: best to use CALLOC not calloc
 				// MDH@03NOV2020: if there are many many list elements allocating all at once is an issue
 				//				how about re-allocating in
@@ -11901,7 +11901,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 				Mlistelement** stack=MALLOC(sizeof(Mlistelement*),maxtop=initialmaxtop,-'l',owner);
 				if(stack!=NULL){
 					sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*maxtop);
-					if(report)outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
+					if(report)q2outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
 					stack[0]=NULL; // i.e. the first lmin1
 					stack[1]=_list->_last;
@@ -11917,7 +11917,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 						lmin1=stack[--top];
 						pmin1=lpartition(_list,lmin1,h); // NOTE p is actually p-1
 						sortstatistics.pointerassignments+=3;sortstatistics.fieldreferences+=2;
-						//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
+						//if(!p){result=M_FALSE;q2outputError("Failed to partition");break;}
 						sortstatistics.pointertests++;
 						l=(lmin1!=NULL?lmin1->_next:_list->_first);
 						sortstatistics.fieldreferences++;sortstatistics.pointerassignments++;
@@ -11925,15 +11925,15 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 							sortstatistics.fieldtests+=2;
 							if(pmin1->index>l->index){
 								if(top>=maxtop){
-									if(report)outputMessage(NULL,"Expanding the stack.\n");
+									if(report)q2outputMessage(NULL,"Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
 									if(NULL==stack){
-										outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
+										q2outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
 										break;
 									}
 									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);
 									maxtop+=initialmaxtop;
-									if(report)outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+									if(report)q2outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 								}
 								stack[top++]=lmin1;
 								stack[top++]=pmin1;
@@ -11952,7 +11952,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 									if(report)output("Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
 									if(NULL==stack){
-										outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
+										q2outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
 										break;
 									}
 									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);									
@@ -11970,7 +11970,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 					FREE_DISOWNED(stack,maxtop,-'l',owner);
 					if(report)output("Quicksort stack freed.\n");
 				}else
-					outputError("Not enough memory to sort the list with quicksort");
+					q2outputError("Not enough memory to sort the list with quicksort");
 			}else
 				result=M_TRUE;
 		}else // no need to sort so success
@@ -12012,14 +12012,14 @@ static bool abinarymerge(Mvalue** const values,unsigned long long l,unsigned lon
 // NOTE amerge is used both in atimsort as in aharmonicasort
 static void outputValues(char const * const prefix,char const * const info,Mvalue const * const * const values,unsigned long long length,unsigned long long bugindex){
 	// if(prefix||info)output("%s%s",prefix,info);
-	q2outputandcollect("Sequence of length %llu: ",length);
+	q2output("Sequence of length %llu: ",length);
 	q2outputValue("'",*values,"'");
 	for(unsigned long long index=1;index<length;index++){
-		q2outputandcollect("%c",',');
-		if(index>bugindex)q2outputandcollect("%c",'*');
+		q2output("%c",',');
+		if(index>bugindex)q2output("%c",'*');
 		q2outputValue("'",*(values+index),"'");
 	}
-	q2outputandcollect("%c",'.');
+	q2output("%c",'.');
 	q2newline(true);
 }
 // the default amerge copies the presumable original values, then uses the copy to overwrite the original with the new values
@@ -12055,7 +12055,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 		sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
 		if(report)
 		{
-			q2outputandcollect("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
+			q2output("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
 			q2outputValue("\ti.e. [",*(values+l),",");q2outputValue(NULL,*(values+m),"] and ");
 			q2outputValue("[",*(values+m+1),",");q2outputValue(NULL,*(values+r),"].\n");
 		}
@@ -12068,9 +12068,9 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 			outputValues("","Checking second sequence: ",right,len2,len2);
 		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
 		if(result){
-			if(report)q2outputandcollect("Sequences are in correct ascending order!\n");
+			if(report)q2output("Sequences are in correct ascending order!\n");
 		}else 
-			outputBug("Sequences are not ordered!");
+			q2outputBug("Sequences are not ordered!");
 		
 		i=j=0;
 		sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
@@ -12085,7 +12085,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 				if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE){
 					result=false;
 					q2outputmessageprefix(M_BUG_PREFIX);
-					q2outputandcollect("Merged value #%llu",i);
+					q2output("Merged value #%llu",i);
 					q2outputValue("'",*valueholder,"' from the first sequence is smaller than");
 					q2outputValue(" the previously added value '",*previousvalueholder,"'.\n");
 					break;
@@ -12098,7 +12098,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 				if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE){
 					result=false;
 					q2outputmessageprefix(M_BUG_PREFIX);
-					q2outputandcollect("Merged value #%llu",j);
+					q2output("Merged value #%llu",j);
 					q2outputValue("'",*valueholder,"' from the second sequence is smaller than");
 					q2outputValue(" the previously added value '",*previousvalueholder,"'.\n");
 					break;
@@ -12116,7 +12116,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 			if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE){
 				result=false;
 				q2outputmessageprefix(M_BUG_PREFIX);
-				q2outputandcollect("Appended value #%llu",i);
+				q2output("Appended value #%llu",i);
 				q2outputValue("'",*valueholder,"' from the first sequence is smaller than");
 				q2outputValue(" the previously added value '",*previousvalueholder,"'.\n");
 				break;
@@ -12132,7 +12132,7 @@ static bool amerge(Mvalue** const values,unsigned long long l,unsigned long long
 			if(previousvalueholder!=NULL&&smallerthan(*valueholder,*previousvalueholder)==M_TRUE){
 				result=false;
 				q2outputmessageprefix(M_BUG_PREFIX);
-				q2outputandcollect("Appended value #%llu",j);
+				q2output("Appended value #%llu",j);
 				q2outputValue("'",*valueholder,"' from the second sequence is smaller than");
 				q2outputValue(" the previously added value '",*previousvalueholder,"'.\n");
 				break;
@@ -12177,7 +12177,7 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 		sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
 		if(report)
 		{
-			q2outputandcollect("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
+			q2output("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
 			q2outputValue("\ti.e. [",*(values+l),",");
 			q2outputValue(NULL,*(values+m),"] and ");
 			q2outputValue("[",*(values+m+1),",");outputValue(NULL,*(values+r),"].\n");
@@ -12192,9 +12192,9 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 			outputValues("","Checking second sequence: ",right,len2,len2);
 		while(++j<len2)if(smallerthan(right[j],right[j-1])==M_TRUE){outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
 		if(result){
-			if(report)q2outputandcollect("Sequences are in correct ascending order!\n");
+			if(report)q2output("Sequences are in correct ascending order!\n");
 		}else
-			outputBug("Sequences are not ordered!");
+			q2outputBug("Sequences are not ordered!");
 
 		// NOTE programmatically a much more elegant merge than amerge()
 		long long smaller; // the last position (index) where the previous element was inserted
@@ -12204,7 +12204,7 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 		do{
 			toinsertValueholder--; // go to the next value to insert
 			if(report)
-			{q2outputandcollect("Value #%llu to insert: ",toinsert);q2outputValue("'",*toinsertValueholder,"'");}
+			{q2output("Value #%llu to insert: ",toinsert);q2outputValue("'",*toinsertValueholder,"'");}
 			// the smallest value of the insert position will be zero!!!
 			smaller=tomergeinto;
 			smallerValueholder=values+l+smaller; // one above the first element to compare against
@@ -12219,8 +12219,8 @@ static bool ainsertmerge(Mvalue** const values,unsigned long long l,unsigned lon
 			if(report)
 			{
 				if(smaller>=0)
-				{q2outputandcollect("Smaller value #%llu:",smaller+1);q2outputValue("'",*smallerValueholder,"'.\n");}
-				else q2outputandcollect("No smaller value found!\n");
+				{q2output("Smaller value #%llu:",smaller+1);q2outputValue("'",*smallerValueholder,"'.\n");}
+				else q2output("No smaller value found!\n");
 			}
 			// move all elements one larger than smallerValueholder
 			sortstatistics.pointerreferences++;sortstatistics.pointerassignments++;
@@ -12279,7 +12279,7 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 		sortstatistics.fieldreferences++;sortstatistics.pointerreferences++;memcpy(right,values+m+1,sizeof(Mvalue*)*len2);
 		if(report)
 		{
-			q2outputandcollect("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
+			q2output("\tTwo sequences of length %llu and %llu, respectively.\n",len1,len2);
 			q2outputValue("\ti.e. [",*(values+l),",");outputValue(NULL,*(values+m),"] and ");
 			q2outputValue("[",*(values+m+1),",");outputValue(NULL,*(values+r),"].\n");
 		}
@@ -12297,9 +12297,9 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 		if(smallerthan(right[j],right[j-1])==M_TRUE)
 		{outputValues(M_BUG_PREFIX,"Second sequence is not ordered: ",right,len2,j-1);result=false;break;}
 		if(result){
-			if(report)q2outputandcollect("Sequences are in correct ascending order!\n");
+			if(report)q2output("Sequences are in correct ascending order!\n");
 		}else
-			outputBug("Sequences are not ordered!");
+			q2outputBug("Sequences are not ordered!");
 		
 		// NOTE programmatically a much more elegant merge than amerge()
 		long long smaller; // the last position (index) where the previous element was inserted
@@ -12310,7 +12310,7 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 		do{
 			toinsertValueholder--; // go to the next value to insert
 			if(report)
-			{q2outputandcollect("Value #%llu to insert: ",toinsert);q2outputValue("'",*toinsertValueholder,"'");}
+			{q2output("Value #%llu to insert: ",toinsert);q2outputValue("'",*toinsertValueholder,"'");}
 			
 			// here's the part where we use a binary search instead of a linear search (backwards) in a quest to determine `smaller` which can range from -1 through tomergeinto-1
 			// NOTE immediately determining the value of smaller+1 so it will range from [0,tomergeinto] afterwards
@@ -12341,7 +12341,7 @@ static bool abinaryinsertmerge(Mvalue** const values,unsigned long long l,unsign
 
 			if(report)
 			{
-				q2outputandcollect("First value not smaller #%llu:",smaller+1);q2outputValue("'",*smallerValueholder,"'.\n");
+				q2output("First value not smaller #%llu:",smaller+1);q2outputValue("'",*smallerValueholder,"'.\n");
 			}
 
 			// move all elements one larger than smallerValueholder
@@ -12658,7 +12658,7 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 							sortstatistics.pointertests++;
 							if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
 								result=M_FALSE;
-								outputError("Failed to merge an up run!");
+								q2outputError("Failed to merge an up run!");
 								break;
 							}
 							largest=arrayindex;
@@ -12678,11 +12678,11 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 							sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 							areverse(values,largest+1,arrayindex,report);
 							if(report)
-								q2outputandcollect("Down run reversed!\n");
+								q2output("Down run reversed!\n");
 							// we only need to merge if largest>=0
 							if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
 								result=M_FALSE;
-								outputError("Failed to merge an up run!");
+								q2outputError("Failed to merge an up run!");
 								break;
 							}
 							largest=arrayindex;
@@ -12704,7 +12704,7 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 						// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
 						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
 							result=M_FALSE;
-							outputError("Failed to merge the final up run!");
+							q2outputError("Failed to merge the final up run!");
 						}
 						/*
 						if(report)
@@ -12716,10 +12716,10 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 						// if we reverse from largest+1 instead of largest we can merge [0,largest] with [largest+1,arrayindex]
 						areverse(values,largest+1,arrayindex,report);
 						if(report)
-							q2outputandcollect("Final down run reversed!\n");
+							q2output("Final down run reversed!\n");
 						if(largest>=0&&!arrayMergeFunction(values,0,largest,arrayindex,report)){
 							result=M_FALSE;
-							outputError("Failed to merge the final down run!");
+							q2outputError("Failed to merge the final down run!");
 						}
 						/*
 						if(report)
@@ -12738,7 +12738,7 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 				q2outputValue("First: '",*_array->values,"'.\n");
 				q2outputValue("Last: '",*(_array->values+_array->numberOfElements-1),"'.\n");
 			}
-			q2outputandcollect("Duration of array sorting by harmonicasort: %.3f ms.\n",duration/M_CLOCKS_PER_MS);
+			q2output("Duration of array sorting by harmonicasort: %.3f ms.\n",duration/M_CLOCKS_PER_MS);
 		}
 	}
 	return result;
@@ -12840,7 +12840,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 								if(report)q2outputValue("Maximum so far: '",largest->_value,"'.\n");
 								if(report)outputList("List so far: '",_list,"'.\n");
 							}else
-							if(report)q2outputandcollect("The up run is empty!\n");
+							if(report)q2output("The up run is empty!\n");
 							rundirection=-1;
 						}
 					}else{ // in a down run
@@ -12872,7 +12872,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 									lreverse(_list,NULL,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
 									if(report)
-										q2outputandcollect("Initial down run reversed!\n");
+										q2output("Initial down run reversed!\n");
 								}						
 								smallest=_list->_first; // TODO we might not need to do this actually
 								sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
@@ -12881,7 +12881,7 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 								{q2outputValue("Minimum so far: '",smallest->_value,"'.\n");outputList("List so far: '",_list,"'.\n");}
 							}else
 							if(report)
-								q2outputandcollect("The down run is empty!\n");
+								q2output("The down run is empty!\n");
 							rundirection=1;
 						}
 					}
@@ -12895,14 +12895,14 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				if(rundirection>0){ // end of an up run
 					// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
 					if(largest!=NULL){
-						if(report)q2outputandcollect("Processing the final up run!\n");
+						if(report)q2output("Processing the final up run!\n");
 						lmerge(_list,NULL,largest,previous);
 					}else
 					if(report)
-						q2outputandcollect("The list was already in ascending order.\n");
+						q2output("The list was already in ascending order.\n");
 				}else
 				if(rundirection<0){ // end of the down run
-					if(report)q2outputandcollect("Processing the final down run!\n");
+					if(report)q2output("Processing the final down run!\n");
 					runsmallest=previous;
 					sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 					if(largest!=NULL){ // something in front that we need to merge the down run into
@@ -12924,8 +12924,8 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 				if(report)
 				{
 					outputList("The sorted list: '",_list,"'.\n");
-					if(_list->_first!=NULL)q2outputValue("First: '",_list->_first->_value,"'.\n");else outputBug("No first!");
-					if(_list->_last!=NULL)q2outputValue("Last: '",_list->_last->_value,"'.\n");else outputBug("No last!");
+					if(_list->_first!=NULL)q2outputValue("First: '",_list->_first->_value,"'.\n");else q2outputBug("No first!");
+					if(_list->_last!=NULL)q2outputValue("Last: '",_list->_last->_value,"'.\n");else q2outputBug("No last!");
 				}
 
 				// reapply the collected indices from the index ranges
@@ -13050,12 +13050,12 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 				unsigned long long processedsofar=0,stacksize=(stackmultiplier!=0?_list->numberOfElements/MAX(2,betweenstackelements/llabs(stackmultiplier)):0); // the maximum number of stack elements we're going to need
 				long long stackminimumindex=0,stackmaximumindex=-1;
 				if(report)
-					q2outputandcollect("Stack size: %llu.\n",stacksize);
+					q2output("Stack size: %llu.\n",stacksize);
 				if(stacksize>=3){
 					stack=CALLOC(sizeof(Mlistelement*),stacksize,-'l',owner);
 					if(stack!=NULL){
 						if(report)
-							q2outputandcollect("Stack address: '%p'.\n",stack);
+							q2output("Stack address: '%p'.\n",stack);
 						if(stackmultiplier<0){ // the stack is to be filled gradually
 							*stack=_list->_first;
 							stackmaximumindex=0; // we have a single value on the stack so it's both the minimum and the maximum
@@ -13068,7 +13068,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 					}
 				}
 				if(report)
-					q2outputandcollect("Stack size: %llu.\n",stacksize);
+					q2output("Stack size: %llu.\n",stacksize);
 				// determine the index ranges
 				Mindexrange indexrange={_list->_first->index,_list->_first->index};
 				Mindexrange* nextindexrange=&indexrange;
@@ -13160,7 +13160,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 						currentValue=current->_value; // the value to compare
 						sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 						if(report)
-						{q2outputandcollect("Run direction: %s",(rundirection>0?"up":"down"));q2outputValue(" - comparing '",previousValue,"'");outputValue(" with successor '",currentValue,"'.\n");}
+						{q2output("Run direction: %s",(rundirection>0?"up":"down"));q2outputValue(" - comparing '",previousValue,"'");outputValue(" with successor '",currentValue,"'.\n");}
 						sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;sortstatistics.comparisons++; // this we know will always happen
 						if(rundirection>0){ // in an up run
 							if(smallerthan(currentValue,previousValue)==M_TRUE){
@@ -13250,9 +13250,9 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 										if(report)
 										{
 											if(smaller)q2outputValue("'",smaller->_value,"' is smaller");
-											else q2outputandcollect("Nothing is smaller");
+											else q2output("Nothing is smaller");
 											if(runsmallest!=NULL)q2outputValue(" then '",runsmallestValue,"'");
-											q2outputandcollect(".\n");
+											q2output(".\n");
 										}
 										largest=lmerge(_list,smaller,largest,previous);
 										largest->index=0; // mark the largest with index 0 (so we can see where it currently is)
@@ -13264,15 +13264,15 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 													stackminimumindex=0;stackmaximumindex=stacksize-1;
 													*stack=_list->_first;
 													if(report)
-														q2outputandcollect("Registering %llu of %llu sorted list elements in the stack.\n",stacksize,processedsofar);
+														q2output("Registering %llu of %llu sorted list elements in the stack.\n",stacksize,processedsofar);
 													Mlistelement** stackelement=stack;
 													if(report)
-														q2outputandcollect("Stack elements after processing %llu elements:",processedsofar);
+														q2output("Stack elements after processing %llu elements:",processedsofar);
 													stackelementindex=1; // MDH@16NOV2020: replacing 0 by 1 because we already have one stack element set
 													// MDH@16NOV2020: it might be writing one value too many here?????
 													while(++stackelementindex<=stacksize){
 														if(report)
-														{q2outputandcollect(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
+														{q2output(" %llu",stackelementindex);outputValue("=",(*stackelement)->_value,NULL);}
 														*(stackelement+1)=(*stackelement)->_next;
 														stackelement++;
 													}
@@ -13289,7 +13289,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 									{q2outputValue("Maximum so far: '",largest->_value,"'.\n");outputList("List so far: '",_list,"'.\n");}
 								}else
 								if(report)
-									q2outputandcollect("The up run is empty!\n");
+									q2output("The up run is empty!\n");
 								rundirection=-1;
 							}
 						}else{ // in a down run
@@ -13391,9 +13391,9 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 										}
 										if(report)
 										{
-											if(smaller)q2outputValue("'",smaller->_value,"' is smaller");else q2outputandcollect("Nothing is smaller");
+											if(smaller)q2outputValue("'",smaller->_value,"' is smaller");else q2output("Nothing is smaller");
 											if(runsmallest)q2outputValue(" then '",runsmallestValue,"'");
-											q2outputandcollect(".\n");
+											q2output(".\n");
 										}
 										largest=lmerge(_list,smaller,largest,previous);
 										largest->index=0;
@@ -13407,19 +13407,19 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 													*stack=_list->_first;
 													Mlistelement** stackelement=stack;
 													if(report)
-														q2outputandcollect("Stack elements after processing %llu elements:",processedsofar);
+														q2output("Stack elements after processing %llu elements:",processedsofar);
 													stackelementindex=1; // MDH@16NOV2020 OOPS: need to do that here as well!!!!! replacing 0 by 1
 													while(++stackelementindex<=stacksize){
 														if(report)
 														{
-															q2outputandcollect(" %llu",stackelementindex);
+															q2output(" %llu",stackelementindex);
 															q2outputValue("=",(*stackelement)->_value,NULL);
 														}
 														*(stackelement+1)=(*stackelement)->_next;
 														stackelement++;
 													}
 													if(report)
-														q2outputandcollect(".\n");
+														q2output(".\n");
 												}
 											}
 										}
@@ -13428,7 +13428,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 										sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
 										lreverse(_list,NULL,runsmallest,report); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
 										if(report)
-											q2outputandcollect("Initial down run reversed!\n");
+											q2output("Initial down run reversed!\n");
 									}						
 									smallest=_list->_first; // TODO we might not need to do this actually
 									sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
@@ -13439,7 +13439,7 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 										outputList("List so far: '",_list,"'.\n");
 								}else
 								if(report)
-									q2outputandcollect("The down run is empty!\n");
+									q2output("The down run is empty!\n");
 								rundirection=1;
 							}
 						}
@@ -13455,14 +13455,14 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 						// obviously, if largest does not have a value yet, the list was already in ascending order to start with in which case we have nothing left to do!!
 						if(largest!=NULL){
 							if(report)
-								q2outputandcollect("Processing the final up run!\n");
+								q2output("Processing the final up run!\n");
 							lmerge(_list,NULL,largest,previous);
 						}else
 						if(report)
-							q2outputandcollect("The list was already in ascending order.\n");
+							q2output("The list was already in ascending order.\n");
 					}else
 					if(rundirection<0){ // end of the down run
-						if(report)q2outputandcollect("Processing the final down run!\n");
+						if(report)q2output("Processing the final down run!\n");
 						runsmallest=previous;
 						sortstatistics.pointerassignments++;sortstatistics.pointerreferences++;
 						if(largest!=NULL){ // something in front that we need to merge the down run into
@@ -13509,17 +13509,17 @@ static long long lharmonicabinarysort(Mlist* const _list,long long stackmultipli
 						indexrangetofree=nextindexrange;
 					}
 					if(report)
-						q2outputandcollect("%lld captured index ranges freed!\n",indexrangesfreed);
+						q2output("%lld captured index ranges freed!\n",indexrangesfreed);
 				} // rundirection!=0
 
 				if(stack!=NULL){
 					if(NULL==(*stack))
-						outputMessage(M_WARNING_PREFIX,"No stack elements used (processed: %lld)!",processedsofar);
+						q2outputMessage(M_WARNING_PREFIX,"No stack elements used (processed: %lld)!",processedsofar);
 					if(report)
-						outputMessage(M_INFO_PREFIX,"Freeing %llu elements of stack '%p'.",stacksize,stack);
+						q2outputMessage(M_INFO_PREFIX,"Freeing %llu elements of stack '%p'.",stacksize,stack);
 					FREE_DISOWNED(stack,stacksize,-'l',owner); // replacing debug version: _FREE_DISOWNED(stack,stacksize,-'l',owner);
 					if(report)
-						outputMessage(M_INFO_PREFIX,"Stack freed!");
+						q2outputMessage(M_INFO_PREFIX,"Stack freed!");
 					stack=NULL;
 				}
 			}
@@ -13711,7 +13711,7 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 			{insertionarrayindex++;break;} // increment again because we need to insert toinsertValue above the not larger value
 			sortstatistics.fieldassignments++;sortstatistics.fieldreferences++;
 			if(report)
-			{q2outputValue("\t\tMoving value '",values[insertionarrayindex],"'");q2outputandcollect(" at index %llu one position up",insertionarrayindex);q2outputValue(" replacing '",values[insertionarrayindex+1],"'.\n");}
+			{q2outputValue("\t\tMoving value '",values[insertionarrayindex],"'");q2output(" at index %llu one position up",insertionarrayindex);q2outputValue(" replacing '",values[insertionarrayindex+1],"'.\n");}
 			// because we decremented insertionarrayindex BEFORE instead of AFTER the following assignment
 			// we're using the proper (i.e. zero-based) indices
 			values[insertionarrayindex+1]=values[insertionarrayindex];
@@ -13720,7 +13720,7 @@ static void ainsertionsort(Mvalue** const values,unsigned long long first,unsign
 		sortstatistics.fieldassignments++;sortstatistics.pointerreferences++;
 		if(insertionarrayindex!=arrayindex){
 			if(report)
-			{q2outputValue("\t\tInserting value '",toinsertValue,"'");q2outputandcollect(" at index %llu",insertionarrayindex);q2outputValue(" replacing '",values[insertionarrayindex],"'.\n");}
+			{q2outputValue("\t\tInserting value '",toinsertValue,"'");q2output(" at index %llu",insertionarrayindex);q2outputValue(" replacing '",values[insertionarrayindex],"'.\n");}
 			values[insertionarrayindex]=toinsertValue;
 		}
 	}
@@ -13753,11 +13753,11 @@ static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunc
 			for(unsigned long long size=M_RUN_LENGTH;size<arraylength;size<<=1)
 				for(unsigned long long left=0;left<arraylength;left+=(size<<1))
 					if(!arrayMergeFunction(values,left,left+size-1,MIN(left+(size<<1),arraylength)-1,report)){
-						outputError("Failed to merge two array parts in timsort");
+						q2outputError("Failed to merge two array parts in timsort");
 						return M_FALSE;
 					}
 		}
-		q2outputandcollect("Duration of array sorting by timsort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
+		q2output("Duration of array sorting by timsort: %.3f ms.\n",((double)(clock()-sortstart))/M_CLOCKS_PER_MS);
 	}
 	return result;
 }
@@ -13945,7 +13945,7 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 				}
 				runbeforefirst=linsertinginsertionSort(_list,runbeforefirst,runlast); // execute the run insertion sort that returns the new last element (which will exist)
 				if(report)
-					q2outputandcollect("Last value: '",_list->_last->_value,"'.\n");
+					q2output("Last value: '",_list->_last->_value,"'.\n");
 				runlast=runbeforefirst->_next; // now equal to the first element of the next run to insertion sort
 				sortstatistics.pointerassignments+=2;sortstatistics.fieldreferences++;
 			}
@@ -13970,9 +13970,9 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 			sortstatistics.pointerassignments+=4;
 			while(size<_list->numberOfElements){
 				size<<=1; // double the size
-				if(report)q2outputandcollect("Merging %llu elements each time.\n",size);
+				if(report)q2output("Merging %llu elements each time.\n",size);
 				numberOfMerges=1+(_list->numberOfElements-1)/size; // will at least equal 2
-				if(report)q2outputandcollect("Number of merges to execute: %llu.\n",numberOfMerges);
+				if(report)q2output("Number of merges to execute: %llu.\n",numberOfMerges);
 				lastanother=NULL;
 				sortstatistics.pointerassignments++;
 				do{
@@ -14043,7 +14043,7 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 				indexrangetofree=nextindexrange;
 			}
 		}else
-		if(report)outputWarning("No need to sort a list with less than 2 elements");
+		if(report)q2outputWarning("No need to sort a list with less than 2 elements");
 		result=M_TRUE;
 	}
 	return result;
@@ -14167,7 +14167,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 						FREE_LIST(_tosortList,owner);
 					// output("List sort result: %lld.\n",sortResult); // DEBUG
 				}else
-					outputError("Failed to create a copy of the list to sort");
+					q2outputError("Failed to create a copy of the list to sort");
 			}else
 			if(_tosortValue->type==VT_ARRAY){
 				Marray* _tosortArray=owned_array(_getArrayCopy(_tosortValue->value._array),owner);
@@ -14189,7 +14189,7 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 						FREE_ARRAY(_tosortArray,owner);
 					// output("List sort result: %lld.\n",sortResult); // DEBUG
 				}else
-					outputError("Failed to create a copy of the array to sort");
+					q2outputError("Failed to create a copy of the array to sort");
 			}
 		}
 	}
@@ -14255,14 +14255,14 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 										if(appendedToMap(_groupMap,owner,group,groupListValue)!=M_TRUE){
 											q2outputmessageprefix(M_ERROR_PREFIX);
 											q2outputValue("Failed to register '",listelementValue,"' in group");
-											q2outputandcollect(" '%s'.\n",group);
+											q2output(" '%s'.\n",group);
 											// NOTE groupListValue will be freed by the gc, along with its list (groupList)
 										}else{ // success
 											groupMapelement=getMapelement(_groupMap,group);
-											if(report)outputMessage(NULL,"New group list registered.\n");
+											if(report)q2outputMessage(M_INFO_PREFIX,"New group list registered.");
 										}
 									}else // groupList is not bound in a group list value, so we have to free it ourselves
-										outputError("Failed to wrap a group list");
+										q2outputError("Failed to wrap a group list");
 									// NOTE the following is a bit elaborate because we know that
 									//	  groupListValue will NOT be referenced (count==0) when it exists
 									//	  so in any normal situation, we either get the warning or the list is freed
@@ -14274,13 +14274,13 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 												free_list(groupList);
 											}else
 											if(report)
-												outputWarning("Can't free the wrapped group list!");
+												q2outputWarning("Can't free the wrapped group list!");
 										}else
-											outputError("Can't free the group list now!");
+											q2outputError("Can't free the group list now!");
 									}else // groupList not bound to groupListValue
 										FREE_LIST(groupList,owner); // groupList is most likely disowned already 
 								}else
-									outputError("Failed to create a group list");
+									q2outputError("Failed to create a group list");
 							} 
 							// we may safely assume that the group list is in the value of the group map element
 							Mlist* groupList=(groupMapelement?groupMapelement->_variable->_value->value._list:NULL);
@@ -14290,12 +14290,12 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 								if(groupListelementIndex<=0){
 									q2outputmessageprefix(M_ERROR_PREFIX);
 									q2outputValue("Failed to register '",listelementValue,"'");
-									q2outputandcollect(" in group '%s'.\n",group);
+									q2output(" in group '%s'.\n",group);
 								}else
 								if(report)
 									output("Index in group list with %zd elements: %lld.\n",groupList->numberOfElements,groupListelementIndex);
 							}else
-								outputError("Failed to obtain the group list");							
+								q2outputError("Failed to obtain the group list");							
 						}else{
 							q2outputmessageprefix(M_WARNING_PREFIX);
 							q2outputValue("'",listelementValue,"' was not grouped.\n");
@@ -14305,15 +14305,15 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 					return _getValueOfMap(disowned_map(_groupMap,owner));
 				}else{ // we have a function, but not a valid function argument list
 					if(_functionArgumentList!=NULL)FREE_LIST(_functionArgumentList,owner);
-					outputError("Failed to prepare for calling the group function");
+					q2outputError("Failed to prepare for calling the group function");
 				}
 
 			}else
-				outputError("Failed to create the group map");
+				q2outputError("Failed to create the group map");
 		}
 	}else{
-		if(_listValue!=NULL)outputError("First argument to the group function not a list");
-		if(_functionValue!=NULL)outputError("Second argument to the group function not a function");
+		if(_listValue!=NULL)q2outputError("First argument to the group function not a list");
+		if(_functionValue!=NULL)q2outputError("Second argument to the group function not a function");
 	}
 	return NULL;
 }
@@ -14354,7 +14354,7 @@ Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__)
 							// NOTE an equal value (direction) 0 can never end a run!!!
 							if(direction!=rundirection){ // change of direction sign
 								if(rundirection!=0&&appendedToList(_runsList,owner,value,valueindex)<=0){
-									outputError("Failed to update the runs list");
+									q2outputError("Failed to update the runs list");
 									break;
 								}
 								rundirection=direction;
@@ -14363,11 +14363,11 @@ Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__)
 						// add the last one (because it's can never be a direction change point)
 						if(appendedToList(_runsList,owner,list->_last->_value,list->_last->index)>0)
 							return _getValueOfList(disowned_list(_runsList,owner));
-						outputError("Failed to add the last list element to the list of run points");
+						q2outputError("Failed to add the last list element to the list of run points");
 					}
 					FREE_LIST(_runsList,owner);
 				}
-				outputError("Failed to create the runs list");
+				q2outputError("Failed to create the runs list");
 			}
 		}else
 		if(_listValue->type==VT_ARRAY){
@@ -14396,7 +14396,7 @@ Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__)
 							// NOTE an equal value (direction) 0 can never end a run!!!
 							if(direction!=0){ // the direction has changed, so we have to register the run point IFF rundirection is nonzero
 								if(rundirection!=0&&appendedToList(_runsList,owner,value,valueindex)<=0){
-									outputError("Failed to update the list of run points");
+									q2outputError("Failed to update the list of run points");
 									break;
 								}
 								rundirection=direction;
@@ -14406,11 +14406,11 @@ Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__)
 						// add the last one (if not already in the list either when all values are equal)
 						if(rundirection==0||appendedToList(_runsList,owner,value,arraylength)>0)
 							return _getValueOfList(disowned_list(_runsList,owner));
-						outputError("Failed to add the last array element to the list of run points");
+						q2outputError("Failed to add the last array element to the list of run points");
 					}
 					FREE_LIST(_runsList,owner);
 				}
-				outputError("Failed to create the runs list");
+				q2outputError("Failed to create the runs list");
 			}
 		}
 	}
@@ -14496,17 +14496,17 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(locale!=NULL){
 		char* newlocale=setlocale(LC_ALL,locale);
 		if(NULL==newlocale)
-			outputMessage(M_ERROR_PREFIX,"Failed to use proposed locale '%s'!\n",locale);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to use proposed locale '%s'!\n",locale);
 		else
 		if(strcmp(locale,newlocale)==0)
-			outputMessage(M_ERROR_PREFIX,"Proposed locale '%s' not accepted. Still using '%s' as locale.\n",locale,newlocale);
+			q2outputMessage(M_ERROR_PREFIX,"Proposed locale '%s' not accepted. Still using '%s' as locale.\n",locale,newlocale);
 	}
 
 	//reportNumberOfAllocations("shellInitialized 2");
 
 	// initialize the random generator
 	long long randomSeedGeneratorInitializationResult=getValueInteger(Msrand(NULL));
-	if(randomSeedGeneratorInitializationResult!=M_TRUE)outputWarning("Failed to initialize the random seed generator");else outputInfo("Random generator initialized.");
+	if(randomSeedGeneratorInitializationResult!=M_TRUE)q2outputWarning("Failed to initialize the random seed generator");else q2outputInfo("Random generator initialized.");
 
 	//reportNumberOfAllocations("shellInitialized 3");
 
@@ -14516,25 +14516,25 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	//reportNumberOfAllocations("shellInitialized 4");
 
 	// register the callbacks
-	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else outputWarning("No input character read function defined!");
-	if(NULL==_inputInfoFunction){inputInfoFunction=inputInfo;outputWarning("Using the default input info function.");}else inputInfoFunction=_inputInfoFunction;
-	if(NULL==_inputErrorFunction){inputErrorFunction=inputError;outputWarning("Using the default input error function.");}else inputErrorFunction=_inputErrorFunction;
-	if(NULL==_outputTokenFunction){outputTokenFunction=outputToken;outputWarning("Using the default output token function.");}else outputTokenFunction=_outputTokenFunction;
-	if(NULL==_reoutputTokenFunction)outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
-	if(NULL==_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
-	if(NULL==_outputCommandInfoFunction)outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
+	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else q2outputWarning("No input character read function defined!");
+	if(NULL==_inputInfoFunction){inputInfoFunction=inputInfo;q2outputWarning("Using the default input info function.");}else inputInfoFunction=_inputInfoFunction;
+	if(NULL==_inputErrorFunction){inputErrorFunction=inputError;q2outputWarning("Using the default input error function.");}else inputErrorFunction=_inputErrorFunction;
+	if(NULL==_outputTokenFunction){outputTokenFunction=outputToken;q2outputWarning("Using the default output token function.");}else outputTokenFunction=_outputTokenFunction;
+	if(NULL==_reoutputTokenFunction)q2outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
+	if(NULL==_updateLastTokenAutocompletionTextFunction)q2outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
+	if(NULL==_outputCommandInfoFunction)q2outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
 
 	//reportNumberOfAllocations("shellInitialized 5");
 
-	if(NULL==inputInfoFunction)outputWarning("No input info function!");else outputInfo("Input info function set!");
-	if(NULL==inputErrorFunction)outputWarning("No input error function!");else outputInfo("Input error function set!");
-	if(NULL==inputCharReadFunction)outputWarning("No input char read function!");else outputInfo("Input char read function set!");
-	if(NULL==outputTokenFunction)outputWarning("No output token function!");else outputInfo("Output token function set!");
-	if(NULL==reoutputTokenFunction)outputWarning("No reoutput token function!");else outputInfo("Reoutput token function set!");
-	if(NULL==updateLastTokenAutocompletionTextFunction)outputWarning("No update last token auto completion text function!");else outputInfo("Update last token auto completion text function set!");
-	if(NULL==outputCommandInfoFunction)outputWarning("No output command info function!");else outputInfo("Output command info function set!");
+	if(NULL==inputInfoFunction)q2outputWarning("No input info function!");else q2outputInfo("Input info function set!");
+	if(NULL==inputErrorFunction)q2outputWarning("No input error function!");else q2outputInfo("Input error function set!");
+	if(NULL==inputCharReadFunction)q2outputWarning("No input char read function!");else q2outputInfo("Input char read function set!");
+	if(NULL==outputTokenFunction)q2outputWarning("No output token function!");else q2outputInfo("Output token function set!");
+	if(NULL==reoutputTokenFunction)q2outputWarning("No reoutput token function!");else q2outputInfo("Reoutput token function set!");
+	if(NULL==updateLastTokenAutocompletionTextFunction)q2outputWarning("No update last token auto completion text function!");else q2outputInfo("Update last token auto completion text function set!");
+	if(NULL==outputCommandInfoFunction)q2outputWarning("No output command info function!");else q2outputInfo("Output command info function set!");
 
-	///outputWarning("Dit is een test");
+	///q2outputWarning("Dit is een test");
 	//reportNumberOfAllocations("shellInitialized 6");
 
 	long long decimalprecision=getDP();
@@ -14548,7 +14548,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 	// MDH@06NOV2019: NULL_value remains NULL for ever...
 	UNDEFINED_value=__value("undefined");
-	if(NULL==UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
+	if(NULL==UNDEFINED_value){q2outputError("Failed to initialize UNDEFINED.");return false;}
 
 	//reportNumberOfAllocations("shellInitialized 8");
 
@@ -14557,7 +14557,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(TYPES_value!=NULL)
 		TYPES_map=TYPES_value->value._map;
 	else
-		outputError("Failed to initialize the TYPES constant");
+		q2outputError("Failed to initialize the TYPES constant");
 
 	//reportNumberOfAllocations("shellInitialized 9");
 
@@ -14565,7 +14565,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	//				therefore it shouldn't be a token value 
 	/*
 	NULL_value=_getValueOfToken(_getNewToken(NULL,TT_SQSTRING),true);
-	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputBug("Failed to create NULL value!");
+	if(NULL_value)NULL_value->value._token->text=__string("NULL");else q2outputBug("Failed to create NULL value!");
 	*/
 
 	// either set the DP_value to 0 (failed to get a decimal context somehow)
@@ -14577,7 +14577,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	/* MDH@14NOV2019: using M for storing both the command (text) and the result (at that moment)
 	_resultListValue=_getListValue(VT_UNDEFINED,true); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
-	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputWarning("Failing to create the results list. The results will not be available through the M function!");
+	if(_resultListValue)incrementReferenceCount(_resultListValue);else q2outputWarning("Failing to create the results list. The results will not be available through the M function!");
 	*/
 
 	//if(amVerboseDebugging())
@@ -14606,28 +14606,28 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@29MAY2019: we've got (symbol) NULL
 			// MDH@06NOV2019: the NULL constant will have value NULL forever
 			if(!addVariable(_Menvironment,owner,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
-				outputWarning("Failed to create, add or initialize constant NULL.");
+				q2outputWarning("Failed to create, add or initialize constant NULL.");
 			}
 			// MDH@06NOV2019: whereas the UNDEFINED constant will be a non-NULL value of type VT_UNDEFINED (of which we do not need to set the value at all)
 			if(!addVariable(_Menvironment,owner,M_UNDEFINED_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_UNDEFINED_VARIABLE_NAME,UNDEFINED_value)){
-				outputWarning("Failed to create, add or initialize constant UNDEFINED.");
+				q2outputWarning("Failed to create, add or initialize constant UNDEFINED.");
 			}
 			if(NULL==NAF_value||!addVariable(_Menvironment,owner,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
-				outputWarning("Failed to create, add or initialize Not-a-float constant NAF.");
+				q2outputWarning("Failed to create, add or initialize Not-a-float constant NAF.");
 				////////return false;
 			}
 			if(NULL==NAI_value||!addVariable(_Menvironment,owner,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
-				outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
+				q2outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
 			// MDH@12SEP2023: if we have a types map
 			if(TYPES_map!=NULL){
 				if(!addVariable(_Menvironment,owner,"TYPES",VT_MAP,true)){
-					outputError("Failed to register the TYPES constant");
+					q2outputError("Failed to register the TYPES constant");
 					return false;
 				}
 				if(!setValue(_Menvironment,"TYPES",TYPES_value)){
-					outputError("Failed to initialize the constant TYPES");
+					q2outputError("Failed to initialize the constant TYPES");
 					return false;
 				}
 				// uoibdqftalmr#$ the mutable value type chars
@@ -14650,88 +14650,88 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				appendedToMap(TYPES_map,valueOwner,"time",_getTextValue("'$"));
 				Mlock(TYPES_value); // to lock the map itself (locking the variable does NOT suffice)
 			}else
-				outputError("Failed to initialize the TYPES map");
+				q2outputError("Failed to initialize the TYPES map");
 
 			//reportNumberOfAllocations("shellInitialized 13");
 		
 
 			/* MDH@13JUN2019: allow user to change the decimal precision
 			if(!DP_value||!addVariable(_Menvironment,"$decimalprecision",VT_INTEGER,false)||!setValue(_Menvironment,"$decimalprecision",DP_value)){
-				outputInfo("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
+				q2outputInfo("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}*/
 			// create and add PI and E constants!!!
 #ifdef M_PI
-			q2outputandcollect("Long double PI is predefined in the math standard library!\n");
+			q2output("Long double PI is predefined in the math standard library!\n");
 #else
 			output("Long double PI is not predefined!\n");
 #endif
 			Mvalue* PI_value=NULL;
 			long double acosl_1=acosl(-1);
 			if(M_LD_PI!=acosl_1){
-				outputMessage(M_WARNING_PREFIX,"Long double constant PI (%.*Lf) replaced by acosl(-1) (%.*Lf).\n",33,M_LD_PI,33,acosl_1);
+				q2outputMessage(M_WARNING_PREFIX,"Long double constant PI (%.*Lf) replaced by acosl(-1) (%.*Lf).",33,M_LD_PI,33,acosl_1);
 				PI_value=_getFloatValue(acosl_1);
 			}else{
-				output("Long double constant PI (%.*Lf) equals acosl(-1) (%.*Lf)!\n",33,M_LD_PI,33,acosl_1);
+				q2outputMessage(M_INFO_PREFIX,"Long double constant PI (%.*Lf) equals acosl(-1) (%.*Lf)!",33,M_LD_PI,33,acosl_1);
 				PI_value=_getFloatValue(M_LD_PI);
 			}
 			if(NULL==PI_value){
-				outputError("Failed to create PI");
+				q2outputError("Failed to create PI");
 				return NULL;
 			}
 			if(!addVariable(_Menvironment,owner,"PI",VT_FLOAT,true)){
-				outputError("Failed to add PI");
+				q2outputError("Failed to add PI");
 				///////free_value(PI_value);
 				return NULL;
 			}
 			if(!setValue(_Menvironment,"PI",PI_value)){
 				////////free_value(PI_value);
-				outputError("Failed to initialize PI");
+				q2outputError("Failed to initialize PI");
 				return NULL;
 			}
 
 #ifdef M_E
-			q2outputandcollect("Long double E is predefined in the math standard library!\n");
+			q2output("Long double E is predefined in the math standard library!\n");
 #else
 			output("Long double E is not predefined!\n");
 #endif
 			Mvalue* E_value=NULL;
 			long double expl1=expl(1);
 			if(M_LD_E!=expl1){
-				outputMessage(M_WARNING_PREFIX,"Long double constant E (%.*Lf) replaced by expl(1) (%.*Lf).\n",33,M_LD_E,33,expl1);
+				q2outputMessage(M_WARNING_PREFIX,"Long double constant E (%.*Lf) replaced by expl(1) (%.*Lf).",33,M_LD_E,33,expl1);
 				E_value=_getFloatValue(expl1);
 			}else{
-				q2outputandcollect("Long double constant E (%.*Lf) equals expl(1) (%.*Lf)!\n",33,M_LD_E,33,expl1);
+				q2outputMessage(M_INFO_PREFIX,"Long double constant E (%.*Lf) equals expl(1) (%.*Lf)!",33,M_LD_E,33,expl1);
 				E_value=_getFloatValue(M_LD_E);
 			}
 			if(NULL==E_value){
 				///////free_value(E_value);
-				outputError("Failed to create E");
+				q2outputError("Failed to create E");
 				return NULL;
 			}
 			if(!addVariable(_Menvironment,owner,"E",VT_FLOAT,true)){
-				outputError("Failed to add E");
+				q2outputError("Failed to add E");
 				return NULL;
 			}
 			if(!setValue(_Menvironment,"E",E_value)){
 				//////free_value(E_value);
-				outputError("Failed to initialize E");
+				q2outputError("Failed to initialize E");
 				return NULL;
 			}
 
 			Mvalue* PHI_value=_getFloatValue(M_LD_PHI);
 			if(NULL==PHI_value){
 				///////free_value(E_value);
-				outputError("Failed to create PHI");
+				q2outputError("Failed to create PHI");
 				return NULL;
 			}
 			if(!addVariable(_Menvironment,owner,"PHI",VT_FLOAT,true)){
-				outputError("Failed to add PHI");
+				q2outputError("Failed to add PHI");
 				return NULL;
 			}
 			if(!setValue(_Menvironment,"PHI",PHI_value)){
 				//////free_value(E_value);
-				outputError("Failed to initialize PHI");
+				q2outputError("Failed to initialize PHI");
 				return NULL;
 			}
 
@@ -14741,15 +14741,15 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@05DEC2020: obtain the current LC_ALL locale, and save it to the LOCALE variable
 			// MDH@07DEC2020: we're going to use a map to store both the current locale setting (in property '') as well as all the fields
 			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
-			if(NULL==localesettingsValue)outputWarning("Failed to obtain the current locale settings value");
+			if(NULL==localesettingsValue)q2outputWarning("Failed to obtain the current locale settings value");
 			// the locale settings variable will be created as immutable, so once set it cannot be changed itself (although the map can be!!!)
 			if(!addVariable(_Menvironment,owner,M_LOCALE_SETTINGS_VARIABLE_NAME,VT_MAP,true)){
-				outputMessage(M_ERROR_PREFIX,"Failed to register '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to register '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
 			if(!setValue(_Menvironment,M_LOCALE_SETTINGS_VARIABLE_NAME,localesettingsValue)){
 				//////free_value(E_value);
-				outputMessage(M_ERROR_PREFIX,"Failed to initialize '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to initialize '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
 
@@ -14758,7 +14758,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			// MDH@30SEP2020: let's add a CWD variable to contain the current working directory (if any) to makes things a little easier
 			if(!addVariable(_Menvironment,owner,"CWD",VT_TEXT,true)){
-				outputError("Failed to add CWD");
+				q2outputError("Failed to add CWD");
 				return NULL;
 			}
 			char cwd[PATH_MAX];
@@ -14770,7 +14770,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			FREE_STRING(cwd_str,owner);
 			if(!setValue(_Menvironment,"CWD",CWD_value)){
 				//////free_value(E_value);
-				outputError("Failed to initialize CWD");
+				q2outputError("Failed to initialize CWD");
 				return NULL;
 			}
 
@@ -14781,15 +14781,15 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// we're going to store all commands in a list called M
 			Mvalue* Mvalue=_getListValue(VT_UNDEFINED);
 			if(!M_value){
-				outputInfo("ERROR: Failed to create the M result list.");
+				q2outputInfo("ERROR: Failed to create the M result list.");
 				return false;
 			}
 			if(!addVariable(_Menvironment,"M",VT_LIST,true)){
-				outputInfo("ERROR: Failed to add the M result list.");
+				q2outputInfo("ERROR: Failed to add the M result list.");
 				return false;
 			}
 			if(!setValue(_Menvironment,"M",M_value)){
-				outputInfo("ERROR: Failed to initialize the M result list.");
+				q2outputInfo("ERROR: Failed to initialize the M result list.");
 				return false;
 			}
 			*/
@@ -14831,7 +14831,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// if(!completedValueFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
 
 			if(!registerInternalFunctions(_Menvironment,owner)){
-				outputError("Failed to register all internal functions");
+				q2outputError("Failed to register all internal functions");
 				return NULL;
 			}
 
@@ -14842,20 +14842,20 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			/* MDH@14NOV2019: replaced by the M variable and M function
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
 			if(_resultListValue&&!completedIntegerFunction(_Menvironment,"M"),"M",getResult)){
-				outputError("Failed to register function M (for requesting previous results)");
+				q2outputError("Failed to register function M (for requesting previous results)");
 				return false;
 			}
 			*/
 			/*
 			if(!completedFunction(_Menvironment,"ml"),ml)){
-				outputInfo("ERROR: Failed to register map list (constructor) function.");
+				q2outputInfo("ERROR: Failed to register map list (constructor) function.");
 				return false;
 			}
 			*/
 			if(!registerFunction(_Menvironment,owner,"Msetdp",Msetdp,1,(char*[]){"decimal precision(integer)"},(Mvalue*[]){NULL})
 				||!registerFunction(_Menvironment,owner,"Mgetdc",Mgetdc,1,(char*[]){"a decimal"},(Mvalue*[]){NULL})
 				||!registerFunction(_Menvironment,owner,"Mgetdp",Mgetdp,1,(char*[]){"a decimal"},(Mvalue*[]){NULL})){
-				outputError("Failed to register the setdp, getdc and getdp functions");
+				q2outputError("Failed to register the setdp, getdc and getdp functions");
 				return NULL;
 			}
 
@@ -14865,19 +14865,19 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!registerFunction(_Menvironment,owner,"pi$q",pi_q,1,(char*[]){"sequence index(integer)"},NULL)
 					||!registerFunction(_Menvironment,owner,"pi$ql",pi_ql,1,(char*[]){"sequence index(integer)"},NULL)
 					||!registerFunction(_Menvironment,owner,"pi",Mpi,2,(char*[]){"decimal precision(integer)","compute (co)sines(boolean)"},(Mvalue*[]){NULL,_getIntegerValue(M_FALSE)})){
-				outputError("Failed to register the pi, pi$q and pi$ql functions");
+				q2outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return NULL;
 			}
 			if(!registerFunction(_Menvironment,owner,"irange",Mirange,2,(char*[]){"from(integer)","through(integer)"},NULL)){
-				outputError("Failed to register the irange() function");
+				q2outputError("Failed to register the irange() function");
 				return NULL;
 			}
 			if(!registerFunction(_Menvironment,owner,"drange",Mdrange,3,(char*[]){"from(number)","through(number)","step(number)"},NULL)){
-				outputError("Failed to register the drange() function");
+				q2outputError("Failed to register the drange() function");
 				return NULL;
 			}
 			if(!registerFunction(_Menvironment,owner,"range",Mrange,3,(char*[]){"from(number)","through(number)","step(number)"},NULL)){
-				outputError("Failed to register the range() function");
+				q2outputError("Failed to register the range() function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
@@ -14894,7 +14894,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"precision",Mprecision,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"o",Mo,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"O",MO,1,(char*[]){"(any)"},NULL)){
-				outputError("Failed to register value type conversion functions");
+				q2outputError("Failed to register value type conversion functions");
 				return NULL;
 			}
 
@@ -14902,12 +14902,12 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			/* MDH@04NOV2019: moved over to Menvironment.h/c
 			if(!completedValueFunction(_Menvironment,"type"),"type",Mtype)){
-				outputError("Failed to register the type function");
+				q2outputError("Failed to register the type function");
 				return false;
 			}
 			*/
 			if(!registerFunction(_Menvironment,owner,"keys",Mkeys,1,(char*[]){"(map)"},NULL)){
-				outputError("Failed to register the keys function");
+				q2outputError("Failed to register the keys function");
 				return NULL;
 			}
 
@@ -14916,7 +14916,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!registerFunction(_Menvironment,owner,"neg",Mneg,1,(char*[]){"(number)"},NULL)
 					||!registerFunction(_Menvironment,owner,"bnot",Mbnot,1,(char*[]){"(number)"},NULL)
 					||!registerFunction(_Menvironment,owner,"not",Mnot,1,(char*[]){"(number)"},NULL)){
-				outputError("Failed to register all unary (neg, bnot, and not) functions");
+				q2outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return NULL;
 			}
 
@@ -14941,14 +14941,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"scalar",Mscalar,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"null",Mnull,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"undefined",Mundefined,1,(char*[]){"(any)"},NULL)){
-				outputError("Failed to register the exists, scalar, null and undefined functions");
+				q2outputError("Failed to register the exists, scalar, null and undefined functions");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 21");
 
 			if(!registerFunction(_Menvironment,owner,"sign",Msign,1,(char*[]){"(number)"},NULL)){
-				outputError("Failed to register the sign function");
+				q2outputError("Failed to register the sign function");
 				return NULL;
 			}
 
@@ -14957,7 +14957,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			if(!registerFunction(_Menvironment,owner,"zero",Mzero,1,(char*[]){"(number)"},NULL)
 					||!registerFunction(_Menvironment,owner,"positive",Mpositive,1,(char*[]){"(number)"},NULL)
 					||!registerFunction(_Menvironment,owner,"negative",Mnegative,1,(char*[]){"(number)"},NULL)){
-				outputError("Failed to register the zero, positive and negative functions");
+				q2outputError("Failed to register the zero, positive and negative functions");
 				return NULL;
 			}
 
@@ -14969,7 +14969,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"split",Msplit,2,(char*[]){"text","separator"},NULL)
 					||!registerFunction(_Menvironment,owner,"length",Mlen,1,(char*[]){"(list|array|text)"},NULL)
 			){
-				outputError("Failed to register the split function and the sum, length and setlength list functions");
+				q2outputError("Failed to register the split function and the sum, length and setlength list functions");
 				return NULL;
 			}
 
@@ -14978,7 +14978,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// MDH@01NOV2019: I have some generic list functions implemented
 			if(!registerFunction(_Menvironment,owner,"empty",Mempty,1,(char*[]){"(any)"},NULL)
 			||!registerFunction(_Menvironment,owner,"clear",Mclear,1,(char*[]){"(any)"},NULL)){
-				outputError("Failed to register the empty and clear function");
+				q2outputError("Failed to register the empty and clear function");
 				return false;
 			}
 
@@ -14989,21 +14989,21 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"first",Mfirst,1,(char*[]){"(list)"},NULL)
 					||!registerFunction(_Menvironment,owner,"last",Mlast,1,(char*[]){"(list)"},NULL)
 				){
-				outputError("Failed to register the statistics, first and last list functions");
+				q2outputError("Failed to register the statistics, first and last list functions");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 26");
 			if(!registerFunction(_Menvironment,owner,"list",Mcreatelist,2,(char*[]){"length(integer)","fill(any)"},NULL))
 			{
-				outputError("Failed to register the create list function");
+				q2outputError("Failed to register the create list function");
 				return NULL;
 			}
 
 			if(!registerFunction(_Menvironment,owner,"array",Mcreatearray,2,(char*[]){"length(integer)","fill"},NULL)
 					||!registerFunction(_Menvironment,owner,"fill",Mfillarray,2,(char*[]){"(array)",NULL},NULL)
 			){
-				outputError("Failed to register the array and fill array functions");
+				q2outputError("Failed to register the array and fill array functions");
 				return NULL;
 			}
 
@@ -15019,14 +15019,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"runpoints",Mrunpoints,1,(char*[]){"(list)"},NULL)
 					||!registerFunction(_Menvironment,owner,"pop",Mpop,1,(char*[]){"(list)"},NULL)
 				){
-				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");
+				q2outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 28");
 
 			if(!registerFunction(_Menvironment,owner,"find",Mfind,3,(char*[]){"(list)",NULL,"index(integer)"},NULL)){
-				outputError("Failed to register the find function");
+				q2outputError("Failed to register the find function");
 				return NULL;
 			}
 
@@ -15039,7 +15039,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"foreach",Mlforeach,2,(char*[]){"(list)","(function)"},NULL)
 					||!registerFunction(_Menvironment,owner,"group",Mlgroup,2,(char*[]){"(list)","(function)"},NULL)
 					){
-				outputError("Failed to register the infamous reduce, map, filter and foreach list functions");
+				q2outputError("Failed to register the infamous reduce, map, filter and foreach list functions");
 				return NULL;
 			}
 
@@ -15047,7 +15047,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 
 			if(!registerFunction(_Menvironment,owner,"tl",Mtl,1,(char*[]){"(any)"},NULL)){
-				outputError("Failed to register the tl text function");
+				q2outputError("Failed to register the tl text function");
 				return NULL;
 			}
 
@@ -15055,7 +15055,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			if(!registerFunction(_Menvironment,owner,"fac",Mfac,1,(char*[]){"(integer)"},NULL)
 				||!registerFunction(_Menvironment,owner,"facd",Mfacd,1,(char*[]){"(integer)"},NULL)){
-				outputError("Failed to register the fac and facd function");
+				q2outputError("Failed to register the fac and facd function");
 				return NULL;
 			}
 
@@ -15063,14 +15063,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 
 			if(!registerFunction(_Menvironment,owner,"reciprocal",Mreciprocal,1,(char*[]){"(number)"},NULL)
 				||!registerFunction(_Menvironment,owner,"fibonacci",Mfibonacci,1,(char*[]){"index(integer)"},NULL)){ // MDH@10OCT2019
-				outputError("Failed to register the reciprocal and fibonacci function");
+				q2outputError("Failed to register the reciprocal and fibonacci function");
 				return NULL;
 			}
 
 			//reportNumberOfAllocations("shellInitialized 33");
 
 			if(!registerFunction(_Menvironment,owner,"concat",Mconcat,2,(char*[]){"(text)","(text)"},NULL)){
-				outputError("Failed to register the concat function");
+				q2outputError("Failed to register the concat function");
 				return NULL;
 			}
 
@@ -15081,7 +15081,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"l2ml",l2ml,1,(char*[]){"(list)"},NULL)
 					||!registerFunction(_Menvironment,owner,"ml2l",ml2l,1,(char*[]){"(list)"},NULL)
 					||!registerFunction(_Menvironment,owner,"ml2m",ml2m,1,(char*[]){"(list)"},NULL)){
-				outputError("Failed to register list conversion functions");
+				q2outputError("Failed to register list conversion functions");
 				return NULL;
 			}
 
@@ -15090,7 +15090,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			// register map conversions
 			if(!registerFunction(_Menvironment,owner,"m2ml",m2ml,1,(char*[]){"(map)"},NULL)
 					||!registerFunction(_Menvironment,owner,"m2l",m2l,1,(char*[]){"(map)"},NULL)){
-				outputError("Failed to register map conversion functions");
+				q2outputError("Failed to register map conversion functions");
 				return NULL;
 			}
 
@@ -15130,7 +15130,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!registerFunction(_Menvironment,owner,"fwrite",Mfwrite,2,(char*[]){"file"},NULL)
 				||!registerFunction(_Menvironment,owner,"fwriteline",Mfwriteline,2,(char*[]){"file(name)","line(text)"},NULL)
 				||!registerFunction(_Menvironment,owner,"fwritelines",Mfwritelines,1,(char*[]){"file","lines(array|list)"},NULL)){
-				outputError("Failed to registered the file functions");
+				q2outputError("Failed to registered the file functions");
 				return NULL;
 			}
 
@@ -15144,7 +15144,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!registerFunction(_Menvironment,owner,"setenv",Msetenv,1,(char*[]){""},NULL)
 				||!registerFunction(_Menvironment,owner,"putenv",Mputenv,1,(char*[]){""},NULL)
 			){
-				outputError("Failed to register the system environment functions");
+				q2outputError("Failed to register the system environment functions");
 				return NULL;				
 			}
 
@@ -15156,7 +15156,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				||!registerFunction(_Menvironment,owner,"settimezone",Msettimezone,1,(char*[]){"timezone(text)"},NULL)
 				||!registerFunction(_Menvironment,owner,"calendartime",Mcalendartime,1,(char*[]){"time(integer)"},NULL)
 				||!registerFunction(_Menvironment,owner,"time",Mparsetime,2,(char*[]){"calendar time","timezone(text)"},NULL)){
-				outputError("Failed to register the time functions");
+				q2outputError("Failed to register the time functions");
 				return NULL;
 			}
 
@@ -15170,7 +15170,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"transpose",Mmatrixtranspose,1,(char*[]){"matrix"},NULL)
 					||!registerFunction(_Menvironment,owner,"det",Mmatrixdeterminant,1,(char*[]){"matrix"},NULL)
 					||!registerFunction(_Menvironment,owner,"trace",Mmatrixtrace,1,(char*[]){"matrix"},NULL)){
-				outputError("Failed to register the matrix functions");
+				q2outputError("Failed to register the matrix functions");
 				return NULL;
 			}
 
@@ -15179,13 +15179,13 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"messagecounts",Mmessagecounts,0,NULL,NULL)
 					||!registerFunction(_Menvironment,owner,"addmessage",Maddmessage,1,(char*[]){"message(text)"},NULL))
 			{
-				outputError("Failed to register the messages functions");
+				q2outputError("Failed to register the messages functions");
 				return NULL;
 			}
 			//reportNumberOfAllocations("shellInitialized 40");
 
 			if(!registerFunction(_Menvironment,owner,"outputtable",Moutputtable,1,(char*[]){"table"},NULL)){
-				outputError("Failed to register the outputtable function");
+				q2outputError("Failed to register the outputtable function");
 				return NULL;
 			}
 
@@ -15318,7 +15318,7 @@ Mstring* _getBlockName(){Mallocationowner owner=getOwner(__LINE__);
  */
 static bool pushBlock(Mblock * const block){
 	if(block==NULL||_lastBlock==NULL)return false;
-	if(Misowned(block))outputError("Block is still owned!");
+	if(Misowned(block))q2outputError("Block is still owned!");
 	_lastBlock->next=owned_block(block,owner_blocks);
 	block->prev=_lastBlock;
 	_lastBlock=_lastBlock->next;
@@ -15352,7 +15352,7 @@ static Mblock* popBlock(){
 bool blocksInitialized(){
 	Mblock* _newBlock=_getNewBlock();
 	if(NULL==_newBlock)return false;
-	if(Misowned(_newBlock))outputError("New block is still owned!");
+	if(Misowned(_newBlock))q2outputError("New block is still owned!");
 	_firstBlock=owned_block(_newBlock,owner_blocks);
 	_lastBlock=_firstBlock;
 	return true;
@@ -15375,10 +15375,10 @@ bool addBlockCommand(Mcommand const * const command){
 			// MDH@12APR2024: since environment->insertToken now points to command->_firstToken as it must be
 			//                we do not need offsetToken anymore and can use the continuationToken in the parent env.
 			Mblock* hostBlock=block->prev;
-			if(NULL==hostBlock){outputBug("No host command environment");return false;}
+			if(NULL==hostBlock){q2outputBug("No host command environment");return false;}
 			output("Embedding environment available.\n");
 			Mtoken* nextInsertToken=hostBlock->continuationToken;
-			if(NULL==nextInsertToken){outputBug("No continuation token");return false;}
+			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
 			output("Continuation token of embedded command available.\n");
 			/*
 			Mtoken* offsetToken=environment->insertToken;
@@ -15389,7 +15389,7 @@ bool addBlockCommand(Mcommand const * const command){
 				// insert a command separator
 				output("Embedding a command separator.\n");
 				Mtoken* listelementToken=owned_token(_getNewCommandToken(blockEnvironment->insertToken,TT_LISTELEMENT),Msubowner(owner_command,1));
-				if(listelementToken==NULL){outputError("Failed to embed a command separator");return false;}
+				if(listelementToken==NULL){q2outputError("Failed to embed a command separator");return false;}
 				listelementToken->text=owned_string(_getString(","),Msubowner(owner_command,2));
 				listelementToken->significantCharacterCount=1;
 				blockEnvironment->insertToken->next=listelementToken;
@@ -15406,9 +15406,9 @@ bool addBlockCommand(Mcommand const * const command){
 					block->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
 					firstSignificantCommandToken->prev=block->insertToken;
 				}else
-					outputError("Insert token vanished");
+					q2outputError("Insert token vanished");
 			}else
-				outputWarning("No significant first subcommand token");
+				q2outputWarning("No significant first subcommand token");
 			// connect end of command to where the super command continues
 			command->_lastToken->next=nextInsertToken; // links the command's last token to the continuation token
 			nextInsertToken->prev=command->_lastToken; // and back
@@ -15423,7 +15423,7 @@ bool addBlockCommand(Mcommand const * const command){
 				if(token==NULL){output("No further tokens to propagate properties from.\n");break;}
 				output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
 				if(token->type==TT_PLACEHOLDER){output("Bumped into a placeholder token.\n");break;} // done
-				if(token->type==TT_ERROR){outputBug("Some error occurred initializing the embedded command");break;}
+				if(token->type==TT_ERROR){q2outputBug("Some error occurred initializing the embedded command");break;}
 			}
 			output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
@@ -15440,9 +15440,9 @@ bool addBlockCommand(Mcommand const * const command){
 				return true;
 				*/
 		}
-		outputError("Embedded command environment vanished");
+		q2outputError("Embedded command environment vanished");
 	}else
-		outputError("No command to embed");
+		q2outputError("No command to embed");
 	return false;
 }
 
@@ -15486,13 +15486,13 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 					///output("Placeholder text appended.\n");
 					free(_placeholderText);
 				}else
-					outputError("No placeholder text!");
+					q2outputError("No placeholder text!");
 				///output("Setting the name of the block.\n");
 				_block->_name=owned_chars(_getChars(string(_blockName)),Msubowner(owner,1));
 				///output("Name of block set!\n");
 				FREE_STRING(_blockName,owner);
 			}else{
-				outputError("Failed to create the block name");
+				q2outputError("Failed to create the block name");
 				_block->_name=owned_chars(_getChars("?"),Msubowner(owner,1));
 			}
 			/* replacing: 
@@ -15527,9 +15527,9 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 										nextPlaceholderToken->significantCharacterCount=1;
 										nextPlaceholderToken->next=placeholderToken->next;
 									}else
-										outputError("Failed to embed )");
+										q2outputError("Failed to embed )");
 								}else
-									outputError("Failed to embed (");
+									q2outputError("Failed to embed (");
 								break;
 							case 'l':case 'L':
 								prevPlaceholderToken=owned_token(_getNewToken(prevPlaceholderToken,TT_LIST,false),ownerToken);
@@ -15542,9 +15542,9 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 										nextPlaceholderToken->significantCharacterCount=1;
 										nextPlaceholderToken->next=placeholderToken->next;
 									}else
-										outputError("Failed to embed ]");
+										q2outputError("Failed to embed ]");
 								}else
-									outputError("Failed to embed [");
+									q2outputError("Failed to embed [");
 								break;
 						}
 					}else*/ 
@@ -15559,9 +15559,9 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 					///////environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
 					return true;
 				}
-				outputBug("Subcommand block vanished");
+				q2outputBug("Subcommand block vanished");
 			}else
-				outputError("Failed to activate the subcommand block");
+				q2outputError("Failed to activate the subcommand block");
 			/* replacing:
 			if(_blockEnvironment->_name!=NULL){
 				Mlist* _blockCommandList=owned_list(__list("block command list"),owner);
@@ -15574,7 +15574,7 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 							_blockEnvironment->insertToken=owned_token(insertToken,getValueDataOwner());
 							return true;
 						}
-						outputError("Failed to activate the block environment");
+						q2outputError("Failed to activate the block environment");
 					}
 					// failed to append the block command to complete
 					FREE_LIST(_blockCommandList,owner);
@@ -15585,12 +15585,12 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			// failed to activate the block environment, so we have to free it again
 			FREE_BLOCK(_block,owner);
 		}else
-			outputError("Failed to create a subcommand block");
+			q2outputError("Failed to create a subcommand block");
 	}else
 	if(NULL==_lastBlock)
-		outputError("No initial subcommand block!");
+		q2outputError("No initial subcommand block!");
 	else
-		outputError("Invalid input to start a subcommand block");
+		q2outputError("Invalid input to start a subcommand block");
 	return false;
 }
 /**
@@ -15712,7 +15712,7 @@ Mblock* endBlock(){
 						///	blockCommandList->_first=nextBlockCommandListElement;
 						///}while(blockCommandList->_first!=NULL);
 					}else
-						outputBug("Missing block environment parent block command list");
+						q2outputBug("Missing block environment parent block command list");
 					// how about extracting the completed block command before popping and destroying the block environment?????
 					return popExecutionEnvironment(); // NOTE that popExecutionEnvironment() does NOT free the popped execution environment!!!!
 					///
@@ -15723,17 +15723,17 @@ Mblock* endBlock(){
 					///if(popExecutionEnvironment()){
 					///	// shouldn't we append the completed block command token to the blockCommandList of the parent environment????
 					///	if(appendedToList(getExecutionEnvironment()->blockCommandList,getValueDataOwner(),_getValueOfToken(completedBlockCommandToken),0)<=0)
-					///		outputError("Failed to append the completed block command to the block command list");
+					///		q2outputError("Failed to append the completed block command to the block command list");
 					///	return completedBlockCommandToken;
 					///}
-					///outputError("Failed to pop the block command environment!");
+					///q2outputError("Failed to pop the block command environment!");
 					///
 				}else
-					outputBug("Block host environment vanished");
+					q2outputBug("Block host environment vanished");
 			}
-			outputBug("Incomplete block command and/or insert token vanished");
+			q2outputBug("Incomplete block command and/or insert token vanished");
 		}else
-			outputBug("Block environment command list vanished");
+			q2outputBug("Block environment command list vanished");
 	}
 	return NULL;
 	*/

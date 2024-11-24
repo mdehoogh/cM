@@ -112,7 +112,7 @@ Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner
 	if(NULL==_biginteger)return NULL;
 	if(_biginteger->_bi!=NULL)DISOWNED(_biginteger->_bi,Msubowner(owner_biginteger,1));
 	DISOWNED(_biginteger,owner_biginteger);
-	if(NULL==Mdisowned(_biginteger,owner_biginteger))outputError("Failed to disown big integer");
+	if(NULL==Mdisowned(_biginteger,owner_biginteger))q2outputError("Failed to disown big integer");
 	return _biginteger;
 }
 /**
@@ -158,7 +158,7 @@ Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
  */
 void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/){
 	if(_biginteger){
-		if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
+		if(amVerboseDebugging())q2outputInfo("Freeing a big integer."); // TODO can we display the value?
 #ifndef __PRODUCTION__
 		mp_clear(_biginteger->_bi);
 		FREE_1(_biginteger->_bi,'b'/*,owner_biginteger*/);
@@ -167,7 +167,7 @@ void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_bigintege
 #endif
 		FREE_1(_biginteger,'B'/*,owner_biginteger*/); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
 	}else
-	if(amVerbose())outputInfo("No big integer to free!");
+	if(amVerbose())q2outputInfo("No big integer to free!");
 }/* VALIDATED */
 
 // MDH@09APR2020: for all methods that call mp_int methods now require calling MP_INT_POINTER() on Mbiginteger instances
@@ -258,13 +258,13 @@ long long getBigintegerInteger(Mbiginteger const * const biginteger){
 				mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
 			result=mp_get_i64(MP_INT_POINTER(biginteger));
 			if(amVerboseDebugging())
-				outputInfo("Big integer converted to a small integer.");
+				q2outputInfo("Big integer converted to a small integer.");
 		}else
 			if(amVerboseDebugging())
-				outputInfo("Big integer cannot be converted to a small integer.");
+				q2outputInfo("Big integer cannot be converted to a small integer.");
 	}
 	if(amVerboseDebugging())
-		outputMessage(M_INFO_PREFIX,"Small integer result: %lld.\n",result);
+		q2outputMessage(M_INFO_PREFIX,"Small integer result: %lld.\n",result);
 	return result;
 }
 
@@ -357,7 +357,7 @@ Mrational* _getLongDoubleRational(long double ld){
         mp_err err=mp_div_2d(_numerator,-exp,_numerator,_shiftedout);
         if(err!=MP_OKAY){
             free_biginteger(_shiftedout);
-            outputError("Failed to adjust the numerator of the rational by the negative exponent of the real.");
+            q2outputError("Failed to adjust the numerator of the rational by the negative exponent of the real.");
             free_biginteger(_numerator);
             return NULL;
         }
@@ -367,12 +367,12 @@ Mrational* _getLongDoubleRational(long double ld){
         free_biginteger(_shiftedout);
     }
     // make the numerator negative if the long double is negative (this is when bit 15 of the exponent equals 1)
-    if(exponent>>15)if(mp_neg(_numerator,_numerator)!=MP_OKAY){outputError("Failed to negate the rational of the real.");free_biginteger(_numerator);return NULL;}
+    if(exponent>>15)if(mp_neg(_numerator,_numerator)!=MP_OKAY){q2outputError("Failed to negate the rational of the real.");free_biginteger(_numerator);return NULL;}
     // if the exponent is non-positive (zero or negative) there's no denominator (i.e. denominator remains 1)
     if(exp<=0)return _getRational(_numerator,NULL,false);
     // ASSERT a positive exponent that we can use for the denominator
     Mbiginteger* _denominator=_getBiginteger(1);
-    if(!_denominator||mp_mul_2d(_denominator,exp,_denominator)!=MP_OKAY){outputError("Failed to compute the denominator of the rational of a real.");free_biginteger(_denominator);return NULL;}
+    if(!_denominator||mp_mul_2d(_denominator,exp,_denominator)!=MP_OKAY){q2outputError("Failed to compute the denominator of the rational of a real.");free_biginteger(_denominator);return NULL;}
     return _getRational(_numerator,_denominator,true);
 }
 */
@@ -412,7 +412,7 @@ void free_text(Mtext* _text/*,Mallocationowner owner*/){
 		// replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)FREE_STRING(_string->_m);_string->_m=NULL;free(_string);}
 	}else
 	if(amVerboseDebugging())
-		outputInfo("No text to free!");
+		q2outputInfo("No text to free!");
 }/* VALIDATED */
 
 /**
@@ -436,7 +436,7 @@ void free_integer(Minteger* _integer/*,Mallocationowner owner*/){
 		if(amVerboseDebugging())output("Freeing integer %llu.\n",_integer->ll);
 		FREE_1(_integer,'I'/*,owner*/);
 	}else
-	if(amVerboseDebugging())outputInfo("No integer to free!");
+	if(amVerboseDebugging())q2outputInfo("No integer to free!");
 }/* VALIDATED */
 #define FREE_INTEGER(_integer,owner_integer) free_integer(disowned_integer(_integer,owner_integer))
 
@@ -461,7 +461,7 @@ void free_float(Mfloat* _float/*,Mallocationowner owner*/){
 		if(amVerboseDebugging())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
 		FREE_1(_float,'F'/*,owner*/);
 	}else
-	if(amVerboseDebugging())outputInfo("No real to free!");
+	if(amVerboseDebugging())q2outputInfo("No real to free!");
 }/* VALIDATED */
 /**
  * @brief the FREE_FLOAT macro that will first disown the M float pointed to and then free the pointer to the disowned M float
@@ -931,7 +931,7 @@ Mstring* _getQuotedTextString(char const * const text,char quote){Mallocationown
 					return disowned_string(_quotedTextString,owner);
 				FREE_STRING(_quotedTextString,owner);
 			}else
-				outputError("Failed to create a quoted text string");
+				q2outputError("Failed to create a quoted text string");
 	}
 	return NULL;
 }/* VALIDATED */
@@ -964,7 +964,7 @@ Mstring* _getQuotedTextCharString(char _char,char quote){Mallocationowner owner=
 			return disowned_string(_quotedTextCharString,owner);
 		FREE_STRING(_quotedTextCharString,owner);
 	}else
-		outputError("Failed to create a quoted character string");
+		q2outputError("Failed to create a quoted character string");
 	return NULL;
 }/* VALIDATED */
 /**
@@ -1406,7 +1406,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 			clock_t then=0; /////=clock();
 			// if(amVerboseDebugging())
 			///////then=clock(); // DEBUG
-			///////if(amVerbose())outputInfo("Determining a big integer text representation.");
+			///////if(amVerbose())q2outputInfo("Determining a big integer text representation.");
 			// output("Big integer text length: %zu.\n",_bigintegerText->length);
 			// output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
 			// MDH@16OCT2023: replacing the call to mp_radix_size with a call to getMpintSize() which approximates the number of decimal digit characters we're going to need!!!!
@@ -1458,24 +1458,24 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 					if(failure>0){
 						FREE_STRING(_mpintText,owner);_mpintText=NULL;
 						switch(failure){
-							case 1:outputMessage(M_ERROR_PREFIX,"Failed to initialize the length of the big integer text representation to %d.",arepsize);break;
-							case 2:outputError("Failed to determine the big integer representation");break;
-							case 3:outputError("Failed to sync the length of the big integer representation");break;
-							case 4:outputError("Failed to remove the trailing zeroes from the big integer representation.");break;
-							case 5:outputError("Failed to append 'e' to the big integer representation.");break;
-							case 6:outputError("Failed to append the exponent part to the big integer representation.");break;
+							case 1:q2outputMessage(M_ERROR_PREFIX,"Failed to initialize the length of the big integer text representation to %d.",arepsize);break;
+							case 2:q2outputError("Failed to determine the big integer representation");break;
+							case 3:q2outputError("Failed to sync the length of the big integer representation");break;
+							case 4:q2outputError("Failed to remove the trailing zeroes from the big integer representation.");break;
+							case 5:q2outputError("Failed to append 'e' to the big integer representation.");break;
+							case 6:q2outputError("Failed to append the exponent part to the big integer representation.");break;
 						}
 					}
 				}else
-					outputMessage(M_ERROR_PREFIX,"Can't store more than %u characters in a string.",SIZE_MAX);
+					q2outputMessage(M_ERROR_PREFIX,"Can't store more than %u characters in a string.",SIZE_MAX);
 			}else
-				outputError("Couldn't determine the size of a big integer");
+				q2outputError("Couldn't determine the size of a big integer");
 			if(then)
-				outputMessage(M_INFO_PREFIX,"Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
+				q2outputMessage(M_INFO_PREFIX,"Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
 		}else
-				outputError("No big integer to represent");
+				q2outputError("No big integer to represent");
 	}else
-		outputError("Failed to create a text for storing the representation of a big integer");
+		q2outputError("Failed to create a text for storing the representation of a big integer");
 	///outputChar('H');
 	return disowned_string(_mpintText,owner);
 }
@@ -1508,7 +1508,7 @@ Mbiginteger *_biLLMax=NULL;
  */
 Mbiginteger* getBigintegerLLMin(){//Mallocationowner owner=getOwner(__LINE__);
 	if(!_biLLMin){
-		if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the smallest small integer.");
+		if(amVerboseDebugging())q2outputInfo("Determining the big integer equivalent of the smallest small integer.");
 		_biLLMin=owned_biginteger(_getBiginteger(M_LL_MIN),owner_biLLextreme);
 		if(amVerboseDebugging())outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
 	}
@@ -1521,7 +1521,7 @@ Mbiginteger* getBigintegerLLMin(){//Mallocationowner owner=getOwner(__LINE__);
  */
 Mbiginteger* getBigintegerLLMax(){
 	if(!_biLLMax){
-		if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the largest small integer.");
+		if(amVerboseDebugging())q2outputInfo("Determining the big integer equivalent of the largest small integer.");
 		_biLLMax=owned_biginteger(_getBiginteger(M_LL_MAX),owner_biLLextreme);
 		if(amVerboseDebugging())outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
 	}
@@ -1611,7 +1611,7 @@ static mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){M
 		output("Power of two exponent: %d.\n",exp);  
 		if(exp!=0){
 			mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
-			if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
+			if(err!=MP_OKAY){q2outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
 		}
 		///if(amVerbose()){
 			Mstring* _bigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020
@@ -1684,7 +1684,7 @@ mp_err mp_set_longdouble(Mbiginteger *a, long double b){
 			mp_set_u64(a,frac);
 			if(amVerbose())output("Fraction part %16x used to initialize the big integer.",frac);
 			err=(exp<0?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a));
-			if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
+			if(err!=MP_OKAY){q2outputError("Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
 			// take over the sign from the long double (bit 15 in the signandexponent part)
 			if(((cast.ldints.signandexponent>>15)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
 			if(amVerbose())output("Sign part of real used to set the sign of the big integer.");
@@ -1971,7 +1971,7 @@ Mstring* _getPrintableString(Mstring const * const str,char quoteChar,char quote
 			}while(strlength);
 		}
 		if(quoteChar)p=string_append_char(p,quoteChar);
-		if(p==NULL){outputError("Failed to create a readable bytes representation");FREE_STRING(_printableString,owner);return NULL;}
+		if(p==NULL){q2outputError("Failed to create a readable bytes representation");FREE_STRING(_printableString,owner);return NULL;}
 		return disowned_string(_printableString,owner);
 	}
 }
@@ -2139,17 +2139,17 @@ size_t outputBiginteger(char const * const prefix,Mbiginteger const * const bigi
  * @return size_t the number of characters output
  */
 size_t q2outputBiginteger(char const * const prefix,Mbiginteger const * const biginteger,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=(prefix!=NULL?q2outputandcollect("%s",prefix):0);
+	size_t written=(prefix!=NULL?q2output("%s",prefix):0);
 	if(biginteger!=NULL){
 		Mstring* _bigintegerText=owned_string(_getBigintegerText(biginteger),owner);
 		if(_bigintegerText){
-			written+=q2outputandcollect("%s",string(_bigintegerText));
+			written+=q2output("%s",string(_bigintegerText));
 			FREE_STRING(_bigintegerText,owner);
 		}else
-				written+=q2outputandcollect("%s","no big integer text representation");
+				written+=q2output("%s","no big integer text representation");
 	}else
-			written+=q2outputandcollect("%c",'?');
-	if(postfix!=NULL)written+=q2outputandcollect("%s",postfix);
+			written+=q2output("%c",'?');
+	if(postfix!=NULL)written+=q2output("%s",postfix);
 	return written;
 }/* VALIDATED */
 
@@ -2184,17 +2184,17 @@ size_t outputDecimal(char const * const prefix,Mdecimal const * const decimal,ch
  * @return size_t the number of characters written
  */
 size_t q2outputDecimal(char const * const prefix,Mdecimal const * const decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=(prefix!=NULL?q2outputandcollect("%s",prefix):0);
+	size_t written=(prefix!=NULL?q2output("%s",prefix):0);
 	if(decimal!=NULL){
 		Mstring* _decimalText=owned_string(_getDecimalText(decimal,false),owner);
 		if(_decimalText){
-			written+=q2outputandcollect("%s",string(_decimalText));
+			written+=q2output("%s",string(_decimalText));
 			FREE_STRING(_decimalText,owner);
 		}else
-			written+=q2outputandcollect("%s","no decimal text representation");
+			written+=q2output("%s","no decimal text representation");
 	}else
-		written+=q2outputandcollect("%c",'?');
-	if(postfix!=NULL)written+=q2outputandcollect("%s",postfix);
+		written+=q2output("%c",'?');
+	if(postfix!=NULL)written+=q2output("%s",postfix);
 	return written;
 }/* VALIDATED */
 
@@ -2253,7 +2253,7 @@ Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
 	if(_file->_name!=NULL){
 		///output("Disowning file name!\n");
 		DISOWNED(_file->_name,owner_file); // MDH@27DEC2020: oops, need to do this too!
-		///if(Misdisowned(_file->_name))output("File name disowned!\n");else outputError("File not disowned");
+		///if(Misdisowned(_file->_name))output("File name disowned!\n");else q2outputError("File not disowned");
 	}
 	///output("Disowning the file!\n");
 	return DISOWNED(_file,owner_file);
@@ -2355,15 +2355,15 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
 		}
 		if(stat_errno!=file->staterrno){ // some change
 			if(file->staterrno)
-				outputMessage(M_ERROR_PREFIX,"%s (error code: %d) updating the status information of file '%s'.",strerror(file->staterrno),file->staterrno,string(file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"%s (error code: %d) updating the status information of file '%s'.",strerror(file->staterrno),file->staterrno,string(file->_name));
 			else
-				outputMessage(M_INFO_PREFIX,"The status information of file '%s' updated successfully.",string(file->_name));
+				q2outputMessage(M_INFO_PREFIX,"The status information of file '%s' updated successfully.",string(file->_name));
 		}
 	}else
 	if(file!=NULL)
-		outputError("Cannot update the file stats of an unnamed file");
+		q2outputError("Cannot update the file stats of an unnamed file");
 	else
-		outputError("No file specified");
+		q2outputError("No file specified");
 }
 
 // MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
@@ -2380,22 +2380,22 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
  */
 bool closeFile(Mfile* const _file,bool report){
 	/////////bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_EXECUTION));
-	if(NULL==_file){outputWarning("No file to close");return false;} // nothing to close
-	if(NULL==_file->_name){outputWarning("File has no name");return true;} // must be closed
+	if(NULL==_file){q2outputWarning("No file to close");return false;} // nothing to close
+	if(NULL==_file->_name){q2outputWarning("File has no name");return true;} // must be closed
 	//////assert(_file->_name); // MDH@28DEC2020: we need a name!!!!
 	if(_file->_f==NULL){
-		outputMessage(M_WARNING_PREFIX,"File '%s' already closed.",string(_file->_name));
+		q2outputMessage(M_WARNING_PREFIX,"File '%s' already closed.",string(_file->_name));
 		return true;
 	} // already closed
 	if(report)
-		outputMessage(M_INFO_PREFIX,"Closing file '%s'.\n",string(_file->_name));
+		q2outputMessage(M_INFO_PREFIX,"Closing file '%s'.\n",string(_file->_name));
 	if(fclose(_file->_f)==0){ // success
 		_file->_f=NULL;
 		if(report)
-			outputMessage(M_INFO_PREFIX,"'%s' closed.\n",string(_file->_name));
+			q2outputMessage(M_INFO_PREFIX,"'%s' closed.\n",string(_file->_name));
 		return true;
 	}
-	outputMessage(M_ERROR_PREFIX,"Failed to close '%s'.",string(_file->_name));
+	q2outputMessage(M_ERROR_PREFIX,"Failed to close '%s'.",string(_file->_name));
 	return false;
 }
 /**
@@ -2460,23 +2460,23 @@ void openFile(Mfile* _file,Mallocationowner owner_file,char* mode,bool report){
 					if(NULL==_file->_stat)_file->_stat=CALLOC_1(sizeof(struct stat),'f',Msubowner(owner_file,1));
 					int updateStatsErrorCode=stat(string(_file->_name),_file->_stat);
 					if(updateStatsErrorCode){ // updating stat failed
-						outputMessage(M_ERROR_PREFIX,"Failed to update the stats of file '%s' in mode '%s' (error code: %d).",string(_file->_name),_file->mode,updateStatsErrorCode);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to update the stats of file '%s' in mode '%s' (error code: %d).",string(_file->_name),_file->mode,updateStatsErrorCode);
 						// perhaps we should never do the following???? although somehow we are using _file->_stat for certain purposes!!!
 						FREE_DISOWNED_1(_file->_stat,'f',owner_file);
 						_file->_stat=NULL;
 					}else
 					if(report)
-						outputMessage(M_INFO_PREFIX,"Stats of file '%s' updated.\n",string(_file->_name));
+						q2outputMessage(M_INFO_PREFIX,"Stats of file '%s' updated.\n",string(_file->_name));
 						*/
 				}else
-					outputMessage(M_ERROR_PREFIX,"Failed to open file '%s'.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s'.",string(_file->_name));
 			}else
 			if(_file->staterrno==0)
-				outputMessage(M_ERROR_PREFIX,"Can't open a '%s': it is a directory!",string(_file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"Can't open a '%s': it is a directory!",string(_file->_name));
 			else
-				outputMessage(M_WARNING_PREFIX,"File '%s' already opened!",string(_file->_name));
+				q2outputMessage(M_WARNING_PREFIX,"File '%s' already opened!",string(_file->_name));
 		}else
-			outputMessage(M_WARNING_PREFIX,"'%s' already open!",string(_file->_name));
+			q2outputMessage(M_WARNING_PREFIX,"'%s' already open!",string(_file->_name));
 	}
 }
 

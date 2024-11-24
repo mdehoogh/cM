@@ -214,7 +214,7 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 				while(_listelement!=NULL){
 					Mvalue* resultValue=binaryoperator(_listelement->_value,_value);
 					if(appendedToList(_result,owner,resultValue,_listelement->index)<=0){
-						outputError("Failed to store the result of applying a binary operator");
+						q2outputError("Failed to store the result of applying a binary operator");
 						break;
 					}
 					// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
@@ -397,7 +397,7 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 					FREE_BIGINTEGER(_biNumerator,owner);
 					return _getValueOfRational(disowned_rational(_negRational,owner));
 				}
-				outputError("Failed to negate the numerator of a rational");
+				q2outputError("Failed to negate the numerator of a rational");
 			}
 		}else
 		if(_value->type==VT_DECIMAL){
@@ -409,7 +409,7 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 					mpd_qcopy_negate(_negDecimal->mpd,decimal->mpd,&status);
 					if(status&0xEFBF){
 						FREE_DECIMAL(_negDecimal,owner);_negDecimal=NULL;
-						outputError("Failed to negate a decimal");
+						q2outputError("Failed to negate a decimal");
 						outputDecimalStatus(status);
 					}else // success, ascertain to copy the repeating field over as that remains the same on negating (assumedly)
 						_negDecimal->repeating=decimal->repeating;
@@ -483,13 +483,13 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 			_sumBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_sumBiginteger!=NULL&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){
 				FREE_BIGINTEGER(_sumBiginteger,owner);_sumBiginteger=NULL;
-				outputError("Failed to add two big integers");
+				q2outputError("Failed to add two big integers");
 			}
 			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				q2outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
-			outputError("Failed to convert an integer to a big integer");
+			q2outputError("Failed to convert an integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -503,7 +503,7 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 				FREE_BIGINTEGER(_sumBiginteger,owner);
 				return _getIntegerValue(llsum);
 			}
-			outputWarning("Small integer sum out of range, will continue using big integer sum.");
+			q2outputWarning("Small integer sum out of range, will continue using big integer sum.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_sumBiginteger,owner));
 	}
@@ -529,12 +529,12 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
 		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		/////outputInfo("Adding two rationals.");
+		/////q2outputInfo("Adding two rationals.");
 		Mrational* _sumRational=owned_rational(_getRationalSum(_rational1,_rational2),owner); // _qsum replaced by _getRationalSum that takes the deltas into account as well
-		/////outputInfo("Rationals added!");
+		/////q2outputInfo("Rationals added!");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(amVerboseDebugging())
-			outputInfo("Rational copies released.");
+			q2outputInfo("Rational copies released.");
 		Mvalue* _sumValue=NULL;
 		if(_sumRational!=NULL){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
@@ -638,7 +638,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			if(amVerboseDebugging())
 				{q2outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert an integer to a big integer");
+			q2outputError("Failed to convert an integer to a big integer");
 		if(_value1->type==VT_TIME)smallinteger1=true; // MDH@16DEC2020: from here treat time value also as a small integer
 		if(_value2->type==VT_TIME)smallinteger2=true; // MDH@16DEC2020: from here treat time value also as a small integer
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
@@ -651,7 +651,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			long long lldifference=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(lldifference!=M_LL_INVALID){FREE_BIGINTEGER(_differenceBiginteger,owner);return _getIntegerValue(lldifference);}
-			outputWarning("Small integer difference out of range, will continue using big integer difference.");
+			q2outputWarning("Small integer difference out of range, will continue using big integer difference.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_differenceBiginteger,owner));
 	}

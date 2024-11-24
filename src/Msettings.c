@@ -166,9 +166,9 @@ void activateWrapmode(){
 	// result=system(wrapping?"tput smam":"tput rmam"); 
 	result=outputControlText(wrapping?"?7h":"?7l"); // 7h used to be 6l doesn't seem to work though, 6h === 7l????
 	if(result)
-		outputMessage(M_ERROR_PREFIX,"Failed to %s wrapping.",(wrapping?"activate":"deactivate"));
+		q2outputMessage(M_ERROR_PREFIX,"Failed to %s wrapping.",(wrapping?"activate":"deactivate"));
 	else 
-		outputMessage(M_INFO_PREFIX,"Will %swrap!",(wrapping?"":"not "));
+		q2outputMessage(M_INFO_PREFIX,"Will %swrap!",(wrapping?"":"not "));
 }
 // M settings
 /**

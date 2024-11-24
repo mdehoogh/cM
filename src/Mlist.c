@@ -60,7 +60,7 @@ Miterator getListiterator(Mlist* list){
 			listiterator.lastindex=list->_last->index;
 		}else
 		if(list->_last!=NULL)
-			outputBug("Assumed last list element points to another list element in constructing a list iterator!");
+			q2outputBug("Assumed last list element points to another list element in constructing a list iterator!");
 	}
 	return listiterator;
 }
@@ -79,10 +79,10 @@ Mvalue* Mcreatelist(Mvalue* lengthValue,Mvalue* fillValue){Mallocationowner owne
 			Mlist* _list=owned_list(__list("createlist"),owner);
 			while(--length>=0)
 			if(appendedToList(_list,owner,fillValue,M_LL_INVALID)<0)
-			outputError("Failed to append list element!");
+			q2outputError("Failed to append list element!");
 			return _getValueOfList(disowned_list(_list,owner));
 		}else
-			outputError("Invalid list length!");
+			q2outputError("Invalid list length!");
 	}
 	return NULL;
 }
@@ -235,11 +235,11 @@ Mvalue* Mpop(Mvalue* listValue){ // remove and return the last value i.e. opposi
 					/////// replacing: assignValue(&last->_value,NULL);FREE(last,"l'); // by assigning NULL last->_value will have one less reference count
 					return lastValue;
 				}
-				outputError("It is not allowed to pop elements from an immutable list");
+				q2outputError("It is not allowed to pop elements from an immutable list");
 			}else
-				outputError("No elements in list to pop");
+				q2outputError("No elements in list to pop");
 		}else
-			outputError("No list to pop from");
+			q2outputError("No list to pop from");
 	}
 	return NULL;
 }
@@ -264,11 +264,11 @@ Mvalue* Mpull(Mvalue* listValue){ // remove and return the first value
 					first->_next=NULL;/* prevents releasing all following!*/FREE_LISTELEMENT(first,list->weak,Msubowner(getValueOwner(),2)); // replacing: FREE(first,"l'); // free the list element we unlinked
 					return firstValue;
 				}
-				outputError("It is not allowed to pull elements from an immutable list");
+				q2outputError("It is not allowed to pull elements from an immutable list");
 			}else
-				outputError("No elements in list to pull");
+				q2outputError("No elements in list to pull");
 		}else
-			outputError("No list to pull from");
+			q2outputError("No list to pull from");
 	}
 	return NULL;
 }
@@ -301,11 +301,11 @@ Mvalue* removedFromList(Mlist* list,Mallocationowner owner_list,long long listIn
 					listelement=previouslistelement->_next;
 				}
 			}else
-				outputError("Cannot remove a list element: the list is immutable");
+				q2outputError("Cannot remove a list element: the list is immutable");
 		}else
-			outputMessage(M_ERROR_PREFIX,"Invalid list index %lld.",listIndex);
+			q2outputMessage(M_ERROR_PREFIX,"Invalid list index %lld.",listIndex);
 	}else
-		outputError("No list to remove from");
+		q2outputError("No list to remove from");
 	return removedValue;
 }
 /**
@@ -333,14 +333,14 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
 								while(indexListelement!=NULL){
 									removedFromListValue=removedFromList(list,Msubowner(getValueOwner(),1),getValueInteger(indexListelement->_value));
 									if(removedFromListValue!=NULL&&appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID)<=0)
-										outputError("Failed to remember a removed list element");
+										q2outputError("Failed to remember a removed list element");
 									indexListelement=indexListelement->_next;
 								}
 								removedValue=_getValueOfList(disowned_list(_removedElementsList,owner)); // MDH@12JUN2020: by passing the list disowned, it will be freed when failing to bind it
 							}else 
-								outputError("Failed to create a list for storing the removed list elements");
+								q2outputError("Failed to create a list for storing the removed list elements");
 						}else 
-							outputBug("Missing index list");
+							q2outputBug("Missing index list");
 					}else // MDH@20MAR2023: are we creating an array or a list???????
 					if(listIndexValue->type==VT_ARRAY){
 						Marray* indexArray=listIndexValue->value._array;
@@ -354,7 +354,7 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
 									if(listIndex!=M_LL_INVALID){
 										removedFromListValue=removedFromList(list,Msubowner(getValueOwner(),1),listIndex);
 										if(removedFromListValue!=NULL&&appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID)<=0)
-											outputError("Failed to append a removed list element");
+											q2outputError("Failed to append a removed list element");
 									}else{
 										q2outputmessageprefix(M_ERROR_PREFIX);
 										q2outputValue("'",indexArray->values[arrayIndex],"' cannot be used as index integer in removing list elements.\n");
@@ -363,19 +363,19 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
 								}
 								removedValue=_getValueOfList(disowned_list(_removedElementsList,owner)); // MDH@12JUN2020: by passing the list disowned, it will be freed when failing to bind it
 							}else 
-								outputError("Failed to create a list for storing the removed list elements");
+								q2outputError("Failed to create a list for storing the removed list elements");
 						}else 
-							outputBug("Missing index array");
+							q2outputBug("Missing index array");
 					}else // something else
 						removedValue=removedFromList(list,Msubowner(getValueOwner(),1),getValueInteger(listIndexValue));
 				}else 
-					outputError("No or invalid list index/indices second argument to the removed() function");
+					q2outputError("No or invalid list index/indices second argument to the removed() function");
 			}else 
-				outputError("Will not remove elements from a list that is immutable");
+				q2outputError("Will not remove elements from a list that is immutable");
 		}else 
-			outputBug("Missing list");
+			q2outputBug("Missing list");
 	}else
-		outputError("List argument to removed() invalid");
+		q2outputError("List argument to removed() invalid");
 	return removedValue;
 }
 
@@ -399,7 +399,7 @@ Mvalue* Mfind(Mvalue* listValue,Mvalue* listElementValue,Mvalue* maximumNumberOf
 				while(listelement!=NULL){
 					if(areValuesEqual(listelement->_value,listElementValue)){
 						if(appendedToList(_foundElementsIndicesList,owner,_getIntegerValue(listelement->index),M_LL_INVALID)<=0)
-							outputError("Failed to store the index of a list element found");else
+							q2outputError("Failed to store the index of a list element found");else
 						if(maximumNumberOfElementsToFind>0&&_foundElementsIndicesList->numberOfElements>=maximumNumberOfElementsToFind)
 							break;
 					}
@@ -407,11 +407,11 @@ Mvalue* Mfind(Mvalue* listValue,Mvalue* listElementValue,Mvalue* maximumNumberOf
 				}
 				_findValue=_getValueOfList(disowned_list(_foundElementsIndicesList,owner));
 			}else
-				outputError("Failed to create the list to store the indices of the element to find");
+				q2outputError("Failed to create the list to store the indices of the element to find");
 		}else
-			outputBug("Missing list");
+			q2outputBug("Missing list");
 	}else
-		outputError("No list to search for a particular value");
+		q2outputError("No list to search for a particular value");
 	return _findValue;
 }
 
@@ -508,7 +508,7 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 				Mbiginteger *_count=owned_biginteger(_getBiginteger(count),owner),*_sum=owned_biginteger(_getBiginteger(sum),owner),*_squaressum=owned_biginteger(_getBiginteger(squaressum),owner);
 				if(_count!=NULL&&_sum!=NULL&&_squaressum!=NULL){
 					Mvalue* _meanValue=_getValueOfRational(_getRational(_sum,_count,M_LD_NAN,true));
-					if(NULL==_meanValue||appendedToMap(_statisticsMap,owner,"mean",_meanValue)<=0)outputError("Failed to store the sample mean in the statistics map");
+					if(NULL==_meanValue||appendedToMap(_statisticsMap,owner,"mean",_meanValue)<=0)q2outputError("Failed to store the sample mean in the statistics map");
 					// the sum of squared deviations (of sum of squares) is defined as squaressum-(sum*sum)/count
 					Mrational* _squaressumRational=owned_rational(_getRational(_squaressum,NULL,M_LD_NAN,false),owner);
 					if(_squaressumRational!=NULL){
@@ -523,7 +523,7 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 										Mvalue* _sumofsquaresRationalValue=_getValueOfRational(disowned_rational(_sumofsquaresRational,owner));
 										if(_sumofsquaresRationalValue!=NULL){ // _sumofsquaresRational now bound to the value
 											if(appendedToMap(_statisticsMap,owner,"sumofsquares",_sumofsquaresRationalValue)<=0)
-												outputError("Failed to store the sample sum of squares in the statistics map");
+												q2outputError("Failed to store the sample sum of squares in the statistics map");
 											// next to divide by the count minus 1 to give us the variance
 											Mbiginteger* _countminus1=owned_biginteger(_getBigintegerCopy(_count),owner);
 											if(_countminus1!=NULL){
@@ -539,10 +539,10 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 																	FREE_DECIMAL(_varianceDecimal,owner);
 																	// NOTE disown _stddevDecimal so that _getValueOfDecimal will free it on failure
 																	if(_stddevDecimal==NULL||appendedToMap(_statisticsMap,owner,"standard deviation",_getValueOfDecimal(disowned_decimal(_stddevDecimal,owner)))<=0)
-																		outputError("Failed to store the sample standard deviation in the statistics map");
+																		q2outputError("Failed to store the sample standard deviation in the statistics map");
 																}
 															}else
-																outputError("Failed to store the sample variance in the statistics map");
+																q2outputError("Failed to store the sample variance in the statistics map");
 														}
 													}
 													FREE_BIGINTEGER(_countminus1,owner);
@@ -554,7 +554,7 @@ Mmap* _getIntegerSampleStatisticsMap(Miterator* iterator){Mallocationowner owner
 							FREE_BIGINTEGER(_squaredsum,owner);
 						}
 					}else 
-						outputError("Failed to initialize the sum of squares");
+						q2outputError("Failed to initialize the sum of squares");
 				}else 
 					outputMemoryError("Failed to store the sample size and/or sum in a big integer");
 				FREE_BIGINTEGER(_sum,owner);
@@ -645,7 +645,7 @@ Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator){Mallocationowner ow
 							appendedToMap(_statisticsMap,owner,"error",_getTextValue("Some error occurred computing the big integer sample statistics."));
 					}
 				}else
-					outputError("Failed to create all big integer helpers in computing big integer sample statistics");
+					q2outputError("Failed to create all big integer helpers in computing big integer sample statistics");
 				FREE_BIGINTEGER(_newsum,owner);
 				FREE_BIGINTEGER(_newssq,owner);
 				FREE_BIGINTEGER(_newminimum,owner);
@@ -653,7 +653,7 @@ Mmap* _getBigintegerSampleStatisticsMap(Miterator* iterator){Mallocationowner ow
 				FREE_BIGINTEGER(_square,owner);
 				// ready to compose the map elements
 			}else 
-				outputError("Failed to initialize the big integer sample statistics");
+				q2outputError("Failed to initialize the big integer sample statistics");
 		}
 		appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
 		appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));

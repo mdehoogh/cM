@@ -109,7 +109,7 @@ mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){Mallocationowner owne
 		if(amVerbose())
 			output("Decimal context with precision %u initialized.\n",mpd_getprec(_mpd_context));
 	}else
-		outputError("Failed to create a new decimal context");
+		q2outputError("Failed to create a new decimal context");
 	return disowned_mpd_context(_mpd_context,owner);
 }
 
@@ -270,14 +270,14 @@ Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getO
 				_lastDecimalcontextElement=decimalcontextElement;
 				return decimalcontextElement->_decimalcontext;
 			}
-			outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context with precision " PRIu64 ".",prec);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context with precision " PRIu64 ".",prec);
 			// not bound!!!
 			disowned_decimalcontext(decimalcontextElement->_decimalcontext,owner);
 		}else
-			outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context wrapper with precision " PRIu64 ".",prec);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context wrapper with precision " PRIu64 ".",prec);
 		FREE_DECIMALCONTEXTELEMENT(decimalcontextElement,owner);
 	}else
-		outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context element with precision " PRIu64 ".",prec);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create the decimal context element with precision " PRIu64 ".",prec);
 	return NULL;
 }
 
@@ -412,7 +412,7 @@ Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){Mallocationowner owne
 		mpd_copy(_decimalCopy->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context); // copy attempt
 		if(!_decimalCopy->mpd){free_decimal(_decimalCopy);_decimalCopy=NULL;} // on failure, release the decimal
 	}else
-		outputError("Failed to copy a decimal");
+		q2outputError("Failed to copy a decimal");
 	return _decimalCopy;
 	*/
 }/* VALIDATED */
@@ -477,7 +477,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 					if(_num3!=NULL&&_bi10!=NULL&&_den2!=NULL&&_den1!=NULL&&mp_read_radix(MP_INT_POINTER(_num3),repeatingText,10)==MP_OKAY){
 						if(amVerbose())q2outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
 						for(int i=decimal->repeating;i>1;i--)if(mp_mul(MP_INT_POINTER(_den2),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den2))!=MP_OKAY){
-							outputError("Failed to multiply the second rational denominator part by 10");
+							q2outputError("Failed to multiply the second rational denominator part by 10");
 							FREE_BIGINTEGER(_den2,owner);
 							_den2=NULL;
 							break;
@@ -490,7 +490,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 							if(numberOfNonRepeatingDecimalDigits>0){
 								while(_den1!=NULL&&(--numberOfNonRepeatingDecimalDigits>=0))
 									if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
-									{outputError("Failed to multiply the first rational denominator part by 10");FREE_BIGINTEGER(_den1,owner);_den1=NULL;}
+									{q2outputError("Failed to multiply the first rational denominator part by 10");FREE_BIGINTEGER(_den1,owner);_den1=NULL;}
 								if(_den1!=NULL){
 									_den=owned_biginteger(__biginteger(),owner);
 									if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY){
@@ -504,7 +504,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 							if(_den!=NULL){ // denominator computed successfully, either to be bound or freed in this block
 								*periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
 								periodText++; // point periodText to the first digit behind the decimal period
-								if(amVerbose())q2outputandcollect("Behind period text: '%s'.\n",periodText);
+								if(amVerbose())q2output("Behind period text: '%s'.\n",periodText);
 
 								// the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
 								Mbiginteger* _num=owned_biginteger(_getBigintegerCopy(_num3),owner); // initialize _num to the repeating digits integer
@@ -548,9 +548,9 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 								FREE_BIGINTEGER(_den,owner);
 							}
 						}else
-							outputError("Failed to compute the second denominator multiplier");
+							q2outputError("Failed to compute the second denominator multiplier");
 					}else
-						outputError("Failed to construct the integer containing the repeating digits");
+						q2outputError("Failed to construct the integer containing the repeating digits");
 					FREE_BIGINTEGER(_num3,owner);
 					FREE_BIGINTEGER(_bi10,owner);
 					FREE_BIGINTEGER(_den2,owner);
@@ -568,7 +568,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 				_rational=owned_rational(_getDecimalTextRational(decimalText),owner);
 			FREE_STRING(_decimalText,owner); // OOPS use FREE_STRING() not free()!
 		}else
-			outputError("Failed to convert the decimal to text");
+			q2outputError("Failed to convert the decimal to text");
 	}
 	return disowned_rational(_rational,owner);
 }/* VALIDATED */
@@ -621,7 +621,7 @@ long double getDecimalLongDouble(Mdecimal* _decimal){
  * @return Mdecimal* the decimal equivalent of rational \p _rational in decimal context \p mpd_context
  */
 Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t const * mpd_context){Mallocationowner owner=getOwner(__LINE__);
-	if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
+	if(!_rational){q2outputError("No rational to convert to a decimal");return NULL;}
 	// _decimalText is a local variable that when set should be freed before returning!!!
 	Mstring* _decimalText=NULL;
 	Mbiginteger *numerator=_rational->num,*denominator=_rational->den; // shortcut to the rational numerator and denominator
@@ -634,7 +634,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 		if(_nonnegativenumerator!=NULL){
 			Mbiginteger *_digit=owned_biginteger(__biginteger(),owner),*_remainder=owned_biginteger(__biginteger(),owner);
 			Mbiginteger* _bi10=owned_biginteger(_getBiginteger(10),owner);
-			// MDH@20MAY2020 can't do this because there would be dangling owned pointers: if(!_bi10){outputError("Failed to create big integer 10");return NULL;}
+			// MDH@20MAY2020 can't do this because there would be dangling owned pointers: if(!_bi10){q2outputError("Failed to create big integer 10");return NULL;}
 			if(_digit!=NULL&&_remainder!=NULL&&_bi10!=NULL&&mp_div(MP_INT_POINTER(_nonnegativenumerator),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))==MP_OKAY){
 				// the integer part is _dividend
 				_decimalText=owned_string(_getBigintegerText(_digit),owner);
@@ -643,7 +643,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 					// in order to find the repeating fraction we have to continue computing the remainders
 					// and we have to register the remainders and compare the one we find with all remembered remainders, so far
 					MbigintegerListelement *_firstRemainderListelement=NULL,*lastRemainderListelement=NULL;
-					////////////////////////if(!_lastRemainderListelement){outputError("Failed to create the list to store the remainders");return NULL;}
+					////////////////////////if(!_lastRemainderListelement){q2outputError("Failed to create the list to store the remainders");return NULL;}
 					/* replacing, using an Mlist):
 					Mlist* _remainderList=owned_list(_getListOfType(VT_BIGINTEGER),owner);
 					Mlistelement* _remainderListelement=NULL;
@@ -675,12 +675,12 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 
 						// remainder hasn't appeared before so store it in the list of remainders
 						_remainderListelement=(MbigintegerListelement*)CALLOC_1(sizeof(MbigintegerListelement),'b',owner); // NOTE re-use of _remainderListelement
-						if(_remainderListelement==NULL){outputError("Failed to create a big integer list element for storing the new remainder");_p=NULL;break;}
+						if(_remainderListelement==NULL){q2outputError("Failed to create a big integer list element for storing the new remainder");_p=NULL;break;}
 
 						// at this point we have a new remainder list element (in _remainderListelement) that should be bound or freed
 						_remainderListelement->_biginteger=owned_biginteger(_getBigintegerCopy(_remainder),owner); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
 						if(_remainderListelement->_biginteger==NULL){
-							outputError("Failed to store the remainder");
+							q2outputError("Failed to store the remainder");
 							FREE_DISOWNED_1(_remainderListelement,'b',owner); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
 							_p=NULL;
 							break;
@@ -691,11 +691,11 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 						remainderCount++;
 						/* replacing:
 						Mvalue* remainderValue=_getBigintegerValue(_getBigintegerCopy(_remainder),true);
-						if(!remainderValue){outputError("Failed to store the remainder");break;}
-						if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);outputError("Failed to remember the remainder in order to recognized the repeating fraction");break;}
+						if(!remainderValue){q2outputError("Failed to store the remainder");break;}
+						if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);q2outputError("Failed to remember the remainder in order to recognized the repeating fraction");break;}
 						*/
 						if(mp_mul(MP_INT_POINTER(_remainder),MP_INT_POINTER(_bi10),MP_INT_POINTER(_remainder))!=MP_OKAY){
-							outputError("Failed to multiply the remainder by 10");
+							q2outputError("Failed to multiply the remainder by 10");
 							_p=NULL;
 							break;
 						}
@@ -703,7 +703,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 						
 						// _digit and _remainder are getting re-used here as well, which does not pose a problem (so we've created them once)
 						if(mp_div(MP_INT_POINTER(_remainder),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))!=MP_OKAY){
-							outputError("Failed to perform a long division to obtain the next decimal digit");
+							q2outputError("Failed to perform a long division to obtain the next decimal digit");
 							_p=NULL;
 							break;
 						}
@@ -713,18 +713,18 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 						// NOTE that _digitText is freed as soon as possible
 						_digitText=owned_string(_getBigintegerText(_digit),owner);
 						if(_digitText==NULL){
-							outputError("Failed to store the next decimal character");
+							q2outputError("Failed to store the next decimal character");
 							_p=NULL;
 							break;
 						}
 						_p=string_append(_p,string(_digitText));
 						FREE_STRING(_digitText,owner); // MDH@11JUN2020: disowns it and frees it
 
-						if(amVerboseDebugging())if(_p!=NULL)q2outputandcollect("Decimal text so far: '%s'.\n",string(_p));
+						if(amVerboseDebugging())if(_p!=NULL)q2output("Decimal text so far: '%s'.\n",string(_p));
 
 						// if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
 						if(isBigintegerZero(_remainderListelement->_biginteger)){
-							if(amVerbose())outputMessage(M_INFO_PREFIX,"%s","Remainder is zero, so the decimal is finished.");
+							if(amVerbose())q2outputMessage(M_INFO_PREFIX,"%s","Remainder is zero, so the decimal is finished.");
 							break;
 						}
 					}
@@ -747,7 +747,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 	if(_decimalText!=NULL){
 		_decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating,mpd_context),owner);
 		if(_decimal==NULL)
-			outputMessage(M_ERROR_PREFIX,"Failed to parse decimal text '%s' of the corresponding rational",string(_decimalText));
+			q2outputMessage(M_ERROR_PREFIX,"Failed to parse decimal text '%s' of the corresponding rational",string(_decimalText));
 		else 
 		if(amVerboseDebugging())
 			q2outputDecimal("Decimal of rational: '",_decimal,"'.\n");
@@ -777,7 +777,7 @@ void report_mpd_status(uint32_t mpd_status){
 		if(mpd_status&MPD_Underflow)output(" Underflow error");
 		output("\n");
 	}else
-		outputInfo("No decimal context status.");
+		q2outputInfo("No decimal context status.");
 }
 
 /**
@@ -836,9 +836,9 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
 					mpd_contexts[mpd_context_count++]=mpd_context;
 					if(amVerbose())output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
 				}else
-					outputMessage(M_ERROR_PREFIX,"Failed to return a decimal context with precision %u.",decimalprecision);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to return a decimal context with precision %u.",decimalprecision);
 			}else
-				outputError("Failed to create a new decimal context");
+				q2outputError("Failed to create a new decimal context");
 		}
 		////Mdecimalraphandler=MMdecimalraphandler;
 	}
@@ -865,14 +865,14 @@ mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){ // MDH@20MAY2020:
 		if(_mpd!=NULL){
 			mpd_set_i64(_mpd,value,mpd_context);
 			if(_mpd->len==0){
-				outputMessage(M_ERROR_PREFIX,"Failed to create decimal with value " PRId64 ".",value);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to create decimal with value " PRId64 ".",value);
 				free_mpd(_mpd);
 				_mpd=NULL;
 			}
 		}else
-			outputError("Failed to create a decimal data instance");
+			q2outputError("Failed to create a decimal data instance");
 	}else
-		outputError("No context to store the decimal data in");
+		q2outputError("No context to store the decimal data in");
 	 /////////q2outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
 	return _mpd;
 }/* VALIDATED */
@@ -912,7 +912,7 @@ Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){
 void free_decimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
 	if(_decimal==NULL)return;
 	if(amVerboseDebugging())output("Freeing decimal.\n");
-	if(_decimal->mpd!=NULL){free_mpd(_decimal->mpd);_decimal->mpd=NULL;}//////else if(verbose)outputError("No data in decimal to free");
+	if(_decimal->mpd!=NULL){free_mpd(_decimal->mpd);_decimal->mpd=NULL;}//////else if(verbose)q2outputError("No data in decimal to free");
 	FREE_1(_decimal,'D'/*,owner_decimal*/);
 }/* VALIDATED */
 
@@ -948,9 +948,9 @@ Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t rep
 				_decimal=NULL;
 			}
 		}else
-			outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
+			q2outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
 	}else
-		outputError("No context to create decimal in");
+		q2outputError("No context to create decimal in");
 	return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
 
@@ -996,7 +996,7 @@ Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 			if(_decimal==NULL)return NULL;
 			uint32_t status=0;mpd_qadd(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){FREE_DECIMAL(_decimal,owner);_decimal=NULL;outputError("Failed to compute the sum of two decimals");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_decimal,owner);_decimal=NULL;q2outputError("Failed to compute the sum of two decimals");}
 		}
 	}
 	return disowned_decimal(_decimal,owner);
@@ -1023,9 +1023,9 @@ Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){Ma
 					_decimal=owned_decimal(_getRationalDecimal(_r,mpd_context),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
-					outputError("Failed to compute the sum of two rational decimals");
+					q2outputError("Failed to compute the sum of two rational decimals");
 			}else
-				outputError("Failed to convert a decimal to a rational");
+				q2outputError("Failed to convert a decimal to a rational");
 			FREE_RATIONAL(_r1,owner);
 			FREE_RATIONAL(_r2,owner);
 		}else // pure decimals
@@ -1055,7 +1055,7 @@ Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 			if(_decimal==NULL)return NULL;
 			uint32_t status=0;mpd_qsub(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){FREE_DECIMAL(_decimal,owner);outputError("Failed to compute the difference of two decimals");return NULL;}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_decimal,owner);q2outputError("Failed to compute the difference of two decimals");return NULL;}
 		}
 	}
 	return disowned_decimal(_decimal,owner);
@@ -1081,9 +1081,9 @@ Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const
 					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
-					outputError("Failed to compute the difference of two rationalized decimals");
+					q2outputError("Failed to compute the difference of two rationalized decimals");
 			}else
-				outputError("Failed to convert a decimal to a rational");
+				q2outputError("Failed to convert a decimal to a rational");
 			FREE_RATIONAL(_r1,owner);
 			FREE_RATIONAL(_r2,owner);
 		}else // pure decimals
@@ -1115,7 +1115,7 @@ Mdecimal* _ddiv(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 			// on failure free the decimal
 			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_decimal,owner);
-				outputError("Failed to compute the quotient of two decimals");
+				q2outputError("Failed to compute the quotient of two decimals");
 				return NULL;
 			}
 		}
@@ -1139,9 +1139,9 @@ Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d
 					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
-					outputError("Failed to compute the quotient of two rationals");
+					q2outputError("Failed to compute the quotient of two rationals");
 			}else
-				outputError("Failed to convert a decimal to a rational");
+				q2outputError("Failed to convert a decimal to a rational");
 			FREE_RATIONAL(_r1,owner);
 			FREE_RATIONAL(_r2,owner);
 		}else // pure decimals
@@ -1173,7 +1173,7 @@ Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 			// on failure free the decimal
 			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_decimal,owner);
-				outputError("Failed to compute the product of two decimals");
+				q2outputError("Failed to compute the product of two decimals");
 				return NULL;
 			}
 		}
@@ -1201,9 +1201,9 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
 					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
-					outputError("Failed to compute the product of two rational decimals");
+					q2outputError("Failed to compute the product of two rational decimals");
 			}else
-				outputError("Failed to convert a decimal to a rational");
+				q2outputError("Failed to convert a decimal to a rational");
 			FREE_RATIONAL(_r1,owner);
 			FREE_RATIONAL(_r2,owner);
 		}else // pure decimals
@@ -1232,14 +1232,14 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating,mpd_
 			mpd_qset_string(_textDecimal->mpd,decimalText,mpd_context_to_use,&status); // NOTE here we have to pass in the default decimal context
 			if((status&0xEFBF)!=0){
 				FREE_DECIMAL(_textDecimal,owner);
-				outputMessage(M_ERROR_PREFIX,"Failed to parse decimal '%s' (error status: %" PRIu32 ").",decimalText,status);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to parse decimal '%s' (error status: %" PRIu32 ").",decimalText,status);
 				return NULL;
 			} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
 		}else
-			outputError("Failed to create a decimal");
-		////////////if(!_textDecimal)outputMessage(M_ERROR_PREFIX,"Failed to create a decimal from '%s'.",decimalText);
+			q2outputError("Failed to create a decimal");
+		////////////if(!_textDecimal)q2outputMessage(M_ERROR_PREFIX,"Failed to create a decimal from '%s'.",decimalText);
 	}else
-		outputError("No decimal text to parse");
+		q2outputError("No decimal text to parse");
 	return disowned_decimal(_textDecimal,owner);
 }/* VALIDATED */
 
@@ -1261,7 +1261,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 	mpd_context_t* mpd_context=decimalcontext->mpd_context;
 
 	mpd_ssize_t decimalprecision=(mpd_context!=NULL?mpd_context->prec:0);
-	if(decimalprecision<=0){outputError("Cannot approximate pi: no decimal context available");return NULL;}
+	if(decimalprecision<=0){q2outputError("Cannot approximate pi: no decimal context available");return NULL;}
 
 	//output("Decimal precision: %lld.\n",decimalprecision);
 
@@ -1288,7 +1288,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 		clock_t now=0,then=(!amVerbose()?clock():-1); // if not running verbose, show number of iterations executed per second
 		// DONE:TODO don't do this because you do need to free whatever was allocated!!!
 		if(lasts!=NULL&&t!=NULL&&s!=NULL&&n!=NULL&&na!=NULL&&d!=NULL&&da!=NULL&&d8!=NULL&&d32!=NULL){
-			if(amVerbose())outputInfo("\tInitial helper decimals created!");
+			if(amVerbose())q2outputInfo("\tInitial helper decimals created!");
 			unsigned long long iter=0;
 			if(amVerbose()){
 				output("\tIteration %u:",iter);
@@ -1314,7 +1314,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 			long long iterthen=iter,seconds=0; // report every second
 			int cmp;
 			mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
-			outputInfo("In the approximation two additional decimal digits will be computed after which rounding will be applied cutting off the two extra decimals.");
+			q2outputInfo("In the approximation two additional decimal digits will be computed after which rounding will be applied cutting off the two extra decimals.");
 			if(then>=0)output("Iterations per second (abort by pressing any key):");
 			bool interrupted=false;
 			while(!mpd_error(mpd_context)){
@@ -1328,7 +1328,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 							then=now;
 							seconds++;
 							output(" %lld",iter-iterthen);
-							if(kbhit()>0){interrupted=true;newline();outputError("Not all decimals of pi reported guaranteed to be correct, as its computation was interrupted by the user!");break;} // MDH@11NOV2019: allow breaking
+							if(kbhit()>0){interrupted=true;newline();q2outputError("Not all decimals of pi reported guaranteed to be correct, as its computation was interrupted by the user!");break;} // MDH@11NOV2019: allow breaking
 							iterthen=iter;
 						}/*else outputChar('.');*/
 					}
@@ -1374,7 +1374,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 				//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
 				if(!cmp){if(amVerbose())output("\tDone!\n");break;}
 				//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
-				if(cmp==INT_MAX){outputError("Something went wrong!");break;}
+				if(cmp==INT_MAX){q2outputError("Something went wrong!");break;}
 				//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
 				mpd_copy(lasts,s,mpd_context); // lasts = s
 				//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
@@ -1414,7 +1414,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 			uint32_t status=0;
 			mpd_qfinalize(s,mpd_context,&status);
 			if((status&0xEFBF)!=0){
-				outputError("Failed to finalize pi");
+				q2outputError("Failed to finalize pi");
 			}else
 			if(!interrupted){
 				// if(then>=0)if(!interrupted){outputChar('.');newline();}
@@ -1450,12 +1450,12 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 			}
 			// MDH@11NOV2019: if we actually failed to store pi (when it was computed uninterrupted to start with!)
 			if(decimalcontext->pi==NULL)
-				outputError("Failed to store the decimal approximation of pi in the decimal context");
+				q2outputError("Failed to store the decimal approximation of pi in the decimal context");
 			else
-				outputInfo("The decimal approximation of pi was stored in the decimal context.");
+				q2outputInfo("The decimal approximation of pi was stored in the decimal context.");
 			// TODO should I mpd_finalize the pi values stored? or for now leave them unrounded?????????
 		}else
-			outputError("Failed to create all helper decimals");
+			q2outputError("Failed to create all helper decimals");
 
 		// get rid of all the decimals we used
 #ifdef __ADEBUG__
@@ -1495,7 +1495,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 
 	}else{ // decimalcontext->pi exists
 
-		if(amVerbose())outputInfo("NOTE: Returning the decimal approximation of pi stored in the decimal context.");
+		if(amVerbose())q2outputInfo("NOTE: Returning the decimal approximation of pi stored in the decimal context.");
 		// a copy to return
 		_decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,decimalcontext->pi),decimalprecision,0,true),owner);
 
@@ -1530,11 +1530,11 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 			mpd_t *_0=__mpd(mpd_context,0),*_1=__mpd(mpd_context,1),*_predefined=__mpd(mpd_context,0),*_rotationsine=__mpd(mpd_context,0),*_rotationcosine=__mpd(mpd_context,0),*_t1=__mpd(mpd_context,0),*_t2=__mpd(mpd_context,0),*_t3=__mpd(mpd_context,0),*_t4=__mpd(mpd_context,0);
 			decimalcontext->predefinedsinedeltaangle=__mpd(mpd_context,0);
 			if(decimalcontext->predefinedsinedeltaangle&&_0!=NULL&&_1!=NULL&&_predefined!=NULL&&_rotationsine!=NULL&&_rotationcosine!=NULL&&_t1!=NULL&&_t2!=NULL&&_t3!=NULL&&_t4!=NULL){
-				if(_intermediateResult)outputInfo("Precomputing 257 equidistant sines in [0,pi/2].");
+				if(_intermediateResult)q2outputInfo("Precomputing 257 equidistant sines in [0,pi/2].");
 				for(int index=256;index>=0;index--)decimalcontext->predefinedsines[index]=__mpd(mpd_context,0); // create all 257 predefined sines instances...
 				// initialize the first and last sine
 				mpd_qcopy(decimalcontext->predefinedsines[256],_1,&status);mpd_qcopy(decimalcontext->predefinedsines[0],_0,&status);
-				if(_intermediateResult)outputInfo("Predefined sine of 0 and pi/2 radians set.");
+				if(_intermediateResult)q2outputInfo("Predefined sine of 0 and pi/2 radians set.");
 				// now we can half index and use the predefined sine and cosine to compute the new sine and cosine
 				int16_t index=256;
 				// store pi/512 or (pi/2)/256 in the predefinedsinedeltaangle!!!
@@ -1552,7 +1552,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 					mpd_qsqrt(decimalcontext->predefinedsines[index],_predefined,mpd_context,&status); // take the square root of the square of the sine (thus the sine) and store it in the table
 					if(_intermediateResult)
 					{
-						q2outputandcollect("Constituent predefined sine #%" PRIu16 ":",index);
+						q2output("Constituent predefined sine #%" PRIu16 ":",index);
 						_intermediateResult->mpd=decimalcontext->predefinedsines[index]
 						;q2outputDecimal(" ",_intermediateResult,".\n");
 					}
@@ -1562,19 +1562,19 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 						mpd_qsqrt(decimalcontext->predefinedsines[256-index],_predefined,mpd_context,&status); // take the square root of the square of the cosine (thus the cosine) and store it in the table
 						if(_intermediateResult)
 						{
-							q2outputandcollect("Constituent predefined sine #%" PRIu16 ":",256-index);
+							q2output("Constituent predefined sine #%" PRIu16 ":",256-index);
 							_intermediateResult->mpd=decimalcontext->predefinedsines[256-index];
 							q2outputDecimal(" ",_intermediateResult,".\n");}
 					}
 				}
-				if(_intermediateResult!=NULL)outputInfo("Constituent predefined sines computed!");
+				if(_intermediateResult!=NULL)q2outputInfo("Constituent predefined sines computed!");
 				// now we know all the initial predefined sines and cosines that we may now use to compute all sines in between
 				uint16_t rotationindex,inbetweenindex=128,skipindex=64;
 				// from 127 through 3 that's all we need to do
 				while(--inbetweenindex>2){
 					if(inbetweenindex==skipindex){skipindex>>=1;continue;} // skip 64, 32, 16, 8 and 4
 					if(_intermediateResult!=NULL)
-						q2outputandcollect("Computing predefined sine #%" PRIu16 " using rotation of applicable constituent predefined sines.\n",inbetweenindex);
+						q2output("Computing predefined sine #%" PRIu16 " using rotation of applicable constituent predefined sines.\n",inbetweenindex);
 					// wait a minute, we know that the bit that corresponds with skipindex is set, so we can initialize the rotation to these angles
 					mpd_qcopy(_rotationsine,decimalcontext->predefinedsines[skipindex],&status);
 					mpd_qcopy(_rotationcosine,decimalcontext->predefinedsines[256-skipindex],&status);
@@ -1596,7 +1596,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 					mpd_qcopy(decimalcontext->predefinedsines[256-inbetweenindex],_rotationcosine,&status);
 				}
 				if(_intermediateResult!=NULL){
-					outputInfo("Predefined sines:");
+					q2outputInfo("Predefined sines:");
 					for(int index=0;index<=256;index++){
 						output("#%d",index);
 						_intermediateResult->mpd=decimalcontext->predefinedsines[index];
@@ -1639,17 +1639,17 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 				while((status&0xEFBF)==0){
 					Msincoselement* _sincoselement=(Msincoselement*)calloc(1,sizeof(Msincoselement));
 					if(_sincoselement==NULL)
-					{outputError("Failed to create the object to store the sine and cosine of a predefined angle");break;} // too bad
+					{q2outputError("Failed to create the object to store the sine and cosine of a predefined angle");break;} // too bad
 					mpd_t *_angle=__mpd(mpd_context,0);
 					if(_angle==NULL)break; // too bad as well
 					mpd_qmul_u32(_angle,_pidiv12,mult,mpd_context,&status);
 					if((status&0xEFBF)!=0)
-					{free_mpd(_angle);outputError("Failed to initialize the angle of a predefined sine and cosine");break;}
+					{free_mpd(_angle);q2outputError("Failed to initialize the angle of a predefined sine and cosine");break;}
 					// we've got all values so nothing can go wrong
 					_sincoselement->_angle=_angle; // store the angle
 					_sincoselement->mult=mult;
 					if(_intermediateResult!=NULL){
-						q2outputandcollect("Sine and cosine of predefined angle #%" PRIu32,_sincoselement->mult);
+						q2output("Sine and cosine of predefined angle #%" PRIu32,_sincoselement->mult);
 						_intermediateResult->mpd=_sincoselement->_angle;
 						q2outputDecimal(" (",_intermediateResult,"):");
 					}
@@ -1673,7 +1673,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 					mult++;
 					if(mult==7)break;
 				}
-				if(mult<7)outputMessage(M_ERROR_PREFIX,"Failed to create %u out of 7 predefined (co)sines.",6-mult);
+				if(mult<7)q2outputMessage(M_ERROR_PREFIX,"Failed to create %u out of 7 predefined (co)sines.",6-mult);
 				free_mpd(_sqrt2div2);free_mpd(_sqrt3div2);
 				// how about computing the CORDIC sines and cosines?????????
 				uint32_t iteration=0;
@@ -1684,7 +1684,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 				while((status&0xEFBF)==0){
 					iteration++;
 					if(iteration==mpd_context->prec*10){
-						outputInfo("Computation of CORDIC angles stopped when exceeding the maximum number of iterations.");
+						q2outputInfo("Computation of CORDIC angles stopped when exceeding the maximum number of iterations.");
 						break;
 					}
 					mpd_qdiv_u32(_cordicangle,_cordicangle,2,mpd_context,&status); // divide the angle by 2
@@ -1728,7 +1728,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 					// done if the CORDIC tangens equals zero!!!!
 					if(mpd_iszero(_cordictangent))break;
 					Msincoselement* _cordicElement=calloc(1,sizeof(Msincoselement));
-					if(_cordicElement==NULL){outputError("Failed to create a CORDIC element.");break;}
+					if(_cordicElement==NULL){q2outputError("Failed to create a CORDIC element.");break;}
 					_cordicElement->_angle=get_mpd_copy(mpd_context,_cordicangle);
 					_cordicElement->_cosine=get_mpd_copy(mpd_context,_cordiccosine);
 					_cordicElement->_sine=get_mpd_copy(mpd_context,_cordicsine);
@@ -1744,20 +1744,20 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 			}
 			if((status&0xEFBF)!=0){
 				if(status!=0xFFFFFFFF){
-					outputError("Failed to store predefined (co)sines in the decimal context");
+					q2outputError("Failed to store predefined (co)sines in the decimal context");
 					report_mpd_status(status);
 				}else
-					outputError("Failed to make preparations for storing predefined sine/cosines in the decimal context!");
+					q2outputError("Failed to make preparations for storing predefined sine/cosines in the decimal context!");
 			}
 
-			outputMessage(M_INFO_PREFIX,"It took %lld ms to compute the sine and cosine of 256 predefined angles.\n",(clock()-then)/M_CLOCKS_PER_MS);
+			q2outputMessage(M_INFO_PREFIX,"It took %lld ms to compute the sine and cosine of 256 predefined angles.\n",(clock()-then)/M_CLOCKS_PER_MS);
 
 		}
 	}
 	return disowned_decimal(_decimal,owner); // freeonfailure=true means if we do not manage to wrap _pi in a decimal free it
 
 	/* replacing:
-	if(!mpd_context){if(decimalprecision>0)outputError("Failed to obtain the requested decimal context");else outputError("No (default) decimal context available");return NULL;}
+	if(!mpd_context){if(decimalprecision>0)q2outputError("Failed to obtain the requested decimal context");else q2outputError("No (default) decimal context available");return NULL;}
 	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
 	*/
 
@@ -1863,7 +1863,7 @@ mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const 
 			}
 		}else{
 			status=0xFFFFFFFF;
-			outputError("Failed to create helper decimals in computing the sine of a decimal");
+			q2outputError("Failed to create helper decimals in computing the sine of a decimal");
 		}
 		/* NO CONVERSION TO THE COSINE SQUARED AND SQUARE ROOTING
 		if((status&0xEFBF)==0){ // so far, so good
@@ -1882,10 +1882,10 @@ mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const 
 		// return the precision so we can return a rounded result (TODO should we do that??????)
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2 as soon as all computations are done
 		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);
-		else outputMessage(M_ERROR_PREFIX,"No %ssine result to finalize.",(sin?"":"co"));
+		else q2outputMessage(M_ERROR_PREFIX,"No %ssine result to finalize.",(sin?"":"co"));
 		*/
 		if((status&0xEFBF)!=0){
-			outputError("Some error trying to compute the sine of a decimal");
+			q2outputError("Some error trying to compute the sine of a decimal");
 			free_mpd(_sinsquared);_sinsquared=NULL;
 		}else
 		if(_intermediateResult!=NULL){
@@ -1897,7 +1897,7 @@ mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const 
 			FREE_DECIMAL(_intermediateResult,owner);
 		} // free verbose intermediate result decimal
 	}
-	////////if(!_sinsquared)outputError("Sine result vanished!");
+	////////if(!_sinsquared)q2outputError("Sine result vanished!");
 	return _sinsquared;
 }
 
@@ -1916,7 +1916,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd
 		if(amVerbose()){
 			Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true),owner);
 			if(_decimal!=NULL){
-				q2outputandcollect("Computing the square of the %s",(sin?"sine":"cosine"));
+				q2output("Computing the square of the %s",(sin?"sine":"cosine"));
 				q2outputDecimal(" of '",_decimal,"'.\n");
 				FREE_DECIMAL(_decimal,owner);
 			}
@@ -1982,7 +1982,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd
 					mpd_qcopy(_intermediateResult->mpd,_term,&status);
 					q2outputDecimal(" increment: '",_intermediateResult,"' -> ");
 					mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);
-					q2outputandcollect("%s",(sin?"Sine":"One minus cosine")); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
+					q2output("%s",(sin?"Sine":"One minus cosine")); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
 					q2outputDecimal(" squared '",_intermediateResult,"'.\n");
 				}
 
@@ -1998,7 +1998,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd
 			}
 		}else{
 			status=0xFFFFFFFF;
-			outputError("Failed to create helper decimals in computing the sine of a decimal");
+			q2outputError("Failed to create helper decimals in computing the sine of a decimal");
 		}
 		if((status&0xEFBF)==0){ // so far, so good
 			// if we need to return the cosine, compute 1 - 
@@ -2016,9 +2016,9 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd
 		// return the precision so we can return a rounded result (TODO should we do that??????)
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2 as soon as all computations are done
 		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);
-		else outputMessage(M_ERROR_PREFIX,"No %ssine result to finalize",(sin?"":"co"));
+		else q2outputMessage(M_ERROR_PREFIX,"No %ssine result to finalize",(sin?"":"co"));
 		if((status&0xEFBF)!=0){
-			outputMessage(M_ERROR_PREFIX,"Some error trying to compute the %ssine of a decimal.",(sin?"":"co"));
+			q2outputMessage(M_ERROR_PREFIX,"Some error trying to compute the %ssine of a decimal.",(sin?"":"co"));
 			free_mpd(_sinsquared);_sinsquared=NULL;
 		}else
 		if(_intermediateResult!=NULL){
@@ -2030,7 +2030,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd
 			FREE_DECIMAL(_intermediateResult,owner); // free verbose intermediate result decimal
 		}
 	}
-	////////if(!_sinsquared)outputError("Sine result vanished!");
+	////////if(!_sinsquared)q2outputError("Sine result vanished!");
 	return _sinsquared;
 }
 /* replacing (one term at a time):
@@ -2038,7 +2038,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool si
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinorcossquared=NULL;
 	if(mpd_context&&x){
-		if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){q2outputandcollect("Computing the square of the %s",(sin?"sine":"cosine"));q2outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}}
+		if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){q2output("Computing the square of the %s",(sin?"sine":"cosine"));q2outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}}
 		uint32_t status=0;
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
 		Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
@@ -2072,7 +2072,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool si
 					mpd_qcopy(_intermediateResult->mpd,_term,&status);
 					q2outputDecimal(" increment: '",_intermediateResult,"' -> ");
 					mpd_qcopy(_intermediateResult->mpd,_sinorcossquared,&status);
-					q2outputandcollect("%s",(sin?"Sine":"One minus cosine")); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
+					q2output("%s",(sin?"Sine":"One minus cosine")); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
 					q2outputDecimal(" squared '",_intermediateResult,"'.\n");
 				}
 				// updating the denominator (started as 2)
@@ -2083,7 +2083,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool si
 			}
 		}else{
 			status=0xFFFFFFFF;
-			outputError("Failed to create helper decimals in computing the sine of a decimal");
+			q2outputError("Failed to create helper decimals in computing the sine of a decimal");
 		}
 		if((status&0xEFBF)==0){ // so far, so good
 			// if we need to return the cosine, compute 1 - 
@@ -2204,7 +2204,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 							mpd_qadd(_newsine,_mpd_sinandcos->sin,_term,mpd_context,&status);
 						if(_intermediateSine!=NULL){
 							mpd_qcopy(_intermediateSine->mpd,_term,&status);
-							q2outputandcollect(" Sine: %s ",(negate?"minus":"plus"));
+							q2output(" Sine: %s ",(negate?"minus":"plus"));
 							q2outputDecimal("'",_intermediateSine,"' -> ");
 							mpd_qcopy(_intermediateSine->mpd,_newsine,&status);
 							q2outputDecimal("'",_intermediateSine,"'");
@@ -2223,7 +2223,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 					if(_intermediateCosine!=NULL)FREE_DECIMAL(_intermediateCosine,owner);
 				}else{
 					status=1;
-					outputError("Failed to create the internal helper decimals in computing the sine and cosine of a decimal");
+					q2outputError("Failed to create the internal helper decimals in computing the sine and cosine of a decimal");
 				}
 				free_mpd(_newsine);free_mpd(_newcosine);
 				free_mpd(_n);free_mpd(_num);free_mpd(_den);free_mpd(_term);
@@ -2251,7 +2251,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 							}
 						}
 					}else
-						outputError("Failed to correct the sine and cosine of a decimal");
+						q2outputError("Failed to correct the sine and cosine of a decimal");
 					// if we've got them, free them
 					free_mpd(_one);free_mpd(_sinesquared);free_mpd(_cosinesquared);
 					//	mpd_finalize(_mpd_sinandcos->sin,mpd_context);mpd_finalize(_mpd_sinandcos->cos,mpd_context);
@@ -2263,9 +2263,9 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 			}
 			FREE_MPD_SINCOS(_mpd_sinandcos,owner);
 		}else
-			outputError("Failed to initialize the object storing the sine and cosine of a decimal");
+			q2outputError("Failed to initialize the object storing the sine and cosine of a decimal");
 	}else
-		outputError("Failed to create the object to store the sine and cosine of a decimal in");
+		q2outputError("Failed to create the object to store the sine and cosine of a decimal in");
 	return NULL;
 }
 
@@ -2283,7 +2283,7 @@ mpd_t* _dsinorcos(mpd_context_t const * const mpd_context,mpd_t const * const x,
 		if(amVerbose()){
 			Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true),owner);
 			if(_decimal!=NULL){
-				q2outputandcollect("Computing the %s",(sin?"sine":"cosine"));
+				q2output("Computing the %s",(sin?"sine":"cosine"));
 				q2outputDecimal(" of '",_decimal,"'.\n");FREE_DECIMAL(_decimal,owner);
 			}
 		}
@@ -2333,7 +2333,7 @@ mpd_t* _dsinorcos(mpd_context_t const * const mpd_context,mpd_t const * const x,
 				}else{ // accuracy reached, but still some iterations left
 					mpd_qadd(_prodacc,_prevprodacc,_prod,mpd_context,&status);
 					if(_intermediateResult!=NULL){
-						q2outputandcollect("Iteration %llu: ",iterations);
+						q2output("Iteration %llu: ",iterations);
 						mpd_qcopy(_intermediateResult->mpd,_prodacc,&status);
 						q2outputDecimal("Incremental remainder: '",_intermediateResult,"'.\n");
 					}
@@ -2365,7 +2365,7 @@ mpd_t* _dsinorcos(mpd_context_t const * const mpd_context,mpd_t const * const x,
 				// and ready to 
 			}
 		}else
-			outputError("Failed to create helper decimals in computing the sine of a decimal");
+			q2outputError("Failed to create helper decimals in computing the sine of a decimal");
 		if(_intermediateResult!=NULL)FREE_DECIMAL(_intermediateResult,owner);
 		// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
 		if(!mpd_iszero(_prevprodacc)){
@@ -2488,26 +2488,26 @@ static mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext co
 							}
 						}else{
 							status=0xFFFFFFFF;
-							outputError("Failed to create the relative angle offset sine/cosine data element");
+							q2outputError("Failed to create the relative angle offset sine/cosine data element");
 						}
 					}else{
 						status=0xFFFFFFFF;
-						outputError("Failed to create the relative angle remainder.");
+						q2outputError("Failed to create the relative angle remainder.");
 					}
 				}else{
 					status=0xFFFFFFFF;
-					outputError("Predefined sines index invalid");
+					q2outputError("Predefined sines index invalid");
 				}
 				if((status&0xEFBF)!=0){FREE_MPD_RELATIVE_ANGLE(_relativeAngle,owner);_relativeAngle=NULL;}
 			}else 
-				outputError("Failed to create a relative angle offset and remainder.");
+				q2outputError("Failed to create a relative angle offset and remainder.");
 			free_mpd(_deltaAngle);free_mpd(_predefinedAngleIndex);
 		}else
-			outputError("Failed to create a relative angle.");
+			q2outputError("Failed to create a relative angle.");
 		if(_intermediateResult!=NULL){_intermediateResult->mpd=NULL;FREE_DECIMAL(_intermediateResult,owner);}
 		return disowned_mpd_relative_angle(_relativeAngle,owner);
 	}else
-		outputError("No angle, decimal context or decimal context predefined sines step angle defined.");
+		q2outputError("No angle, decimal context or decimal context predefined sines step angle defined.");
 	return NULL;
 }
 // preferable over:
@@ -2568,11 +2568,11 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext const * const decimalcon
 					}else
 						_relativeAngle->sincoselement=sincoselement;
 				}else
-					outputError("No predefined angles");
+					q2outputError("No predefined angles");
 			}else
-				outputError("Failed to initialize the relative angle");
+				q2outputError("Failed to initialize the relative angle");
 		}else
-			outputError("Failed to prepare for computing the relative angle");
+			q2outputError("Failed to prepare for computing the relative angle");
 		if(_intermediateResult!=NULL){_intermediateResult->mpd=NULL;FREE_DECIMAL(_intermediateResult,owner);}
 		free_mpd(_deltaAngle1);free_mpd(_deltaAngle2);
 	}
@@ -2677,8 +2677,8 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 					_absx=__mpd(mpd_context,0);
 					if(_absx!=NULL){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(_absx==NULL)
-					{outputError("Failed to negate the decimal to compute the CORDIC sine of");return NULL;}
-					if(amVerbose())outputInfo("Computing the CORDIC sine of a negative decimal.");
+					{q2outputError("Failed to negate the decimal to compute the CORDIC sine of");return NULL;}
+					if(amVerbose())q2outputInfo("Computing the CORDIC sine of a negative decimal.");
 				}
 				mpd_t* _CORDICsine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2698,10 +2698,10 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
 					if(amVerbose()){
 						q2outputDecimal("Quadrant of CORDIC sine argument '",x,"': ");
-						q2outputandcollect("%" PRIu32 ".\n",xquadrant);
+						q2output("%" PRIu32 ".\n",xquadrant);
 					}
 					if((status&0xEFBF)!=0){
-						outputError("Failed to compute the CORDIC sine of a decimal");
+						q2outputError("Failed to compute the CORDIC sine of a decimal");
 						report_mpd_status(status);
 					}else{
 						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
@@ -2728,7 +2728,7 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the CORDIC sine of a decimal");
+							q2outputError("Failed to compute the CORDIC sine of a decimal");
 							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
 							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
@@ -2737,10 +2737,10 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 							///*
 							if(_CORDICsine!=NULL){
 								if((_absx!=NULL)!=(xquadrant==2||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
-									if(amVerbose())outputInfo("Negating the computed CORDIC sine!");
+									if(amVerbose())q2outputInfo("Negating the computed CORDIC sine!");
 									mpd_set_negative(_CORDICsine); // negate the _sine
 								}else
-								if(amVerbose())outputInfo("Not negating the CORDIC sine!");
+								if(amVerbose())q2outputInfo("Not negating the CORDIC sine!");
 								if(amVerbose()){
 									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 									if(_decimal!=NULL){
@@ -2749,16 +2749,16 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
 										FREE_DECIMAL(_decimal,owner);
 									}else
-										outputError("Failed to create a decimal for showing the CORDIC sine");
+										q2outputError("Failed to create a decimal for showing the CORDIC sine");
 								}
 							}else
-								outputError("Failed to compute the CORDIC sine of the normalized decimal");
+								q2outputError("Failed to compute the CORDIC sine of the normalized decimal");
 						}
 						// free whatever we created...
 						if(_xsin!=NULL)free_mpd(_xsin);
 					}
 				}else
-					outputError("Failed to create helper decimals for computing the CORDIC sine of a decimal");
+					q2outputError("Failed to create helper decimals for computing the CORDIC sine of a decimal");
 				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx!=NULL)free_mpd(_absx);
 				if(_CORDICsine!=NULL){
@@ -2767,9 +2767,9 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 				}
 			}
 		}
-		outputError("No decimal context to compute the CORDIC sine of a decimal in");
+		q2outputError("No decimal context to compute the CORDIC sine of a decimal in");
 	}else
-		outputError("No decimal to compute the CORDIC sine of");
+		q2outputError("No decimal to compute the CORDIC sine of");
 	return NULL;
 }
 /**
@@ -2798,9 +2798,9 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 					_absx=__mpd(mpd_context,0);
 					if(_absx!=NULL){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(_absx==NULL)
-					{outputError("Failed to negate the decimal to compute the CORDIC cosine of");return NULL;}
+					{q2outputError("Failed to negate the decimal to compute the CORDIC cosine of");return NULL;}
 					if(amVerbose())
-						outputInfo("Computing the CORDIC cosine of a negative decimal.");
+						q2outputInfo("Computing the CORDIC cosine of a negative decimal.");
 				}
 				mpd_t* _CORDICcosine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2821,7 +2821,7 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 					if(amVerbose())
 						{q2outputDecimal("Quadrant of CORDIC cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
-						outputError("Failed to compute the CORDIC cosine of a decimal");
+						q2outputError("Failed to compute the CORDIC cosine of a decimal");
 						report_mpd_status(status);
 					}else{
 						bool cos=true; // whether to compute the sine or cosine (of the transformed angle)
@@ -2848,7 +2848,7 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the CORDIC cosine of a decimal");
+							q2outputError("Failed to compute the CORDIC cosine of a decimal");
 							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
 							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
@@ -2857,11 +2857,11 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 							///*
 							if(_CORDICcosine!=NULL){
 								if(xquadrant==1||xquadrant==2){
-									if(amVerbose())outputInfo("Negating the computed CORDIC cosine!");
+									if(amVerbose())q2outputInfo("Negating the computed CORDIC cosine!");
 									mpd_set_negative(_CORDICcosine); // negate the _sine
 								}else
 								if(amVerbose())
-									outputInfo("Not negating the CORDIC cosine!");
+									q2outputInfo("Not negating the CORDIC cosine!");
 								if(amVerbose()){
 									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 									if(_decimal!=NULL){
@@ -2870,16 +2870,16 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
 										FREE_DECIMAL(_decimal,owner);
 									}else
-										outputError("Failed to create a decimal for showing the CORDIC cosine");
+										q2outputError("Failed to create a decimal for showing the CORDIC cosine");
 								}
 							}else
-								outputError("Failed to compute the CORDIC cosine of the normalized decimal");
+								q2outputError("Failed to compute the CORDIC cosine of the normalized decimal");
 						}
 						// free whatever we created...
 						if(_xcos!=NULL)free_mpd(_xcos);
 					}
 				}else
-					outputError("Failed to create helper decimals for computing the CORDIC cosine of a decimal");
+					q2outputError("Failed to create helper decimals for computing the CORDIC cosine of a decimal");
 				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx!=NULL)free_mpd(_absx);
 				if(_CORDICcosine!=NULL){
@@ -2888,9 +2888,9 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 				}
 			}
 		}
-		outputError("No decimal context to compute the CORDIC cosine of a decimal in");
+		q2outputError("No decimal context to compute the CORDIC cosine of a decimal in");
 	}else
-		outputError("No decimal to compute the CORDIC cosine of");
+		q2outputError("No decimal to compute the CORDIC cosine of");
 	return NULL;
 }
 
@@ -2932,7 +2932,7 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 		if((status&0xEFBF)!=0)break;
 	}
 	free_mpd(_xcopy);
-	q2outputandcollect("CORDIC rotation flags after checking %" PRIu32 " CORDIC angles",count);
+	q2output("CORDIC rotation flags after checking %" PRIu32 " CORDIC angles",count);
 	q2outputBiginteger(": ",_applyRotationFlags,".\n");
 	// ok, rotation flags set, ready to perform the rotations based on the rotation flags if at least one is set
 	mpd_t *_t1=__mpd(mpd_context,0),*_t2=__mpd(mpd_context,0),*_t3=__mpd(mpd_context,0),*_t4=__mpd(mpd_context,0);
@@ -2995,9 +2995,9 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
 					if(_absx!=NULL){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
-					if(_absx==NULL){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
+					if(_absx==NULL){q2outputError("Failed to negate the decimal to compute the sine of");return NULL;}
 					if(amVerbose())
-						outputInfo("Computing the sine of a negative decimal.");
+						q2outputInfo("Computing the sine of a negative decimal.");
 				}
 				// the result is stored in _sine
 				mpd_t* _sine=NULL;
@@ -3021,7 +3021,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 					if(amVerbose())
 						q2outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
 					if((status&0xEFBF)!=0){
-						outputError("Failed to compute the quadrant of a decimal in computing its sine");
+						q2outputError("Failed to compute the quadrant of a decimal in computing its sine");
 						report_mpd_status(status);
 					}else{
 						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
@@ -3048,7 +3048,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the sine of the (normalized) decimal that lies outside the first quadrant");
+							q2outputError("Failed to compute the sine of the (normalized) decimal that lies outside the first quadrant");
 							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
 							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
@@ -3064,10 +3064,10 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
 										FREE_DECIMAL(_decimal,owner);
 									}else
-										outputError("Failed to create a decimal for showing the CORDIC sine");
+										q2outputError("Failed to create a decimal for showing the CORDIC sine");
 									free_mpd(_CORDICsine);
 								}else
-									outputError("Failed to compute the CORDIC sine!");
+									q2outputError("Failed to compute the CORDIC sine!");
 							}
 							/*
 							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x->mpd);
@@ -3085,7 +3085,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 										free_decimal(_decimal);
 									}else
 										outputChar('?');
-									outputInfo(".");
+									q2outputInfo(".");
 								}
 								// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
 								// which consists of two terms that need to be added or subtracted
@@ -3122,7 +3122,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 								free_mpd(_term1);free_mpd(_term2);
 								free_mpd_relative_angle(_relativeAngle);
 							}else
-								outputError("Failed to compute the relative angle");
+								q2outputError("Failed to compute the relative angle");
 							*/
 							// MDH@11SEP2019: the following is preferred because we have precomputed 257 equidistant angle sines between 0 and pi/2
 							// MDH@09NOV2022: the following is NOT included in _dcosine so I suggest to remove it here (unless we understand what it is used for)
@@ -3136,14 +3136,14 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 										if(_decimal!=NULL){
 											_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;
 											q2outputDecimal(NULL,_decimal,NULL);
-											q2outputandcollect("%c",_predefinedSinesRelativeAngle->negative?'-':'+');
+											q2output("%c",_predefinedSinesRelativeAngle->negative?'-':'+');
 											_decimal->mpd=_predefinedSinesRelativeAngle->_delta_angle;
 											q2outputDecimal(NULL,_decimal,NULL);
 											_decimal->mpd=NULL; // so it won't get freed by free_decimal()
 											FREE_DECIMAL(_decimal,owner);
 										}else
-											q2outputandcollect("%c",'?');
-										outputInfo(".");
+											q2output("%c",'?');
+										q2outputInfo(".");
 									//}
 									// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
 									// which consists of two terms that need to be added or subtracted
@@ -3190,7 +3190,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 									free_mpd(_term1);free_mpd(_term2);
 									FREE_MPD_RELATIVE_ANGLE(_predefinedSinesRelativeAngle,owner);
 								}else
-									outputError("Failed to compute the difference argument with predefined sines");
+									q2outputError("Failed to compute the difference argument with predefined sines");
 							}
 
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
@@ -3200,7 +3200,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 							if(_sine!=NULL)mpd_qfinalize(_sine,mpd_context,&status);else status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
 							// some extra work as we've received the sine squared
 							if((status&0xEFBF)!=0){
-								outputError("Failed to compute the sine from the sine square approximation");
+								q2outputError("Failed to compute the sine from the sine square approximation");
 								free_mpd(_sine);
 								_sine=NULL;
 							}
@@ -3221,27 +3221,27 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 							*/
 							if(_sine!=NULL){
 								if((_absx!=NULL)!=(xquadrant==2||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
-									if(amVerbose())outputInfo("Negating the computed sine!");
+									if(amVerbose())q2outputInfo("Negating the computed sine!");
 									mpd_set_negative(_sine); // negate the _sine
 								}else
 								if(amVerbose())
-									outputInfo("Not negating the sine!");
+									q2outputInfo("Not negating the sine!");
 							}else
-								outputError("Failed to compute the sine of the normalized decimal");
+								q2outputError("Failed to compute the sine of the normalized decimal");
 						}
 						// free whatever we created...
 						if(_xsin!=NULL)free_mpd(_xsin);
 					}
 				}else
-					outputError("Failed to create helper decimals for computing the sine of a decimal");
+					q2outputError("Failed to create helper decimals for computing the sine of a decimal");
 				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx!=NULL)free_mpd(_absx);
 				if(_sine!=NULL)return _getDecimal(_sine,mpd_context->prec,0,true); // TODO does it matter who disowns it?				
 			}
 		}else
-			outputError("No decimal context to compute the sine of a decimal");
+			q2outputError("No decimal context to compute the sine of a decimal");
 	}else
-		outputError("No decimal to compute the sine of");
+		q2outputError("No decimal to compute the sine of");
 	return NULL;
 }
 
@@ -3274,9 +3274,9 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 					if(_absx!=NULL){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0)
 					{free_mpd(_absx);_absx=NULL;}}
 					if(_absx==NULL)
-					{outputError("Failed to negate the decimal argument to the cosine function");return NULL;}
+					{q2outputError("Failed to negate the decimal argument to the cosine function");return NULL;}
 					if(amVerbose())
-						outputInfo("Computing the cosine of a negative decimal.");
+						q2outputInfo("Computing the cosine of a negative decimal.");
 				}
 				// _cosine is to store the result in
 				mpd_t* _cosine=NULL;
@@ -3297,7 +3297,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
 					if((status&0xEFBF)!=0){
-						outputError("Failed to compute the cosine of a decimal");
+						q2outputError("Failed to compute the cosine of a decimal");
 						report_mpd_status(status);
 					}else{
 						if(amVerbose())
@@ -3326,7 +3326,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the cosine of a (normalized) decimal that does not lie in the first quadrant.");
+							q2outputError("Failed to compute the cosine of a (normalized) decimal that does not lie in the first quadrant.");
 							report_mpd_status(status);
 						}else{
 							// MDH@09NOV2022 NOTE: computing the CORDIC cosine is optional (and only computed when verbose is true) [now also added to _dcosine]
@@ -3340,10 +3340,10 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
 										FREE_DECIMAL(_decimal,owner);
 									}else
-										outputError("Failed to create a decimal for showing the CORDIC cosine");
+										q2outputError("Failed to create a decimal for showing the CORDIC cosine");
 									free_mpd(_CORDICcosine);
 								}else
-									outputError("Failed to compute the CORDIC cosine!");
+									q2outputError("Failed to compute the CORDIC cosine!");
 							}
 
 							// TODO here we could use the predefined sine function values to compute the result (as we do in _dsine)
@@ -3358,13 +3358,13 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 									mpd_qsqrt(_cosine,_cosine,mpd_context,&status);
 								}else{
 									status=0xFFFFFFFF;
-									outputBug("Invalid squared sine computed."); // TODO do something better with bugs!!!
+									q2outputBug("Invalid squared sine computed."); // TODO do something better with bugs!!!
 								}
 							}
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // approximate with two additional digits
 							if(_cosine!=NULL)mpd_qfinalize(_cosine,mpd_context,&status); // round to the 'original' precision
 							if((status&0xEFBF)!=0){
-								outputError("Failed to compute the cosine from the sine square approximation");
+								q2outputError("Failed to compute the cosine from the sine square approximation");
 								free_mpd(_cosine);
 								_cosine=NULL;
 							}
@@ -3384,21 +3384,21 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 								// whether _absx is NULL or not doesn't matter as cos(-x)=cos(x)
 								if(xquadrant==1||xquadrant==2)mpd_set_negative(_cosine); // negate the _cosine in quadrant 1 and 2 (from pi/2 to 3*pi/2)
 							}else
-								outputError("Failed to compute the cosine of the normalized decimal");
+								q2outputError("Failed to compute the cosine of the normalized decimal");
 						}
 						// free whatever we created...
 						if(_xcos!=NULL)free_mpd(_xcos);
 					}
 				}else
-					outputError("Failed to create helper decimals for computing the cosine of a decimal");
+					q2outputError("Failed to create helper decimals for computing the cosine of a decimal");
 				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx!=NULL)free_mpd(_absx);
 				return(_cosine!=NULL?_getDecimal(_cosine,mpd_context->prec,0,true):NULL);				
 			}
 		}
-		outputError("No decimal context to compute the cosine of a decimal in");
+		q2outputError("No decimal context to compute the cosine of a decimal in");
 	}else
-		outputError("No decimal to compute the cosine of");
+		q2outputError("No decimal to compute the cosine of");
 	return NULL;
 }
 
@@ -3433,10 +3433,10 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 						if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}
 					}
 					if(NULL==_absx){
-						outputError("Failed to negate the decimal to compute the sine of");return NULL;
+						q2outputError("Failed to negate the decimal to compute the sine of");return NULL;
 					}
 					if(amVerbose())
-						outputInfo("Computing the sine of a negative decimal.");
+						q2outputInfo("Computing the sine of a negative decimal.");
 				}
 				mpd_t* _tan=NULL; // the end result
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -3457,7 +3457,7 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 					if(amVerbose())
 						q2outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
 					if((status&0xEFBF)!=0){
-						outputError("Failed to compute the sine of a decimal");
+						q2outputError("Failed to compute the sine of a decimal");
 						report_mpd_status(status);
 					}else{
 						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
@@ -3477,7 +3477,7 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 								status=0xFFFFFFFF;
 						}
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the sine of a decimal");
+							q2outputError("Failed to compute the sine of a decimal");
 							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
 
@@ -3496,9 +3496,9 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 									mpd_qsqrt(_tan,_sinsquared,mpd_context,&status);
 									free_mpd(_sinsquared);
 								}else
-									outputError("Failed to compute the squared-sine of a decimal.");
+									q2outputError("Failed to compute the squared-sine of a decimal.");
 							}else
-								outputError("Failed to create the decimal for storing the tangent.");
+								q2outputError("Failed to create the decimal for storing the tangent.");
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // reset precision (TODO not thread-safe if we would be running multiple versions using the same mpd_context!!!!)
 							if(_tan!=NULL){
 								if(amVerbose()){
@@ -3515,31 +3515,31 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 								status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
 							// some extra work as we've received the sine squared
 							if((status&0xEFBF)!=0)
-							{outputError("Failed to compute the tangent from the sine square approximation");free_mpd(_tan);_tan=NULL;}
+							{q2outputError("Failed to compute the tangent from the sine square approximation");free_mpd(_tan);_tan=NULL;}
 
 							if(_tan!=NULL){
 								if((_absx!=NULL)!=(xquadrant==1||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
-									if(amVerbose())outputInfo("Negating the computed tangent!");
+									if(amVerbose())q2outputInfo("Negating the computed tangent!");
 									mpd_set_negative(_tan); // negate the _sine
 								}else
 								if(amVerbose())
-									outputInfo("Not negating the tangent!");
+									q2outputInfo("Not negating the tangent!");
 							}else
-								outputError("Failed to compute the tangent of the normalized decimal");
+								q2outputError("Failed to compute the tangent of the normalized decimal");
 						}
 						// free whatever we created...
 						if(_xsin!=NULL)free_mpd(_xsin);
 					}
 				}else
-					outputError("Failed to create helper decimals for computing the tangent of a decimal");
+					q2outputError("Failed to create helper decimals for computing the tangent of a decimal");
 				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx!=NULL)free_mpd(_absx);
 				return(_tan!=NULL?_getDecimal(_tan,mpd_context->prec,0,true):NULL);				
 			}
 		}
-		outputError("No decimal context to compute the tangent of a decimal");
+		q2outputError("No decimal context to compute the tangent of a decimal");
 	}else
-		outputError("No decimal to compute the tangent of");
+		q2outputError("No decimal to compute the tangent of");
 	return NULL;
 }
 
@@ -3586,12 +3586,12 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 							mpd_qdiv(_add,_num,_den,mpd_context,&status);
 						}
 						if((status&0xEFBF)!=0){
-							outputError("Something went wrong in executing dexp()");
+							q2outputError("Something went wrong in executing dexp()");
 							free_mpd(_exp);
 							_exp=NULL;
 						}
 					}else
-						outputError("Failed to create all dexp() execution helper decimals");
+						q2outputError("Failed to create all dexp() execution helper decimals");
 					if(_intermediateResult!=NULL)FREE_DECIMAL(_intermediateResult,owner);
 					free_mpd(_prevexp);
 					free_mpd(_i);
@@ -3599,13 +3599,13 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 					free_mpd(_den);
 					free_mpd(_add);
 				}else
-					outputError("Failed to initialize the result of dexp()");
+					q2outputError("Failed to initialize the result of dexp()");
 			}else
-			if(amVerbose())outputInfo("Zero argument to exp() approximation.");
+			if(amVerbose())q2outputInfo("Zero argument to exp() approximation.");
 			if(_exp!=NULL)
 				return _getDecimal(_exp,mpd_context->prec,0,true);
 		}else
-			outputError("No decimal context available for use in dexp().");
+			q2outputError("No decimal context available for use in dexp().");
 	}
 	return NULL;
 }
@@ -3630,7 +3630,7 @@ Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){Mallocationowner ow
 					free_mpd(_mpd1);
 					if((status&0xEFBF)){
 						FREE_DECIMAL(_inverseDecimal,owner);
-						outputError("Failed to compute the reciprocal of a decimal");
+						q2outputError("Failed to compute the reciprocal of a decimal");
 						return NULL;
 					}
 				}
@@ -3713,7 +3713,7 @@ long long isDecimalOne(Mdecimal const * const decimal){
 		uint32_t status=0;
 		int cmpresult=mpd_qcmp(decimal->mpd,getDecimalOne(),&status);
 		if((status&0xEFBF)==0)result=(cmpresult==0?M_TRUE:M_FALSE);
-		else outputMessage(M_ERROR_PREFIX,"Failed to determine whether a decimal equals 1 (status: %" PRIu32 ").",status);
+		else q2outputMessage(M_ERROR_PREFIX,"Failed to determine whether a decimal equals 1 (status: %" PRIu32 ").",status);
 	}
 	return result;
 }/* VALIDATED */
@@ -3742,19 +3742,19 @@ long long decimal2long(Mdecimal const * const decimal){
  */
 void outputDecimalStatus(uint32_t status){
 	if(status>0){
-		outputInfo("Decimal computations error report.");
-		if(status&MPD_IEEE_Invalid_operation)outputInfo("\tIEEE Invalid operation error.");
-		if(status&MPD_Clamped)outputInfo("\tClamped error.");
-		if(status&MPD_Division_by_zero)outputInfo("\tDivision by zero error.");
-		if(status&MPD_Fpu_error)outputInfo("\tFPU error.");
-		if(status&MPD_Inexact)outputInfo("\tInexact error.");
-		if(status&MPD_Not_implemented)outputInfo("\tNot implemented error.");
-		if(status&MPD_Overflow)outputInfo("\tOverflow error.");
-		if(status&MPD_Rounded)outputInfo("\tRounding error.");
-		if(status&MPD_Subnormal)outputInfo("\tSubnormal error.");
-		if(status&MPD_Underflow)outputInfo("\tUnderflow error.");
+		q2outputInfo("Decimal computations error report.");
+		if(status&MPD_IEEE_Invalid_operation)q2outputInfo("\tIEEE Invalid operation error.");
+		if(status&MPD_Clamped)q2outputInfo("\tClamped error.");
+		if(status&MPD_Division_by_zero)q2outputInfo("\tDivision by zero error.");
+		if(status&MPD_Fpu_error)q2outputInfo("\tFPU error.");
+		if(status&MPD_Inexact)q2outputInfo("\tInexact error.");
+		if(status&MPD_Not_implemented)q2outputInfo("\tNot implemented error.");
+		if(status&MPD_Overflow)q2outputInfo("\tOverflow error.");
+		if(status&MPD_Rounded)q2outputInfo("\tRounding error.");
+		if(status&MPD_Subnormal)q2outputInfo("\tSubnormal error.");
+		if(status&MPD_Underflow)q2outputInfo("\tUnderflow error.");
 	}else
-		outputInfo("No decimal context errors.");
+		q2outputInfo("No decimal context errors.");
 }
 
 /**
@@ -3769,7 +3769,7 @@ Mdecimal* _getDecimalSqrt(Mdecimal const * const decimal){Mallocationowner owner
 		// TODO if decimal has a certain precision shouldn't the decimal context exist?????
 		Mdecimalcontext* decimalcontext=getDecimalcontext(decimal->prec);
 		if(NULL==decimalcontext){
-			outputMessage(M_WARNING_PREFIX,"Non-existing decimal context with precision %d.",decimal->prec);
+			q2outputMessage(M_WARNING_PREFIX,"Non-existing decimal context with precision %d.",decimal->prec);
 			decimalcontext=M_DECIMALCONTEXT;
 		}
 		Mdecimal* _result=owned_decimal(__decimal(decimalcontext->mpd_context,0,0),owner);
@@ -3778,7 +3778,7 @@ Mdecimal* _getDecimalSqrt(Mdecimal const * const decimal){Mallocationowner owner
 			mpd_qsqrt(_result->mpd,decimal->mpd,decimalcontext->mpd_context,&status);
 			if((status&0xEFBF)==0)return disowned_decimal(_result,owner);
 			FREE_DECIMAL(_result,owner); /////_result=NULL;
-			outputError("Failed to compute the square root of a decimal");
+			q2outputError("Failed to compute the square root of a decimal");
 			outputDecimalStatus(status);
 		}
 	}

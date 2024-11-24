@@ -76,7 +76,7 @@ bool pushMessageStream(FILE* stream,char const * const source,char const * const
 					_messageStreamStack=messageStream;
 				}else{
 					free(messageStream);messageStream=NULL;
-					outputMessage(M_ERROR_PREFIX,"Failed to register message stream '%s'.",source);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to register message stream '%s'.",source);
 				}
 			}
 		}
@@ -120,7 +120,7 @@ bool popAllMessageStreams(char const * const source){
 		while(messageStream!=NULL){
 			MessageStream* nextMessageStream=messageStream->next;
 			if(strcmp(messageStream->source,source)==0&&!removeMessageStream(messageStream)){
-				outputMessage(M_ERROR_PREFIX,"Failed to remove a message stream of source '%s'.",source);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to remove a message stream of source '%s'.",source);
 				break;
 			}
 			messageStream=nextMessageStream;
@@ -297,12 +297,12 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			messageNode->message=calloc(1,sizeof(Message));
 			if(NULL==messageNode->message){
 				free(messageNode);
-				outputError("Failed to allocate message");
+				q2outputError("Failed to allocate message");
 				return false;
 			}
 			messageNode->message->msg=strdup(messageText);
 			if(NULL==messageNode->message->msg){
-				outputError("Failed to store message");
+				q2outputError("Failed to store message");
 				free(messageNode->message);
 				free(messageNode);
 				return false;
@@ -320,7 +320,7 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 			return true;
 		}
 	}else
-		outputError("Failed to register a message");
+		q2outputError("Failed to register a message");
 	return false;
 }
 // end message type lists helper functions
@@ -382,7 +382,7 @@ Messages* _getMessages(){
 									&&(firstMessageTypeIndex<0
 										||messageTypeNodes[messageTypeIndex]->message->index<messageTypeNodes[firstMessageTypeIndex]->message->index))
 								firstMessageTypeIndex=messageTypeIndex;
-						if(firstMessageTypeIndex<0){outputBug("No messages left!");break;} // should not happen!!
+						if(firstMessageTypeIndex<0){q2outputBug("No messages left!");break;} // should not happen!!
 						// register the message at firstMessageTypeIndex as the next one
 						messages->messages[collectedMessageIndex]=messageTypeNodes[firstMessageTypeIndex]->message;
 						messages->types[collectedMessageIndex]=messageTypes[firstMessageTypeIndex];
@@ -397,7 +397,7 @@ Messages* _getMessages(){
 				}else{
 					if(messages->types!=NULL)free(messages->types);
 					if(messages->messages!=NULL)free(messages->messages);
-					outputError("No memory for messages");
+					q2outputError("No memory for messages");
 				}
 				//////free(messageTypeNodes);			
 			}else{
@@ -446,7 +446,7 @@ static void outputMessageCounts(MessageCounts const * const messageCounts){
 				,messageCounts->messagecounts[messageCountIndex].messageType,messageCounts->messagecounts[messageCountIndex].count);
 		}
 	}else
-		outputError("No message counts defined to output!");
+		q2outputError("No message counts defined to output!");
 }
 /**
  * @brief frees \p message
@@ -598,7 +598,7 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 								&&(firstMessageTypeIndex<0
 									||messageTypeNodes[messageTypeIndex]->message->index<messageTypeNodes[firstMessageTypeIndex]->message->index))
 							firstMessageTypeIndex=messageTypeIndex;
-					if(firstMessageTypeIndex<0){outputBug("No messages left!");break;} // should not happen!!
+					if(firstMessageTypeIndex<0){q2outputBug("No messages left!");break;} // should not happen!!
 					// register the message at firstMessageTypeIndex as the next one
 					_messages->messages[collectedMessageIndex]=messageTypeNodes[firstMessageTypeIndex]->message;
 					_messages->types[collectedMessageIndex]=messageTypes[firstMessageTypeIndex];
@@ -643,7 +643,7 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 			///output("Messages retrieved.\n");
 			return _messages;
 		}
-		outputError("Failed to allocate memory to store messages");
+		q2outputError("Failed to allocate memory to store messages");
 		freeMessages(_messages);
 	}
 	return NULL;
@@ -701,7 +701,7 @@ Messages* _getMessagesOfType(char const * const messageTypePrefix){
 				///output("Messages retrieved.\n");
 				return messages;
 			}
-			outputError("Failed to allocate memory to store messages");
+			q2outputError("Failed to allocate memory to store messages");
 		}
 		free_messages(messages);
 	}
@@ -743,7 +743,7 @@ static void removeFilteredFromMessageTypeListNode(MessageTypeListNode * const me
 		messageTypeListNode->firstMessageNode=NULL;
 		messageTypeListNode->lastMessageNode=NULL;
 	}else
-		outputMessage(M_ERROR_PREFIX,"Not all messages of type '%s' removed!",messageTypeListNode->messageType);
+		q2outputMessage(M_ERROR_PREFIX,"Not all messages of type '%s' removed!",messageTypeListNode->messageType);
 		*/
 }
 /**
@@ -771,9 +771,9 @@ long long removeMessages(MessageCounts const * const messageCounts){
 			messageTypeListNode=messageTypeListNode->next;
 		}
 		if(unremovedMessageCount>0)
-			outputMessage(M_ERROR_PREFIX,"Failed to remove %zu messages.",unremovedMessageCount);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to remove %zu messages.",unremovedMessageCount);
 	}else
-		outputMessage(M_INFO_PREFIX,"No messages to remove!");
+		q2outputMessage(M_INFO_PREFIX,"No messages to remove!");
 	return unremovedMessageCount;
 }
 
@@ -850,6 +850,7 @@ static void registerBug(){
 		outputSystemError("Failed to register a bug!");
 }
 static void registerResult(){
+	///output("Registering result!");
 	if(!addMessageOfType(outputText+resultPrefixLength,M_RESULT_PREFIX))
 		outputSystemError("Failed to register a result!");
 }
@@ -866,7 +867,7 @@ static void registerMessage(){
 static void collectLine(char* newlinePosition,bool echoToOutput){
 	assert(newlinePosition);
 	*newlinePosition='\0';
-	////////output("Collecting line '%s'.\n",outputText);
+	///output("Collecting line '%s'.\n",outputText);
 	if(echoToOutput)output("%s%c",outputText,'\n');
 	// now we can check whether outputText is an error, bug or warning
 	if(strncmp(M_RESULT_PREFIX,outputText,resultPrefixLength)==0){
@@ -892,11 +893,21 @@ static void collectLine(char* newlinePosition,bool echoToOutput){
 		// we have to move the remaining text up
 		*(outputText+outputLength)='\0';
 	}else
-		outputMessage(M_ERROR_PREFIX,"Can't shorten the length of the output buffer (%zu) by %zu.\n",outputLength,shortened);
+		q2outputMessage(M_ERROR_PREFIX,"Can't shorten the length of the output buffer (%zu) by %zu.\n",outputLength,shortened);
+}
+/**
+ * @brief attempts to extracts the message line
+ * 
+ * @param echoToOutput 
+ */
+static void extractMessage(bool echoToOutput){
+	if(NULL==outputText)return;
+	char* newlinePosition=strchr(outputText,'\n');
+	if(newlinePosition!=NULL)collectLine(newlinePosition,echoToOutput);
 }
 
 size_t q2outputmessageprefix(char const * const messageprefix){
-	return(messageprefix!=NULL?q2outputandcollect("%s",messageprefix)+output("%s",M_MESSAGE_PREFIX):0);
+	return(messageprefix!=NULL?q2output("%s",messageprefix)+output("%s",M_MESSAGE_PREFIX):0);
 }
 
 /**
@@ -905,18 +916,17 @@ size_t q2outputmessageprefix(char const * const messageprefix){
  * @param info the info text to output
  * @returns the number of characters output
  */
-size_t outputInfo(char const * const info){
+size_t q2outputInfo(char const * const info){
 	size_t written=0;
 	if(info!=NULL){
 		size_t l=strlen(info);
-		if(l>0){
-			if(M_INFO_PREFIX!=NULL&&*M_INFO_PREFIX)
-				written=q2outputmessageprefix(M_INFO_PREFIX);
-			written+=q2outputandcollect("%s",info);
+		if(l){
+			if(M_INFO_PREFIX!=NULL&&*M_INFO_PREFIX)written=q2outputmessageprefix(M_INFO_PREFIX);
+			written+=q2output("%s",info);
     	l--;
 			if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')
-				written+=q2outputandcollect("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-	    written+=q2outputandcollect("%c",'\n');// replacing: newline();
+				written+=q2output("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+	    written+=q2output("%c",'\n');// replacing: newline();
 		}
 	}
 	return written;
@@ -927,20 +937,19 @@ size_t outputInfo(char const * const info){
  * 
  * @param warning the warning text to output
  */
-size_t outputWarning(char const * const warning){
+size_t q2outputWarning(char const * const warning){
 	size_t result=0;
 	if(warning!=NULL){
     size_t l=strlen(warning);
-    if(l>0){
+    if(l){
 			// MDH@19AUG2024: it's a nuisance if a warning does not end with a period and we have to add a period
 			//                so we can't directly call addMessageOfType() here
-			if(M_WARNING_PREFIX!=NULL&&*M_WARNING_PREFIX)
-				result=q2outputmessageprefix(M_WARNING_PREFIX);
-			result=q2outputandcollect("%s",warning);
+			if(M_WARNING_PREFIX!=NULL&&*M_WARNING_PREFIX)result=q2outputmessageprefix(M_WARNING_PREFIX);
+			result=q2output("%s",warning);
     	l--;
 			if(l>0)if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')
-				result+=q2outputandcollect("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=q2outputandcollect("%c",'\n'); // replacing: newline();
+				result+=q2output("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    	result+=q2output("%c",'\n'); // replacing: newline();
 		}
 	}
 	///output("Warning length: %zu.\n",result);
@@ -952,15 +961,15 @@ size_t outputWarning(char const * const warning){
  * 
  * @param error the error text to output
  */
-size_t outputError(char const * const error){
+size_t q2outputError(char const * const error){
 	size_t result=0;
 	if(error!=NULL){
   	size_t l=strlen(error);
-  	if(l>0){
+  	if(l){
 			if(M_ERROR_PREFIX!=NULL&&*M_ERROR_PREFIX)result=q2outputmessageprefix(M_ERROR_PREFIX);
-  		result+=q2outputandcollect("%s",error);
-    	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=q2outputandcollect("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=q2outputandcollect("%c",'\n'); // replacing: newline();
+  		result+=q2output("%s",error);
+    	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=q2output("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    	result+=q2output("%c",'\n'); // replacing: newline();
 		}
 	}
 	return result;
@@ -973,7 +982,7 @@ size_t outputError(char const * const error){
  */
 size_t outputMemoryError(char const * const memoryerror){
   if(NULL==memoryerror)return 0;
-	return outputMessage(M_ERROR_PREFIX,"%s. Probable cause: out of memory!",memoryerror);
+	return q2outputMessage(M_ERROR_PREFIX,"%s. Probable cause: out of memory!",memoryerror);
 }
 
 // MDH@05NOV2019: might come in handy to be able to report bugs
@@ -987,10 +996,10 @@ size_t outputErrorAndText(char const * const error,char const * const text){
 	size_t result=0;
 	if(error!=NULL){
 		result=q2outputmessageprefix(M_ERROR_PREFIX);
-		result+=q2outputandcollect("%s. ",error);
+		result+=q2output("%s. ",error);
 	}
-	if(text!=NULL)result+=q2outputandcollect("%s.",text);
-	return result+q2outputandcollect("\n");
+	if(text!=NULL)result+=q2output("%s.",text);
+	return result+q2output("\n");
 }
 
 /**
@@ -998,15 +1007,15 @@ size_t outputErrorAndText(char const * const error,char const * const text){
  * 
  * @param bug the bug text
  */
-size_t outputBug(char const * const bug){
+size_t q2outputBug(char const * const bug){
 	size_t result=0;
 	if(bug!=NULL){
     size_t l=strlen(bug);
 		if(l>0){
 			if(M_BUG_PREFIX!=NULL&&*M_BUG_PREFIX)result=q2outputmessageprefix(M_BUG_PREFIX);
-			result+=q2outputandcollect("%s",bug);
-			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=q2outputandcollect("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-			result+=q2outputandcollect("%c",'\n'); //newline();
+			result+=q2output("%s",bug);
+			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=q2output("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+			result+=q2output("%c",'\n'); //newline();
 		}
 	}
 	return result;
@@ -1050,15 +1059,16 @@ static void reportOutputMessageMemoryError(){
  */
 size_t q2collect(char const * const fmt,...){
 	size_t result=0;
-	if(fmt!=NULL&&strlen(fmt)>0){
-		if(outputText!=NULL){
+	if(outputText!=NULL){
+		if(fmt!=NULL&&*fmt){
+			////output("Collecting!");
 			do{
 				///output("Output size: %llu - length: %llu - format: '%s'",outputSize,outputLength,fmt);
 			  va_list args;
   			va_start(args,fmt);
 			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
 				va_end(args);
-				///output("Count: %d",count);
+				///output("Collect count: %d\n",count);
 				if(count<=0){
 					///////outputText[outputLength]='\0'; // just in case
 					reportOutputMessageFormatError();
@@ -1074,9 +1084,7 @@ size_t q2collect(char const * const fmt,...){
 					//////output("%s",outputText);
 					///for(size_t i=0;i<outputSize&&outputText[i]!=0;i++)output("%c",outputText[i]);
 					///output("%s",">>>>>>>>>>\n");
-					char* newlinePosition=strchr(outputText,'\n');
-					if(newlinePosition!=NULL)
-						collectLine(newlinePosition,false);
+					extractMessage(false);
 					///else output("%s!\n","No end-of-line");
 					break;
 				}
@@ -1101,12 +1109,12 @@ size_t q2collect(char const * const fmt,...){
 
 /**
  * @brief outputs and collects (in the current message being composed) formatted text
- * @details (dependency) when changed, outputMessage() could should be synced accordingly!!
+ * @details (dependency) when changed, q2outputMessage() could should be synced accordingly!!
  * @param fmt 
  * @param ... 
  * @return size_t the number of characters logged
  */
-size_t q2outputandcollect(char const * const fmt,...){
+size_t q2output(char const * const fmt,...){
 	size_t result=0; // number of characters output
 	if(fmt!=NULL&&strlen(fmt)>0){
 		// 1. output
@@ -1125,12 +1133,11 @@ size_t q2outputandcollect(char const * const fmt,...){
 					break;
 				}
 				if(outputLength+count<outputSize){ // success
+					result+=count;
 					outputLength+=count; // new start
 					// if we have a full line output that full line
 					////////printf("%s",outputText);
-					char* newlinePosition=strchr(outputText,'\n');
-					if(newlinePosition!=NULL)
-						collectLine(newlinePosition,false);
+					extractMessage(false); // TODO shouldn't this be true???? DONE no
 					break;
 				}
 				outputSize+=64;
@@ -1159,31 +1166,31 @@ size_t q2outputandcollect(char const * const fmt,...){
  * @return size_t 
  */
 size_t q2newline(bool echoToOutput){
-	return(echoToOutput?q2outputandcollect("%c",'\n'):q2collect("%c",'\n'));
+	return(echoToOutput?q2output("%c",'\n'):q2collect("%c",'\n'));
 }
 
 /**
  * @brief outputs a single message of type \p messageType
  * @details this is the recommended method to output a message, which delegates to the q2... methods
- *          most of its code is also present in q2outputandcollect() and perhaps should be delegated to a common method
+ *          most of its code is also present in q2output() and perhaps should be delegated to a common method
  * @param messageType 
  * @param fmt 
  * @param ... 
  * @return size_t 
  */
-size_t outputMessage(char const * const messageType,char const * const fmt,...){
+size_t q2outputMessage(char const * const messageType,char const * const fmt,...){
 	// ASSERT assumes no pending message current, and no newlines inside the message!!!
 	// NOTE does not append periods at the end of the message!!!
 	size_t written=0;
 	if(messageType!=NULL&&*messageType){
 		// TODO this is going to be a problem, since q2outputandcollect doesn't output immediately
 		//      so we can't output M_MESSAGE_PREFIX 
-		written+=q2outputandcollect("%s",messageType);
+		written+=q2output("%s",messageType);
 		// not collecting the message prefix itself so it won't become part of the message itself (although it is written to output)
 		if(M_MESSAGE_PREFIX!=NULL&&*M_MESSAGE_PREFIX)
 			written+=output("%s",M_MESSAGE_PREFIX); // output the message type followed by the message prefix
 	}
-	// the next part is similar to what q2outputandcollect() does
+	// the next part is similar to what q2output() does
 	if(fmt!=NULL&&strlen(fmt)>0){
 		// 1. output
 		va_list args;va_start(args,fmt);int count=vprintf(fmt,args);va_end(args);if(count>0)written+=count;
@@ -1202,13 +1209,10 @@ size_t outputMessage(char const * const messageType,char const * const fmt,...){
 				if(outputLength+count<outputSize){ // success
 					written+=count;
 					outputLength+=count; // new start
-					/* not here because assuming the message does not contain newline characters!!!
+					/// not here because assuming the message does not contain newline characters!!!
 					// if we have a full line output that full line
 					////////printf("%s",outputText);
-					char* newlinePosition=strchr(outputText,'\n');
-					if(newlinePosition!=NULL)
-						collectLine(newlinePosition,true);
-					*/
+					extractMessage(false); // TODO shouldn't this be true?
 					break;
 				}
 				outputSize+=64;
@@ -1228,63 +1232,50 @@ size_t outputMessage(char const * const messageType,char const * const fmt,...){
 /**
  * @brief collects a single message of type \p messageType
  * @details this is the recommended method to output a message, which delegates to the q2... methods
- *          most of its code is also present in q2outputandcollect() and perhaps should be delegated to a common method
+ *          most of its code is also present in q2output() and perhaps should be delegated to a common method
  * @param messageType 
  * @param fmt 
  * @param ... 
  * @return size_t 
  */
-size_t collectMessage(char const * const messageType,char const * const fmt,...){
+size_t q2collectMessage(char const * const messageType,char const * const fmt,...){
 	// ASSERT assumes no pending message current, and no newlines inside the message!!!
 	// NOTE does not append periods at the end of the message!!!
-	size_t written=0;
-	if(messageType!=NULL&&*messageType){
-		// TODO this is going to be a problem, since q2outputandcollect doesn't output immediately
-		//      so we can't output M_MESSAGE_PREFIX 
-		written+=q2collect("%s",messageType);
-		/* not collecting the message prefix itself so it won't become part of the message itself (although it is written to output)
-		if(M_MESSAGE_PREFIX!=NULL&&*M_MESSAGE_PREFIX)
-			written+=output("%s",M_MESSAGE_PREFIX); // output the message type followed by the message prefix
-		*/
-	}
-	// the next part is similar to what q2outputandcollect() does
-	if(fmt!=NULL&&strlen(fmt)>0){
+	if(NULL==outputText)return 0;
+	size_t written=(messageType!=NULL&&*messageType?q2collect("%s",messageType):0);
+	// the next part is similar to what q2output() does
+	if(fmt!=NULL&&*fmt){
 		/* 1. output
 		va_list args;va_start(args,fmt);int count=vprintf(fmt,args);va_end(args);if(count>0)written+=count;
 		*/
 		// 2. collect
-		if(outputText!=NULL){
-			do{
-			  va_list args;
-  			va_start(args,fmt);
-			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
-				va_end(args);
-				if(count<=0){
-					//////outputText[outputLength]='\0'; // just in case
-					reportOutputMessageFormatError();
-					break;
-				}
-				if(outputLength+count<outputSize){ // success
-					written+=count;
-					outputLength+=count; // new start
-					/* not here because assuming the message does not contain newline characters!!!
-					// if we have a full line output that full line
-					////////printf("%s",outputText);
-					char* newlinePosition=strchr(outputText,'\n');
-					if(newlinePosition!=NULL)
-						collectLine(newlinePosition,true);
-					*/
-					break;
-				}
-				outputSize+=64;
-				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
-				if(NULL==newOutputText){
-					reportOutputMessageMemoryError();
-					break;
-				}
-				outputText=newOutputText;
-			}while(true);
-		}
+		do{
+			va_list args;
+			va_start(args,fmt);
+			int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+			va_end(args);
+			if(count<=0){
+				//////outputText[outputLength]='\0'; // just in case
+				reportOutputMessageFormatError();
+				break;
+			}
+			if(outputLength+count<outputSize){ // success
+				written+=count;
+				outputLength+=count; // new start
+				/// not here because assuming the message does not contain newline characters!!!
+				// if we have a full line output that full line
+				////////printf("%s",outputText);
+				extractMessage(false);
+				break;
+			}
+			outputSize+=64;
+			char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+			if(NULL==newOutputText){
+				reportOutputMessageMemoryError();
+				break;
+			}
+			outputText=newOutputText;
+		}while(true);
 	}
 	// finish by outputting and collecting a newline (which of course will collect the line!!!!!)
 	return written+q2newline(false);
@@ -1312,7 +1303,7 @@ bool messageStreamsInitialized(char const * const source){
 	if(initializeOutputCollector())
 		output("Text output initialized!\n");
 	else
-		outputError("Failed to initialize text output");
+		q2outputError("Failed to initialize text output");
 	return(_messageStreamStack!=NULL||pushMessageStream(stdout,(source!=NULL?source:""),NULL)); // stdout is the principal output message stream
 }
 */

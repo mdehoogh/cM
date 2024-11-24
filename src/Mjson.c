@@ -122,7 +122,7 @@ Mjsonvalue* json_parse(char const * const _text,size_t *pos){Mallocationowner ow
 			if(_jsonvalue){
 
 			}else
-				outputMessage(M_ERROR_PREFIX,"Failed to parse JSON value text '%s'.",_text);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to parse JSON value text '%s'.",_text);
 			return disowned_jsonvalue(_jsonvalue,owner);
 		}
 	}

@@ -229,7 +229,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=owned_environment(__environment(),owner); // free asap
 	if(_functionExecutionEnvironment){
-		if(amVerbose())outputInfo("Registering the name of the function execution environment");
+		if(amVerbose())q2outputInfo("Registering the name of the function execution environment");
 		_functionExecutionEnvironment->_name=owned_chars(_getChars(functionName),Msubowner(owner,1)); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
@@ -239,23 +239,23 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		*/
 		// 2. make the definition environment the parent of the function execution environment
 		assignValue(&_functionExecutionEnvironment->_parent,_function->_definitionEnvironmentValue); // MDH@03FEB2020 replacing: _functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
-		if(amVerbose())outputInfo("Parent of function execution environment set to the function definition environment");
+		if(amVerbose())q2outputInfo("Parent of function execution environment set to the function definition environment");
 		// 3. create the argument map fields as variables in the function execution environment
 		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,owner,_argumentMap);
 		if(functionExecutionEnvironmentInitialized){
 			if(amVerbose())
-				outputInfo("Function execution environment initialized.");
+				q2outputInfo("Function execution environment initialized.");
 			// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
 			if(!addVariable(_functionExecutionEnvironment,owner,"$",VT_UNDEFINED,false)){
-				outputError("Failed to add the result variable to the function execution environment");
+				q2outputError("Failed to add the result variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else // also add the function exit flag variable (with name ! which cannot be set in the code because it is an invalid name)
 			if(!addVariable(_functionExecutionEnvironment,owner,"!",VT_UNDEFINED,false)){
-				outputError("Failed to add the exit flag variable to the function execution environment");
+				q2outputError("Failed to add the exit flag variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}
 		}else
-			outputError("Failed to initialize the function execution environment.");
+			q2outputError("Failed to initialize the function execution environment.");
 		if(!functionExecutionEnvironmentInitialized){FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);_functionExecutionEnvironment=NULL;}
 	}
 	return disowned_environment(_functionExecutionEnvironment,owner);
@@ -342,42 +342,42 @@ Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command
 int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report){
 
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return 0;}
+	if(!command||!command->_firstToken){if(report)q2outputError("Undefined or empty command");return 0;}
 
 	Mtoken* lastCommandToken=command->_lastToken;
 	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
 
-	if(!lastCommandToken){if(report)outputError("Empty command");return 0;}
+	if(!lastCommandToken){if(report)q2outputError("Empty command");return 0;}
 	
 	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
 	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
-	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
+	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)q2outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
 
 	// MDH@28FEB2020: if the current last command token is an error do NOT remove, but let the caller handle it!!!!
-	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Command is erroneous.");return -1;}
+	if(lastCommandToken->type==TT_ERROR){if(report)q2outputError("Command is erroneous.");return -1;}
 	/* replacing:
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
 	if(lastCommandToken&&lastCommandToken->type==TT_ERROR){unfinishToken(lastCommandToken);lastCommandToken=removedLastCommandToken(command);return false;}
 
-	{if(report)outputError("Can't evaluate erroneous command");if(!removedLastCommandToken(command)){if(report)outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
+	{if(report)q2outputError("Can't evaluate erroneous command");if(!removedLastCommandToken(command)){if(report)q2outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
 
 	lastCommandToken=command->_lastToken;
 	*/
 
 	// 3. if the last token is an operator of sorts the command is incomplete
-	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return -2;}
+	if(lastCommandToken->type<=8){if(report)q2outputError("Value behind operator at end of command missing");return -2;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
 	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
 	//                    this actually means that if expr is NULL there's one parentheses too many!!!
 	/*
-	if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
-	if(_userInputCommand->_lastToken->expr!=_userInputCommand->_firstToken){outputError("Not enough parentheses!");return false;}
+	if(!_userInputCommand->_lastToken->expr){q2outputError("Too many parentheses!");return false;}
+	if(_userInputCommand->_lastToken->expr!=_userInputCommand->_firstToken){q2outputError("Not enough parentheses!");return false;}
 	*/
 	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
 	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
-	//////////// already noticed while entering the expression!!!!: if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
+	//////////// already noticed while entering the expression!!!!: if(!_userInputCommand->_lastToken->expr){q2outputError("Too many parentheses!");return false;}
 	Mtoken* expressionToken=lastCommandToken->expr; // the token pointed to by the last command token
 	if(expressionToken)if(lastCommandToken->type==TT_END_OF_LIST||lastCommandToken->type==TT_END_OF_FUNCTION_CALL||lastCommandToken->type==TT_END_OF_MAP)expressionToken=expressionToken->expr;
 	if(expressionToken){ // could be a problem
@@ -386,9 +386,9 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 			if(report)
 				output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
 		switch(expressionToken->type){
-			case TT_LIST:{if(report)outputError("Missing end of list");return -3;}
-			case TT_FUNCTION_CALL:{if(report)outputError("Missing end of function call");return -4;}
-			case TT_MAP:{if(report)outputError("Missing end of map");return -5;}
+			case TT_LIST:{if(report)q2outputError("Missing end of list");return -3;}
+			case TT_FUNCTION_CALL:{if(report)q2outputError("Missing end of function call");return -4;}
+			case TT_MAP:{if(report)q2outputError("Missing end of map");return -5;}
 			default:
 				{
 					if(report)output("%sUnknown expression with first token of type %s left unfinished.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
@@ -399,7 +399,7 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 		// MDH@23JUL2019: we can now be very strict
 		//                the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
 		if(_userInputCommand->_lastToken->expr->type!=TT_EXPRESSION||(string_length(_userInputCommand->_lastToken->expr->text)&&string_char(_userInputCommand->_lastToken->expr->text,0)!=' ')){
-			outputError("Incomplete command");
+			q2outputError("Incomplete command");
 			return false;
 		}
 		*/
@@ -407,10 +407,10 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 		// this is allowed if this token ends something that points to NULL
 		if((_userInputCommand->_lastToken->type!=TT_END_OF_LIST&&_userInputCommand->_lastToken->type!=TT_END_OF_FUNCTION_CALL&&_userInputCommand->_lastToken->type!=TT_END_OF_MAP)||_userInputCommand->_lastToken->expr->expr){
 			switch(_userInputCommand->_lastToken->expr->expr->type){
-				case TT_LIST:outputError("Missing end of list.");break;
-				case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
-				case TT_MAP:outputError("Missing end of map!");break;
-				default:outputError("Not enough parentheses.");break;
+				case TT_LIST:q2outputError("Missing end of list.");break;
+				case TT_FUNCTION_CALL:q2outputError("Missing end of function call!");break;
+				case TT_MAP:q2outputError("Missing end of map!");break;
+				default:q2outputError("Not enough parentheses.");break;
 			}
 			return false;
 		}
@@ -419,12 +419,12 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 
 	// 4. can't end with function of function call
 	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
-	if(lastCommandToken->type==TT_FUNCTION){if(report)outputError("Function call missing at end of command");return -7;}
-	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)outputError("Unfinished function call");return -8;}
-	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)outputError("Unfinished list");return -9;}
-	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)outputError("Unfinished string literal");return -10;}
-	if(lastCommandToken->type==TT_EXPRESSION){if(report)outputError("Unfinished expression");return -11;}
-	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return -12;}
+	if(lastCommandToken->type==TT_FUNCTION){if(report)q2outputError("Function call missing at end of command");return -7;}
+	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)q2outputError("Unfinished function call");return -8;}
+	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)q2outputError("Unfinished list");return -9;}
+	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)q2outputError("Unfinished string literal");return -10;}
+	if(lastCommandToken->type==TT_EXPRESSION){if(report)q2outputError("Unfinished expression");return -11;}
+	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)q2outputError("Unfinished map");return -12;}
 	
 	return 1;
 
@@ -435,7 +435,7 @@ Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char co
 	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,owner_command,amVerbose());
 	if(aValidCommandIndicator<=0)return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
-	if(amVerbose())outputInfo("Evaluating...");
+	if(amVerbose())q2outputInfo("Evaluating...");
 	return getValueOfExpression(getExecutionEnvironment()->_name->chars,commandType,(TokenType[]){},0);
 }
 
@@ -451,7 +451,7 @@ long long getDP(){
 	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
 	long long dp=(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
-	if(dp==M_LL_INVALID)outputBug("No default decimal context active!");
+	if(dp==M_LL_INVALID)q2outputBug("No default decimal context active!");
 	return dp;
 }
 // MDH@18OCT2019: if someone wants to know about the decimal context
@@ -575,7 +575,7 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 						popExecutionEnvironment(); // pop the do environment we successfully pushed
 					}
 				}else
-					outputError("Failed to create the do environment");
+					q2outputError("Failed to create the do environment");
 				FREE_ENVIRONMENT(_doEnvironment,owner); // MDH@17JUN2020: check if this should be here
 			}
 		}
@@ -623,7 +623,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 						// although perhaps we should exclude using $ and _ well especially _
 						// MDH@08NOV2019: a list is also allowed actually anything
 						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,getOwnerExecutionEnvironment(),initializationValue->value._map)){
-							outputError("Failed to initialize the for loop local variables");
+							q2outputError("Failed to initialize the for loop local variables");
 							forEnvironmentInitialized=false;
 						}
 					}
@@ -703,9 +703,9 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 						}
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
-					if(amVerboseDebugging())outputInfo("For loop environment popped.");
+					if(amVerboseDebugging())q2outputInfo("For loop environment popped.");
 				}else{
-					outputError("Failed to activate the for loop execution environment");
+					q2outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
 				}
 			}else
@@ -713,11 +713,11 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			if(!forEnvironmentInitialized){
 				// FREE_ENVIRONMENT(_forEnvironment,owner); // have to free the environment myself
 				// if(amVerbose())
-				outputInfo("Uninitialized for loop environment discarded!");
+				q2outputInfo("Uninitialized for loop environment discarded!");
 			}
 			FREE_ENVIRONMENT(_forEnvironment,owner); // MDH@17JUN2020: TODO should this be here???
 		}else
-			outputError("Failed to create the for loop execution environment");
+			q2outputError("Failed to create the for loop execution environment");
 	}
 	return _result;
 }
@@ -1044,7 +1044,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 
 		}else
 		if(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||lastCommandToken->significantCharacterCount>0){
-			///////////if(amVerbose())outputInfo("!");/////(*inputInfoFunction)("New token!");
+			///////////if(amVerbose())q2outputInfo("!");/////(*inputInfoFunction)("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
 			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
@@ -1287,7 +1287,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				if(newLastEvalCommandToken!=_evalCommand->_lastToken)_evalCommand->_lastToken=SUBOWNED(OWNED(newLastEvalCommandToken,owner),1); // update our eval command's last token TODO do we need to test here????
 				if(!_evalCommand->_lastToken)break;
 			}
-			if(amVerbose())outputInfo("'.");
+			if(amVerbose())q2outputInfo("'.");
 			if(_evalCommand->_lastToken){
 				// just like with do() we have to evaluate the command in a subenvironment
 				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
@@ -1664,10 +1664,10 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 Mrational* _qsum(Mrational* _rational1,Mrational* _rational2){
 	Mrational* _rational=__rational(); // we need a rational to hold the sum
 	if(_rational){
-		outputInfo("Adding two rationals.");
+		q2outputInfo("Adding two rationals.");
 		mp_err status=_qadd(_rational,_rational1,_rational2);
 		output("Two rationals added (status=%i).\n",status);
-		if(status!=MP_OKAY){FREE_RATIONAL(_rational);_rational=NULL;outputError("Failed to add two rationals");}else outputInfo("Two rationals added successfully."); // addition failed somehow...
+		if(status!=MP_OKAY){FREE_RATIONAL(_rational);_rational=NULL;q2outputError("Failed to add two rationals");}else q2outputInfo("Two rationals added successfully."); // addition failed somehow...
 	}
 	return _rational;
 }
@@ -1708,69 +1708,69 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Adding two decimals.");
+	///////q2outputInfo("Adding two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
-		if(status&0xEFBF){FREE_DECIMAL(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
+		if(status&0xEFBF){FREE_DECIMAL(_result);_result=NULL;q2outputError("Failed to compute the sum of two decimals.");}
 	}else
-		outputError("Failed to create the sum decimal");
+		q2outputError("Failed to create the sum decimal");
 	return _result;
 }
 Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Dividing two decimals.");
+	///////q2outputInfo("Dividing two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			FREE_DECIMAL(_result);_result=NULL;
-			outputError("Failed to compute the quotient of two decimals");
+			q2outputError("Failed to compute the quotient of two decimals");
 		}
 	}else 
-		outputError("Failed to create the quotient decimal");
+		q2outputError("Failed to create the quotient decimal");
 	return _result;
 }
 Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Multiplying two decimals.");
+	///////q2outputInfo("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			FREE_DECIMAL(_result);_result=NULL;
-			outputError("Failed to compute the product of two decimals");
+			q2outputError("Failed to compute the product of two decimals");
 		}
 	}else
-		outputError("Failed to create the product decimal");
+		q2outputError("Failed to create the product decimal");
 	return _result;
 }
 Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	if(!mpd_context){q2outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(mpd_context,0,0);
-	///////outputInfo("Multiplying two decimals.");
+	///////q2outputInfo("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
 		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			FREE_DECIMAL(_result);_result=NULL;
-			outputError("Failed to compute the difference of two decimals");
+			q2outputError("Failed to compute the difference of two decimals");
 		}
 	}else
-		outputError("Failed to create the difference decimal");
+		q2outputError("Failed to create the difference decimal");
 	return _result;
 }
 */
@@ -1885,7 +1885,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							Mbiginteger* _newAddendumDenominator=owned_biginteger(_Iadd(_addendumDenominator,_denominatorIncrement),owner);
 							if(!_newAddendumDenominator){
 								// MDH@27MAY2020: FREE_BIGINTEGER(_addendumDenominator,owner); // won't be using this in the addendum rational
-								outputError("Failed to increment the addendum denominator");
+								q2outputError("Failed to increment the addendum denominator");
 								break;
 							}
 							if(amVerbose())
@@ -1907,7 +1907,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								outputBiginteger("New addendum denominator: ",_addendumDenominator,".\n");
 						}
 					}else{
-						outputError("Failed to initialize the addendum numerator and its increment value (2)");
+						q2outputError("Failed to initialize the addendum numerator and its increment value (2)");
 					}
 					// MDH@27MAY2020: free helper big integers
 					FREE_BIGINTEGER(_addendumDenominator,owner);
@@ -1940,7 +1940,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			if(amVerbose())
 				output("Computing %llu continued fractions of pi.\n",iter);
 			Mbiginteger* _bi3=owned_biginteger(_getBiginteger(3),owner);
-			if(!_bi3){outputError("Failed to create big integer 3.");return NULL;}
+			if(!_bi3){q2outputError("Failed to create big integer 3.");return NULL;}
 			Mrational* _rational=owned_rational(_getRational(_bi3,NULL,M_LD_NAN,false),owner);
 			FREE_BIGINTEGER(_bi3,owner);
 			if(_rational){
@@ -1948,7 +1948,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					// working backwards starting with the last denominator quotient seems to be best
 					// in every step you have to compute i**2/6 the second term of the denominator
 					Mbiginteger* _bi6=owned_biginteger(_getBiginteger(6),owner);
-					if(!_bi6){outputError("Failed to create big integer of 6.");return NULL;}
+					if(!_bi6){q2outputError("Failed to create big integer of 6.");return NULL;}
 					Mrational* _denominatorRational=(_bi6?owned_rational(_getRational(_bi6,NULL,M_LD_NAN,false),owner):NULL); // the final denominator equals 6
 					if(_denominatorRational){
 						if(amVerbose())
@@ -1984,7 +1984,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						}
 					}
 					FREE_BIGINTEGER(_bi6,owner);
-					// MDH@27MAY2020: if(!_denominatorRational){outputError("Final denominator could not be computed");return NULL;}
+					// MDH@27MAY2020: if(!_denominatorRational){q2outputError("Final denominator could not be computed");return NULL;}
 					// NOTE: do NOT use the originals in inverting the denominator because those will be freed below so we need to pass in copies
 					Mrational* _inverseDenominatorRational=owned_rational(_getInverseRational(_denominatorRational),owner);
 					Mrational* _result=NULL;
@@ -2042,7 +2042,7 @@ for i in range(10000):
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
 Mvalue* getResult(Mvalue* indexValue){
-	if(amVerbose())outputInfo("Result requested!");
+	if(amVerbose())q2outputInfo("Result requested!");
 	if(!indexValue)return _resultListValue;
 	long long indexValueInteger=getValueInteger(indexValue); // NOTE all index values should be positive!!!
 	return (indexValueInteger>0?getValueAtIndex(_resultListValue->value._list,indexValueInteger):NULL); // TODO are we calling getResult anywhere????
@@ -2058,7 +2058,7 @@ Mvalue* l2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		Mmap* _map=owned_map(_getMapOfType(value->type),owner); // a strong map
 		if(!_map)return NULL;
 		if(!listAppendedToMap(_map,owner,value->value._list))
-			outputError("Failed to append a list to a map")
+			q2outputError("Failed to append a list to a map")
 		; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 		_mapValue=_getValueOfMap(disowned_map(_map,owner)); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 	}
@@ -2072,7 +2072,7 @@ Mvalue* l2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		if(!_maplist)return NULL;
 		// TODO check if we're passing the right 
 		if(!listAppendedToMaplist(_maplist,owner,value->value._list))
-			outputError("Failed to append a list to a map list")
+			q2outputError("Failed to append a list to a map list")
 		; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 		_maplistValue=_getValueOfList(disowned_list(_maplist,owner));
 	}
@@ -2430,11 +2430,11 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 		if(_deltaRational){
 			_purifiedRational=owned_rational(_getPureRationalSum(pureRational,_deltaRational),owner);
 			FREE_RATIONAL(_deltaRational,owner);
-			if(!_purifiedRational)outputError("Failed to sum two pure rationals");
+			if(!_purifiedRational)q2outputError("Failed to sum two pure rationals");
 		}else
-			outputError("Failed to rationalize a real");
+			q2outputError("Failed to rationalize a real");
 	}else
-		outputError("No base pure rational to use in purification");
+		q2outputError("No base pure rational to use in purification");
 	return disowned_rational(_purifiedRational,owner);
 }
 
@@ -2467,10 +2467,10 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 			_purifiedRational=owned_rational(_getPurifiedRational(_pureRational,rationaldelta),owner);
 			FREE_RATIONAL(_pureRational,owner);
 		}else
-			outputError("Failed to create a pure rational");
+			q2outputError("Failed to create a pure rational");
 		if(!_purifiedRational){ // failed to wrap the numerator and denominator (copy), so considered unbound, and so to be freed!!!!
 			FREE_BIGINTEGER(_num,owner);FREE_BIGINTEGER(_den,owner);
-			outputError("Failed to purify a rational");
+			q2outputError("Failed to purify a rational");
 			return NULL;
 		}
 		return _getValueOfRational(disowned_rational(_purifiedRational,owner));
@@ -2521,7 +2521,7 @@ Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)ret
 				{outputValue("Text representation of '",value,"': ");output("'%s'.\n",string(_valueText));}
 			_result=_getTextValue(string(_valueText));
 		}else
-			outputError("Failed to prepend a quote character to a text representation");
+			q2outputError("Failed to prepend a quote character to a text representation");
 		FREE_STRING(_valueText,owner);
 	}
 	return _result;
@@ -2608,7 +2608,7 @@ static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner o
 			listelement=listelement->_next;
 		}
 	}else 
-		outputError("Failed to initialize the concatenation result text");
+		q2outputError("Failed to initialize the concatenation result text");
 	return disowned_string(_concatenated,owner);
 }
 Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(__LINE__);
@@ -2626,7 +2626,7 @@ Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(_
 			if(string_insert_char(_concat,0,'\''))
 				_concatValue=_getTextValue(string(_concat));
 			else 
-				outputError("Failed to construct the concatenation text");
+				q2outputError("Failed to construct the concatenation text");
 			FREE_STRING(_concat,owner);
 		}
 		if(_separator)FREE_STRING(_separator,owner);
@@ -2661,12 +2661,12 @@ Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								if((status=mp_copy(MP_INT_POINTER(_fibonacciBiginteger),MP_INT_POINTER(_secondBiginteger)))!=MP_OKAY)break;
 							}
 						}else 
-							outputError("Failed to initialize the Fibonacci sequence");
+							q2outputError("Failed to initialize the Fibonacci sequence");
 						FREE_BIGINTEGER(_firstBiginteger,owner);FREE_BIGINTEGER(_secondBiginteger,owner);
 					}else // no additions
 						status=mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_fibonacciBiginteger));
 				}else
-					outputError("Failed to initialize the Fibonacci sum");
+					q2outputError("Failed to initialize the Fibonacci sum");
 				FREE_BIGINTEGER(_counterBiginteger,owner);
 			}
 		}
@@ -2736,16 +2736,16 @@ typedef struct Mexpressionvalue{
 // free_expressionvalue does NOT free the token as it will probably be passed on...
 void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 	if(_expressionvalue){
-		if(amVerbose())outputInfo("Releasing the result!");
+		if(amVerbose())q2outputInfo("Releasing the result!");
 		// MDH@03MAY2019: append the result value at the proper index (as indicated by the command index)
-		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_valuereference->_variable->_value,commandCount+1))outputInfo("ERROR: Failed to save the result.");else if(amVerbose())outputInfo("Result saved.");}
-		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))outputInfo("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputInfo("Result appended to the M list.");
+		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_valuereference->_variable->_value,commandCount+1))q2outputInfo("ERROR: Failed to save the result.");else if(amVerbose())q2outputInfo("Result saved.");}
+		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))q2outputInfo("ERROR: Failed to append the result to the M list.");else if(amVerbose())q2outputInfo("Result appended to the M list.");
 		//// NEVER free what does not have an underscore at the start!!!! FREE_TOKEN(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
 		////////output("Freeing expression!");
 		decrementReferenceCount(_expressionvalue->_valuereference->_variable->_value); // as where freeing _expressionvalue!!!!
 		free(_expressionvalue);
 	}else
-	if(amVerbose())outputInfo("No result to free!");
+	if(amVerbose())q2outputInfo("No result to free!");
 	
 }
 */
@@ -3112,7 +3112,7 @@ static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionNa
 FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
 // MDH@02MAR2020 NOTE: there's no need to return the new function body request instance as it is not used
 static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
-	if(!functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
+	if(!functionName||!strlen(functionName)){q2outputError("Invalid or missing function name.");return NULL;} // invalid input
 	// ASSERT a 'valid' function name
 	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",M_ERROR_PREFIX,functionName);return NULL;} // already have it
 	// technically it should not have been requested already (or exist)
@@ -3135,7 +3135,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
 	_currentFunctionBodyInput=OWNED(CALLOC_1(sizeof(FunctionBodyInput),'8',owner),owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
-	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
+	if(!_currentFunctionBodyInput){q2outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName->chars);
 	if(function&&function->type==FT_USER){
 		// it's better to put the next request in, so after finishing with this request we can do the following if any
@@ -3151,10 +3151,10 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		if(_functionExecutionEnvironment){
 			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
-			outputError("Failed to register the function execution environment.");
+			q2outputError("Failed to register the function execution environment.");
 			free_environment(disowned_environment(_functionExecutionEnvironment,owner));
 		}else
-			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
+			q2outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
 	FREE_DISOWNED_1(_currentFunctionBodyInput,'H',owner_currentFunctionBodyInput);
@@ -3296,7 +3296,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 				Mvalue* *valueholder=&referencedValue; // MDH@07APR2020 replacing what we used in setReferencedValue(): getValueHolder(getExecutionEnvironment(),_valuereference->_name);
 				// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 				if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
-					// if(amVerboseDebugging())outputInfo("************ Element(s) to set.");
+					// if(amVerboseDebugging())q2outputInfo("************ Element(s) to set.");
 					// let's get the first index/attribute name
 					Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@19JUN2020 not anymore: MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
@@ -3365,7 +3365,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 														assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
 														if(amVerboseDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 													}
-													if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
+													if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;q2outputError("Failed to create a list or map.");}
 												}
 												// as soon as the list or map valueholder is created we can use it to get the new value reference IFF the value is of the right type, we have to ascertain that all copies are zero
 											}
@@ -3480,7 +3480,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										}else{ // REALLOC failed
 											result=false;
 											numberOfNewValueholders=0;
-											outputError("Failed to reallocate the indexed value references");
+											q2outputError("Failed to reallocate the indexed value references");
 										}
 									}
 									if(_flattenedIndexList)FREE_LIST(_flattenedIndexList,owner);
@@ -3509,7 +3509,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 							}
 							referencedValue=_getValueOfList(disowned_list(_resultList,owner)); // the result
 						}else
-							outputError("Failed to obtain the list of referenced values");
+							q2outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
 						FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
 					}
@@ -3568,7 +3568,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									output("%s",M_ERROR_PREFIX);
 									outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
 								}else
-									outputError("A zero index is not allowed");
+									q2outputError("A zero index is not allowed");
 							}
 						}else{
 							output("%s",M_ERROR_PREFIX);
@@ -3619,7 +3619,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 				if(!itemidList->_first)if(appendedToList(itemidList,owner_valuereference,(*valueholder)->type==VT_LIST?_getIntegerValue(M_LL_INVALID):_getTextValue("'"),M_LL_INVALID)<0)return false;
 				result=true;
 				if(amVerboseDebugging())
-					outputInfo("************ Element(s) to set.");
+					q2outputInfo("************ Element(s) to set.");
 				// let's get the first index/attribute name
 				Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
@@ -3687,7 +3687,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 													assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
 													if(amDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 												}
-												if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
+												if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;q2outputError("Failed to create a list or map.");}
 											}
 											// as soon as the list or map valueholder is created we can use it to get the new value reference IFF the value is of the right type, we have to ascertain that all copies are zero
 										}
@@ -3720,7 +3720,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 															assignValue(_valueholders[valueholderIndex+numberOfNewValueholders],_getMapValue(VT_UNDEFINED,false));
 															if(amVerbose())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex+numberOfNewValueholders,_valuereference->_name);
 														}
-														if(isValueUndefined(*_valueholders[valueholderIndex+numberOfNewValueholders])!=M_FALSE){_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;outputError("Failed to create a list or map.");}
+														if(isValueUndefined(*_valueholders[valueholderIndex+numberOfNewValueholders])!=M_FALSE){_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;q2outputError("Failed to create a list or map.");}
 													}
 													*/
 													if(*valueholder){
@@ -3841,7 +3841,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 												}else
 													FREE_LIST(_assignedIndexList,owner);
 											}else
-												outputBug("Failed to populate the assigned index list");
+												q2outputBug("Failed to populate the assigned index list");
 											flattenedIndexListelement=flattenedIndexListelement->_next;
 											// output("%c\n",'F'); // DEBUG
 										}
@@ -3849,7 +3849,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 									}else{ // REALLOC failed
 										result=false;
 										numberOfNewValueholders=0;
-										outputError("Failed to reallocate the indexed value references");
+										q2outputError("Failed to reallocate the indexed value references");
 									}
 								}
 								// MDH@19JUN2020 TODO not too happy about using _flattenedIndexList and assignedIndexList to collect the actual ids of the properties or array elements
@@ -3858,7 +3858,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 										outputList("Flattened index list: '",_flattenedIndexList,"'.\n");
 										if(_flattenedIndexList->_first!=_flattenedIndexList->_last){ // more than one element: replace the value by the reversed list (which is disowned to start with!!!!)
 											Mlist* _rereversedIndexList=owned_list(_getReversedList(_flattenedIndexList),owner);
-											if(_rereversedIndexList)assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));else outputBug("Failed to reverse an index list");
+											if(_rereversedIndexList)assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));else q2outputBug("Failed to reverse an index list");
 										}else // replace the value by the first value in the flattened index list
 											assignValue(&indexorattributenameListelement->_value,_flattenedIndexList->_first->_value);
 									}
@@ -3923,7 +3923,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 												}
 											}
 											// MDH@30MAR2020: if a value holder was not set, we do not continue TODO or should we only do this when all are undefined??????
-											if(valueholderIndex>=0){result=false;outputError("Failed to create a list or map.");}
+											if(valueholderIndex>=0){result=false;q2outputError("Failed to create a list or map.");}
 										}
 										flattenedIndexListelement=flattenedIndexListelement->_next;
 									}
@@ -3933,7 +3933,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 							}
 							if(_flattenedIndexList)FREE_LIST(_flattenedIndexList);
 						}else
-							outputError("No index value.");
+							q2outputError("No index value.");
 					}
 					if(result){
 						// if(amDebugging())
@@ -3975,7 +3975,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 				}else
 				if(isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type!=VT_LIST){
 					result=false;
-					outputError("No index/attribute name specified");
+					q2outputError("No index/attribute name specified");
 				}
 				*/
 			}else
@@ -3998,7 +3998,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 					}
 				}
 				if(amVerboseDebugging())
-					outputInfo("Value set!");
+					q2outputInfo("Value set!");
 			}
 		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
@@ -4015,10 +4015,10 @@ long long getBigintegerInteger(Mbiginteger* biginteger){
 		if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
 			result=mp_get_i64(MP_INT_POINTER(biginteger));
 			if(amVerboseDebugging())
-				outputInfo("Big integer converted to a small integer.");
+				q2outputInfo("Big integer converted to a small integer.");
 		}else
 			if(amVerboseDebugging())
-				outputInfo("Big integer cannot be converted to a small integer.");
+				q2outputInfo("Big integer cannot be converted to a small integer.");
 	}
 	if(amVerboseDebugging())
 		output("Small integer result: %lld.\n",result);
@@ -4133,12 +4133,12 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						unsigned long long numberOfFunctionParameters=(function->_parameterMap?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
 						if(!strcmp(_significantTokenText,DEFINEANONYMOUSFUNCTION_NAME)){
 							if(amVerboseDebugging())
-								outputInfo("Definition of an anonymous function encountered!");
+								q2outputInfo("Definition of an anonymous function encountered!");
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-1; // i.e. evaluate the first argument only in the current context
 						}else
 						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
 							if(amVerboseDebugging())
-								outputInfo("Definition of a user function encountered!");
+								q2outputInfo("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-2;	// i.e. evaluate the first two arguments only in the current context
 						}else
 						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)||!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
@@ -4169,7 +4169,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
 								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
-									outputError("Failed to create the to do expression list");
+									q2outputError("Failed to create the to do expression list");
 									FREE_LIST(functionCallArgumentList,owner);
 									functionCallArgumentList=NULL; // so nothing will get done!!
 								}
@@ -4218,7 +4218,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								if(strlen(definedFunctionName))
 									output("%sFailed to create function '%s'.",M_ERROR_PREFIX,definedFunctionName);
 								else
-									outputError("Name of function to create not defined.");
+									q2outputError("Name of function to create not defined.");
 							}
 							//////outputValue("Function call value '",functionCallValue,"'.\n");
 							_valueReference->_value=functionCallValue; // MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,functionCallValue);
@@ -4226,13 +4226,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
 							if(amVerboseDebugging())
-								{outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
+								{outputValue("Function call result value: '",_valueReference->_value,"'.\n");q2outputInfo("Freeing the function argument map!");}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
 							FREE_MAP(_functionCallArgumentMap,owner); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerboseDebugging())
-								outputInfo("Function argument map freed!");
+								q2outputInfo("Function argument map freed!");
 						}else
-							outputError("No function arguments");
+							q2outputError("No function arguments");
 					}else
 						output("%sFunction '%s' unknown!\n",M_ERROR_PREFIX,_significantTokenText);
 				}
@@ -4345,7 +4345,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(amVerboseDebugging())output("Integer part of decimal text: '%s'.\n",string(pRealText));
 						pRealText=string_append(pRealText,_realSignificantTokenText);
 						if(amVerboseDebugging())
-							outputInfo("Fractional part appended!");
+							q2outputInfo("Fractional part appended!");
 						if(strlen(_realSignificantTokenText)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
 						if(amVerboseDebugging())output("Parsing '%s' to a decimal.\n",string(pRealText));
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
@@ -4354,29 +4354,29 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
 						free(_realSignificantTokenText); // freed!!!
 						if(amVerboseDebugging())output("Real part string length: %u.\n",l);
-						if(getDP()<l)outputWarning("More decimals present in literal than expected. Rounding may occur.");
-						if(amVerboseDebugging())outputInfo("Decimal precision checked!");
+						if(getDP()<l)q2outputWarning("More decimals present in literal than expected. Rounding may occur.");
+						if(amVerboseDebugging())q2outputInfo("Decimal precision checked!");
 						Mdecimal* _decimal=owned_decimal(__decimal(get_default_mpd_context(),0,0),owner);
-						if(amVerboseDebugging())outputInfo("Decimal created!");
+						if(amVerboseDebugging())q2outputInfo("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
-							if(amVerboseDebugging())outputInfo("Decimal initialized.");
+							if(amVerboseDebugging())q2outputInfo("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
 								assignValue(&_valueReference->_value,_getValueOfDecimal(disowned_decimal(_decimal,owner)));
 							else
 								outputErrorAndText("The decimal value of %s is undefined",string(pRealText));
 						}else
-							outputError("Failed to create a decimal");
+							q2outputError("Failed to create a decimal");
 						/* replacing:
 						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getValueOfRational(_rational));
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
-						if(amVerboseDebugging())outputInfo("Releasing decimal text.");
+						if(amVerboseDebugging())q2outputInfo("Releasing decimal text.");
 						FREE_STRING(_realText,owner);
-						if(amVerboseDebugging())outputInfo("Decimal text released.");
+						if(amVerboseDebugging())q2outputInfo("Decimal text released.");
 					}else
-						outputError("Failed to initialize the text representation of a decimal");
+						q2outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
@@ -4429,14 +4429,14 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					canbeindexedtheoretically=true;
 					Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0,false);
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-					if(amVerboseDebugging())outputInfo("Going to wrap the list extracted!");
+					if(amVerboseDebugging())q2outputInfo("Going to wrap the list extracted!");
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
 					if(_expressionListValue->value._list->numberOfElements==1){
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
 					}else
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue),owner);
-					if(amVerboseDebugging())outputInfo("Extracted list wrapped!");
+					if(amVerboseDebugging())q2outputInfo("Extracted list wrapped!");
 				}
 				break;
 			default:
@@ -4445,12 +4445,12 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		if(_significantTokenText)free(_significantTokenText); // free the (duplicated significant) token text
 		if(amVerboseDebugging()){
 			if(_valueReference){
-				outputInfo("Extracted reference:");
-				if(_valueReference->_name)output("\tName: '%s'.\n",_valueReference->_name);else outputInfo("\tNo name!");
-				if(_valueReference->_value)outputValue("\tValue: '",_valueReference->_value,"'.\n");else outputInfo("\tNo value referenced!");
-				if(_valueReference->_itemid)outputValue("\tIndex ids: ",_valueReference->_itemid,"'.\n");else outputInfo("\tNo item ids.");
+				q2outputInfo("Extracted reference:");
+				if(_valueReference->_name)output("\tName: '%s'.\n",_valueReference->_name);else q2outputInfo("\tNo name!");
+				if(_valueReference->_value)outputValue("\tValue: '",_valueReference->_value,"'.\n");else q2outputInfo("\tNo value referenced!");
+				if(_valueReference->_itemid)outputValue("\tIndex ids: ",_valueReference->_itemid,"'.\n");else q2outputInfo("\tNo item ids.");
 			}else
-				outputInfo("No value reference!");
+				q2outputInfo("No value reference!");
 		}
 
 		// MDH@17NOV2019: if indexing is theoretically possible, we should further check for indexes
@@ -4479,13 +4479,13 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						Mlistelement* newItemIdListElement=newItemIdsList->_first;
 						while(newItemIdListElement){
 							if(appendedToList(itemIdsList,owner,newItemIdListElement->_value,M_LL_INVALID)<=0){
-								outputError("Failed to append augmented item id.");
+								q2outputError("Failed to append augmented item id.");
 								// TODO can't break here?????
 							}
 							newItemIdListElement=newItemIdListElement->_next;
 						}
 					}else
-						outputBug("Item ids not a list.");
+						q2outputBug("Item ids not a list.");
 					// indexListValue will be removed by the garbage collector
 				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
 					// we have to wrap the property name inside a value as text
@@ -4545,7 +4545,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			}
 			if(amVerboseDebugging())outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
 		}else
-		if(amVerboseDebugging())outputInfo("No unary operators to apply!");
+		if(amVerboseDebugging())q2outputInfo("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=nextEnvironmentExpressionToken();
@@ -4557,7 +4557,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			outputValue("Value result: '",_valueReference->_value,"'");
 			output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);
 		}else
-			outputInfo("No value result!");
+			q2outputInfo("No value result!");
 	}
 	
 	return disowned_valuereference(_valueReference,owner);
@@ -4724,12 +4724,12 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 			_sumBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_sumBiginteger&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){
 				FREE_BIGINTEGER(_sumBiginteger,owner);_sumBiginteger=NULL;
-				outputError("Failed to add two big integers");
+				q2outputError("Failed to add two big integers");
 			} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
-			outputError("Failed to convert an integer to a big integer");
+			q2outputError("Failed to convert an integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -4743,7 +4743,7 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 				FREE_BIGINTEGER(_sumBiginteger,owner);
 				return _getIntegerValue(llsum);
 			}
-			outputWarning("Small integer sum out of range, will continue using big integer sum.");
+			q2outputWarning("Small integer sum out of range, will continue using big integer sum.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_sumBiginteger,owner));
 	}
@@ -4769,12 +4769,12 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
 		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		/////outputInfo("Adding two rationals.");
+		/////q2outputInfo("Adding two rationals.");
 		Mrational* _sumRational=owned_rational(_getRationalSum(_rational1,_rational2),owner); // _qsum replaced by _getRationalSum that takes the deltas into account as well
-		/////outputInfo("Rationals added!");
+		/////q2outputInfo("Rationals added!");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(amVerboseDebugging())
-			outputInfo("Rational copies released.");
+			q2outputInfo("Rational copies released.");
 		Mvalue* _sumValue=NULL;
 		if(_sumRational){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
@@ -4871,7 +4871,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			if(amVerboseDebugging())
 				{outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert an integer to a big integer");
+			q2outputError("Failed to convert an integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -4882,7 +4882,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			long long llsum=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llsum!=M_LL_INVALID){FREE_BIGINTEGER(_differenceBiginteger,owner);return _getIntegerValue(llsum);}
-			outputWarning("Small integer difference out of range, will continue using big integer difference.");
+			q2outputWarning("Small integer difference out of range, will continue using big integer difference.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_differenceBiginteger,owner));
 	}
@@ -4958,7 +4958,7 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			if(amVerboseDebugging())
 				{outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -4969,7 +4969,7 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			long long llproduct=getBigintegerInteger(_productBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llproduct!=M_LL_INVALID){FREE_BIGINTEGER(_productBiginteger,owner);return _getIntegerValue(llproduct);}
-			outputWarning("Small integer product out of range, will continue using big integer product.");
+			q2outputWarning("Small integer product out of range, will continue using big integer product.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_productBiginteger,owner));
 	}
@@ -4986,14 +4986,14 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
 			_productBiginteger=__biginteger();
-			if(!_productBiginteger)outputError("Failed to create the product big integer");else
+			if(!_productBiginteger)q2outputError("Failed to create the product big integer");else
 			if(mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){
-				FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
+				FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;q2outputError("Failed to multiply two big integers");
 			}else
 			if(amVerbose())outputBiginteger("Big integer product: '",_productBiginteger,"'.\n");
 			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		}else
-			outputError("Failed to create two helper big integers");
+			q2outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getValueOfBiginteger(disowned_biginteger(_productBiginteger,true);
 	}
@@ -5097,11 +5097,11 @@ Mdecimal* _getDecimalPower(mpd_t* base,mpd_t* exponent,mpd_context_t* mpd_contex
 			uint32_t status=0;
 			mpd_qpow(_decimalPower->mpd,base,exponent,mpd_context,&status);
 			if((status&0xEFBF)!=0)
-			{outputError("Failed to apply the decimal power function");FREE_DECIMAL(_decimalPower,owner);_decimalPower=NULL;}
+			{q2outputError("Failed to apply the decimal power function");FREE_DECIMAL(_decimalPower,owner);_decimalPower=NULL;}
 		}else
-			outputError("Failed to create decimal power function result");
+			q2outputError("Failed to create decimal power function result");
 	}else
-		outputError("Insufficient input for computing a decimal power");
+		q2outputError("Insufficient input for computing a decimal power");
 	return disowned_decimal(_decimalPower,owner);
 }
 
@@ -5242,11 +5242,11 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 									mpd_qmul(_resultDecimal->mpd,_doublehalfresultDecimal->mpd,baseDecimal->mpd,mpd_context,&status);
 									if((status&0xEFBF)!=0){FREE_DECIMAL(_resultDecimal,owner);_resultDecimal=NULL;}
 								}else
-									outputError("Failed to create a decimal in computing the integer power of a decimal");
+									q2outputError("Failed to create a decimal in computing the integer power of a decimal");
 							}else
 								_resultDecimal=owned_decimal(_getDecimalCopy(_doublehalfresultDecimal),owner);
 						}else
-							outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
+							q2outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
 						FREE_DECIMAL(_doublehalfresultDecimal,owner);
 					}
 					FREE_DECIMAL(_halfresultDecimal,owner);
@@ -5368,24 +5368,24 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										// update the delta
 										outputBiginteger("\tNumerator ",_pk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
 										if(computeBigintegerPower(_pk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY)
-										{outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										{q2outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										outputBiginteger(" ",_pktothepowern,".\n");
 										outputBiginteger("\tDenominator ",_qk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
 										if(computeBigintegerPower(_qk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY)
-										{outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										{q2outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										outputBiginteger(" ",_qktothepowern,".\n");
 
 										/* replacing:
-										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
-										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
+										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){q2outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){q2outputError("Failed to compute the power of the denominator of the rational approximation");break;}
 										*/
-										if(!q_a||!_delta1||mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(!q_a||!_delta1||mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 1: ",_delta1,".\n");
-										if(!p_a||!_delta2||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(!p_a||!_delta2||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 2: ",_delta2,".\n");
-										if(!_delta2||!_delta1||!_distancenumerator||mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+										if(!_delta2||!_delta1||!_distancenumerator||mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){q2outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
 										// we can compute the denominator of the distance as well which is q_a times _qktothepowern
-										if(!_qktothepowern||!q_a||!_distancedenominator||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
+										if(!_qktothepowern||!q_a||!_distancedenominator||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){q2outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
 
 										outputBiginteger("\tDistance from (",_pk,"/");outputBiginteger(NULL,_qk,")");outputBiginteger("**",rootDegreeBiginteger," to ");
 										outputBiginteger("root argument (",p_a,"/");outputBiginteger(NULL,q_a,"): ");
@@ -5399,29 +5399,29 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 
 										if(mp_iszero(MP_INT_POINTER(_distancenumerator)))break; // if delta is zero, exact hit (which I think can only happen when)
 										
-										if(mp_div(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_pk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_divremainder))!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
+										if(mp_div(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_pk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_divremainder))!=MP_OKAY){q2outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
 										// update _pk (next) and _qk (next)
-										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextpk))!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-										if(mp_add(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_nextpk))!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_nextqk))!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextqk))!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextpk))!=MP_OKAY){q2outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										if(mp_add(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_nextpk))!=MP_OKAY){q2outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_nextqk))!=MP_OKAY){q2outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextqk))!=MP_OKAY){q2outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 										// that's neat isn't it?
 										// how about normalizing _pk and _qk here, which might help
-										if(mp_gcd(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd))!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
+										if(mp_gcd(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd))!=MP_OKAY){q2outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
 										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_divremainder))!=MP_OKAY
 																	||mp_div(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_divremainder))!=MP_OKAY))
-										{outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
+										{q2outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
 
 										// do the bracketing here (on the next pk and qk) 
 										// ASSERT we have to ascertain that the denominator remains the same!!!!!
 										// the sign of distance numerator tells us on which side of the root we are
 										// how about using two big integers???? starting out with 
-										if(computeBigintegerPower(_nextpk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance numerator for bracketing.");break;}
-										if(computeBigintegerPower(_nextqk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance denominator for bracketing.");break;}
-										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
-										if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
-										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
+										if(computeBigintegerPower(_nextpk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){q2outputError("Failed to initialize the distance numerator for bracketing.");break;}
+										if(computeBigintegerPower(_nextqk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){q2outputError("Failed to initialize the distance denominator for bracketing.");break;}
+										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){q2outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){q2outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){q2outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
 										outputBiginteger("\n\tDistance of the next Newtonian approximation (",_nextpk,"/");
 										outputBiginteger(NULL,_nextqk,"):");outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,").\n");
 
@@ -5476,14 +5476,14 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											output("\t%sFailed to perform rational root bracketing.\n",M_ERROR_PREFIX);
 
 										// what's the change in approximation?
-										if(mp_mul(MP_INT_POINTER(_pk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_num))!=MP_OKAY){outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
-										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_num1))!=MP_OKAY){outputError("Failed to initialize the change to the rational root approximation");break;}
-										if(mp_sub(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
-										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk),MP_INT_POINTER(_den))!=MP_OKAY){outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
-										if(mp_gcd(MP_INT_POINTER(_num),MP_INT_POINTER(_den),MP_INT_POINTER(_gcd))!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_pk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_num))!=MP_OKAY){q2outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
+										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_num1))!=MP_OKAY){q2outputError("Failed to initialize the change to the rational root approximation");break;}
+										if(mp_sub(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){q2outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
+										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk),MP_INT_POINTER(_den))!=MP_OKAY){q2outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
+										if(mp_gcd(MP_INT_POINTER(_num),MP_INT_POINTER(_den),MP_INT_POINTER(_gcd))!=MP_OKAY){q2outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
 										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_num),MP_INT_POINTER(_gcd),MP_INT_POINTER(_num),MP_INT_POINTER(_divremainder))!=MP_OKAY
 											||mp_div(MP_INT_POINTER(_den),MP_INT_POINTER(_gcd),MP_INT_POINTER(_den),MP_INT_POINTER(_divremainder))!=MP_OKAY))
-										{outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
+										{q2outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
 										output("\tChange in rational approximation: ",iter);outputBiginteger("(",_num,NULL);outputBiginteger("/",_den,")");
 										bool decimalprecisionreached=false;
 										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_num),/*_getBigintegerCopy*/(_den),M_LD_NAN,false),owner);
@@ -5501,8 +5501,8 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");(*inputCharReadFunction)(&c);outputChar('\n'); // wait for any key
 											if(c==3)break;
 										}
-										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pk))!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
-										if(mp_copy(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk))!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
+										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pk))!=MP_OKAY){q2outputError("Failed to update the numerator of the rational root approximation");break;}
+										if(mp_copy(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk))!=MP_OKAY){q2outputError("Failed to update the denominator of the rational root approximation");break;}
 
 									}
 									FREE_BIGINTEGER(_pktothepowern,owner);
@@ -5533,14 +5533,14 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 								_rationalBigintegerRootRational=owned_rational(_getRational(_pk,_qk,M_LD_NAN,true),owner);
 							}
 						}else
-							outputError("Failed to initialize the rational root approximation");
+							q2outputError("Failed to initialize the rational root approximation");
 					}else
-						outputError("Failed to initialize the rational rational root approximation");
+						q2outputError("Failed to initialize the rational rational root approximation");
 					if(!rootArgumentRational->den)FREE_BIGINTEGER(q_a,owner); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
 					// take care of freeing the result numerator and denominator when we do not have a rational root rational
 					if(!_rationalBigintegerRootRational){FREE_BIGINTEGER(_pk,owner);FREE_BIGINTEGER(_qk,owner);}
 				}else
-					outputError("The root degree is too large (which should never happen though, as it should have been prevented)");
+					q2outputError("The root degree is too large (which should never happen though, as it should have been prevented)");
 			}else
 				_rationalBigintegerRootRational=owned_rational(_getRationalCopy(rootArgumentRational),owner);
 		}else // the root degree equals 0
@@ -5576,7 +5576,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 					Mdecimal *_bigintegerRootDecimal=owned_decimal(__decimal(mpd_context,1,0),owner)
 					        ,*_nextBigintegerRootDecimal=owned_decimal(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
 					if(_bigintegerRootDecimal&&_nextBigintegerRootDecimal){
-						outputInfo("Root computation result decimals created...");
+						q2outputInfo("Root computation result decimals created...");
 						uint32_t status=0;
 						// let's determine on which side of one the root argument is located!!!!
 						int rootArgumentComparison=mpd_qcmp(_rootArgumentDecimal->mpd,_bigintegerRootDecimal->mpd,&status);
@@ -5589,19 +5589,19 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 							// 0. preparations: we need (root degree - 1 ) regularly
 							Mdecimal* _rootDegreeMinus1Decimal=owned_decimal(__decimal(mpd_context,0,0),owner); /////_getDecimalCopy(_rootDegreeDecimal);
 							if(_rootDegreeMinus1Decimal){
-								outputInfo("Root computation helper decimal created...");
+								q2outputInfo("Root computation helper decimal created...");
 								// can't I use getDecimalOne() here?????? apparently not!!
 								mpd_t* _decimalOne=__mpd(mpd_context,1);
 								mpd_qsub(_rootDegreeMinus1Decimal->mpd,_rootDegreeDecimal->mpd,_decimalOne,mpd_context,&status);
 								free_mpd(_decimalOne);
 								if((status&0xEFBF)==0){
-									outputInfo("Root computation helper decimal initialized...");
+									q2outputInfo("Root computation helper decimal initialized...");
 									// we need the root degree minus 1 as big integer as well
 									Mbiginteger* _rootDegreeMinus1Biginteger=owned_biginteger(_getBigintegerCopy(rootDegreeBiginteger),owner);
 									if(_rootDegreeMinus1Biginteger){
-										outputInfo("Root computation helper big integer created...");
+										q2outputInfo("Root computation helper big integer created...");
 										if(mp_decr(MP_INT_POINTER(_rootDegreeMinus1Biginteger))==MP_OKAY){
-											outputInfo("Root computation helper big integer initialized...");
+											q2outputInfo("Root computation helper big integer initialized...");
 											// we need a product, a quotient and an addition help decimal
 											/*
 											Mdecimal *_distance=__decimal(mpd_context,0,0),*_prevdistance=__decimal(mpd_context,0,0);
@@ -5612,7 +5612,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													,*_power=owned_decimal(__decimal(mpd_context,0,0),owner);
 											// initial value of the quotient denominator that we need for checking whether we're done and in the computation
 											if(/*_distance&&_prevdistance&&*/_product&&_quotient&&_productplusquotient&&_power){
-												outputInfo("Root computation helper decimals created...");
+												q2outputInfo("Root computation helper decimals created...");
 												// ready to rock 'n' roll, eh iterate
 												// NOTE iterating until the next value is the same wasn't working, it might be better to compute the power value itself and to compare with the root argument value, if match stop!!
 												unsigned long long iter=0;
@@ -5634,7 +5634,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													// if the distance hasn't changed we're done (as we noticed the distance won't be zero in general)
 													if(mpd_qcmp(_distance->mpd,_prevdistance->mpd,&status)==0)break; // a match, so done
 													free_mpd(_prevdistance->mpd);_prevdistance->mpd=mpd_qncopy(_distance->mpd);
-													if(!_prevdistance->mpd){outputError("Failed to copy the distance!");break;}
+													if(!_prevdistance->mpd){q2outputError("Failed to copy the distance!");break;}
 													*/
 													// replacing: if(mpd_iszero(_distance->mpd))break;
 													// if the product of the quotient denominator and the root decimal equals the root argument
@@ -5671,7 +5671,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 														outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
 												}
 											}else
-												outputError("Failed to create helper decimals in computing a root decimal");
+												q2outputError("Failed to create helper decimals in computing a root decimal");
 											/*
 											FREE_DECIMAL(_distance);FREE_DECIMAL(_prevdistance);
 											*/
@@ -5680,32 +5680,32 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 											FREE_DECIMAL(_productplusquotient,owner);
 											FREE_DECIMAL(_power,owner);
 										}else
-											outputError("Failed to compute a helper big integer in computing a root decimal");
+											q2outputError("Failed to compute a helper big integer in computing a root decimal");
 										FREE_BIGINTEGER(_rootDegreeMinus1Biginteger,owner);
-										outputInfo("Root computation helper big integer released...");
+										q2outputInfo("Root computation helper big integer released...");
 									}else
-										outputError("Failed to copy the root degree in computing a root decimal");
+										q2outputError("Failed to copy the root degree in computing a root decimal");
 								}else
-									outputError("Failed to compute a helper decimal in computing a root decimal");
+									q2outputError("Failed to compute a helper decimal in computing a root decimal");
 							}else
-								outputError("Failed to create a helper decimal in computing a root decimal");
+								q2outputError("Failed to create a helper decimal in computing a root decimal");
 							FREE_DECIMAL(_rootDegreeMinus1Decimal,owner);
-							outputInfo("Root computation helper decimal released...");
+							q2outputInfo("Root computation helper decimal released...");
 						}else
 						if(rootArgumentComparison)
-							outputError("Failed to initialize the result of the root computation to the square root");
+							q2outputError("Failed to initialize the result of the root computation to the square root");
 						else // wrap the result (which is 1)
 							_bigintegerRootValue=_getValueOfDecimal(disowned_decimal(_bigintegerRootDecimal,owner));
 					}
 					FREE_DECIMAL(_nextBigintegerRootDecimal,owner);
 					FREE_DECIMAL(_rootDegreeDecimal,owner);
-					outputInfo("Root computation degree decimal released...");
+					q2outputInfo("Root computation degree decimal released...");
 				}else{
 					output("%s",M_ERROR_PREFIX);
 					outputBiginteger("Failed to convert root degree '",rootDegreeBiginteger,"' to a decimal.\n");
 				}
 			}else
-				outputError("Failed to create a decimal context for computing a decimal root");
+				q2outputError("Failed to create a decimal context for computing a decimal root");
 			if(rootArgumentValue->type!=VT_DECIMAL)FREE_DECIMAL(_rootArgumentDecimal,owner);
 		}else{
 			output("%s",M_ERROR_PREFIX);outputValue("Failed to convert root argument '",rootArgumentValue,"' to a decimal.\n");
@@ -5746,22 +5746,22 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 			if(amVerbose())
 				{outputBiginteger("Power: '",_powerBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: if the base is integer, we're going to try to return a small integer
 		if(smallinteger1){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
-			if(amVerbose())outputInfo("Will try to convert the big integer result back to a small integer.");
+			if(amVerbose())q2outputInfo("Will try to convert the big integer result back to a small integer.");
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
 			long long llpower=getBigintegerInteger(_powerBiginteger);
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llpower!=M_LL_INVALID){
-				if(amVerbose())outputInfo("Will remove the big integer exponentiation result!");
+				if(amVerbose())q2outputInfo("Will remove the big integer exponentiation result!");
 				FREE_BIGINTEGER(_powerBiginteger,owner);
-				if(amVerbose())outputInfo("Returning the small integer equivalent of the big integer exponentation result.");
+				if(amVerbose())q2outputInfo("Returning the small integer equivalent of the big integer exponentation result.");
 				return _getIntegerValue(llpower);
 			}
-			outputWarning("Small integer exponentation result out of range, will continue using the big integer exponentiation result.");
+			q2outputWarning("Small integer exponentation result out of range, will continue using the big integer exponentiation result.");
 		}
 		///////outputBiginteger("Exponentation result: '",_powerBiginteger,"'.\n");
 		return _getValueOfBiginteger(disowned_biginteger(_powerBiginteger,owner));
@@ -5855,7 +5855,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 								outputValue("Rational exponent root of ",_rootArgumentValue,NULL);outputValue(": ",_rootValue,".\n");
 								*/
 							}else
-								outputError("Failed to determine the integer and fractional part of a rational exponent");
+								q2outputError("Failed to determine the integer and fractional part of a rational exponent");
 							FREE_BIGINTEGER(_integerdividend,owner);FREE_BIGINTEGER(_remainder,owner);
 						}else // the numerator equals the denominator meaning that _value1 is the value to return
 							_rootValue=_value1;
@@ -5873,7 +5873,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						if(_returnValue)_returnValue=Mreciprocal(_returnValue);
 					}
 				}else
-					outputError("Failed to reverse the sign of the rational exponent");
+					q2outputError("Failed to reverse the sign of the rational exponent");
 				if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_exponentRational,owner);
 			}else{ // not integer based exponent (so if the exponent is a decimal is does not have a repeating part), so use decimals
 				// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
@@ -5884,11 +5884,11 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 				if(_baseDecimal&&_exponentDecimal){
 					Mdecimal* _powerDecimal=NULL;
 					mpd_context_t* mpd_context=getContextOfDecimals(_baseDecimal,_exponentDecimal);
-					if(!mpd_context)outputError("No decimal context for use in the power function");
+					if(!mpd_context)q2outputError("No decimal context for use in the power function");
 					// the decimal library has a function to compute the power of two decimals and we can use that for most of the value pairs
 					// if either has a repeating part we have a problem
 					if(_baseDecimal->repeating>0){
-						if(amVerbose())outputInfo("Computing the power of a rational.");
+						if(amVerbose())q2outputInfo("Computing the power of a rational.");
 						// the result is the quotient of the power of the numerator divided by the power of the denominator of the associated rational
 						Mrational* _baseRational=getValueRational(_value1);if(_value1->type!=VT_RATIONAL)owned_rational(_baseRational,owner);
 						Mdecimal* _baseNumDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->num),owner);
@@ -5901,18 +5901,18 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 							uint32_t status=0;
 							mpd_qdiv(_powerDecimal->mpd,_numPowerDecimal->mpd,_denPowerDecimal->mpd,mpd_context,&status);
 							if((status&0xEFBF)!=0)
-							{outputError("Failed to divide the numerator and denominator powers");FREE_DECIMAL(_powerDecimal,owner);_powerDecimal=NULL;}
+							{q2outputError("Failed to divide the numerator and denominator powers");FREE_DECIMAL(_powerDecimal,owner);_powerDecimal=NULL;}
 						}else
-							outputError("Failed to create the decimal result of applying the power function to a rational");
+							q2outputError("Failed to create the decimal result of applying the power function to a rational");
 						FREE_DECIMAL(_baseNumDecimal,owner);FREE_DECIMAL(_baseDenDecimal,owner);
 						FREE_DECIMAL(_numPowerDecimal,owner);FREE_DECIMAL(_denPowerDecimal,owner);
 						if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_baseRational,owner);
 					}else{ // base and exponent decimals is true
 						_powerDecimal=owned_decimal(_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
-						outputInfo("Power decimal computed!");
+						q2outputInfo("Power decimal computed!");
 						// if the exponent is integer typed, the base type determines what to return
 					}
-					if(_powerDecimal)_returnValue=_getValueOfDecimal(disowned_decimal(_powerDecimal,owner));else outputError("Failed to create the power function result decimal");
+					if(_powerDecimal)_returnValue=_getValueOfDecimal(disowned_decimal(_powerDecimal,owner));else q2outputError("Failed to create the power function result decimal");
 				}
 				// if the originals weren't decimals, free the created decimals!!!!
 				if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_baseDecimal,owner);
@@ -5959,14 +5959,14 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 						if(exponentOf10==0)
 							_rational=_getRational(_numerator,_getBigintegerCopy(_value1->value._rational->den),getReal(_value1->value._rational->delta),true,true);
 						else
-							outputError("Failed to multiply the numerator of the rational by an integer power of 10.");
+							q2outputError("Failed to multiply the numerator of the rational by an integer power of 10.");
 					}else{
 						Mbiginteger* _denominator=(!_value1->value._rational->den?_getBiginteger(1):_getBigintegerCopy(_value1->value._rational->den));
 						while(exponentOf10<0)if(mp_mul(_denominator,_biginteger10,_denominator)==MP_OKAY)exponentOf10++;else break;
 						if(exponentOf10==0)
 							_rational=_getRational(_getBigintegerCopy(_value1->value._rational->num),_denominator,getReal(_value1->value._rational->delta),true,true);
 						else
-							outputError("Failed to multiply the denominator of the rational by an integer power of 10.");
+							q2outputError("Failed to multiply the denominator of the rational by an integer power of 10.");
 					}
 					FREE_BIGINTEGER(_biginteger10);
 				}
@@ -6070,7 +6070,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 			{FREE_BIGINTEGER(_integerquotientBiginteger,owner);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -6084,7 +6084,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 				FREE_BIGINTEGER(_integerquotientBiginteger,owner);
 				return _getIntegerValue(llintegerquotient);
 			}
-			outputWarning("Small integer integer quotient out of range, will continue using big integer integer quotient.");
+			q2outputWarning("Small integer integer quotient out of range, will continue using big integer integer quotient.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_integerquotientBiginteger,owner));
 	}
@@ -6109,10 +6109,10 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 						FREE_BIGINTEGER(_integerremainderBiginteger);
 					}
 				}else 
-					outputError("Failed to create the integer divide result big integer");
+					q2outputError("Failed to create the integer divide result big integer");
 			}
 		}else 
-			outputError("Failed to create two helper big integers");
+			q2outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getValueOfBiginteger(disowned_biginteger(_integerdivideBiginteger,true);
 	}
@@ -6189,7 +6189,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 			{FREE_BIGINTEGER(_moduloBiginteger,owner);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer division remainder: '",_moduloBiginteger,"'.\n");}
 		}else
-			outputError("Failed to convert a small integer to a big integer");
+			q2outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
 		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
@@ -6200,7 +6200,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 			long long llmodulo=getBigintegerInteger(_moduloBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llmodulo!=M_LL_INVALID){FREE_BIGINTEGER(_moduloBiginteger,owner);return _getIntegerValue(llmodulo);}
-			outputWarning("Small integer quotient remainder out of range, will continue using big integer quotient remainder.");
+			q2outputWarning("Small integer quotient remainder out of range, will continue using big integer quotient remainder.");
 		}
 		return _getValueOfBiginteger(disowned_biginteger(_moduloBiginteger,owner));
 	}
@@ -6296,7 +6296,7 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_xorbiginteger,owner));
 		}else
-			outputError("Failed to create the xor result big integer");
+			q2outputError("Failed to create the xor result big integer");
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -6320,7 +6320,7 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_bitwiseandbiginteger,owner));
 		}else
-			outputError("Failed to create the bitwise and result big integer");
+			q2outputError("Failed to create the bitwise and result big integer");
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -6345,7 +6345,7 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 			return _getValueOfBiginteger(disowned_biginteger(_bitwiseorbiginteger,owner));
 		}else
-			outputError("Failed to create the bitwise or result big integer");
+			q2outputError("Failed to create the bitwise or result big integer");
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -6425,9 +6425,9 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 				FREE_BIGINTEGER(_shiftleftBiginteger,owner);_shiftleftBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
 			}else 
-				outputError("Failed to shift left a big integer");
+				q2outputError("Failed to shift left a big integer");
 		}else
-			outputError("Failed to create the shift left result big integer");
+			q2outputError("Failed to create the shift left result big integer");
 		return _getValueOfBiginteger(disowned_biginteger(_shiftleftBiginteger,owner));
 	}
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
@@ -6445,14 +6445,14 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 					if(!_shiftleftRational->den)_shiftleftRational->den=_getBiginteger(1); // force having a non NULL denominator before trying to shift it
 					if(_shiftleftRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftleftRational->den),-shiftleftinteger,MP_INT_POINTER(_shiftleftRational->den))!=MP_OKAY){
 						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
-						outputError("Failed to half a rational");
+						q2outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftleftRational){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational,owner);}
 				}else{ 
 					if(mp_mul_2d(MP_INT_POINTER(_shiftleftRational->num),shiftleftinteger,MP_INT_POINTER(_shiftleftRational->num))!=MP_OKAY){
 						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
-						outputError("Failed to double a rational");
+						q2outputError("Failed to double a rational");
 					}
 				}
 				if(_shiftleftRational){
@@ -6461,10 +6461,10 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 					{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize shift left rational ",_shiftleftRational,".\n");}
 				}
 			}else 
-				outputError("Failed to copy a rational");
+				q2outputError("Failed to copy a rational");
 			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		}else 
-			outputError("Failed to convert a decimal to a rational");
+			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftleftRational,owner));
 	}
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
@@ -6473,9 +6473,9 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		if(_shiftleftDecimal){
 			uint32_t status=0;
 			if(_shiftleftDecimal>0)mpd_qshiftr(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,shiftleftinteger,&status);else mpd_qshiftl(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,-shiftleftinteger,&status);
-			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftleftDecimal,owner);_shiftleftDecimal=NULL;outputError("Failed to shift a decimal to the left");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftleftDecimal,owner);_shiftleftDecimal=NULL;q2outputError("Failed to shift a decimal to the left");}
 		}else 
-			outputError("Failed to copy a decimal");
+			q2outputError("Failed to copy a decimal");
 		return _getValueOfDecimal(disowned_decimal(_shiftleftDecimal,owner));
 	}
 	return NULL;
@@ -6499,9 +6499,9 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				FREE_BIGINTEGER(_shiftrightBiginteger,owner);_shiftrightBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
 			}else 
-				outputError("Failed to shift right a big integer");
+				q2outputError("Failed to shift right a big integer");
 		}else
-			outputError("Failed to create the shift right result big integer");
+			q2outputError("Failed to create the shift right result big integer");
 		return _getValueOfBiginteger(disowned_biginteger(_shiftrightBiginteger,owner));
 		/* replacing:
 		// what we shift by should fit in int64_t!!!!
@@ -6517,7 +6517,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				}
 			}
 		}else
-			outputError("Number of shift positions too large");
+			q2outputError("Number of shift positions too large");
 		*/
 	}
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
@@ -6535,14 +6535,14 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 					if(!_shiftrightRational->den)_shiftrightRational->den=OWNED(_getBiginteger(1),owner); // force having a non NULL denominator before trying to shift it
 					if(_shiftrightRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftrightRational->den),shiftrightinteger,MP_INT_POINTER(_shiftrightRational->den))!=MP_OKAY){
 						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
-						outputError("Failed to half a rational");
+						q2outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftrightRational){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational,owner);}
 				}else{ // naughty boy (or girl for that matter)...
 					if(mp_mul_2d(MP_INT_POINTER(_shiftrightRational->num),-shiftrightinteger,MP_INT_POINTER(_shiftrightRational->num))!=MP_OKAY){
 						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
-						outputError("Failed to double a rational");
+						q2outputError("Failed to double a rational");
 					}
 				}
 				if(_shiftrightRational){
@@ -6551,10 +6551,10 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 					{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize shift right rational ",_shiftrightRational,".\n");}
 				}
 			}else 
-				outputError("Failed to copy a rational");
+				q2outputError("Failed to copy a rational");
 			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		}else 
-			outputError("Failed to convert a decimal to a rational");
+			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftrightRational,owner));
 	}
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
@@ -6563,9 +6563,9 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		if(_shiftrightDecimal){
 			uint32_t status=0;
 			if(_shiftrightDecimal>0)mpd_qshiftr(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,shiftrightinteger,&status);else mpd_qshiftl(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,-shiftrightinteger,&status);
-			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;outputError("Failed to shift a decimal to the right");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;q2outputError("Failed to shift a decimal to the right");}
 		}else 
-			outputError("Failed to copy a decimal");
+			q2outputError("Failed to copy a decimal");
 		return _getValueOfDecimal(disowned_decimal(_shiftrightDecimal,owner));
 	}
 	return NULL;
@@ -6599,9 +6599,9 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				result=isRationalNegative(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
@@ -6618,9 +6618,9 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				result=isDecimalNegative(_decimalDifference);
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
@@ -6653,9 +6653,9 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				result=not(isRationalNegative(_rationalDifference));
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
@@ -6671,9 +6671,9 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				result=not(isDecimalNegative(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
@@ -6705,9 +6705,9 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				result=not(isRationalNegative(_rationalDifference));
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
@@ -6724,9 +6724,9 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				result=not(isDecimalNegative(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
@@ -6760,9 +6760,9 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 				result=not(isRationalZero(_rationalDifference)); 
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
@@ -6779,9 +6779,9 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 				result=not(isDecimalZero(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
@@ -6814,9 +6814,9 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 				result=isRationalZero(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
@@ -6833,9 +6833,9 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 				result=isDecimalZero(_decimalDifference);
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
@@ -6868,9 +6868,9 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 				result=not(isRationalPositive(_rationalDifference)); // i.e. if difference is NOT positive, we should return M_TRUE
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
-				outputError("Failed to compute the difference of two rationals");
+				q2outputError("Failed to compute the difference of two rationals");
 		}else
-			outputError("Failed to convert comparison operator arguments to rationals");
+			q2outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
@@ -6887,9 +6887,9 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 				result=not(isDecimalPositive(_decimalDifference));
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
-				outputError("Failed to compute the difference of two decimals");
+				q2outputError("Failed to compute the difference of two decimals");
 		}else
-			outputError("Failed to convert comparison arguments to decimals");
+			q2outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
@@ -6930,24 +6930,24 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 						while(integerrangeValue){
 							// determine whether this value does not exceed the last value
 							inrangeValue=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
-							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
+							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){q2outputError("Unable to determine whether the integer is inside the integer range");break;}
 							if(inrangeValue->value._integer->ll==0)break; // not in range
 							if(appendedToList(_scalarRangeList,owner,integerrangeValue,M_LL_INVALID)<=0)
-							{FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
+							{FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;q2outputError("Failed to add an integer to an integer range");break;}
 							// determine the next value to insert into the integer range
 							if(*up)rangeInteger++;else rangeInteger--;
 							integerrangeValue=_getIntegerValue(rangeInteger);
 						}
 					}else
-						outputError("Failed to initialize the first candidate range integer");
+						q2outputError("Failed to initialize the first candidate range integer");
 				}else
-					outputError("Failed to extract the lower bound of the integer range");
+					q2outputError("Failed to extract the lower bound of the integer range");
 			}else
-				outputError("Failed to determine the first integer range value");
+				q2outputError("Failed to determine the first integer range value");
 		}else
-			outputError("Unable to determine whether to go up or down in the integer range");
+			q2outputError("Unable to determine whether to go up or down in the integer range");
 	}else
-		outputError("Failed to create a list to store the integer range");
+		q2outputError("Failed to create a list to store the integer range");
 	return disowned_list(_scalarRangeList,owner);
 }
 // MDH@18OCT2019: we can get the range of integers between two values using step _value3, but when _value3 is defined, we actually start at _value1!!
@@ -7111,7 +7111,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			default:output("%sUnknown binary operator '%s'.\n",M_ERROR_PREFIX,operator);
 		}
 		if(amVerboseDebugging())
-			{if(result)outputValue("Result of applying binary operator: '",result,"'.\n");else outputInfo("No result!");}
+			{if(result)outputValue("Result of applying binary operator: '",result,"'.\n");else q2outputInfo("No result!");}
 	}
 	return result;
 }
@@ -7190,7 +7190,7 @@ char* getSignificantTokenText(Mtoken* token){
 		tokenTextLength=string_length(tokenText);
 		firstInsignificantTokenCharacter=string_char(tokenText,token->significantCharacterCount);
 		if(!string_shorten(tokenText,expressionToken->significantCharacterCount)){
-			outputError("Failed to shorten token text");
+			q2outputError("Failed to shorten token text");
 			return NULL;
 		}
 	}
@@ -7292,11 +7292,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 								Mlistelement* newItemIdListElement=newItemIdsList->_first;
 								while(newItemIdListElement){
 									if(!appendedToList(itemIdsList,newItemIdListElement->_value,M_LL_INVALID))
-										outputError("Failed to append augmented item id.");
+										q2outputError("Failed to append augmented item id.");
 									newItemIdListElement=newItemIdListElement->_next;
 								}
 							}else 
-								outputBug("Item ids not a list.");
+								q2outputBug("Item ids not a list.");
 							// indexListValue will be removed by the garbage collector
 						}else // no item id yet, so the same way as is done before set _itemid to the index list value
 							assignValue(&operandValueReference->_itemid,indexListValue);
@@ -7315,15 +7315,15 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				endTokenTypeIndex=endTokenTypeCount;
 				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
 				if(endTokenTypeIndex){
-					if(amVerboseDebugging())outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
+					if(amVerboseDebugging())q2outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
 					break;
 				}
-				if(amVerboseDebugging())outputInfo(" NO");
+				if(amVerboseDebugging())q2outputInfo(" NO");
 
 				if(amVerboseDebugging())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
 				_formulaelement->_operator=owned_string(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
-				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
+				if(!_formulaelement->_operator){q2outputError("Failed to copy the operator");break;}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
 				while(expressionToken->next&&expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
@@ -7338,13 +7338,13 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement->_next=OWNED(__formulaelement("successor"),owner); // MDH@08JUN2020: similar to all other formula elements this one needs to be owned by me as well otherwise I won't be able to free it myself
 				_formulaelement=_formulaelement->_next;
 				if(!_formulaelement){
-					outputError("Failed to create a new formula element.");
+					q2outputError("Failed to create a new formula element.");
 					break;
 				}
 				formulaElementCount++;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
-			if(amVerboseDebugging())outputInfo("No further formula elements!");
+			if(amVerboseDebugging())q2outputInfo("No further formula elements!");
 		}
 
 		// evaluate the formula
@@ -7423,7 +7423,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						FREE_DISOWNED_1(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
 						formulaElementCount--; // one less to free!!!
 					}else
-						outputInfo("No formula element to free!");
+						q2outputInfo("No formula element to free!");
 					*/
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
 					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
@@ -7534,7 +7534,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			newline();
 			*/
-			if(amVerboseDebugging())outputInfo("Formula elements freed.");
+			if(amVerboseDebugging())q2outputInfo("Formula elements freed.");
 		}else
 		if(amVerboseDebugging())output("No result of expression '%s' to store.",info);
 	}
@@ -7593,13 +7593,13 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	while(numberOfSettingCharacters>0)settingApplied(settingCharacters[--numberOfSettingCharacters]);
 
 	// register the callbacks
-	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else outputWarning("No input character read function defined!");
-	if(!_inputInfoFunction){inputInfoFunction=inputInfo;outputWarning("Using the default input info function.");}else inputInfoFunction=_inputInfoFunction;
-	if(!_inputErrorFunction){inputErrorFunction=inputError;outputWarning("Using the default input error function.");}else inputErrorFunction=_inputErrorFunction;
-	if(!_outputTokenFunction){outputTokenFunction=outputToken;outputWarning("Using the default output token function.");}else outputTokenFunction=_outputTokenFunction;
-	if(!_reoutputTokenFunction)outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
-	if(!_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
-	if(!_outputCommandInfoFunction)outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
+	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else q2outputWarning("No input character read function defined!");
+	if(!_inputInfoFunction){inputInfoFunction=inputInfo;q2outputWarning("Using the default input info function.");}else inputInfoFunction=_inputInfoFunction;
+	if(!_inputErrorFunction){inputErrorFunction=inputError;q2outputWarning("Using the default input error function.");}else inputErrorFunction=_inputErrorFunction;
+	if(!_outputTokenFunction){outputTokenFunction=outputToken;q2outputWarning("Using the default output token function.");}else outputTokenFunction=_outputTokenFunction;
+	if(!_reoutputTokenFunction)q2outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
+	if(!_updateLastTokenAutocompletionTextFunction)q2outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
+	if(!_outputCommandInfoFunction)q2outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
 
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return NULL; // let's force starting with a default decimal context
@@ -7610,13 +7610,13 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 
 	// MDH@06NOV2019: NULL_value remains NULL for ever...
 	UNDEFINED_value=__value("undefined");
-	if(!UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
+	if(!UNDEFINED_value){q2outputError("Failed to initialize UNDEFINED.");return false;}
 
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
 	//                therefore it shouldn't be a token value 
 	/*
 	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
-	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputBug("Failed to create NULL value!");
+	if(NULL_value)NULL_value->value._token->text=__string("NULL");else q2outputBug("Failed to create NULL value!");
 	*/
 
 	// either set the DP_value to 0 (failed to get a decimal context somehow)
@@ -7628,7 +7628,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	/* MDH@14NOV2019: using M for storing both the command (text) and the result (at that moment)
 	_resultListValue=_getListValue(VT_UNDEFINED,true); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
-	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputWarning("Failing to create the results list. The results will not be available through the M function!");
+	if(_resultListValue)incrementReferenceCount(_resultListValue);else q2outputWarning("Failing to create the results list. The results will not be available through the M function!");
 	*/
 
 	if(amVerboseDebugging())output("Creating the root environment.\n"); // DEBUG
@@ -7645,69 +7645,69 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			// MDH@29MAY2019: we've got (symbol) NULL
 			// MDH@06NOV2019: the NULL constant will have value NULL forever
 			if(!addVariable(_Menvironment,owner,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
-				outputWarning("Failed to create, add or initialize constant NULL.");
+				q2outputWarning("Failed to create, add or initialize constant NULL.");
 			}
 			// MDH@06NOV2019: whereas the UNDEFINED constant will be a non-NULL value of type VT_UNDEFINED (of which we do not need to set the value at all)
 			if(!addVariable(_Menvironment,owner,M_UNDEFINED_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_UNDEFINED_VARIABLE_NAME,UNDEFINED_value)){
-				outputWarning("Failed to create, add or initialize constant UNDEFINED.");
+				q2outputWarning("Failed to create, add or initialize constant UNDEFINED.");
 			}
 			if(!NAF_value||!addVariable(_Menvironment,owner,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
-				outputWarning("Failed to create, add or initialize Not-a-float constant NAF.");
+				q2outputWarning("Failed to create, add or initialize Not-a-float constant NAF.");
 				////////return false;
 			}
 			if(!NAI_value||!addVariable(_Menvironment,owner,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
-				outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
+				q2outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
 			/* MDH@13JUN2019: allow user to change the decimal precision
 			if(!DP_value||!addVariable(_Menvironment,"$decimalprecision",VT_INTEGER,false)||!setValue(_Menvironment,"$decimalprecision",DP_value)){
-				outputInfo("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
+				q2outputInfo("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}*/
 			// create and add PI and E constants!!!
 			Mvalue* PI_value=_getFloatValue(M_LD_PI);
 			if(!PI_value){
-				outputError("Failed to create PI");
+				q2outputError("Failed to create PI");
 				return NULL;
 			}
 			if(!addVariable(_Menvironment,owner,"PI",VT_FLOAT,true)){
-				outputError("Failed to add PI");
+				q2outputError("Failed to add PI");
 				///////free_value(PI_value);
 				return NULL;
 			}
 			if(!setValue(_Menvironment,"PI",PI_value)){
 				////////free_value(PI_value);
-				outputError("Failed to initialize PI");
+				q2outputError("Failed to initialize PI");
 				return NULL;
 			}
 			Mvalue* E_value=_getFloatValue(M_LD_E);
 			if(!E_value){
 				///////free_value(E_value);
-				outputError("Failed to create E");
+				q2outputError("Failed to create E");
 				return NULL;
 			}
 			if(!addVariable(_Menvironment,owner,"E",VT_FLOAT,true)){
-				outputError("Failed to add E");
+				q2outputError("Failed to add E");
 				return NULL;
 			}
 			if(!setValue(_Menvironment,"E",E_value)){
 				//////free_value(E_value);
-				outputError("Failed to initialize E");
+				q2outputError("Failed to initialize E");
 				return NULL;
 			}
 			/*
 			// we're going to store all commands in a list called M
 			Mvalue* Mvalue=_getListValue(VT_UNDEFINED);
 			if(!M_value){
-				outputInfo("ERROR: Failed to create the M result list.");
+				q2outputInfo("ERROR: Failed to create the M result list.");
 				return false;
 			}
 			if(!addVariable(_Menvironment,"M",VT_LIST,true)){
-				outputInfo("ERROR: Failed to add the M result list.");
+				q2outputInfo("ERROR: Failed to add the M result list.");
 				return false;
 			}
 			if(!setValue(_Menvironment,"M",M_value)){
-				outputInfo("ERROR: Failed to initialize the M result list.");
+				q2outputInfo("ERROR: Failed to initialize the M result list.");
 				return false;
 			}
 			*/
@@ -7725,41 +7725,41 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 		    // if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
 
 			if(!registerInternalFunctions(_Menvironment,owner)){
-				outputError("Failed to register all internal functions");
+				q2outputError("Failed to register all internal functions");
 				return NULL;
 			}
 			/* MDH@14NOV2019: replaced by the M variable and M function
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
 			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),"M",getResult)){
-				outputError("Failed to register function M (for requesting previous results)");
+				q2outputError("Failed to register function M (for requesting previous results)");
 				return false;
 			}
 			*/
 			/*
 			if(!completedFunction(_getFunction(_Menvironment,"ml"),ml)){
-				outputInfo("ERROR: Failed to register map list (constructor) function.");
+				q2outputInfo("ERROR: Failed to register map list (constructor) function.");
 				return false;
 			}
 			*/
 			if(!completedIntegerFunction(_getFunction(_Menvironment,owner,"setdp"),"setdp",setdp)
 				||!completedIntegerFunction(_getFunction(_Menvironment,owner,"getdc"),"getdc",getdc)
 				||!completedIntegerFunction(_getFunction(_Menvironment,owner,"getdp"),"getdp",getdp)){
-				outputError("Failed to register the setdp, getdc and getdp functions");
+				q2outputError("Failed to register the setdp, getdc and getdp functions");
 				return NULL;
 			}
 			// pi() functions (decimal and rational)
 			if(!completedIntegerFunction(_getFunction(_Menvironment,owner,"pi$q"),"pi$q",pi_q)
 					||!completedIntegerFunction(_getFunction(_Menvironment,owner,"pi$ql"),"pi$ql",pi_ql)
 					||!completedIntegerBooleanFunction(_getFunction(_Menvironment,owner,"pi"),"pi",Mpi)){
-				outputError("Failed to register the pi, pi$q and pi$ql functions");
+				q2outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return NULL;
 			}
 			if(!completedValueValueFunction(_getFunction(_Menvironment,owner,"range"),"range",Mrange)){
-				outputError("Failed to register the range function");
+				q2outputError("Failed to register the range function");
 				return NULL;
 			}
 			if(!completedValueValueValueFunction(_getFunction(_Menvironment,owner,"rangevalues"),"rangevalues",Mrangevalues)){
-				outputError("Failed to register the range values function");
+				q2outputError("Failed to register the range values function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
@@ -7772,56 +7772,56 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"d"),"d",d)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"o"),"o",o)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"O"),"O",O)){
-				outputError("Failed to register value type conversion functions");
+				q2outputError("Failed to register value type conversion functions");
 				return NULL;
 			}
 			/* MDH@04NOV2019: moved over to Menvironment.h/c
 			if(!completedValueFunction(_getFunction(_Menvironment,"type"),"type",Mtype)){
-				outputError("Failed to register the type function");
+				q2outputError("Failed to register the type function");
 				return false;
 			}
 			*/
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"keys"),"keys",Mkeys)){
-				outputError("Failed to register the keys function");
+				q2outputError("Failed to register the keys function");
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"neg"),"neg",Mneg)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"bnot"),"bnot",Mbnot)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"not"),"not",Mnot)){
-				outputError("Failed to register all unary (neg, bnot, and not) functions");
+				q2outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"exists"),"exists",Mexists)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"scalar"),"scalar",Mscalar)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"null"),"null",Mnull)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"undefined"),"undefined",Mundefined)){
-				outputError("Failed to register the exists, scalar, null and undefined functions");
+				q2outputError("Failed to register the exists, scalar, null and undefined functions");
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sign"),"sign",Msign)){
-				outputError("Failed to register the sign function");
+				q2outputError("Failed to register the sign function");
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"zero"),"zero",Mzero)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"positive"),"positive",Mpositive)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"negative"),"negative",Mnegative)){
-				outputError("Failed to register the zero, positive and negative functions");
+				q2outputError("Failed to register the zero, positive and negative functions");
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sum"),"sum",Msum)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"len"),"len",Mlen)){
-				outputError("Failed to register the sum and len list functions");
+				q2outputError("Failed to register the sum and len list functions");
 				return NULL;
 			}
 			// MDH@01NOV2019: I have some generic list functions implemented
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"empty"),"empty",Mempty)||!completedValueFunction(_getFunction(_Menvironment,owner,"clear"),"clear",Mclear)){
-				outputError("Failed to register the empty and clear function");
+				q2outputError("Failed to register the empty and clear function");
 				return false;
 			}
 			if(!completedListFunction(_getFunction(_Menvironment,owner,"statistics"),"statistics",Mstats)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"first"),"first",Mfirst)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"last"),"last",Mlast)){
-				outputError("Failed to register the statistics, first and last list functions");
+				q2outputError("Failed to register the statistics, first and last list functions");
 				return NULL;
 			}
 			if(!completedListValueFunction(_getFunction(_Menvironment,owner,"removed"),"removed",Mremoved)
@@ -7829,30 +7829,30 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)){
-				outputError("Failed to register the removed, push(=drop), shove and pop functions");
+				q2outputError("Failed to register the removed, push(=drop), shove and pop functions");
 				return NULL;
 			}
 			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,owner,"find"),"find",Mfind)){
-				outputError("Failed to register the find function");
+				q2outputError("Failed to register the find function");
 				return NULL;
 			}
 
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"tl"),"tl",Mtl)){
-				outputError("Failed to register the tl text function");
+				q2outputError("Failed to register the tl text function");
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"fac"),"fac",Mfac)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"facd"),"facd",Mfacd)){
-				outputError("Failed to register the fac and facd function");
+				q2outputError("Failed to register the fac and facd function");
 				return NULL;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"reciprocal"),"reciprocal",Mreciprocal)
 					||!completedValueFunction(_getFunction(_Menvironment,owner,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
-				outputError("Failed to register the reciprocal and fibonacci function");
+				q2outputError("Failed to register the reciprocal and fibonacci function");
 				return NULL;
 			}
 			if(!completedValueValueFunction(_getFunction(_Menvironment,owner,"concat"),"concat",Mconcat)){
-				outputError("Failed to register the concat function");
+				q2outputError("Failed to register the concat function");
 				return NULL;
 			}
 			// register list conversions
@@ -7860,13 +7860,13 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 					||!completedListFunction(_getFunction(_Menvironment,owner,"l2ml"),"l2ml",l2ml)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"ml2l"),"ml2l",ml2l)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"ml2m"),"ml2m",ml2m)){
-				outputError("Failed to register list conversion functions");
+				q2outputError("Failed to register list conversion functions");
 				return NULL;
 			}
 			// register map conversions
 			if(!completedListFunction(_getFunction(_Menvironment,owner,"m2ml"),"m2ml",m2ml)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"m2l"),"m2l",m2l)){
-				outputError("Failed to register map conversion functions");
+				q2outputError("Failed to register map conversion functions");
 				return NULL;
 			}
 

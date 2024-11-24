@@ -42,7 +42,7 @@ Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
 //				will return a negative value if _token is undefined
 size_t getTokenSignificantCharacterCount(Mtoken const * const token){
 	if(token!=NULL)return token->significantCharacterCount;
-	outputBug("Can't return the number of significant characters of an undefined token.");
+	q2outputBug("Can't return the number of significant characters of an undefined token.");
 	return SIZE_T_MAX; // which is the best value to return to indicate invalid input
 }
 bool setTokenSignificantCharacterCount(Mtoken * const token,size_t significantCharacterCount){
@@ -50,7 +50,7 @@ bool setTokenSignificantCharacterCount(Mtoken * const token,size_t significantCh
 		token->significantCharacterCount=significantCharacterCount;
 		return(token->significantCharacterCount==significantCharacterCount);
 	}
-	outputBug("Can't set the number of significant characters of an undefined token.");
+	q2outputBug("Can't set the number of significant characters of an undefined token.");
 	return false;
 }
 
@@ -66,12 +66,12 @@ Mstring* _getTokenText(Mtoken const * const token){
 }
 bool isTokenUnfinished(Mtoken const * const token){
 	if(token!=NULL)return(token->significantCharacterCount==0);
-	outputBug("Can't determine whether an undefined token is unfinished.");
+	q2outputBug("Can't determine whether an undefined token is unfinished.");
 	return false;
 }
 bool isTokenFinished(Mtoken const * const token){
 	if(token!=NULL)return(token->significantCharacterCount>0);
-	outputBug("Can't determine whether an undefined token is finished.");
+	q2outputBug("Can't determine whether an undefined token is finished.");
 	return false;
 }
 void finishToken(Mtoken * const token){
@@ -79,9 +79,9 @@ void finishToken(Mtoken * const token){
 		token->significantCharacterCount=string_length(token->text);
 		logToOutputFile("Token '%s' finished!",string(token->text));
 	}
-	else outputBug("Can't finish an undefined token.");
+	else q2outputBug("Can't finish an undefined token.");
 }
 void unfinishToken(Mtoken * const token){
 	if(token!=NULL)token->significantCharacterCount=0;
-	else outputBug("Can't finish an undefined token.");
+	else q2outputBug("Can't finish an undefined token.");
 }

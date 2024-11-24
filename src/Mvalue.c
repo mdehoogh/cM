@@ -134,14 +134,14 @@ Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,long lon
 			return disowned_variable(_variable,owner);
 		}
 		if(Misdisowned(_name))freeChars(_name);
-		outputError("Failed to create a variable.");
+		q2outputError("Failed to create a variable.");
 	}else
-		outputError("No variable name defined");
+		q2outputError("No variable name defined");
 	/*
 	 if(!_variable->_name){
 		freeChars(_name,owner);
 		free_variable(_variable,true,owner);
-		outputMessage(M_ERROR_PREFIX,"Failed to allocate memory to store name '%s' of the new variable.",_name->chars);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to allocate memory to store name '%s' of the new variable.",_name->chars);
 		return NULL;
 	}
 	_variable->valuetype=valuetype;
@@ -267,10 +267,10 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
 	if(source){
 		_list->_creator=owned_chars(_getChars(source),Msubowner(owner,1)); // replacing: keep disowned, so easy to reown... SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
 		if(!_list->_creator)
-			outputMessage(M_ERROR_PREFIX,"Failed to register list creator '%s'.",source);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to register list creator '%s'.",source);
 		else
 		if(amVerboseDebugging())
-			outputMessage(M_INFO_PREFIX,"List creator: '%s'.",_list->_creator->chars);
+			q2outputMessage(M_INFO_PREFIX,"List creator: '%s'.",_list->_creator->chars);
 	}
 	return DISOWNED_LIST(_list,owner);
 }
@@ -342,15 +342,15 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
 				if(report)
 					output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
 			}else
-				outputWarning("Unnamed map attribute!");
+				q2outputWarning("Unnamed map attribute!");
 			free_variable(_mapelement->_variable,weak);
 			_mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
 		}else
-			outputWarning("No map attribute to free!");
+			q2outputWarning("No map attribute to free!");
 		FREE_1(_mapelement,'m'/*,owner*/);
 		result+=1;
 		if(report)
-			outputInfo("\tMap element freed!");
+			q2outputInfo("\tMap element freed!");
 	}
 	return result;
 }/* VALIDATED */
@@ -402,7 +402,7 @@ Mmap* __map(char const * const source){Mallocationowner owner=getOwner(__LINE__)
 		///////output("Creating a map of source '%s'.\n",source);
 		_map->_creator=owned_chars(_getChars(source),Msubowner(owner,1)); 
 		if(NULL==_map->_creator)
-			outputMessage(M_ERROR_PREFIX,"Failed to register map creator '%s'.",source);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to register map creator '%s'.",source);
 		else
 		if(amVerboseDebugging())
 			output("Map creator: '%s'.\n",_map->_creator->chars);
@@ -422,7 +422,7 @@ void free_map(Mmap* _map/*,Mallocationowner owner*/){
 		_map->_first=NULL;
 	}else
 	if(amVerboseDebugging()) 
-		outputInfo("No map attributes to free!");
+		q2outputInfo("No map attributes to free!");
 	FREE_1(_map,'M'/*,owner*/);
 }/* VALIDATED */
 
@@ -436,7 +436,7 @@ void free_map(Mmap* _map/*,Mallocationowner owner*/){
  * @return Mvaluereference* \p _valuereference owned by \p owner_valuereference
  */
 Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
-	if(NULL==_valuereference){outputError("No value reference to disown!");return NULL;}
+	if(NULL==_valuereference){q2outputError("No value reference to disown!");return NULL;}
 		//output("%s disowning a value reference!",getAllocationOwnerText(owner_valuereference));
 		////output("Disowning value reference '%s'!\n",_valuereference->_name->chars);
 	disowned_chars(_valuereference->_name,owner_valuereference);
@@ -511,14 +511,14 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
 	Mvalue* _value=NULL;
 	if(NULL==_valueList){
 		_valueList=owned_list(__list("global value list"),owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
-		if(NULL==_valueList){outputBug("Failed to create the global value list.");return NULL;}
+		if(NULL==_valueList){q2outputBug("Failed to create the global value list.");return NULL;}
 		// MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
 		//				as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
 		Mvalue* _undefinedValue=CALLOC_1(sizeof(Mvalue),'U',owner);
 		long long valueIndex=appendedToList(_valueList,owner_valueList,_undefinedValue,M_LL_INVALID);
 		if(valueIndex<=0){
 			FREE_DISOWNED_1(_undefinedValue,'U',owner);
-			outputBug("Failed to store the global undefined value.");
+			q2outputBug("Failed to store the global undefined value.");
 			return NULL;
 		}
 		OWNED(DISOWNED(_undefinedValue,owner),owner_value); // MDH@06APR2023: take over ownership of the appended value
@@ -543,7 +543,7 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
 		}else // couldn't get a new value, so free the value list element immediately
 			FREE_DISOWNED_1(_valueListelement,'l',owner);
 	}
-	if(NULL==_value)outputError("Failed to create value!"); // serious enough to report
+	if(NULL==_value)q2outputError("Failed to create value!"); // serious enough to report
 	return _value;
 }/* VALIDATED */
 // MDH@01MAY2019: 'local' function for freeing a value
@@ -555,7 +555,7 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
  * @param _value
  */
 static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
-	//////if(amVerbose()){q2outputandcollect("Value of type '%s'",VALUETYPENAMES[_value->type]);q2outputValue(" to free: '",_value,"'.\n");}
+	//////if(amVerbose()){q2output("Value of type '%s'",VALUETYPENAMES[_value->type]);q2outputValue(" to free: '",_value,"'.\n");}
 	// I do not need to free the value itself, only the pointers inside it
 	if(_value!=NULL){
 		switch(_value->type){
@@ -582,7 +582,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
 		FREE_DISOWNED_1(_value,'X',owner_value);
 		if(amVerboseDebugging())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
 	}else
-		outputBug("No value to free!");
+		q2outputBug("No value to free!");
 }/* VALIDATED */
 
 // can be asked to remove unused values
@@ -610,19 +610,19 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 			checked++;
 			if(_valueListelement->_value!=NULL){
 				if(showInfo){
-					q2outputandcollect("Checking value #%llu with id %llu",checked,_valueListelement->index);
+					q2output("Checking value #%llu with id %llu",checked,_valueListelement->index);
 					/////q2outputValue(": '",_valueListelement->_value,"'");
-					q2outputandcollect(". ");
+					q2output(". ");
 				}
-				// if(showInfo)outputInfo("\tChecking the count!");
+				// if(showInfo)q2outputInfo("\tChecking the count!");
 				if(_valueListelement->_value->count==0){ // unused
-					if(showInfo)q2outputandcollect("Freeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+					if(showInfo)q2output("Freeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
 					free_value(_valueListelement->_value);_valueListelement->_value=NULL; // essential to NULL so removing the value list elements below becomes possible
 					// MDH@15MAR2023 moved below: tofree++;
 				}else
-				if(showInfo)outputInfo("Still in use!");
+				if(showInfo)q2outputInfo("Still in use!");
 			}else
-				outputMessage(M_BUG_PREFIX,"No value stored in value #%llu.",checked); // technically a bug not an error
+				q2outputMessage(M_BUG_PREFIX,"No value stored in value #%llu.",checked); // technically a bug not an error
 			if(NULL==_valueListelement->_value)tofree++; // MDH@15MAR2023: every list element with NULL value is removable!!!
 			_valueListelement=_valueListelement->_next;
 		}
@@ -650,13 +650,13 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 					if(_valueList->numberOfElements>0)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
 					*/
 					FREE_DISOWNED_1(_valueListelement,'l',owner_valueListelement);
-					if(showInfo)if(removed%1000==0)q2outputandcollect("M values removed so far: %llu.\n",removed);
+					if(showInfo)if(removed%1000==0)q2output("M values removed so far: %llu.\n",removed);
 				}
 				// next to check!!!
 				_valueListelement=_nextValueListelement;
 			}
 			if(report)
-				q2outputandcollect("Actual number of M values removed: %llu.\n",removed);
+				q2output("Actual number of M values removed: %llu.\n",removed);
 			// update the first and last in the list (could both be NULL!!!)
 			_valueList->_first=_firstValueListelement;
 			_valueList->_last=_lastValueListelement;
@@ -666,16 +666,16 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 				_valueListelement=_valueList->_first;
 				while(_valueListelement){left++;_valueListelement=_valueListelement->_next;}
 				long long unaccounted=checked;unaccounted-=(left+removed);
-				q2outputandcollect("Number of M values left: %llu (unaccounted: %lld).\n",left,unaccounted);
+				q2output("Number of M values left: %llu (unaccounted: %lld).\n",left,unaccounted);
 			}
 		}
 	}
 	if(tofree>0){
 		if(tofree>removed)
-			outputMessage(M_WARNING_PREFIX,"Failed to free %llu unused value list elements.",(tofree-removed));
+			q2outputMessage(M_WARNING_PREFIX,"Failed to free %llu unused value list elements.",(tofree-removed));
 		else 
 		if(showInfo)
-			outputInfo("All unused value list elements freed!");
+			q2outputInfo("All unused value list elements freed!");
 	}
 	return removed;
 }/* VALIDATED */
@@ -700,11 +700,11 @@ bool decrementReferenceCount(Mvalue * const _value){Mallocationowner owner=getOw
 	if(_value!=NULL){
 		if(_value->count>0){(_value->count)--;return true;}
 		Mstring* _valueText=owned_string(_getValueText(_value,false,false),owner);
-		outputMessage(M_BUG_PREFIX,"Reference count of '%s' of type '%c' already zero.",string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
+		q2outputMessage(M_BUG_PREFIX,"Reference count of '%s' of type '%c' already zero.",string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
 		FREE_STRING(_valueText,owner);
 	}else
 	if(amVerbose())
-		outputInfo("No value to decrement the reference count of.");
+		q2outputInfo("No value to decrement the reference count of.");
 	return false;
 }/* VALIDATED */
 /**
@@ -717,7 +717,7 @@ bool decrementReferenceCount(Mvalue * const _value){Mallocationowner owner=getOw
 bool incrementReferenceCount(Mvalue* _value){
 	if(_value!=NULL){(_value->count)++;return true;}
 	if(amVerbose())
-		outputInfo("No value to increment the reference count of.");
+		q2outputInfo("No value to increment the reference count of.");
 	return false;
 }/* VALIDATED */
 
@@ -769,7 +769,7 @@ void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
 			reference->variable->referencecount--;
 			reference->variable=NULL; // to be safe
 		}else
-			outputBug("Count of referenced variable already zero.");
+			q2outputBug("Count of referenced variable already zero.");
 	}
 	FREE_1(reference,'Q'/*,owner_reference*/);
 }
@@ -795,7 +795,7 @@ Mreference* _getReference(Mvariable* _variable){Mallocationowner owner=getOwner(
  */
 Mvalue* _getValueOfReference(Mreference* _reference/*,Mallocationowner owner_reference*/){
 	// MDH@19MAY2020: should we check whether _reference is ownable???????
-	if(NULL==_reference){outputWarning("No reference to wrap.");return NULL;}
+	if(NULL==_reference){q2outputWarning("No reference to wrap.");return NULL;}
 	Mvalue* _referenceValue=__value("reference");
 	if(_referenceValue!=NULL){
 		_referenceValue->type=VT_REFERENCE;
@@ -898,7 +898,7 @@ Mvalue* _getStringValue(Mstring const * const str){Mallocationowner owner=getOwn
 	Mvalue* _stringValue=__value("string");
 	if(NULL==_stringValue){
 		if(disowned_string)free_string(str);
-		outputError("Failed to create a bytes value");
+		q2outputError("Failed to create a bytes value");
 		return NULL;
 	}
 	_stringValue->type=VT_BYTES;
@@ -917,7 +917,7 @@ Mvalue* _getStringTextValue(Mstring const * const str){Mallocationowner owner=ge
 	char* s=string(str); // will also 'finish' str (i.e. write a NUL character where the length points to)
 	if(NULL==s)return NULL;
 	unsigned char* NULpos=(unsigned char*)strchr(str->_chars->chars,'\0');
-	if(NULL==NULpos){outputBug("Missing NUL character!");return NULL;}
+	if(NULL==NULpos){q2outputBug("Missing NUL character!");return NULL;}
 	// if there's a NUL character found, we need to do more!!!
 	size_t l=str->length;
 	if(l>=NULpos-str->_chars->chars)return _getTextValue(s);
@@ -966,7 +966,7 @@ Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const sour
 	Mlist* _list=owned_list(__list(source!=NULL?source:"_getListValue"),owner);
 	if(NULL==_list){
 		// if(amVerboseDebugging())
-			outputError("Failed to create a list.\n");
+			q2outputError("Failed to create a list.\n");
 		return NULL;
 	}
 	Mvalue* _listValue=__value(weak?"weak list":"strong list");
@@ -993,12 +993,12 @@ Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner
 	while(listelement!=NULL){
 		Mvalue* indexValue=_getIntegerValue(listelement->index);
 		if(indexValue==NULL){
-			outputError("Failed to create a list index value.");
+			q2outputError("Failed to create a list index value.");
 			break;
 		}
 		if(appendedToList(_list,owner,indexValue,M_LL_INVALID)<=0){
 			// NO need to free indexValue because it is a Value!!!
-			outputError("Failed to append list element index");
+			q2outputError("Failed to append list element index");
 			break;
 		}
 		listelement=listelement->_next;
@@ -1015,7 +1015,7 @@ Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner
  */
 Mlist* _getReversedList(Mlist const * const list){if(NULL==list)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _list=owned_list(_getListOfType(list->valuetype),owner); // make a list of the same type as the list argument
-	if(NULL==_list){outputError("Failed to create a M list");return NULL;}
+	if(NULL==_list){q2outputError("Failed to create a M list");return NULL;}
 	Mlistelement* listelement=list->_first;
 	while(listelement!=NULL){
 		if(appendedToList(_list,owner,listelement->_value,0)<=0){FREE_LIST(_list,owner);return NULL;}
@@ -1193,14 +1193,14 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
 		// I guess we'll have to duplicate the attribute name because it will be wrapped inside a Value
 		// this is a bit of an issue because typically text should be enquoted
 		Mstring* _attributeName=owned_string(_getString("'"),owner);
-		if(NULL==_attributeName){outputError("Failed to duplicate a map attribute name");break;}
+		if(NULL==_attributeName){q2outputError("Failed to duplicate a map attribute name");break;}
 		string_append(_attributeName,mapelement->_variable->_name->chars); // MDH@17APR2020: char* _name replaced by Mchars* _name // append the attribute name
 		Mvalue* attributeValue=_getTextValue(string(_attributeName));
 		FREE_STRING(_attributeName,owner);
-		if(NULL==attributeValue){outputError("Failed to store a map attribute name");break;}
+		if(NULL==attributeValue){q2outputError("Failed to store a map attribute name");break;}
 		if(appendedToList(_list,owner,attributeValue,M_LL_INVALID)<=0){
 			// NO need to free indexValue because it is a Value!!!
-			outputError("Failed to append map attribute name");break;
+			q2outputError("Failed to append map attribute name");break;
 		}
 		mapelement=mapelement->_next;
 	}
@@ -1364,16 +1364,16 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
 					_map->_first=_mapelement;
 					_map->_last=_mapelement;
 					if(amVerboseDebugging())
-						outputInfo("Returning the single float map!");
+						q2outputInfo("Returning the single float map!");
 					return disowned_map(_map,owner);
 				}
-				outputError("Failed to create the float variable map");
+				q2outputError("Failed to create the float variable map");
 				FREE_MAPELEMENT(_mapelement,false,owner);
 			}else
-				outputError("Failed to create the float variable map element");
+				q2outputError("Failed to create the float variable map element");
 			FREE_VARIABLE(_realVariable,false,owner);
 		}else
-			outputError("Failed to create the float variable name");
+			q2outputError("Failed to create the float variable name");
 	}
 	return NULL;
 }/* VALIDATED */
@@ -1400,7 +1400,7 @@ Mmap* _getMap(char* name){if(NULL==name)return NULL;Mallocationowner owner=getOw
 		}
 		FREE_VARIABLE(_variable,false,owner);
 	}else
-		outputMessage(M_ERROR_PREFIX,"Failed to create map '%s'.",name);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create map '%s'.",name);
 	return NULL;
 }/* VALIDATED */
 /**
@@ -1430,15 +1430,15 @@ Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE
 							if(NULL==_map->_first)_map->_first=_map->_last; // initialize first if necessary
 							_map->numberOfElements++; // count one more
 						}else
-							outputMessage(M_ERROR_PREFIX,"Failed to copy the map attribute name '%s'.",mapelementVariable->_name->chars);
+							q2outputMessage(M_ERROR_PREFIX,"Failed to copy the map attribute name '%s'.",mapelementVariable->_name->chars);
 					}else
-						outputMessage(M_ERROR_PREFIX,"Failed to copy map attribute '%s'.",mapelementVariable->_name->chars);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to copy map attribute '%s'.",mapelementVariable->_name->chars);
 				}
 				mapelement=mapelement->_next;
 			}
 			return disowned_map(_map,owner);
 		}else
-			outputError("Failed to create a map");
+			q2outputError("Failed to create a map");
 	}
 	return NULL;
 }
@@ -1465,12 +1465,12 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
 					if(NULL==_list->_first)_list->_first=_list->_last;
 					_list->numberOfElements++;
 				}else 
-					outputError("Failed to copy a list element");
+					q2outputError("Failed to copy a list element");
 				listelement=listelement->_next;
 			}
 			return disowned_list(_list,owner);
 		}else
-			outputError("Failed to create a list");
+			q2outputError("Failed to create a list");
 	}
 	return NULL;
 }
@@ -1495,16 +1495,16 @@ static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowne
 					_mapelement->_variable=_variable;
 					_map->numberOfElements=1;
 					_map->_first=_mapelement;
-					if(amVerboseDebugging())outputInfo("Returning the single integer map!");
+					if(amVerboseDebugging())q2outputInfo("Returning the single integer map!");
 					return disowned_map(_map,owner);
 				}
-				outputError("Failed to create the one variable map");
+				q2outputError("Failed to create the one variable map");
 				FREE_MAPELEMENT(_mapelement,false,owner);
 			}else
-				outputError("Failed to create the one variable map element");
+				q2outputError("Failed to create the one variable map element");
 			FREE_VARIABLE(_variable,false,owner);
 		}else
-			outputError("Failed to create the variable of the one variable map");
+			q2outputError("Failed to create the variable of the one variable map");
 	}
 	return NULL;
 }
@@ -1543,7 +1543,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
 	Mmap* _listMap=owned_map(_getOneArgumentMap(name,VT_LIST),owner);
 	if(NULL==_listMap){
 		// if(amVerboseDebugging())
-		   outputError("Failed to create a one argument list map.");
+		   q2outputError("Failed to create a one argument list map.");
 		return NULL;
 	}
 	assignValue(&_listMap->_first->_variable->_value,_listValue);
@@ -1566,7 +1566,7 @@ Mmap* _getMapMap(char* name,Mvalue* _mapValue){Mallocationowner owner=getOwner(_
 	Mmap* _mapMap=owned_map(_getOneArgumentMap(name,VT_MAP),owner);
 	if(NULL==_mapMap){
 		// if(amVerboseDebugging())
-		   outputError("Failed to create a one argument map map.");
+		   q2outputError("Failed to create a one argument map map.");
 		return NULL;
 	}
 	assignValue(&_mapMap->_first->_variable->_value,_mapValue);
@@ -1599,19 +1599,19 @@ static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mv
 						_map->numberOfElements=2;
 						return disowned_map(_map,owner);
 					}
-					outputError("Failed to create both map element variables");
+					q2outputError("Failed to create both map element variables");
 					FREE_MAP(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
 				}else
-					outputError("Failed to create a map");
+					q2outputError("Failed to create a map");
 			}else
-				outputError("Failed to create both integer map elements");
+				q2outputError("Failed to create both integer map elements");
 			// either map element might have been created and we need to release them
 			FREE_MAPELEMENT(_mapelement1,false,owner);
 			FREE_MAPELEMENT(_mapelement2,false,owner);
 		}else
-			outputMessage(M_ERROR_PREFIX,"Two argument map element names '%s' and '%s' undefined or the same.",name1,name2);
+			q2outputMessage(M_ERROR_PREFIX,"Two argument map element names '%s' and '%s' undefined or the same.",name1,name2);
 	}else
-		outputError("Not both two map element names defined");
+		q2outputError("Not both two map element names defined");
 	return NULL;	
 }
 /**
@@ -1979,7 +1979,7 @@ Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const 
 				///output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
 			}
 		}else
-			outputError("Failed to allocate memory for storing the array elements");
+			q2outputError("Failed to allocate memory for storing the array elements");
 	}
 	return DISOWNED_ARRAY(_array,owner);
 }
@@ -2048,7 +2048,7 @@ Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwne
 			}
 			return disowned_array(_array,owner);
 		}else
-			outputError("Failed to create an array");
+			q2outputError("Failed to create an array");
 	}
 	return NULL;
 }
@@ -2150,26 +2150,26 @@ void checkList(Mlist* _list){
 				// the number of elements in the list should match the number of counted elements
 				long long listelementindex=0;
 				while(true){
-					if(l==0)outputError("More elements in list than accounted for");
+					if(l==0)q2outputError("More elements in list than accounted for");
 					l--;
 					if(_listelement->index<=listelementindex)
-						outputMessage(M_ERROR_PREFIX,"List element index (%lld) below the expected list element index (%lld).",_listelement->index,listelementindex);
+						q2outputMessage(M_ERROR_PREFIX,"List element index (%lld) below the expected list element index (%lld).",_listelement->index,listelementindex);
 					listelementindex=_listelement->index;
 					if(NULL==_listelement->_next){
 						if(_list->_last!=_listelement)
-							outputError("Registered last list element not equal to the actual last list element");
+							q2outputError("Registered last list element not equal to the actual last list element");
 						break;						
 					}
-					outputMessage(M_INFO_PREFIX,"List element with index %llu OK.",_listelement->index);
+					q2outputMessage(M_INFO_PREFIX,"List element with index %llu OK.",_listelement->index);
 					_listelement=_listelement->_next;
 				}
-				if(l>0)outputError("Less elements in list than accounted for");else 
-				if(l<0)outputMessage(M_ERROR_PREFIX,"%lld more elements in list than counted.",(-l));
+				if(l>0)q2outputError("Less elements in list than accounted for");else 
+				if(l<0)q2outputMessage(M_ERROR_PREFIX,"%lld more elements in list than counted.",(-l));
 			}else
-				outputMessage(M_ERROR_PREFIX,"List with %lld elements does not have a first element!",l);
+				q2outputMessage(M_ERROR_PREFIX,"List with %lld elements does not have a first element!",l);
 		}else{
-			if(_list->_first!=NULL)outputError("Empty list with first element");
-			if(_list->_last!=NULL)outputError("Empty list with last element");
+			if(_list->_first!=NULL)q2outputError("Empty list with first element");
+			if(_list->_last!=NULL)q2outputError("Empty list with last element");
 		}
 	}
 }/* VALIDATED */
@@ -2223,14 +2223,14 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
  * @return the index of the element wrapping \p _value appended or inserted, zero or negative on failure (M_LL_INVALID which is negative indicating undefined \p _list)
  */
 /*unsigned*/ long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
-	if(NULL==_list){outputError("No list to append to");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
-	if(_list->unlockCode>0){outputError("Unable to change the list: it is immutable");return 0;}
+	if(NULL==_list){q2outputError("No list to append to");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
+	if(_list->unlockCode>0){q2outputError("Unable to change the list: it is immutable");return 0;}
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
 	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
 		q2outputmessageprefix(M_ERROR_PREFIX);
 		q2outputValue("Unable to add '",_value,"'");
-		q2outputandcollect(" of type '%s' to a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
+		q2output(" of type '%s' to a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
 		/////return 0;
 	}
 	// check validity of index first
@@ -2238,13 +2238,13 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	// MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
 	// MDH@05NOV2019: if supposed to append the value, and the current last index is already equal to the maximum possible index, we consider the list to be full
 	if(index==M_LL_INVALID){
-		if(lastindex==M_LL_MAX){outputError("Unable to append to a list: it is full");return 0;};
+		if(lastindex==M_LL_MAX){q2outputError("Unable to append to a list: it is full");return 0;};
 		index=lastindex+1;
 	} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
 	if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
 	// MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
 	if(index<0){
-		outputMessage(M_ERROR_PREFIX,"Index %lld of (new) list element too small.",index);
+		q2outputMessage(M_ERROR_PREFIX,"Index %lld of (new) list element too small.",index);
 		return M_LL_INVALID;
 	} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
 	// if(amVerboseDebugging()){outputValue("Adding '",_value,"' to a list");output(" at index %lld.\n",index);}
@@ -2257,7 +2257,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 			_prevListelement=_listelement;
 			if(NULL==_listelement->_next){
 				q2outputmessageprefix(M_BUG_PREFIX);
-				q2outputandcollect("Index (%llu) ",_listelement->index);
+				q2output("Index (%llu) ",_listelement->index);
 				q2outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");
 				return M_LL_INVALID;
 			}
@@ -2274,7 +2274,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	// if we do not have a list element ascertain to have one
 	if(NULL==_listelement){ // not yet present in list, so we have to create a new element
 		_listelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
-		if(NULL==_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
+		if(NULL==_listelement){q2outputError("Failed to create a list element to insert");return 0;} // failure
 	}
 	// MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
 	if(!_list->weak){
@@ -2321,11 +2321,11 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 			// if(amVerboseDebugging())
 			// {q2outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
 			(_nextListelement->index)++;
-			// if(amVerboseDebugging()){q2outputValue("\tIndex of '",_nextListelement->_value,"' incremented");q2outputandcollect(" to %llu.\n",_nextListelement->index);} // DEBUG
+			// if(amVerboseDebugging()){q2outputValue("\tIndex of '",_nextListelement->_value,"' incremented");q2output(" to %llu.\n",_nextListelement->index);} // DEBUG
 			_nextListelement=_nextListelement->_next;
-			// if(amVerboseDebugging()){if(_nextListelement)outputInfo("\tA next element to consider!");else outputInfo("\tNo next element to consider!");}
+			// if(amVerboseDebugging()){if(_nextListelement)q2outputInfo("\tA next element to consider!");else q2outputInfo("\tNo next element to consider!");}
 		}
-		//if(amVerboseDebugging()){q2outputValue("\t'",_listelement->_value,"' prepended to a list");q2outputandcollect(" (now) with %llu elements.\n",_list->numberOfElements);}
+		//if(amVerboseDebugging()){q2outputValue("\t'",_listelement->_value,"' prepended to a list");q2output(" (now) with %llu elements.\n",_list->numberOfElements);}
 	}
 	if(amDebugging())checkList(_list);
 	///////if(amVerbose())output("New list index: %llu.\n",_listelement->index);
@@ -2342,25 +2342,25 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
  * @return long long the index of the inserted element (zero or negative on failure)
  */
 long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
-	if(NULL==_list){outputError("No list to insert into");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
-	if(_list->unlockCode>0){outputError("Unable to change the list: it is immutable");return 0;}
+	if(NULL==_list){q2outputError("No list to insert into");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
+	if(_list->unlockCode>0){q2outputError("Unable to change the list: it is immutable");return 0;}
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
 	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
 		q2outputmessageprefix(M_ERROR_PREFIX);
 		q2outputValue("Unable to insert '",_value,"'");
-		q2outputandcollect(" of type '%s' into a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
+		q2output(" of type '%s' into a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
 		return 0;
 	}
 	// check validity of index first
 	long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
 	// MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
 	// MDH@05NOV2019: if supposed to append the value, and the current last index is already equal to the maximum possible index, we consider the list to be full
-	if(index==M_LL_INVALID){if(lastindex==M_LL_MAX){outputError("Unable to insert into a list: it is full");return 0;};index=lastindex+1;} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
+	if(index==M_LL_INVALID){if(lastindex==M_LL_MAX){q2outputError("Unable to insert into a list: it is full");return 0;};index=lastindex+1;} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
 	if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
 	// MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
 	if(index<0){
-		outputMessage(M_ERROR_PREFIX,"Index %lld of (new) list element too small.",index);
+		q2outputMessage(M_ERROR_PREFIX,"Index %lld of (new) list element too small.",index);
 		return M_LL_INVALID;
 	} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
 	if(index==0)index=1; // MDH@23NOV2020: let's NOT allow index to be zero, the minimum possible value is 1 
@@ -2374,7 +2374,7 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 			_prevListelement=_listelement;
 			if(NULL==_listelement->_next){
 				q2outputmessageprefix(M_BUG_PREFIX);
-				q2outputandcollect("Index (%llu) ",_listelement->index);
+				q2output("Index (%llu) ",_listelement->index);
 				q2outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");
 				return M_LL_INVALID;
 			}
@@ -2391,7 +2391,7 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 	// MDH@23NOV2020: _listelement will always be NULL, so no need to actually test that
 	// removing: if(!_listelement){ // not yet present in list, so we have to create a new element
 		_listelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
-		if(NULL==_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
+		if(NULL==_listelement){q2outputError("Failed to create a list element to insert");return 0;} // failure
 	// removing:}
 	// MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
 	if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
@@ -2422,11 +2422,11 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 			// if(amVerboseDebugging())
 			// {q2outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
 			(_nextListelement->index)++;
-			// if(amVerboseDebugging()){q2outputValue("\tIndex of '",_nextListelement->_value,"' incremented");q2outputandcollect(" to %llu.\n",_nextListelement->index);} // DEBUG
+			// if(amVerboseDebugging()){q2outputValue("\tIndex of '",_nextListelement->_value,"' incremented");q2output(" to %llu.\n",_nextListelement->index);} // DEBUG
 			_nextListelement=_nextListelement->_next;
-			// if(amVerboseDebugging()){if(_nextListelement)outputInfo("\tA next element to consider!");else outputInfo("\tNo next element to consider!");}
+			// if(amVerboseDebugging()){if(_nextListelement)q2outputInfo("\tA next element to consider!");else q2outputInfo("\tNo next element to consider!");}
 		}
-		//if(amVerboseDebugging()){q2outputValue("\t'",_listelement->_value,"' prepended to a list");q2outputandcollect(" (now) with %llu elements.\n",_list->numberOfElements);}
+		//if(amVerboseDebugging()){q2outputValue("\t'",_listelement->_value,"' prepended to a list");q2output(" (now) with %llu elements.\n",_list->numberOfElements);}
 	}
 	*/
 	// MDH@23NOV2020: if we have a nextlistelement we should increment the index until it's no longer the same, i.e. all elements are shifted one position up
@@ -2532,7 +2532,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 			// MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
 			if(NULL==_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
 				if(report)
-				{q2outputandcollect("Setting the value of attribute '%s'",attributeName);q2outputValue(" to '",_attributeValue,"'.\n");}
+				{q2output("Setting the value of attribute '%s'",attributeName);q2outputValue(" to '",_attributeValue,"'.\n");}
 				// MDH@22OCT2020: get the map element associated with the given attribute name (without creating it)
 				Mmapelement* _mapelement=getMapelement(_map,attributeName);
 				/* replacing:
@@ -2540,7 +2540,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 				while(_mapelement&&(!_mapelement->_variable||strcmp(_mapelement->_variable->_name->chars,attributeName)))_mapelement=_mapelement->_next;
 				*/
 				if(NULL==_mapelement){ // not found
-					if(report)outputInfo("Attribute not found");
+					if(report)q2outputInfo("Attribute not found");
 					_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
 					if(_mapelement!=NULL){
 						// MDH@09JUN2020: we can immediately set the owner of _variable to be in the map because if we succeed in creating it that's where it will go
@@ -2548,7 +2548,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 						// MDH@25MAY2020: we're disowning _variable because we 
 						Mvariable* _variable=_getVariableWithName(attributeName,VT_UNDEFINED,false,Msubowner(owner_map,2)); // TODO why would this 'variable' be mutable, and allowing all values????
 						if(_variable!=NULL){ // the variable was created so attach in map
-							if(report)outputInfo("Map element created");
+							if(report)q2outputInfo("Map element created");
 							 // pass ownership of _mapelement to _map at the first sublevel
 							_mapelement->_variable=_variable; // pass ownership of _variable to the mapelement at the second sublevel in the map
 							if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
@@ -2557,10 +2557,10 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 							// result=M_TRUE; // success
 						}else{ // we have a map element BUT no variable, so no go
 							FREE_MAPELEMENT(_mapelement,false,owner);_mapelement=NULL;
-							outputError("Failed to create a new attribute");
+							q2outputError("Failed to create a new attribute");
 						}
 					}else
-						outputError("Failed to create new map element");
+						q2outputError("Failed to create new map element");
 				}
 				if(_mapelement!=NULL){
 					if(_map->weak)
@@ -2573,10 +2573,10 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 				q2outputmessageprefix(M_ERROR_PREFIX);q2outputValue("Unable to add '",_attributeValue,"' to a map: it is of the wrong type.\n");
 			}
 		}else 
-			outputError("Unable to change the map: it is immutable");
+			q2outputError("Unable to change the map: it is immutable");
 	}else
-		outputError("No map or atribute name specified");
-	if(report)q2outputandcollect("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
+		q2outputError("No map or atribute name specified");
+	if(report)q2output("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
 	return result;
 }/* VALIDATED */
 /**
@@ -2781,7 +2781,7 @@ void outputList(char const * const prefix,Mlist const * const list,char const * 
  */
 void q2outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _listText=owned_string(_getListText(list,LLONG_MAX,LLONG_MAX),owner);
-	q2outputandcollect("%s%s%s",(prefix!=NULL?prefix:""),(_listText!=NULL?string(_listText):"?"),(suffix!=NULL?suffix:""));
+	q2output("%s%s%s",(prefix!=NULL?prefix:""),(_listText!=NULL?string(_listText):"?"),(suffix!=NULL?suffix:""));
 	if(_listText!=NULL)FREE_STRING(_listText,owner);
 }/* VALIDATED */
 
@@ -2806,7 +2806,7 @@ void outputArray(char const * const prefix,Marray const * const array,char const
  */
 void q2outputArray(char const * const prefix,Marray const * const array,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _arrayText=owned_string(_getArrayText(array,LLONG_MAX,LLONG_MAX),owner);
-	q2outputandcollect("%s%s%s",(prefix!=NULL?prefix:""),(_arrayText!=NULL?string(_arrayText):"?"),(suffix!=NULL?suffix:""));
+	q2output("%s%s%s",(prefix!=NULL?prefix:""),(_arrayText!=NULL?string(_arrayText):"?"),(suffix!=NULL?suffix:""));
 	if(_arrayText!=NULL)FREE_STRING(_arrayText,owner);
 }/* VALIDATED */
 
@@ -3104,18 +3104,18 @@ size_t outputValue(char const * const prefix,Mvalue const * const value,char con
  * @return size_t the number of characters output
  */
 size_t q2outputValue(char const * const prefix,Mvalue const * const value, char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=(prefix!=NULL?q2outputandcollect("%s",prefix):0);
+	size_t written=(prefix!=NULL?q2output("%s",prefix):0);
 	if(value!=NULL){
 		// output("(%s)%u",TOKENTYPE_STRING[value->type],value->type); // DEBUG
 		Mstring* _valueText=owned_string(_getValueText(value,false,true),owner); // free asap
 		if(_valueText!=NULL){
-			written+=q2outputandcollect("%s",string(_valueText));
+			written+=q2output("%s",string(_valueText));
 			FREE_STRING(_valueText,owner);
 			// obsolete: _valueText=NULL;
 		}
 	}else
-		written+=q2outputandcollect("%c",'?');
-	if(suffix!=NULL)written+=q2outputandcollect("%s",suffix);
+		written+=q2output("%c",'?');
+	if(suffix!=NULL)written+=q2output("%s",suffix);
 	return written;
 }
 
@@ -3282,7 +3282,7 @@ bool listAppendedToMap(Mmap* const _map,Mallocationowner owner_map,const Mlist* 
 			while(_listelement){
 				Mstring* _indexValueText=owned_string(__string(),owner);
 				if(_indexValueText){ // free asap
-					if(!appendll(_indexValueText,_listelement->index)||appendedToMap(_map,owner_map,string(_indexValueText),_listelement->_value)<=0){outputError("Failed to append a list element to a map");result=false;}
+					if(!appendll(_indexValueText,_listelement->index)||appendedToMap(_map,owner_map,string(_indexValueText),_listelement->_value)<=0){q2outputError("Failed to append a list element to a map");result=false;}
 					FREE_STRING(_indexValueText,owner); // freeing
 				}else{
 					result=false;
@@ -3313,7 +3313,7 @@ bool listAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,
 			while(result&&_listelement!=NULL){
 				// index and value of the list element are stored in a new list!!
 				Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false,"listAppendedToMapList"); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
-				if(NULL==_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
+				if(NULL==_maplistelementValue){q2outputError("Failed to create an empty list");result=false;break;}
 				Mlist* _maplistelement=_maplistelementValue->value._list;
 				if(NULL==_maplistelement)result=false;else
 				if(appendedToList(_maplistelement,owner,_getIntegerValue(_listelement->index),M_LL_INVALID)<=0)result=false;else
@@ -3325,7 +3325,7 @@ bool listAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,
 				}
 				/* MDH@26MAY2020 replacing: if we fail to construct the maplist element or to add it
 				if(!_maplistelement||appendedToList(_maplistelement,owner_maplist,_getIntegerValue(_listelement->index),M_LL_INVALID)<=0||!appendedToList(_maplistelement,_listelement->_value,M_LL_INVALID)||!appendedToList(_maplist,_maplistelementValue,M_LL_INVALID)){
-					outputError("Failed to create or populate map list element");
+					q2outputError("Failed to create or populate map list element");
 					result=false;
 				}else
 				*/
@@ -3403,7 +3403,7 @@ bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist con
 						// TODO again the value is appended as is, but 
 						// DONE that should be OK, because values are essentially immutable!!!
 						if(!string_length(_attributeNameValueText)||!appendedToMap(_map,owner_map,string(_attributeNameValueText),_maplistelementValue->value._list->_first->_next->_value)){
-							outputError("Failed to append a list element to a map (using the index text as attribute name)");
+							q2outputError("Failed to append a list element to a map (using the index text as attribute name)");
 							result=false;
 						}
 						FREE_STRING(_attributeNameValueText,owner);
@@ -3437,7 +3437,7 @@ bool mapAppendedToList(Mlist* const _list,Mallocationowner owner_list,const Mmap
 				// only add those map elements of which the key can be converted to a positive integer
 				long long index=atoll(_mapelement->_variable->_name->chars);
 				if(index>0&&appendedToList(_list,owner_list,_mapelement->_variable->_value,index)<=0){
-					outputError("Failed to append a map element to a list (using the integer value of the name as index)");
+					q2outputError("Failed to append a map element to a list (using the integer value of the name as index)");
 					result=false;
 				}
 				_mapelement=_mapelement->_next;
@@ -3479,24 +3479,24 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,c
 							if(_attributeNameValue!=NULL&&appendedToList(_maplistelement,owner_maplistelement,_attributeNameValue,M_LL_INVALID)>0){
 								if(appendedToList(_maplistelement,owner_maplist,_mapelement->_variable->_value,M_LL_INVALID)<=0||appendedToList(_maplist,owner_maplist,_maplistelementValue,M_LL_INVALID)<=0){
 									result=false;
-									outputError("Failed to append the attribute value in constructing a map list element");
+									q2outputError("Failed to append the attribute value in constructing a map list element");
 								}
 							}else{
 								result=false;
-								outputError("Failed to create or add the attribute name in constructing a map list element");
+								q2outputError("Failed to create or add the attribute name in constructing a map list element");
 							}
 						}else{
 							result=false;
-							outputError("Failed to construct the attribute name text in constructing a map list element");
+							q2outputError("Failed to construct the attribute name text in constructing a map list element");
 						}
 						FREE_STRING(_attributeName,owner); // freed!
 					}else{
 						result=false;
-						outputError("Failed to create a text");
+						q2outputError("Failed to create a text");
 					}			   
 				}else{
 					result=false;
-					outputError("Failed to create a map list element list");
+					q2outputError("Failed to create a map list element list");
 				}
 				_mapelement=_mapelement->_next;
 			}
@@ -3526,7 +3526,7 @@ Mdecimal* _getValueTextDecimal(Mvalue* value,mpd_context_t const * mpd_context){
 				_valueTextDecimal=owned_decimal(_getTextDecimal(string(_valueText),0,mpd_context),owner);
 				FREE_STRING(_valueText,owner);
 			}else
-				outputError("Failed to create the text trying to convert a value to a decimal");
+				q2outputError("Failed to create the text trying to convert a value to a decimal");
 		}else
 			_valueTextDecimal=owned_decimal(_getDecimalCopy(value->value._decimal),owner); // shouldn't happen though
 	}
@@ -3540,10 +3540,10 @@ Mdecimal* _getValueTextDecimal(Mvalue* value,mpd_context_t const * mpd_context){
 			uint32_t status=0;
 			mpd_qset_string(_parsedValueDecimal->mpd,string(_valueText),get_default_mpd_context(),&status);
 			FREE_STRING(_valueText);
-			if((status&0xEFBF)!=0){FREE_DECIMAL(_parsedValueDecimal);_parsedValueDecimal=NULL;outputError("Failed to parse the decimal text");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_parsedValueDecimal);_parsedValueDecimal=NULL;q2outputError("Failed to parse the decimal text");}
 		}
 	}else
-		outputError("Failed to create a decimal");
+		q2outputError("Failed to create a decimal");
 	return _parsedValueDecimal;
 	*/
 }
@@ -3935,17 +3935,17 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
 					_rational=_getRational(_numerator,_denominator,delta,false/*,true*/); // construct the intermediate result without normalizing
 					FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner); // MDH@26MAY2020 now always!!!
 					if(NULL==_rational){
-						outputMessage(M_ERROR_PREFIX,"Failed to construct the rational approximation %lld/%lld.\n",p,q);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to construct the rational approximation %lld/%lld.\n",p,q);
 						break;
 					}
 					// NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
 					// NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
 					Mvalue* _rationalValue=_getValueOfRational(disowned_rational(_rational,owner));
-					if(NULL==_rationalValue){FREE_RATIONAL(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
+					if(NULL==_rationalValue){FREE_RATIONAL(_rational,owner);q2outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
 					// NOTE probably best to break if we can't append approximations!!
 					// NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
 					if(appendedToList(_iterationsList,owner,_rationalValue,i)<=0)
-					{/*FREE_RATIONAL(_rational);*/outputError("Failed to register a rational approximation");break;}
+					{/*FREE_RATIONAL(_rational);*/q2outputError("Failed to register a rational approximation");break;}
 					// if we get here success in updating the iterations list!!!!
 					// if delta is now zero, we're done!!!
 					if(isLongDoubleZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
@@ -3970,7 +3970,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
 				Mvalue* _rationalValue=_getValueOfRational(disowned_rational(_rational,owner)); // OK free __biginteger() if failing to get that _rational
 				if(NULL==_rationalValue)FREE_RATIONAL(_rational,owner);else 
 				if(appendedToList(_iterationsList,owner,_rationalValue,0)<=0)
-					outputError("Failed to append rational approximation to the result list"); // no need to free _rational because it's value wrapper will be garbage collected!!
+					q2outputError("Failed to append rational approximation to the result list"); // no need to free _rational because it's value wrapper will be garbage collected!!
 			}
 		}
 		/* 
@@ -3983,14 +3983,14 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
 				// ASSERT failed to append the rational approximation to the iterations list
 				// free whatever's NOT being returned NOTE the list itself will be freed below
 				free_value(_rationalValue);
-				outputError("Failed to append the rational of a real to the result list");
+				q2outputError("Failed to append the rational of a real to the result list");
 			}else // failed to wrap the rational
-				outputError("Failed to store the rational approximation");
+				q2outputError("Failed to store the rational approximation");
 		}
 		free_list(_iterationsList);
 		*/
 	}else
-		outputError("Failed to create a list for storing the rational approximations");
+		q2outputError("Failed to create a list for storing the rational approximations");
 	return disowned_list(_iterationsList,owner);
 }/* VALIDATED */
 
@@ -4002,7 +4002,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
  * @param _value 
  */
 void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowner owner=getOwner(__LINE__);
-	// {q2outputValue("Storing '",_value,"'");q2outputandcollect(" in %p.\n",_valueholder);} // DEBUG
+	// {q2outputValue("Storing '",_value,"'");q2output(" in %p.\n",_valueholder);} // DEBUG
 	// ASSERT not a composite value (so like an end node)
 	if(*_valueholder!=NULL)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
 	// MDH@01NOV2019: it's a leap of faith to let assignValue() create copies of composite values i.e. instead of assigning _value to the *_valueholder we assign a new map or list value
@@ -4227,21 +4227,21 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner o
 										}
 										if(!success){FREE_BIGINTEGER(_dividend,owner);_dividend=NULL;}
 									}else 
-										outputError("Failed to create big integer dividend");
+										q2outputError("Failed to create big integer dividend");
 									FREE_BIGINTEGER(_remainder,owner);
 								}else 
-									outputError("Failed to create big integer remainder");
+									q2outputError("Failed to create big integer remainder");
 							}else
-								outputError("Failed to double big integer denominator");
+								q2outputError("Failed to double big integer denominator");
 							FREE_BIGINTEGER(_twiceden,owner);
 						}
 					}else
-						outputError("Failed to double big integger numerator");
+						q2outputError("Failed to double big integger numerator");
 					FREE_BIGINTEGER(_twicenum,owner); // freed!
 				}else
-					outputError("Failed to create big integer");
+					q2outputError("Failed to create big integer");
 			}else
-				outputError("Failed to compute the absolute of a big integer");
+				q2outputError("Failed to compute the absolute of a big integer");
 			FREE_BIGINTEGER(_absnum,owner); // freed!
 		}
 		return disowned_biginteger(_dividend,owner);
@@ -4277,7 +4277,7 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
 		// get the absolute value of the numerator
 		Mbiginteger* _absnum=owned_biginteger(__biginteger(),owner); // to be freed asap
 		if(mp_abs(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_absnum))!=MP_OKAY)
-		{FREE_BIGINTEGER(_absnum,owner);outputError("Failed to compute the absolute of a big integer");return NULL;}
+		{FREE_BIGINTEGER(_absnum,owner);q2outputError("Failed to compute the absolute of a big integer");return NULL;}
 		Mbiginteger *_dividend=owned_biginteger(__biginteger(),owner),*_remainder=owned_biginteger(__biginteger(),owner);
 		bool success=(mp_div(MP_INT_POINTER(_absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
 		if(success&&mp_iszero(MP_INT_POINTER(_remainder))!=MP_YES){ // division succeeded with a non-zero remainder
@@ -4286,16 +4286,16 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
 					// if flooring (instead of ceiling) we have to subtract one
 					if(floor&&!towardszero&&mp_decr(MP_INT_POINTER(_dividend))!=MP_OKAY){
 						success=false;
-						outputError("Failed to decrement the truncated negative big integer");
+						q2outputError("Failed to decrement the truncated negative big integer");
 					}
 				}else{
 					success=false;
-					outputError("Failed to negate the big integer dividend");
+					q2outputError("Failed to negate the big integer dividend");
 				}
 			}else{
 				if(!floor&&!towardszero&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY){
 					success=false;
-					outputError("Failed to increment truncated positive big integer");
+					q2outputError("Failed to increment truncated positive big integer");
 				}
 			}
 			if(!success){FREE_BIGINTEGER(_dividend,owner);_dividend=NULL;}
@@ -4333,7 +4333,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 					if((status&0xEFBF)==0)return disowned_decimal(_truncDecimal,owner);
 					q2outputmessageprefix(M_ERROR_PREFIX);
 					q2outputDecimal("Failed to truncate decimal '",_decimal,"'");
-					q2outputandcollect(" (status: %.8x).\n",status);
+					q2output(" (status: %.8x).\n",status);
 					FREE_DECIMAL(_truncDecimal,owner);
 				}
 			}else
@@ -4345,7 +4345,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 					if((status&0xEFBF)==0)return disowned_decimal(_floorDecimal,owner);
 					q2outputmessageprefix(M_ERROR_PREFIX);
 					q2outputDecimal("Failed to floor decimal '",_decimal,"'");
-					q2outputandcollect(" (status: %.8x).\n",status);
+					q2output(" (status: %.8x).\n",status);
 					FREE_DECIMAL(_floorDecimal,owner);
 				}					
 			}else{
@@ -4356,12 +4356,12 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 					if((status&0xEFBF)==0)return disowned_decimal(_ceilDecimal,owner);
 					q2outputmessageprefix(M_ERROR_PREFIX);
 					q2outputDecimal("Failed to ceil decimal '",_decimal,"'");
-					q2outputandcollect(" (status: %.8x).\n",status);
+					q2output(" (status: %.8x).\n",status);
 					FREE_DECIMAL(_ceilDecimal,owner);
 				}
 			}
 		}else
-			outputError("No context available for converting a decimal to an integer");
+			q2outputError("No context available for converting a decimal to an integer");
 	}
 	return NULL;
 }
@@ -4384,11 +4384,11 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){Mallocationowner owner=getOwner
 				if((status&0xEFBF)==0)return disowned_decimal(_roundDecimal,owner);
 				q2outputmessageprefix(M_ERROR_PREFIX);
 				q2outputDecimal("Failed to round decimal '",_decimal,"'");
-				q2outputandcollect(" (status: %.8x).\n",status);
+				q2output(" (status: %.8x).\n",status);
 				FREE_DECIMAL(_roundDecimal,owner);
 			}
 		}else
-			outputError("No context available for rounding a decimal");
+			q2outputError("No context available for rounding a decimal");
 	}
 	return NULL;
 }
@@ -4714,9 +4714,9 @@ void free_environment(Menvironment* _environment/*,Mallocationowner owner_enviro
  */
 Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
 	Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
-	if(NULL==_environment){outputError("Failed to create an environment");return NULL;}
+	if(NULL==_environment){q2outputError("Failed to create an environment");return NULL;}
 	_environment->_variableMap=CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
-	if(NULL==_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
+	if(NULL==_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;q2outputError("Failed to create the new environment variable map");}
 	return disowned_environment(_environment,owner);
 }/* VALIDATED */
 // MDH@25FEB2021: on occasion it's useful to be able to initialize a new environment with a variable map somehow
@@ -4729,9 +4729,9 @@ Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
  */
 Menvironment* _getEnvironment(Mmap* _variableMap){Mallocationowner owner=getOwner(__LINE__);
 	Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
-	if(NULL==_environment){outputError("Failed to create an environment");return NULL;}
+	if(NULL==_environment){q2outputError("Failed to create an environment");return NULL;}
 	_environment->_variableMap=(_variableMap?owned_map(_variableMap,Msubowner(owner,1)):CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)));
-	if(NULL==_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
+	if(NULL==_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;q2outputError("Failed to create the new environment variable map");}
 	return disowned_environment(_environment,owner);
 }/* VALIDATED */
 
@@ -4786,7 +4786,7 @@ Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_functi
 		return NULL;
 	}
 	if(amVerbose())
-		outputInfo("Binding the function to the value");
+		q2outputInfo("Binding the function to the value");
 	_value->type=VT_FUNCTION;
 	_value->value._function=(disowned_function?owned_function(_function,owner_value_data):_function);
 	if(amVerbose())
@@ -4847,7 +4847,7 @@ Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=
 						;
 					FREE_STRING(_permissions,owner);
 				}else
-					outputError("Failed to represent the file permissions");
+					q2outputError("Failed to represent the file permissions");
 				*/
 				// File size property
 				Minteger* _integer=owned_integer(_getInteger(filestat.st_size),owner);
@@ -4856,7 +4856,7 @@ Mmap* _getFileStatPropertyMap(Mfile const * const _file){Mallocationowner owner=
 						///output("File size added to file stat map.\n")
 					;
 				}else
-					outputError("Failed to represent the file size");
+					q2outputError("Failed to represent the file size");
 
 				// Get file creation time in seconds and convert seconds to date and time format
 				struct tm dt = *(gmtime(&filestat.st_ctime));
@@ -4957,7 +4957,7 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 						FREE_STRING(_filemode,owner);
 					}
 				}else
-					outputBug("File mode of opened file vanished!");
+					q2outputBug("File mode of opened file vanished!");
 				/* replacing:
 				Mstring* _openmode=owned_string(_getString("'"),owner);
 				if(_openmode!=NULL){
@@ -4989,7 +4989,7 @@ Mmap* _getFilePropertyMap(Mfile const * const _file){Mallocationowner owner=getO
 			return disowned_map(_map,owner);
 
 		}else
-			outputError("Failed to create the file property map");
+			q2outputError("Failed to create the file property map");
 	}
 	return NULL;
 
@@ -5011,17 +5011,17 @@ long long fExists(Mfile * const file,bool report){
 		if(report){
 			q2outputmessageprefix(M_ERROR_PREFIX);
 			switch(errno){
-				case EACCES:q2outputandcollect("'The permissions specified by amode (%d) are denied, or search permission is denied on a component of the path prefix",F_OK);break;
-				case EINTR:q2outputandcollect("'Interrupted by a signal");break;
-				case EINVAL:q2outputandcollect("'Invalid amode (%d)",F_OK);break;
-				case ELOOP:q2outputandcollect("'Too many levels of symbolic links or prefixes");break;
-				case ENAMETOOLONG:q2outputandcollect("'The length of the file/directory name exceeds %d, or one of the parts of the file/directory name is longer than %d",PATH_MAX,NAME_MAX);break;
-				case ENOENT:q2outputandcollect("'A component of the path isn't valid");break;
-				case ENOSYS:q2outputandcollect("'The access() function isn't implemented for the filesystem underlying the file/directory specified");break;
-				case ENOTDIR:q2outputandcollect("'A component of the path isn't a directory");break;
-				case EROFS:q2outputandcollect("'Write access was requested for a file residing on a read-only file system");break;
+				case EACCES:q2output("'The permissions specified by amode (%d) are denied, or search permission is denied on a component of the path prefix",F_OK);break;
+				case EINTR:q2output("'Interrupted by a signal");break;
+				case EINVAL:q2output("'Invalid amode (%d)",F_OK);break;
+				case ELOOP:q2output("'Too many levels of symbolic links or prefixes");break;
+				case ENAMETOOLONG:q2output("'The length of the file/directory name exceeds %d, or one of the parts of the file/directory name is longer than %d",PATH_MAX,NAME_MAX);break;
+				case ENOENT:q2output("'A component of the path isn't valid");break;
+				case ENOSYS:q2output("'The access() function isn't implemented for the filesystem underlying the file/directory specified");break;
+				case ENOTDIR:q2output("'A component of the path isn't a directory");break;
+				case EROFS:q2output("'Write access was requested for a file residing on a read-only file system");break;
 			}
-			q2outputandcollect("' checking for the existence of file/directory '%s'.\n",string(file->_name));
+			q2output("' checking for the existence of file/directory '%s'.\n",string(file->_name));
 		}
 		return M_FALSE;
 	}
@@ -5085,7 +5085,7 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 		if(filename!=NULL&&strlen(filename)){
 			_file->_name=owned_string(_getString(filename),Msubowner(owner,1)); // bind _filename to _file->_name (ownership one level down)
 			if(NULL==_file->_name){
-				outputMessage(M_ERROR_PREFIX,"Failed to set the name of the file to '%s'.",filename);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to set the name of the file to '%s'.",filename);
 				FREE_FILE(_file,owner);
 				return NULL;
 			}
@@ -5098,7 +5098,7 @@ Mfile* _getFile(char const * const filename){Mallocationowner owner=getOwner(__L
 		if(_file->_stat!=NULL){
 			if(stat(string(_file->_name),_file->_stat)!=0){FREE_DISOWNED_1(_file->_stat,'f',owner);_file->_stat=NULL;}
 		}else
-			outputError("Unable to obtain the file stats");
+			q2outputError("Unable to obtain the file stats");
 		*/
 	}
 	return NULL;
@@ -5120,13 +5120,13 @@ static Mfile* _getFileWithName(Mvalue const * const filenameValue){
 				char* filename=filenameValue->value._text->_c;
 				Mfile* _file=_getFile(filename);
 				if(_file!=NULL)return _file;
-				outputMessage(M_ERROR_PREFIX,"Failed to create a file object with name '%s'.",filename);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to create a file object with name '%s'.",filename);
 			}else
-				outputBug("Filename vanished");
+				q2outputBug("Filename vanished");
 		}else
-			outputError("Assumed filename of wrong type");
+			q2outputError("Assumed filename of wrong type");
 	}else
-		outputError("No filename specified");
+		q2outputError("No filename specified");
 	return NULL;
 }
 /**
@@ -5177,7 +5177,7 @@ long long fIsReadable(Mfile const * const _file,bool report){
 		}
 	}else
 	if(report)
-		outputError("No file specified to determine the readability of");
+		q2outputError("No file specified to determine the readability of");
 	return result;
 }
 /**
@@ -5207,7 +5207,7 @@ long long fIsWriteable(Mfile const * const _file,bool report){
 		}
 	}else
 	if(report)
-		outputError("No file specified to determine the readability of");
+		q2outputError("No file specified to determine the readability of");
 	return result;
 	/* replacing:
 	if(NULL==_file)return false;
@@ -5244,10 +5244,10 @@ long long fDeleted(Mfile * const _file,Mallocationowner owner_file){
 			if(result==M_TRUE){
 				if(remove(string(_file->_name))){ // failure because remove() returns 0 on success
 					result=M_FALSE;
-					outputMessage(M_ERROR_PREFIX,"Failed to delete file '%s'.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to delete file '%s'.",string(_file->_name));
 				}
 			}else
-				outputMessage(M_ERROR_PREFIX,"Can't delete '%s': it is not a regular (existing) file.",string(_file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"Can't delete '%s': it is not a regular (existing) file.",string(_file->_name));
 			/* replacing:
 			// if remove returns a non-zero value, removing the file failed!!!!
 			if(file->staterrno<0)fUpdateStats(file,true);
@@ -5261,22 +5261,22 @@ long long fDeleted(Mfile * const _file,Mallocationowner owner_file){
 					///	FREE_DISOWNED_1(file->_stat,'f',owner_file);
 					///	file->_stat=NULL;
 					///}else
-					///	outputError("Failed to remove the stats of the deleted file");
+					///	q2outputError("Failed to remove the stats of the deleted file");
 					///
 				}else // failure, so the stats stay!!!
-					outputMessage(M_ERROR_PREFIX,"Failed to delete file '%s'.",string(file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to delete file '%s'.",string(file->_name));
 			}else{
 				result=M_TRUE; // safe to return true as well!!!
-				outputMessage(M_ERROR_PREFIX,"File '%s' cannot be deleted: it does not exist!",string(file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"File '%s' cannot be deleted: it does not exist!",string(file->_name));
 			}
 			*/
 		}else
-			outputMessage(M_ERROR_PREFIX,"It is not allowed to delete an opened file '%s'!",string(_file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"It is not allowed to delete an opened file '%s'!",string(_file->_name));
 	}else
 	if(_file!=NULL)
-		outputError("Cannot delete an unnamed file");
+		q2outputError("Cannot delete an unnamed file");
 	else
-		outputError("No file to delete specified");
+		q2outputError("No file to delete specified");
 	return result;
 }
 /**
@@ -5345,30 +5345,30 @@ long long fOpened(Mfile * const file,Mallocationowner owner_file,char const * op
 					// get rid of the current file mode whatever it is
 					if(file->_mode!=NULL){
 						FREE(file->_mode,1+strlen(file->_mode),-'"');file->_mode=NULL;
-						q2outputandcollect("Registered file mode released.\n");
+						q2output("Registered file mode released.\n");
 					}
 					if(file->_f!=NULL){ // successfully opened the file in mode 'mode'
 						file->_mode=_strdup(mode); // register the actual mode the file was opened in
 						if(file->_mode!=NULL)result=M_TRUE;
-						else outputMessage(M_ERROR_PREFIX,"Failed to register '%s' as the mode file '%s' was opened in.",mode,string(file->_name));
+						else q2outputMessage(M_ERROR_PREFIX,"Failed to register '%s' as the mode file '%s' was opened in.",mode,string(file->_name));
 					}else
-						outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' in mode '%s'.",string(file->_name),mode);
+						q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' in mode '%s'.",string(file->_name),mode);
 					/* replacing and augmenting:
 					_file->_f=fopen(string(_file->_name),mode);
 					if(_file->_f){_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2];} // remember the opening mode when the file was successfully opened
 					*/
 				}else
 				if(*mode=='w')
-					outputMessage(M_ERROR_PREFIX,"Can't overwrite existing content in '%s'.",string(file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Can't overwrite existing content in '%s'.",string(file->_name));
 				else
-					outputMessage(M_ERROR_PREFIX,"Can't open directory '%s'.",string(file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Can't open directory '%s'.",string(file->_name));
 			}else
-				outputMessage(M_ERROR_PREFIX,"Can't open file '%s': invalid mode '%s'.",string(file->_name),mode);
+				q2outputMessage(M_ERROR_PREFIX,"Can't open file '%s': invalid mode '%s'.",string(file->_name),mode);
 		}else
 		if(strcmp(mode,file->_mode))
-			outputMessage(M_WARNING_PREFIX,"File '%s' already open in mode '%s' instead of the requested mode '%s'!",string(file->_name),file->_mode,mode);
+			q2outputMessage(M_WARNING_PREFIX,"File '%s' already open in mode '%s' instead of the requested mode '%s'!",string(file->_name),file->_mode,mode);
 		else
-			outputMessage(M_WARNING_PREFIX,"File '%s' already open!",string(file->_name));
+			q2outputMessage(M_WARNING_PREFIX,"File '%s' already open!",string(file->_name));
 	}
 	return result;
 }
@@ -5384,7 +5384,7 @@ long long fClosed(Mfile * const file,Mallocationowner owner_file,bool report){
 			///delegated now to closeFile!!! if(report)output("Closing file '%s'.\n",string(file->_name));
 			if(!closeFile(file,report))return M_FALSE;
 		}else
-			outputMessage(M_WARNING_PREFIX,"File '%s' already closed!",string(file->_name));
+			q2outputMessage(M_WARNING_PREFIX,"File '%s' already closed!",string(file->_name));
 		return M_TRUE;
 	}
 	return M_LL_INVALID;
@@ -5430,11 +5430,11 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 								// we have to ascertain to have sufficient room to store what we read
 								output("Changing the string length from %llu to %llu.\n",l,l+numberOfBytesToReadAtOnce);
 								if(NULL==string_setlength(_bytesRead,l+numberOfBytesToReadAtOnce)){
-									outputMessage(M_ERROR_PREFIX,"Failed to allocate sufficient memory to read the bytes from file '%s' to.",string(file->_name));
+									q2outputMessage(M_ERROR_PREFIX,"Failed to allocate sufficient memory to read the bytes from file '%s' to.",string(file->_name));
 									break;
 								}
-								q2outputandcollect("Length set to %llu.\n",_bytesRead->length);
-								q2outputandcollect("Reading %lld bytes from file '%s'.\n",numberOfBytesToReadAtOnce,string(file->_name));
+								q2output("Length set to %llu.\n",_bytesRead->length);
+								q2output("Reading %lld bytes from file '%s'.\n",numberOfBytesToReadAtOnce,string(file->_name));
 								size_t numberOfBytesRead=fread(_bytesRead->_chars->chars+l,sizeof(unsigned char),numberOfBytesToReadAtOnce,file->_f);
 								string_setlength(_bytesRead,l+numberOfBytesRead);
 								if(numberOfBytesRead==0)break;
@@ -5449,22 +5449,22 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
 							}
 							*/
 							if(numberOfBytes>0)
-								outputMessage(M_ERROR_PREFIX,"Failed to read %d %s from file '%s'.",numberOfBytes,(openedInBinaryMode?"bytes":"characters"),string(file->_name));
+								q2outputMessage(M_ERROR_PREFIX,"Failed to read %d %s from file '%s'.",numberOfBytes,(openedInBinaryMode?"bytes":"characters"),string(file->_name));
 							// succeeded when all bytes were read or we bumped into end-of-file!!
 							if(numberOfBytes<=0||feof(file->_f))return disowned_string(_bytesRead,owner);
 							FREE_STRING(_bytesRead,owner);
 							}
 					}else
-						outputMessage(M_ERROR_PREFIX,"Failed to prepare for reading %s from file '%s'.",(openedInBinaryMode?"bytes":"characters"),string(file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Failed to prepare for reading %s from file '%s'.",(openedInBinaryMode?"bytes":"characters"),string(file->_name));
 				}else
-					outputMessage(M_ERROR_PREFIX,"Cannot read from '%s': end-of-file reached.",string(file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Cannot read from '%s': end-of-file reached.",string(file->_name));
 				////}
 			}else
-				outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': it is not readable.",string(file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': it is not readable.",string(file->_name));
 		}else
-			outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': it is not open.",string(file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': it is not open.",string(file->_name));
 	}else
-		outputError("No file specified to read from");
+		q2outputError("No file specified to read from");
 	return NULL;
 }
 
@@ -5476,17 +5476,17 @@ Mstring* fRead(Mfile const * const file/*,Mallocationowner owner_file*/,long lon
  */
 static void reportFileReadErrorCode(Mfile const * const file,long long errorCode){
 	if(errorCode==M_LL_INVALID)
-		outputBug("Invalid arguments to the string_freadline() function call");
+		q2outputBug("Invalid arguments to the string_freadline() function call");
 	else
 	if(errorCode==1)
-		outputMessage(M_ERROR_PREFIX,"Out of memory trying to read a text line from file '%s'.",string(file->_name));
+		q2outputMessage(M_ERROR_PREFIX,"Out of memory trying to read a text line from file '%s'.",string(file->_name));
 	else
 	if(errorCode==2){
 		int fileErrorCode=ferror(file->_f);
 		if(fileErrorCode)
-			outputMessage(M_ERROR_PREFIX,"Error with error code %d trying to read a text line from file '%s'.",fileErrorCode,string(file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"Error with error code %d trying to read a text line from file '%s'.",fileErrorCode,string(file->_name));
 		else
-			outputMessage(M_ERROR_PREFIX,"Unknown error trying to read a text line from file '%s'.",string(file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"Unknown error trying to read a text line from file '%s'.",string(file->_name));
 	}
 }
 /**
@@ -5576,7 +5576,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 								if(feof(file->_f))break; // to be tested AFTER reading
 								// MDH@27DEC2020: whatever is read, it must not be negative!!!!
 								if(c<SCHAR_MIN||c>SCHAR_MAX){
-									outputMessage(M_ERROR_PREFIX,"Invalid character code (%i) read from '%s'.",c,string(file->_name));
+									q2outputMessage(M_ERROR_PREFIX,"Invalid character code (%i) read from '%s'.",c,string(file->_name));
 									break;
 								}
 								// let me suggest to only stop on \n and remove the \r if there's one in front of the \n
@@ -5585,7 +5585,7 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 									break; // either LF or CR would stop the reading
 								}
 								p=string_append_char(p,c);
-								if(NULL==p){outputError("Failed to read all text line characters");break;}
+								if(NULL==p){q2outputError("Failed to read all text line characters");break;}
 							}
 							///* MDH@30APR2024: since we didn't break on '\r' there's no need to actually do the following anymore
 							//// skip the optional linefeed following any carriage return, if something else push back again
@@ -5595,15 +5595,15 @@ Mstring* fReadLine(Mfile const * const file/*,Mallocationowner owner_file*/){Mal
 						}
 					}
 				/*}else
-					outputMessage(M_ERROR_PREFIX,"Can't read a line from file '%s' in binary mode.",string(file->_name));*/
+					q2outputMessage(M_ERROR_PREFIX,"Can't read a line from file '%s' in binary mode.",string(file->_name));*/
 			}else
-				outputMessage(M_ERROR_PREFIX,"Can't read a line from file '%s': it is not readable.",string(file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"Can't read a line from file '%s': it is not readable.",string(file->_name));
 		}else
-			outputMessage(M_ERROR_PREFIX,"Can't read a line from file '%s': it is not open.",string(file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"Can't read a line from file '%s': it is not open.",string(file->_name));
 		/* not here!!
 		// if the file is disowned (which it will be if it was created)
 		if(Misdisowned(file)){
-			outputWarning("Reading a single line of text from a locally created file like this will always return the first text line!");
+			q2outputWarning("Reading a single line of text from a locally created file like this will always return the first text line!");
 			free_file_file); // MDH@28DEC2020: will take care of closing the file as well now
 		}
 		return result;
@@ -5649,7 +5649,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 							// we'll be using a single line to read the individual lines into
 							// NOTE when reading in binary mode, we can't actually reuse the line we use because we're actually storing the Mstring explicitly
 							Mstring* _line=owned_string((openedInBinaryMode?__string():_getString("'")),owner);
-							if(NULL==_line){outputError("Failed to create a line buffer");return M_LL_INVALID;}
+							if(NULL==_line){q2outputError("Failed to create a line buffer");return M_LL_INVALID;}
 							Mlistelement* listelement=NULL;
 							/////output("Will start reading text lines.\n");
 							// MDH@27MAY2024: for an example of how to handle reading a single line see fReadline()
@@ -5673,13 +5673,13 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 								/* replacing:
 								/////output("Copy at end: %lld.\n",copyAtEnd);
 								if(numberOfCharsRead==M_LL_INVALID){ // something went wrong
-									outputMessage(M_ERROR_PREFIX,"Failed to allocate memory to store text read from file '%s'.",string(file->_name));
+									q2outputMessage(M_ERROR_PREFIX,"Failed to allocate memory to store text read from file '%s'.",string(file->_name));
 									result=-result;
 									break;
 								}
 								if(numberOfCharsRead==0){
 									result=-result;
-									outputMessage(M_ERROR_PREFIX,"No characters read from file '%s'.",string(file->_name));
+									q2outputMessage(M_ERROR_PREFIX,"No characters read from file '%s'.",string(file->_name));
 									break;
 								}
 								*/
@@ -5694,7 +5694,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 									// we'll be storing __line as a whole, and 'return' the remainder read to the open file since the remainder may contain NUL characters, so we can't rely on moving the remainder
 									// throw back what we're not going to store
 									if(NULL==linefeedCharacterPosition){
-										outputError("Failed to read a line");
+										q2outputError("Failed to read a line");
 										break;
 									}
 									long long lineLength=(linefeedCharacterPosition-lastStoredCharacterPosition+1);
@@ -5709,14 +5709,14 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 									listelement=getAppendedListelement(linesReadList,owner_linesReadList);
 									if(NULL==listelement){
 										result=-result;
-										outputError("Failed to store the binary line read");
+										q2outputError("Failed to store the binary line read");
 										break;
 									}
 									assignValue(&listelement->_value,_getStringValue(disowned_string(_line,owner)));
-									if(NULL==listelement->_value){outputError("Failed to store a binary line read!");break;}
+									if(NULL==listelement->_value){q2outputError("Failed to store a binary line read!");break;}
 									// ASSERT _line is now bound in listelement->_value
 									_line=owned_string(__string(),owner);
-									if(NULL==_line){outputError("Failed to create a new binary buffer");break;}
+									if(NULL==_line){q2outputError("Failed to create a new binary buffer");break;}
 								}else{ // opened in text mode
 									readButNotStored=0; // for safety, just in case some positive value was still around
 										// consume ALL text lines read
@@ -5730,7 +5730,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 										listelement=getAppendedListelement(linesReadList,owner_linesReadList);
 										if(NULL==listelement){
 											result=-result;
-											outputError("Failed to store the text line read");
+											q2outputError("Failed to store the text line read");
 											break;
 										}
 										// STEP 1. mark the end of the text line NOTE this won't change the actual length, but will ascertain that _getTextValue() copies the actual line
@@ -5793,7 +5793,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 													listelement=getAppendedListelement(linesReadList,owner_linesReadList);
 													if(NULL==listelement){
 														result=-result;
-														outputError("Failed to store the last text line");
+														q2outputError("Failed to store the last text line");
 													}else{
 														assignValue(&listelement->_value,_getTextValue(string(startOfLine)));
 														readButNotStored=0; // stored, so no need to actually return which means we're staying at end-of-file
@@ -5808,7 +5808,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 												//////output("Number of characters moved: %lld.\n",numberOfCharsMoved);
 												if(numberOfCharsMoved!=readButNotStored){ // not all characters moved, which means something went wrong, and we have to abort and give the remainder back!!!
 													result=-result;
-													outputMessage(M_ERROR_PREFIX,"Only %lld out of %lld characters moved.",numberOfCharsMoved,readButNotStored);
+													q2outputMessage(M_ERROR_PREFIX,"Only %lld out of %lld characters moved.",numberOfCharsMoved,readButNotStored);
 													break;
 												}
 												///////readButNotStored=0; // successfully moved, but since we're not breaking out of the loop yet, it doesn't matter
@@ -5823,7 +5823,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 											long long numberOfCharsMoved=string_move(_line,(startOfLine+1)-_line->_chars->chars,1L);
 											if(numberOfCharsMoved==M_LL_INVALID){
 												if(result>0)result=-result;
-												outputError("Failed to prepare for reading the next line(s)");
+												q2outputError("Failed to prepare for reading the next line(s)");
 												break;
 											}
 											if(feof(file->_f)){ // nothing to read left from the file
@@ -5835,7 +5835,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 												listelement=getAppendedListelement(linesReadList,owner_linesReadList);
 												if(NULL==listelement){
 													if(result>0)result=-result;
-													outputError("Failed to append a text line list element");
+													q2outputError("Failed to append a text line list element");
 												}else{
 													readButNotStored=0; // do NOT allow the cursor to be reset
 													assignValue(&listelement->_value,_getTextValue(string(_line)));
@@ -5862,7 +5862,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 										if(NULL==newbuffer&&!feof(file->_f)){
 											FREE_STRING(_line,owner);
 											_line=NULL;
-											outputMessage(M_ERROR_PREFIX,"Some error reading text from '%s'.",string(file->_name));
+											q2outputMessage(M_ERROR_PREFIX,"Some error reading text from '%s'.",string(file->_name));
 										}else{
 											// the problem is that buffer might not end with a new line
 											buffer_length=strlen(buffer);
@@ -5889,7 +5889,7 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 									assignValue(&listelement->_value,_getTextValue(string(_line)));
 									*/
 								}
-								if(errorCode>0){if(result>0)result=-result;outputError("Some error occurred");break;}
+								if(errorCode>0){if(result>0)result=-result;q2outputError("Some error occurred");break;}
 							}
 							// the part that was read but somehow not stored needs to be available for successive reading!!!
 							if(!openedInBinaryMode){
@@ -5902,20 +5902,20 @@ long long fReadLines(Mfile const * const file/*,Mallocationowner owner_file*/,lo
 							// if we have a listelement we succeeded, well mostly
 							/////if(listelement==NULL){FREE_LIST(_linesReadList,owner);return NULL;}
 						}else
-							outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': end-of-file reached.",string(file->_name));
+							q2outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': end-of-file reached.",string(file->_name));
 					}else
-						outputMessage(M_WARNING_PREFIX,"No text lines can be read from '%s' (mode: %s): end-of-file reached.\n",string(file->_name),file->_mode);
+						q2outputMessage(M_WARNING_PREFIX,"No text lines can be read from '%s' (mode: %s): end-of-file reached.\n",string(file->_name),file->_mode);
 				/*}else
-					outputMessage(M_ERROR_PREFIX,"Unable to read text lines from '%s' (mode: %s).",string(file->_name),file->_mode);*/
+					q2outputMessage(M_ERROR_PREFIX,"Unable to read text lines from '%s' (mode: %s).",string(file->_name),file->_mode);*/
 			}else
-				outputMessage(M_ERROR_PREFIX,"Can't read text lines from file '%s': it is not readable.",string(file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"Can't read text lines from file '%s': it is not readable.",string(file->_name));
 		}else
-			outputMessage(M_ERROR_PREFIX,"Can't read text lines from file '%s': it is not open.",string(file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"Can't read text lines from file '%s': it is not open.",string(file->_name));
 	}else
 	if(NULL==file)
-		outputError("No file to read from specified");
+		q2outputError("No file to read from specified");
 	else
-		outputError("The number of lines to read is invalid");
+		q2outputError("The number of lines to read is invalid");
 	return result;
 }
 
@@ -6003,7 +6003,7 @@ long long fWriteCharsToFile(Mfile const * const file/*,Mallocationowner owner_fi
 							}else{
 								if(!notwritten){
 									notwritten=charsToWrite;
-									outputMessage(M_ERROR_PREFIX,"Failed to write text '%s'.",chars);
+									q2outputMessage(M_ERROR_PREFIX,"Failed to write text '%s'.",chars);
 								}else
 									notwritten+=charsToWrite;
 							}
@@ -6024,9 +6024,9 @@ long long fWriteCharsToFile(Mfile const * const file/*,Mallocationowner owner_fi
 			}
 			result=notwritten;
 			if(notwritten)
-				outputMessage(M_ERROR_PREFIX,"Failed to write %lld characters to '%s': %lld.",string(file->_name),notwritten);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to write %lld characters to '%s': %lld.",string(file->_name),notwritten);
 		}else
-			outputError("Can't write to an unopened file");
+			q2outputError("Can't write to an unopened file");
 	}
 	return result;
 }
@@ -6072,9 +6072,9 @@ long long fWriteBytesToFile(Mfile const * const file,Mstring const * const str,b
 				}
 			}
 			if(result)
-				outputMessage(M_ERROR_PREFIX,"Failed to write %lld characters to '%s': %lld.",string(file->_name),result);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to write %lld characters to '%s': %lld.",string(file->_name),result);
 		}else
-			outputError("Can't write to an unopened file");
+			q2outputError("Can't write to an unopened file");
 	}
 	return result;
 }
@@ -6115,7 +6115,7 @@ long long fWriteTextToFile(Mfile const * const file,Mtext const * const textToWr
 							}else{
 								if(!notwritten){
 									notwritten=charsToWrite;
-									outputMessage(M_ERROR_PREFIX,"Failed to write text '%s'.",string(_textToWrite));
+									q2outputMessage(M_ERROR_PREFIX,"Failed to write text '%s'.",string(_textToWrite));
 								}else
 									notwritten+=charsToWrite;
 							}
@@ -6145,7 +6145,7 @@ long long fWriteTextToFile(Mfile const * const file,Mtext const * const textToWr
 				}
 			}
 		}else
-			outputError("Can't write to an unopened file");
+			q2outputError("Can't write to an unopened file");
 	}
 	return notwritten;
 }
@@ -6189,16 +6189,16 @@ static long long fWriteLines(Mfile * const file,Mlist const * const linesToWrite
 							if(_lineText!=NULL){
 								if(fWriteTextToFile(file,_lineText,file->linesWritten>0)!=0){
 									if(result>0)result=-result;
-									outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld '%s'.",(result>0?result:-result),_lineText->_c);
+									q2outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld '%s'.",(result>0?result:-result),_lineText->_c);
 								}else
 									file->linesWritten++;
 							}else
-								outputMessage(M_ERROR_PREFIX,"No line to write at list index %llu.",lineListelement->index);
+								q2outputMessage(M_ERROR_PREFIX,"No line to write at list index %llu.",lineListelement->index);
 						}else
 						if(lineListelement->_value->type==VT_BYTES){
 							if(fWriteBytesToFile(file,lineListelement->_value->value._string,file->linesWritten>0)!=0){
 								if(result>0)result=-result;
-								outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld of bytes.",(result>0?result:-result));
+								q2outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld of bytes.",(result>0?result:-result));
 							}else
 								file->linesWritten++;
 						}else{
@@ -6215,11 +6215,11 @@ static long long fWriteLines(Mfile * const file,Mlist const * const linesToWrite
 					lineListelement=lineListelement->_next;
 				}
 			}else
-				outputError("Can't write to an unopened file");
+				q2outputError("Can't write to an unopened file");
 		}else
-			outputError("Nothing to write");
+			q2outputError("Nothing to write");
 	}else
-		outputError("No file to write to");
+		q2outputError("No file to write to");
 	return result;
 }
 
@@ -6249,7 +6249,7 @@ long long fPosition(Mfile const * const file){
 		}
 		// in case off_t is a larger integer data type than long long!!!
 		if(position<=M_LL_MAX)return(long long)position;
-		outputError("File position too large!");
+		q2outputError("File position too large!");
 	}
 	return M_LL_INVALID;
 }
@@ -6266,9 +6266,9 @@ long long fSetPosition(Mfile const * const file,long long newposition){
 			}else{
 				newposition=M_LL_INVALID;
 				if(file->_name!=NULL)
-					outputMessage(M_ERROR_PREFIX,"Failed to obtain the size of file '%s'.",string(file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to obtain the size of file '%s'.",string(file->_name));
 				else
-					outputError("Failed to obtain the size of the file");
+					q2outputError("Failed to obtain the size of the file");
 			}
 		}else // moving back but relative if newposition is negative, but non-negative newposition values should be reachable!!
 		if(newposition<0){
@@ -6278,13 +6278,13 @@ long long fSetPosition(Mfile const * const file,long long newposition){
 				newposition+=position;
 		}
 	}else
-		outputMessage("Failed to obtain the current file position in setting the file position to '%lld'.",newposition);
+		q2outputMessage("Failed to obtain the current file position in setting the file position to '%lld'.",newposition);
 	// when newposition is valid, and we succeed in setting the file position to newposition, position should be set to that newposition
 	if(newposition>=0){
 		if(fseeko(file->_f,(off_t)newposition,SEEK_SET)==0)position=newposition;
-		else outputMessage(M_ERROR_PREFIX,"Failed to set the file position to '%lld'.",newposition);
+		else q2outputMessage(M_ERROR_PREFIX,"Failed to set the file position to '%lld'.",newposition);
 	}else
-		outputMessage(M_ERROR_PREFIX,"New file position '%lld' invalid.",newposition);
+		q2outputMessage(M_ERROR_PREFIX,"New file position '%lld' invalid.",newposition);
 	return position;
 }
 /**
@@ -6303,10 +6303,10 @@ long long fPushPosition(Mfile * const file,Mallocationowner file_owner){Mallocat
 				file->_filepositionstack=OWNED(DISOWNED(_fileposition,owner),Msubowner(file_owner,1));
 				return M_TRUE;
 			}
-			outputError("Failed to store the current file position");
+			q2outputError("Failed to store the current file position");
 			FREE_DISOWNED_1(_fileposition,'P',owner);
 		}else
-			outputError("Failed to create a file position object");
+			q2outputError("Failed to create a file position object");
 		return M_FALSE;
 	}
 	return M_LL_INVALID;
@@ -6325,7 +6325,7 @@ long long fPopPosition(Mfile * const file,Mallocationowner file_owner){
 			//output("Restoring the file position.\n");
 			result=(fsetpos(file->_f,&file->_filepositionstack->fpos)?M_FALSE:M_TRUE);
 			if(result==M_FALSE)
-				outputError("Failed to restore the file position, but popping the stored file position anway");
+				q2outputError("Failed to restore the file position, but popping the stored file position anway");
 			//else output("File position restored.\n");
 			Mfileposition* nextFileposition=file->_filepositionstack->next;
 			FREE_DISOWNED_1(file->_filepositionstack,'P',file_owner);
@@ -6355,7 +6355,7 @@ long long fJumpToStart(Mfile * const file){
 			*/
 			// replacing: return M_TRUE;
 		}else
-			outputError("Failed to move the file cursor to the start of the file");
+			q2outputError("Failed to move the file cursor to the start of the file");
 		return fPosition(file); // replacing: return M_FALSE;
 	}
 	return M_LL_INVALID;
@@ -6369,7 +6369,7 @@ long long fJumpToStart(Mfile * const file){
 long long fJumpToEnd(Mfile const * const file){
 	if(file!=NULL&&file->_f!=NULL){
 		if(fseeko(file->_f,0L,SEEK_END)!=0)
-			outputError("Failed to move the file cursor to the end of the file");
+			q2outputError("Failed to move the file cursor to the end of the file");
 		return fPosition(file);
 	}
 	return M_LL_INVALID;
@@ -6399,13 +6399,13 @@ Mvalue* Mfflush(Mvalue const * const fileValue){
 		if(file->_f!=NULL){
 			if(fflush(file->_f)){
 				result=M_FALSE;
-				outputError("Failed to flush the file");
+				q2outputError("Failed to flush the file");
 			}else
 				result=M_TRUE;
 		}else
-			outputError("Can't flush an unopened file");
+			q2outputError("Can't flush an unopened file");
 	}else
-		outputError("Argument to fflush() not of type file");
+		q2outputError("Argument to fflush() not of type file");
 	return _getIntegerValue(result);
 }
 
@@ -6481,10 +6481,10 @@ Mvalue* Mftype(Mvalue const * const fileValue){Mallocationowner owner=getOwner(_
 					if(S_ISFIFO(_file->stat.st_mode)){if(string_append(_typetext,"FIFO special file/pipe")!=NULL)success=true;}else
 					if(S_ISLNK(_file->stat.st_mode)){if(string_append(_typetext,"symbolic link")!=NULL)success=true;}else
 					if(S_ISSOCK(_file->stat.st_mode)){if(string_append(_typetext,"socket")!=NULL)success=true;}
-					else outputMessage(M_ERROR_PREFIX,"Unknown file type '%d'.",_file->stat.st_mode);
+					else q2outputMessage(M_ERROR_PREFIX,"Unknown file type '%d'.",_file->stat.st_mode);
 				}
 			}else
-				outputError("Failed to create the file type text representation");
+				q2outputError("Failed to create the file type text representation");
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // release the created file
 			if(_typetext!=NULL){
 				Mvalue* result=(success?_getValueOfText(_getText(string(_typetext))):NULL);
@@ -6493,9 +6493,9 @@ Mvalue* Mftype(Mvalue const * const fileValue){Mallocationowner owner=getOwner(_
 			}
 		}else
 		if(_file!=NULL)
-			outputMessage(M_ERROR_PREFIX,"Can't determine the type of the file: '%s' is not an existing regular file.",string(_file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"Can't determine the type of the file: '%s' is not an existing regular file.",string(_file->_name));
 		else
-			outputError("No file specified");
+			q2outputError("No file specified");
 	}
 	return NULL;
 }
@@ -6558,9 +6558,9 @@ Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner own
 										if(fileOpened==M_TRUE)
 											return(fileValue->type==VT_FILE?fileValue:_getValueOfFile(disowned_file(_file,owner)));
 										if(openmodeText!=NULL)
-											outputMessage(M_ERROR_PREFIX,"Opening the file in mode '%s' failed.",openmodeText);
+											q2outputMessage(M_ERROR_PREFIX,"Opening the file in mode '%s' failed.",openmodeText);
 										else
-											outputError("Failed to open the file in the default file mode");
+											q2outputError("Failed to open the file in the default file mode");
 											/*
 											if(_file->mode[0])string_append_char(mode_str,_file->mode[0]);
 											if(_file->mode[1])string_append_char(mode_str,_file->mode[1]);
@@ -6569,25 +6569,25 @@ Mvalue* Mfopen(Mvalue* fileValue,Mvalue* openmodeTextValue){Mallocationowner own
 										// opening failed, so if we created the file from the file's name, we have to free it
 										if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner); // free the file we created because it won't be returned Mvalue wrapped
 									}else
-										outputError("The second and third mode character should be different!");
+										q2outputError("The second and third mode character should be different!");
 								}else
-									outputError("The third mode character should be either 'b' or '+'");
+									q2outputError("The third mode character should be either 'b' or '+'");
 							}else
-								outputError("The second mode character should be either 'b' or '+'");
+								q2outputError("The second mode character should be either 'b' or '+'");
 						}else
-							outputError("%sThe first mode character should be either 'r', 'w' or 'a'");
+							q2outputError("%sThe first mode character should be either 'r', 'w' or 'a'");
 					}else
 					if(openmodeText!=NULL)
-						outputMessage(M_ERROR_PREFIX,"Invalid open mode '%s'.",openmodeText);
+						q2outputMessage(M_ERROR_PREFIX,"Invalid open mode '%s'.",openmodeText);
 					else
-						outputError("Invalid open mode");
-				///}else outputError("If there is no default file mode (from a previous file opening) a second argument representing the open mode is required");
+						q2outputError("Invalid open mode");
+				///}else q2outputError("If there is no default file mode (from a previous file opening) a second argument representing the open mode is required");
 			}else
-				outputError("The mode argument should be of type text");
+				q2outputError("The mode argument should be of type text");
 		}else
-			outputMessage(M_ERROR_PREFIX,"File '%s' is already open. Close it first before reopening it!",string(_file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"File '%s' is already open. Close it first before reopening it!",string(_file->_name));
 	}else
-		outputError("The file argument should either of type file or text (denoting the filename)");
+		q2outputError("The file argument should either of type file or text (denoting the filename)");
 	return NULL;
 }
 /**
@@ -6605,25 +6605,25 @@ Mvalue* Mopen(Mvalue* filenameValue,Mvalue* openmodeTextValue){Mallocationowner 
 	if(filenameValue!=NULL&&(openmodeTextValue==NULL||openmodeTextValue->type==VT_TEXT)){
 		char* openmodeSpec=(openmodeTextValue!=NULL?openmodeTextValue->value._text->_c:NULL);
 		if(filenameValue->type==VT_FILE){ // unexpected but we can still open this file
-			outputWarning("Calling open() is preferred over calling open() to open a file created with file()");
+			q2outputWarning("Calling open() is preferred over calling open() to open a file created with file()");
 			// if we manage to open the file successfully we return filenameValue as is, otherwise we return NULL!!
 			if(fOpened(filenameValue->value._file,getValueDataOwner(),openmodeSpec,false,false)==M_TRUE)
 				return filenameValue;
-			outputMessage(M_ERROR_PREFIX,"Failed to open file '%s'.",string(filenameValue->value._file->_name));
+			q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s'.",string(filenameValue->value._file->_name));
 		}else
 		if(filenameValue->type==VT_TEXT){
 			Mfile* _file=owned_file(_getFile(filenameValue->value._text->_c),owner);
 			if(_file!=NULL){
 				if(fOpened(_file,owner,openmodeSpec,false,false)==M_TRUE)
 					return _getValueOfFile(disowned_file(_file,owner));
-				outputMessage(M_ERROR_PREFIX,"Failed to open the file with name '%s'.",filenameValue->value._text->_c);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to open the file with name '%s'.",filenameValue->value._text->_c);
 				// release the file because it is not being wrapped 
 				FREE_FILE(_file,owner);
 			}else
-				outputMessage(M_ERROR_PREFIX,"Failed to create a file with name '%s'.",filenameValue->value._text->_c);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to create a file with name '%s'.",filenameValue->value._text->_c);
 		}
 	}else
-		outputError("Invalid input to open()");
+		q2outputError("Invalid input to open()");
 	return result;
 	*/
 }
@@ -6646,9 +6646,9 @@ Mvalue* Mfexists(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 				FREE_FILE(_file,owner);
 			}
 		}else
-			outputError("Invalid input to fexists()");
+			q2outputError("Invalid input to fexists()");
 	}else
-		outputError("No input to fexists()");
+		q2outputError("No input to fexists()");
 	return _getIntegerValue(result);
 }
 /**
@@ -6671,11 +6671,11 @@ Mvalue* Mexists(Mvalue* filenameValue){Mallocationowner owner=getOwner(__LINE__)
 				// the file does not exist, so won't be returned wrapped, and therefore needs to be discarded immediately
 				FREE_FILE(_file,owner);
 			}else
-				outputMessage(M_ERROR_PREFIX,"Failed to create a file with name '%s'.",filenameValue->value._text->_c);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to create a file with name '%s'.",filenameValue->value._text->_c);
 		}else
-			outputError("Invalid input to fexists()");
+			q2outputError("Invalid input to fexists()");
 	}else
-		outputError("No input to fexists()");
+		q2outputError("No input to fexists()");
 	return NULL;
 }
 
@@ -6688,12 +6688,12 @@ Mvalue* Misdir(Mvalue const * const filenameValue){Mallocationowner owner=getOwn
 				result=(fIsDir(_file,false)?M_TRUE:M_FALSE);
 				FREE_FILE(_file,owner);
 			}else	
-				outputError("Failed to create the temporary file object");
+				q2outputError("Failed to create the temporary file object");
 		}else
 		if(filenameValue->type==VT_FILE)
 			result=(fIsDir(filenameValue->value._file,false)?M_TRUE:M_FALSE);
 		else
-			outputError("Invalid input to the isdir() function");
+			q2outputError("Invalid input to the isdir() function");
 	}
 	return _getIntegerValue(result);	
 }
@@ -6746,14 +6746,14 @@ Mvalue* Mfsize(Mvalue const * const fileValue){
 					// TODO how to deal with files opened in binary mode????
 					if(fseeko(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
 						result=fPosition(file); // determine the 
-						if(fseeko(file->_f,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
+						if(fseeko(file->_f,filepos,SEEK_SET))q2outputError("Failed to return to the current position of the file");
 					}else{
 						filepos==M_LL_INVALID;
-						outputError("Failed to move the file position to the end of the file to determine the file size");
+						q2outputError("Failed to move the file position to the end of the file to determine the file size");
 					}
 				}
 				if(filepos==M_LL_INVALID){ // determining the file size from an opened file failed or it is not open to start with
-					if(file->_f!=NULL)outputWarning("Failed to determine the current file position");
+					if(file->_f!=NULL)q2outputWarning("Failed to determine the current file position");
 					bool fileExists=(fExists(file,false)==M_TRUE);
 					if(fileExists&&fIsRegularFile(file,false)){ // we know that file->stat is now up to date and contains the size of the file
 #if defined _WIN32 || defined _WIN64 || defined __WIN32 || defined _WCE || defined MSDOS || defined __MSDOS || defined OS2 || defined _OS2 || defined __OS2___
@@ -6764,34 +6764,34 @@ Mvalue* Mfsize(Mvalue const * const fileValue){
 						if(filepos!=M_LL_INVALID){ // the current position is known
 							if(fseeko(file->_f,0L,SEEK_END)==0){ // move position to the end of the file
 								result=fPosition(file); // determine the 
-								if(fseeko(file,filepos,SEEK_SET))outputError("Failed to return to the current position of the file");
+								if(fseeko(file,filepos,SEEK_SET))q2outputError("Failed to return to the current position of the file");
 							}else
-								outputError("Failed to move to the end of the file");
+								q2outputError("Failed to move to the end of the file");
 						}
-						if(filepos!=M_LL_INVALID)if(!fileisopen)if(fClosed(file,getValueDataOwner(),false)!=M_TRUE)outputError("Failed to close a temporarily opened file");
+						if(filepos!=M_LL_INVALID)if(!fileisopen)if(fClosed(file,getValueDataOwner(),false)!=M_TRUE)q2outputError("Failed to close a temporarily opened file");
 #else
 						if(file->staterrno==0)
 							result=file->stat.st_size; // easiest way to get the size of the file
 						else
-							outputMessage(M_ERROR_PREFIX,"Can't obtain the size of file '%s' because of error '%s'.",string(file->_name),strerror(file->staterrno));
+							q2outputMessage(M_ERROR_PREFIX,"Can't obtain the size of file '%s' because of error '%s'.",string(file->_name),strerror(file->staterrno));
 #endif
 					}else
 					if(fileExists)
-						outputMessage(M_ERROR_PREFIX,"Can't determine the size of '%s': it is not a regular file.",string(file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Can't determine the size of '%s': it is not a regular file.",string(file->_name));
 					else
-						outputMessage(M_ERROR_PREFIX,"Can't get the size of file '%s': it does not exist!",string(file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Can't get the size of file '%s': it does not exist!",string(file->_name));
 				}
 			}else
-				outputError("File argument undefined");
+				q2outputError("File argument undefined");
 		}else
 		if(fileValue->type==VT_TEXT){
 			struct stat filestats;
 			if(stat(fileValue->value._text->_c,&filestats)==0)
 				result=filestats.st_size;
 			else 
-				outputMessage(M_ERROR_PREFIX,"Error '%s' occurred accessing the status of file '%s'.",strerror(errno),fileValue->value._text->_c);
+				q2outputMessage(M_ERROR_PREFIX,"Error '%s' occurred accessing the status of file '%s'.",strerror(errno),fileValue->value._text->_c);
 		}else
-			outputError("The argument should either be of type file or of type text (denoting the name of an existing file)");
+			q2outputError("The argument should either be of type file or of type text (denoting the name of an existing file)");
 	}
 	return _getIntegerValue(result);
 }
@@ -6831,7 +6831,7 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"r",false,false)==M_TRUE)
 					opened=true;
 				else
-					outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to read from.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to read from.",string(_file->_name));
 			}
 			if(_file->_f!=NULL){
 				if(!feof(_file->_f)){
@@ -6845,18 +6845,18 @@ Mvalue* Mfread(Mvalue* fileValue,Mvalue* numberOfBytesValue){Mallocationowner ow
 						}else // opened in binary mode
 							result=_getStringValue(disowned_string(_bytesRead,owner));
 					}else
-						outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': not enough memory available!",string(_file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': not enough memory available!",string(_file->_name));
 				}else
-					outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': end-of-file reached!",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': end-of-file reached!",string(_file->_name));
 				// close the file if opened here
 				if(opened)closeFile(_file,true);
 			}
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
-			/*else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
+			/*else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))q2outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
 		}else
-			outputError("Either a file or a file name required as first argument");
+			q2outputError("Either a file or a file name required as first argument");
 	}else
-			outputError("No file to read from");
+			q2outputError("No file to read from");
 	return result; // some error
 }
 /**
@@ -6878,7 +6878,7 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"r",false,false)==M_TRUE)
 					opened=true;
 				else
-					outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to read from.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to read from.",string(_file->_name));
 			}
 			if(_file->_f!=NULL){
 				if(!feof(_file->_f)){
@@ -6892,18 +6892,18 @@ Mvalue* Mfreadline(Mvalue* fileValue){Mallocationowner owner=getOwner(__LINE__);
 						}else
 							result=_getStringValue(disowned_string(_textLineRead,owner)); // an immutable version of the bytes obtained
 					}else
-						outputMessage(M_ERROR_PREFIX,"Failed to obtain memory to read a text line from '%s' into.",string(_file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Failed to obtain memory to read a text line from '%s' into.",string(_file->_name));
 					if(opened)closeFile(_file,true);
 				}else
-					outputMessage(M_ERROR_PREFIX,"Can't read a text line from '%s': end-of-file reached.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Can't read a text line from '%s': end-of-file reached.",string(_file->_name));
 			}
 			// free the file when it was created
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
-			/*else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
+			/*else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))q2outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
 		}else
-			outputError("Either a file or a file name required as first argument");
+			q2outputError("Either a file or a file name required as first argument");
 	}else
-		outputError("No file (name) to read from specified");
+		q2outputError("No file (name) to read from specified");
 	return result;
 }
 // MDH@01OCT2020: how about allowing to read a number of lines in one go??????
@@ -6929,16 +6929,16 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
 					if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"r",false,false)==M_TRUE)
 						opened=true;
 					else
-						outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to read from.",string(_file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to read from.",string(_file->_name));
 				}
 				if(_file->_f!=NULL){
 					if(!feof(_file->_f)){ // end-of-file not reached yet!!
 						if(numberOfLines==M_LL_INVALID)
-							q2outputandcollect("About to read all lines from file '%s'.\n",string(_file->_name));
+							q2output("About to read all lines from file '%s'.\n",string(_file->_name));
 						else
-							q2outputandcollect("About to read %lld lines from file '%s'.\n",numberOfLines,string(_file->_name));
+							q2output("About to read %lld lines from file '%s'.\n",numberOfLines,string(_file->_name));
 						long long filepos=fPosition(_file); // MDH@08MAY2024: we'll need the current file position to know whether to close the file again or not
-						if(filepos<0)outputWarning("Failed to obtain the current file position");
+						if(filepos<0)q2outputWarning("Failed to obtain the current file position");
 						Mlist* textLinesReadBefore=NULL;
 						if(listValue!=NULL){
 							if(listValue->type!=VT_LIST){
@@ -6952,7 +6952,7 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
 							long long numberOfLinesRead=fReadLines(_file,numberOfLines,_textLinesRead,(textLinesReadBefore!=NULL?getValueDataOwner():owner),report);
 							if(numberOfLinesRead>=0){
 								if(numberOfLines>=0&&numberOfLinesRead!=numberOfLines)
-									outputMessage(M_WARNING_PREFIX,"Only %lld out of the requested %lld lines read from file '%s'.",numberOfLinesRead,numberOfLines,string(_file->_name));
+									q2outputMessage(M_WARNING_PREFIX,"Only %lld out of the requested %lld lines read from file '%s'.",numberOfLinesRead,numberOfLines,string(_file->_name));
 								// either returning listValue or the new created list
 								result=_getValueOfList(textLinesReadBefore!=NULL?listValue:disowned_list(_textLinesRead,owner));
 								// if we've reached the end of the file and we've read ALL lines, we close the file as a service to the user
@@ -6960,32 +6960,32 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
 									if(filepos==0){
 										if(closeFile(_file,false)){
 											opened=false;
-											q2outputandcollect("File '%s' from which all text lines were read closed!\n",string(_file->_name));
+											q2output("File '%s' from which all text lines were read closed!\n",string(_file->_name));
 										}else
-											outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'!",string(_file->_name));
+											q2outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'!",string(_file->_name));
 									}else
-										outputMessage(M_WARNING_PREFIX,"File '%s' not closed, although end-of-file reached.",string(_file->_name));
+										q2outputMessage(M_WARNING_PREFIX,"File '%s' not closed, although end-of-file reached.",string(_file->_name));
 								}
 							}else{
 								// free the created list as it will not be returned
 								if(textLinesReadBefore==NULL)FREE_LIST(_textLinesRead,owner);
-								outputMessage(M_ERROR_PREFIX,"Failed to read lines from '%s'.",string(_file->_name));
+								q2outputMessage(M_ERROR_PREFIX,"Failed to read lines from '%s'.",string(_file->_name));
 							}
 						}else
-							outputError("Failed to create the list to store the lines read into");
+							q2outputError("Failed to create the list to store the lines read into");
 					}else
-						outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': end-of-file reached.",string(_file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Can't read from file '%s': end-of-file reached.",string(_file->_name));
 					if(opened)closeFile(_file,true);
 				}else
-					outputMessage(M_ERROR_PREFIX,"Can't read from unopened file '%s'.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Can't read from unopened file '%s'.",string(_file->_name));
 				if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
-				/* else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
+				/* else if(opened&&_file->_f!=NULL&&!closeFile(_file,true))q2outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
 			}else
-				outputError("Either a file or a file name required as first argument");
+				q2outputError("Either a file or a file name required as first argument");
 		}else
-			outputError("No file to read lines from");
+			q2outputError("No file to read lines from");
 	}else
-		outputMessage(M_ERROR_PREFIX,"The number of lines to read specified (%lld) in invalid!",numberOfLines);
+		q2outputMessage(M_ERROR_PREFIX,"The number of lines to read specified (%lld) in invalid!",numberOfLines);
 	return result;
 }
 
@@ -7027,11 +7027,11 @@ Mvalue* Mfsetpos(Mvalue* fileValue,Mvalue* newpositionValue){
 			if(newposition!=M_LL_INVALID)result=(long long)fSetPosition(_file,newposition);
 		}else
 		if(_file!=NULL)
-			outputError("No open file specified");
+			q2outputError("No open file specified");
 		else
-			outputError("No file specified");
+			q2outputError("No file specified");
 	}else
-		outputError("No or an invalid position specified");
+		q2outputError("No or an invalid position specified");
 	return _getIntegerValue(result);
 }
 /**
@@ -7045,7 +7045,7 @@ Mvalue* Mfpushpos(Mvalue const * const fileValue){
 	if(fileValue!=NULL&&fileValue->type==VT_FILE){
 		result=fPushPosition(fileValue->value._file,getValueDataOwner());
 	}else
-		outputError("The argument to fpushpos() does not denote an opened file");
+		q2outputError("The argument to fpushpos() does not denote an opened file");
 	return _getIntegerValue(result);
 }
 Mvalue* Mfpoppos(Mvalue const * const fileValue){
@@ -7053,7 +7053,7 @@ Mvalue* Mfpoppos(Mvalue const * const fileValue){
 	if(fileValue!=NULL&&fileValue->type==VT_FILE){
 		result=fPopPosition(fileValue->value._file,getValueDataOwner());
 	}else
-		outputError("The argument to fpoppos() does not denote an opened file");
+		q2outputError("The argument to fpoppos() does not denote an opened file");
 	return _getIntegerValue(result);
 }
 /**
@@ -7067,7 +7067,7 @@ Mvalue* Mftostart(Mvalue const * const fileValue){
 	if(fileValue!=NULL&&fileValue->type==VT_FILE){
 		result=fJumpToStart(fileValue->value._file);
 	}else
-		outputError("The argument to fpushpos() does not denote an opened file");
+		q2outputError("The argument to fpushpos() does not denote an opened file");
 	return _getIntegerValue(result);
 }
 /**
@@ -7081,7 +7081,7 @@ Mvalue* Mftoend(Mvalue const * const fileValue){
 	if(fileValue!=NULL&&fileValue->type==VT_FILE){
 		result=fJumpToEnd(fileValue->value._file);
 	}else
-		outputError("The argument to fpushpos() does not denote an opened file");
+		q2outputError("The argument to fpushpos() does not denote an opened file");
 	return _getIntegerValue(result);
 }
 /**
@@ -7102,9 +7102,9 @@ Mvalue* Mfseek(Mvalue* fileValue,Mvalue* newpositionValue){
 	}
 	if(newposition!=M_LL_INVALID){
 		Mfile* _file=(fileValue!=NULL&&fileValue->type==VT_FILE?fileValue->value._file:NULL);
-		if(_file!=NULL)newposition=fSetPosition(_file,newposition);else outputError("File argument to fseek() not of type file");
+		if(_file!=NULL)newposition=fSetPosition(_file,newposition);else q2outputError("File argument to fseek() not of type file");
 	}else
-		outputError("Invalid second (new file position) argument to fseek()");
+		q2outputError("Invalid second (new file position) argument to fseek()");
 	return _getIntegerValue(newposition);
 }
 /*
@@ -7182,7 +7182,7 @@ long long fWriteValue(FILE* const file,Mvalue* valueToWrite,bool openedInBinaryM
 					result=fWriteString(file,_valueToWriteText);
 					FREE_STRING(_valueToWriteText,owner);
 				}else
-					outputError("%sFailed to obtain the text representation to write to a file");
+					q2outputError("%sFailed to obtain the text representation to write to a file");
 			}
 		}else{ // writing to a text file
 			Mstring* _valueToWriteText=owned_string(_getValueText(valueToWrite,true,true),owner);
@@ -7190,7 +7190,7 @@ long long fWriteValue(FILE* const file,Mvalue* valueToWrite,bool openedInBinaryM
 				result=fWriteString(file,_valueToWriteText);
 				FREE_STRING(_valueToWriteText,owner);
 			}else
-				outputError("%sFailed to obtain the text representation to write to a file");
+				q2outputError("%sFailed to obtain the text representation to write to a file");
 		}
 		/*
 		if(binary){
@@ -7206,7 +7206,7 @@ long long fWriteValue(FILE* const file,Mvalue* valueToWrite,bool openedInBinaryM
 		*/
 	}else
 	if(NULL==valueToWrite)
-		outputError("No value to write!");
+		q2outputError("No value to write!");
 	return result;
 }
 
@@ -7229,7 +7229,7 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"ab+",false,false)==M_TRUE)
 					opened=true;
 				else
-					outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' in binary append mode.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' in binary append mode.",string(_file->_name));
 			}
 			if(_file->_f!=NULL){
 				result=fWriteValue(_file->_f,writeValue,fIsOpenedInBinaryMode(_file)==M_TRUE);
@@ -7241,7 +7241,7 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 						result=fWriteString(_file->_f,_writeValueText);
 						FREE_STRING(_writeValueText,owner);
 					}else
-						outputMessage(M_ERROR_PREFIX,"Failed to create the text to write to file '%s'.",string(_file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Failed to create the text to write to file '%s'.",string(_file->_name));
 				}else
 					result=fWriteValueToBinaryFile(_file->_f,writeValue);
 				*/
@@ -7270,15 +7270,15 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 									if(_lineText!=NULL){
 										if(fWriteTextToFile(_file,_lineText,false)!=0){
 											if(result>0)result=-result;
-											outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld '%s'.",(result>0?result:-result),_lineText->_c);
+											q2outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld '%s'.",(result>0?result:-result),_lineText->_c);
 										}
 									}else
-										outputMessage(M_ERROR_PREFIX,"No line to write at list index %llu.",lineListelement->index);
+										q2outputMessage(M_ERROR_PREFIX,"No line to write at list index %llu.",lineListelement->index);
 								}else
 								if(lineListelement->_value->type==VT_BYTES){
 									if(fWriteBytesToFile(_file,lineListelement->_value->value._string,false)!=0){
 										if(result>0)result=-result;
-										outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld of bytes.",(result>0?result:-result));
+										q2outputMessage(M_ERROR_PREFIX,"Failed to write line #%lld of bytes.",(result>0?result:-result));
 									}
 								}
 							}
@@ -7306,14 +7306,14 @@ Mvalue* Mfwrite(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner=get
 				*/
 			}else
 			if(fileValue!=NULL)
-				outputError("No file or file name specified to write to");
+				q2outputError("No file or file name specified to write to");
 			else
-				outputError("No file to write to");
+				q2outputError("No file to write to");
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
-			/*else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
+			/*else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)q2outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
 		}
 	}else
-		outputError("No or invalid text to write");
+		q2outputError("No or invalid text to write");
 	return _getIntegerValue(result);
 }
 /**
@@ -7333,7 +7333,7 @@ Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner
 				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a+",false,false)==M_TRUE)
 					opened=true;
 				else
-					outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to append to.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to append to.",string(_file->_name));
 			}
 			if(_file->_f!=NULL){
 				result=fWriteValue(_file->_f,writeValue,fIsOpenedInBinaryMode(_file)==M_TRUE);
@@ -7345,7 +7345,7 @@ Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner
 						result=fWriteString(_file->_f,_writeValueText);
 						FREE_STRING(_writeValueText,owner);
 					}else
-						outputMessage(M_ERROR_PREFIX,"Failed to create the text to write to file '%s'.",string(_file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"Failed to create the text to write to file '%s'.",string(_file->_name));
 				}else
 					result=fWriteValueToBinaryFile(_file->_f,writeValue);
 				*/
@@ -7368,16 +7368,16 @@ Mvalue* Mfwriteline(Mvalue* fileValue,Mvalue* writeValue){Mallocationowner owner
 				}
 				*/
 			}else
-				outputError("Can't write (a line) to an unopened file");
+				q2outputError("Can't write (a line) to an unopened file");
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
-			/*else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
+			/*else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)q2outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));*/
 		}else
 		if(fileValue!=NULL)
-			outputError("No file or file name specified to write a line to");
+			q2outputError("No file or file name specified to write a line to");
 		else
-			outputError("No file specified to write to");
+			q2outputError("No file specified to write to");
 	}else
-		outputError("No line specified to write");
+		q2outputError("No line specified to write");
 	return _getIntegerValue(result);
 }
 
@@ -7396,14 +7396,14 @@ Mvalue* Mfnewline(Mvalue const * const fileValue){Mallocationowner owner=getOwne
 			if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a+",false,false)==M_TRUE)
 				opened=true;
 			else
-				outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to append an end-of-line to.",string(_file->_name));
+				q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to append an end-of-line to.",string(_file->_name));
 		}
 		if(_file->_f!=NULL){
 			result=fWriteChars(_file->_f,FILE_EOLN);
 			if(opened)closeFile(_file,true);
 		}
 	}else
-		outputError("No file to write an end-of-line to");
+		q2outputError("No file to write an end-of-line to");
 	return _getIntegerValue(result);
 }
 
@@ -7424,7 +7424,7 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 				if(fOpened(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),"a+",false,false)==M_TRUE)
 					opened=true;
 				else
-					outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to append to.",string(_file->_name));
+					q2outputMessage(M_ERROR_PREFIX,"Failed to open file '%s' to append to.",string(_file->_name));
 			}
 			if(_file->_f!=NULL){
 				bool openedInBinaryMode=(fIsOpenedInBinaryMode(_file)==M_TRUE);
@@ -7445,7 +7445,7 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 								}
 								if(lineListelement!=NULL){
 									if(fWriteChars(_file->_f,FILE_EOLN)!=0){
-										outputError("Failed to write end-of-line");
+										q2outputError("Failed to write end-of-line");
 										break;
 									}
 								}
@@ -7454,20 +7454,20 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 							result--;
 							if(result==0){
 								if(lineListelement!=NULL)
-									outputMessage(M_BUG_PREFIX,"Number of elements in list to write to file '%s' invalid!",string(_file->_name));
+									q2outputMessage(M_BUG_PREFIX,"Number of elements in list to write to file '%s' invalid!",string(_file->_name));
 								break;
 							}
 						}
 					}else
 					if(result<0)
-						outputError("No list to write");
+						q2outputError("No list to write");
 				}else
 				if(linesToWriteValue->type==VT_ARRAY){
 					Marray* arrayToWrite=linesToWriteValue->value._array;
 					Mvalue** values=(arrayToWrite!=NULL?arrayToWrite->values:NULL);
 					result=(values!=NULL?arrayToWrite->numberOfElements:-1);
 					if(result>0){
-						q2outputandcollect("Number of lines to write: %lld.\n",result);
+						q2output("Number of lines to write: %lld.\n",result);
 						while(result>0){
 							//////if(result>=0)result++;else result--;
 							Mvalue* valueToWrite=*values;
@@ -7480,7 +7480,7 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 								// always write an end-of-line unless this is the last line to write in a file opened here
 								if(result>1){
 									if(fWriteChars(_file->_f,FILE_EOLN)!=0){
-										outputError("Failed to write a newline");
+										q2outputError("Failed to write a newline");
 										break;
 									}
 								}
@@ -7506,23 +7506,23 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 						}
 					}else
 					if(result<0)
-						outputMessage(M_ERROR_PREFIX,"No array to write to file '%s'.",string(_file->_name));
+						q2outputMessage(M_ERROR_PREFIX,"No array to write to file '%s'.",string(_file->_name));
 				}else{
-					outputMessage(M_WARNING_PREFIX,"No array of list specified to write to '%s'. Will write a single line.",
+					q2outputMessage(M_WARNING_PREFIX,"No array of list specified to write to '%s'. Will write a single line.",
 						string(_file->_name));
 					result=(fWriteValue(_file->_f,linesToWriteValue,openedInBinaryMode)==0&&fWriteChars(_file->_f,FILE_EOLN)==0?0:1);
 				}
 				if(opened)closeFile(_file,true);
 			}
 			if(fileValue->type!=VT_FILE)FREE_FILE(_file,owner);
-			//else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));
+			//else if(opened&&_file->_f!=NULL&&fClosed(_file,(fileValue->type==VT_FILE?getValueDataOwner():owner),true)!=M_TRUE)q2outputMessage(M_ERROR_PREFIX,"Failed to close file '%s'.",string(_file->_name));
 		}else
 		if(fileValue!=NULL)
-			outputError("No file or file name specified to write lines to");
+			q2outputError("No file or file name specified to write lines to");
 		else
-			outputError("No file to write to specified");
+			q2outputError("No file to write to specified");
 	}else
-		outputError("No file to write to");
+		q2outputError("No file to write to");
 	return _getIntegerValue(result);
 }
 
@@ -7584,9 +7584,9 @@ Mvalue* Mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
 						// let's NOT prepend the directory name!!!! string_append(_filename,directoryname);
 						if(string_append(_filename,en->d_name)!=NULL){
 							if(appendedToList(files_list,owner,_getTextValue(string(_filename)),M_LL_INVALID)<=0)
-								outputError("Failed to append the name of a list");
+								q2outputError("Failed to append the name of a list");
 						}else
-							outputError("Failed to construct the name of a file");
+							q2outputError("Failed to construct the name of a file");
 						FREE_STRING(_filename,owner);
 					}
 				}
@@ -7714,7 +7714,7 @@ Mrational* _getValueRational(Mvalue const * const value){Mallocationowner owner=
 			case VT_INTEGER:
 				{
 					Mbiginteger* value_bi=owned_biginteger(_getValueBiginteger(value),owner);
-					if(NULL==value_bi){outputError("Failed to convert an integer to a big integer.");return NULL;}
+					if(NULL==value_bi){q2outputError("Failed to convert an integer to a big integer.");return NULL;}
 					_rational=owned_rational(_getRational(value_bi,NULL,M_LD_NAN,false),owner); // not to free what's wrapped in _value
 					FREE_BIGINTEGER(value_bi,owner);
 				}
@@ -7752,7 +7752,7 @@ Mrational* _getValueRational(Mvalue const * const value){Mallocationowner owner=
 					Mbiginteger* bi_num=NULL;
 					if(numeratorValue!=NULL){
 						bi_num=_getValueBiginteger(numeratorValue);
-						if(bi_num==NULL){outputError("Failed to convert the first listelement into a big integer");return NULL;}
+						if(bi_num==NULL){q2outputError("Failed to convert the first listelement into a big integer");return NULL;}
 					}
 					Mbiginteger* bi_den=NULL;
 					if(denominatorValue!=NULL){
@@ -7760,7 +7760,7 @@ Mrational* _getValueRational(Mvalue const * const value){Mallocationowner owner=
 						if(bi_den==NULL){
 							// TODO whatever _getValueBiginteger returned hasn't be owned here, so call free_biginteger not FREE_BIGINTEGER
 							if(bi_num!=NULL&&numeratorValue!=NULL&&numeratorValue->type!=VT_BIGINTEGER)free_biginteger(bi_num);
-							outputError("Failed to convert the second list element to a big integer");
+							q2outputError("Failed to convert the second list element to a big integer");
 							return NULL;
 						}
 					}
@@ -7814,7 +7814,7 @@ Mlist* _getTableOfArrays(Marray* columnNamesArray,Mallocationowner owner_columnN
 				if(appendedToList(_table,owner,columnNamesArrayValue,M_LL_INVALID)>0){
 					return disowned_list(_table,owner);
 				}
-				outputError("Failed to store the column names in a new table");
+				q2outputError("Failed to store the column names in a new table");
 			}
 		}
 	}
@@ -7848,21 +7848,21 @@ Mlist* _getTableOfLists(Mlist* columnNamesList/*,size_t numberOfRows*/,Mallocati
 					while(numberOfRows>0){
 						numberOfRows--;
 						Mvalue* _rowValue=_getValueOfArray(_getArray("table",columnNamesList->numberOfElements,NULL));
-						if(NULL==_rowValue){outputError("Failed to create a new table row; the table will be incomplete");break;}
-						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row; the table will be incomplete");break;}
+						if(NULL==_rowValue){q2outputError("Failed to create a new table row; the table will be incomplete");break;}
+						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){q2outputError("Failed to append a new table row; the table will be incomplete");break;}
 					}
 					*/
 					/* replacing:
 					while(numberOfRows>0){
 						numberOfRows--;
 						Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED));
-						if(NULL==_rowValue){outputError("Failed to create a new table row");break;}
-						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){outputError("Failed to append a new table row");break;}
+						if(NULL==_rowValue){q2outputError("Failed to create a new table row");break;}
+						if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0){q2outputError("Failed to append a new table row");break;}
 					}
 					*/
 					return disowned_list(_table,owner);
 				}
-				outputError("Failed to store the column names in a new table");
+				q2outputError("Failed to store the column names in a new table");
 			}
 		}
 		// in essence the values in the list have their counts incremented when being added to it
@@ -7904,7 +7904,7 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 					///output("Number of message type filters in array: %zu.\n",messageCountIndex);
 					_messageCounts->count=messageCountIndex;
 				}else
-					outputError("Failed to allocate memory for message counts");
+					q2outputError("Failed to allocate memory for message counts");
 			}
 		}else
 		if(messageTypeValue->type==VT_LIST){
@@ -7927,7 +7927,7 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 					////output("Number of message type filters in list: %zu.\n",messageCountIndex);
 					_messageCounts->count=messageCountIndex;
 				}else
-					outputError("Failed to allocate memory for message counts");
+					q2outputError("Failed to allocate memory for message counts");
 			}
 		}else
 		if(messageTypeValue->type==VT_MAP){
@@ -7956,7 +7956,7 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 					////output("Number of message type filters in map: %zu.\n",messageCountIndex);
 					_messageCounts->count=messageCountIndex;
 				}else
-					outputError("Failed to allocate memory for message counts");
+					q2outputError("Failed to allocate memory for message counts");
 			}
 		}else{ // single value message type
 			_messageCounts->count=1;
@@ -7969,13 +7969,13 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 				}else
 					_messageCounts->messagecounts[0]=(MessageCount){0,strdup(messageTypeValue->value._text->_c)};
 			}else{
-				outputError("Failed to allocate message type counts");
+				q2outputError("Failed to allocate message type counts");
 				freeMessageCounts(_messageCounts);
 				_messageCounts=NULL;
 			}
 		}
 	}else
-		outputError("Failed to allocated memory for the message type counts");
+		q2outputError("Failed to allocated memory for the message type counts");
 	return _messageCounts;
 }
 /**
@@ -7995,15 +7995,15 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 			_messages=_getFilteredMessages(_messageCounts); // getFilteredMessages() replaces getMessagesOfType()
 			freeMessageCounts(_messageCounts);
 		}else
-			outputError("Failed to compose the message type counts");
+			q2outputError("Failed to compose the message type counts");
 	}else{
-		q2outputandcollect("Retrieving all messages!\n");
+		q2output("Retrieving all messages!\n");
 		_messages=_getFilteredMessages(NULL);
 	}
 	/* replacing:
 	if(messageTypeValue!=NULL){
 		if(messageTypeValue->type!=VT_TEXT){
-			outputError("Invalid message type; will return all messages");
+			q2outputError("Invalid message type; will return all messages");
 			messages=_getMessagesOfType(NULL);
 		}else
 			messages=_getMessagesOfType(messageTypeValue->value._text->_c);
@@ -8011,7 +8011,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 		messages=_getMessagesOfType(NULL);
 	*/
 	if(_messages!=NULL){
-		q2outputandcollect("Number of messages: %zu.\n",_messages->count);
+		q2output("Number of messages: %zu.\n",_messages->count);
 		char returnType='t'; // returns a table by default
 		if(returnTypeValue!=NULL&&returnTypeValue->type==VT_TEXT){
 			if(strlen(returnTypeValue->value._text->_c)>0){
@@ -8019,7 +8019,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 				if(returnType!='a'&&returnType!='m'&&returnType!='l')returnType='t';
 			}
 		}
-		q2outputandcollect("Return type: %c.\n",returnType);
+		q2output("Return type: %c.\n",returnType);
 		Marray* messagesArray=NULL;
 		Mlist* messagesList=NULL;
 		Mmap* messagesMap=NULL;
@@ -8052,14 +8052,14 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						assignValue(++messageArrayelement,_getValueOfText(_getSingleQuotedText(messageType)));
 						assignValue(++messageArrayelement,_getValueOfText(_getSingleQuotedText(messageText)));
 						if(appendedToList(messagesList,owner,_getValueOfArray(disowned_array(messageArray,owner)),M_LL_INVALID)<=0)
-							outputError("Failed to append messages to the messages list");
+							q2outputError("Failed to append messages to the messages list");
 					}
 				}else
-					outputError("Failed to initialize the message table list");
+					q2outputError("Failed to initialize the message table list");
 				/*}else
-					outputError("Failed to populate the messages table column names list");*/
+					q2outputError("Failed to populate the messages table column names list");*/
 			}else
-				outputError("Failed to create the messages table column names list");
+				q2outputError("Failed to create the messages table column names list");
 		}else
 		if(returnType=='a'){
 			// instead of an array we could return a list as well, or as a map (with the id used as key)
@@ -8070,7 +8070,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 					Message* message=_messages->messages[--messageIndex];
 					if(NULL==message)continue;
 					Mstring* msgText=owned_string(_getString("'"),owner);
-					if(msgText==NULL){outputError("%sFailed to create text to store message in");continue;}
+					if(msgText==NULL){q2outputError("%sFailed to create text to store message in");continue;}
 					if(message->id!=NULL&&strlen(message->id)){
 						string_append_char(msgText,'(');
 						string_append(msgText,message->id);
@@ -8108,7 +8108,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 					if(NULL==idMessageList)continue;
 					Mstring* msgText=owned_string(_getString("'"),owner);
 					if(msgText==NULL){
-						outputError("%sFailed to create text to store message in");
+						q2outputError("%sFailed to create text to store message in");
 						continue;
 					}
 					if(messageType!=NULL){
@@ -8117,7 +8117,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 					}
 					string_append(msgText,message->msg);
 					if(appendedToList(idMessageList,owner,_getStringTextValue(msgText),M_LL_INVALID)<=0)
-						outputError("Failed to append message to id message list");
+						q2outputError("Failed to append message to id message list");
 					FREE_STRING(msgText,owner);
 				}
 			}
@@ -8131,7 +8131,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 					messageIndex++;
 					if(NULL==message)continue;
 					Mstring* msgText=owned_string(_getString("'"),owner);
-					if(msgText==NULL){outputError("Failed to create text to store message in");continue;}
+					if(msgText==NULL){q2outputError("Failed to create text to store message in");continue;}
 					if(message->id!=NULL&&strlen(message->id)){
 						string_append_char(msgText,'(');
 						string_append(msgText,message->id);
@@ -8143,7 +8143,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 					}
 					string_append(msgText,message->msg);
 					if(appendedToList(messagesList,owner,_getStringTextValue(msgText),message->index)<=0)
-						outputError("Failed to append messages to the messages list");
+						q2outputError("Failed to append messages to the messages list");
 					FREE_STRING(msgText,owner);
 				}
 			}
@@ -8175,11 +8175,11 @@ static Mvalue* getMessageCountsValue(MessageCounts* messageCounts){Mallocationow
 			while(messageIndex<numberOfMessageCounts){
 				MessageCount messageCount=messageCounts->messagecounts[messageIndex++];
 				if(appendedToMap(_messagecountsMap,owner,messageCount.messageType,_getIntegerValue(messageCount.count))!=M_TRUE)
-					outputMessage(M_ERROR_PREFIX,"Failed to append message count of type '%s'.",messageCount.messageType);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to append message count of type '%s'.",messageCount.messageType);
 			}
 			return _getValueOfMap(disowned_map(_messagecountsMap,owner));
 		}
-		outputError("Failed to create the map to hold the message counts");
+		q2outputError("Failed to create the map to hold the message counts");
 	}
 	return NULL;
 }
@@ -8233,6 +8233,6 @@ Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
 		messageCountsValue=getMessageCountsValue(_messageCounts);
 		freeMessageCounts(_messageCounts);
 	}else
-		outputError("Failed to extract the message counts");
+		q2outputError("Failed to extract the message counts");
 	return messageCountsValue;
 }

@@ -35,41 +35,41 @@ bool updateLocalesettingsMap(){
 			struct lconv* localeSettings=localeconv();
 			if(localeSettings){
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"decimal_point",_getValueOfText(_getSingleQuotedText(localeSettings->decimal_point)))<=0)
-					outputError("Failed to store the decimal_point locale setting");
+					q2outputError("Failed to store the decimal_point locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"thousands_sep",_getValueOfText(_getSingleQuotedText(localeSettings->thousands_sep)))<=0)
-					outputError("Failed to store the thousands_sep locale setting");
+					q2outputError("Failed to store the thousands_sep locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"grouping",_getValueOfText(_getSingleQuotedText(localeSettings->grouping)))<=0)
-					outputError("Failed to store the grouping locale setting");
+					q2outputError("Failed to store the grouping locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"int_curr_symbol",_getValueOfText(_getSingleQuotedText(localeSettings->int_curr_symbol)))<=0)
-					outputError("Failed to store the int_curr_symbol locale setting");
+					q2outputError("Failed to store the int_curr_symbol locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"currency_symbol",_getValueOfText(_getSingleQuotedText(localeSettings->currency_symbol)))<=0)
-					outputError("Failed to store the currency_symbol locale setting");
+					q2outputError("Failed to store the currency_symbol locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"mon_decimal_point",_getValueOfText(_getSingleQuotedText(localeSettings->mon_decimal_point)))<=0)
-					outputError("Failed to store the mon_decimal_point locale setting");
+					q2outputError("Failed to store the mon_decimal_point locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"mon_thousands_sep",_getValueOfText(_getSingleQuotedText(localeSettings->mon_thousands_sep)))<=0)
-					outputError("Failed to store the mon_thousands_sep locale setting");
+					q2outputError("Failed to store the mon_thousands_sep locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"mon_grouping",_getValueOfText(_getSingleQuotedText(localeSettings->mon_grouping)))<=0)
-					outputError("Failed to store the mon_grouping locale setting");
+					q2outputError("Failed to store the mon_grouping locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"positive_sign",_getValueOfText(_getSingleQuotedText(localeSettings->positive_sign)))<=0)
-					outputError("Failed to store the positive_sign locale setting");
+					q2outputError("Failed to store the positive_sign locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"negative_sign",_getValueOfText(_getSingleQuotedText(localeSettings->negative_sign)))<=0)
-					outputError("Failed to store the decimal point locale setting");
+					q2outputError("Failed to store the decimal point locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"int_frac_digits",_getValueOfText(_getSingleQuotedCharText(localeSettings->int_frac_digits)))<=0)
-					outputError("Failed to store the int_frac_digits locale setting");
+					q2outputError("Failed to store the int_frac_digits locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"frac_digits",_getValueOfText(_getSingleQuotedCharText(localeSettings->frac_digits)))<=0)
-					outputError("Failed to store the frac_digits locale setting");
+					q2outputError("Failed to store the frac_digits locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"p_cs_precedes",_getValueOfText(_getSingleQuotedCharText(localeSettings->p_cs_precedes)))<=0)
-					outputError("Failed to store the p_cs_precedes locale setting");
+					q2outputError("Failed to store the p_cs_precedes locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"p_sep_by_space",_getValueOfText(_getSingleQuotedCharText(localeSettings->p_sep_by_space)))<=0)
-					outputError("Failed to store the p_sep_by_space locale setting");
+					q2outputError("Failed to store the p_sep_by_space locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"n_cs_precedes",_getValueOfText(_getSingleQuotedCharText(localeSettings->n_cs_precedes)))<=0)
-					outputError("Failed to store the n_cs_precedes locale setting");
+					q2outputError("Failed to store the n_cs_precedes locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"n_sep_by_space",_getValueOfText(_getSingleQuotedCharText(localeSettings->n_sep_by_space)))<=0)
-					outputError("Failed to store the n_sep_by_space locale setting");
+					q2outputError("Failed to store the n_sep_by_space locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"p_sign_posn",_getValueOfText(_getSingleQuotedCharText(localeSettings->p_sign_posn)))<=0)
-					outputError("Failed to store the p_sign_posn locale setting");
+					q2outputError("Failed to store the p_sign_posn locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"n_sign_posn",_getValueOfText(_getSingleQuotedCharText(localeSettings->n_sign_posn)))<=0)
-					outputError("Failed to store the n_sign_posn locale setting");
+					q2outputError("Failed to store the n_sign_posn locale setting");
 				return true;
 			}
 		}
@@ -90,9 +90,9 @@ Mmap* getLocalesettingsMap(){///////////Mallocationowner owner=getOwner(__LINE__
 		_localesettingsMap=owned_map(__map("getLocaleSettingsMap()"),owner_localesettingsmap);
 	if(_localesettingsMap!=NULL){
 		if(!updateLocalesettingsMap())
-			outputError("Failed to register the current locale settings");
+			q2outputError("Failed to register the current locale settings");
 	}else
-		outputError("Failed to create the map for storing the locale settings");
+		q2outputError("Failed to create the map for storing the locale settings");
 	// NOTE not returning the map disowned, so this module will keep ownership of the map
 	return _localesettingsMap; //////disowned_map(_localesettingsMap,owner_localesettingsmap); 
 }

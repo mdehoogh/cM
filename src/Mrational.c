@@ -238,7 +238,7 @@ static mp_err _biadd(Mbiginteger const * const a,Mbiginteger const * const b,Mbi
 mp_err _qmul(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@03APR2020: rewriting of computing _qmul with more precise error reporting...
 	if(a==NULL||b==NULL||c==NULL){
-		outputError("Cannot compute the product of two rationals: input missing");
+		q2outputError("Cannot compute the product of two rationals: input missing");
 		return MP_ERR;
 	}
 	Mbiginteger *_num=NULL,*_den=NULL;
@@ -246,13 +246,13 @@ mp_err _qmul(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	if(status==MP_OKAY){
 		if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES){
 			status=MP_ERR;
-			outputError("The denominator of the product of two rationals is zero");
+			q2outputError("The denominator of the product of two rationals is zero");
 		}else{
 			status=_bimul(a->num,b->num,&_num);owned_biginteger(_num,owner);
-			if(status!=MP_OKAY)outputError("Failed to compute the product of the rational numerators");
+			if(status!=MP_OKAY)q2outputError("Failed to compute the product of the rational numerators");
 		}
 	}else
-		outputError("Failed to compute the product of the rational denominators");
+		q2outputError("Failed to compute the product of the rational denominators");
 	/* replacing:
 	Mbiginteger *_num=NULL,*_den=NULL;
 	mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
@@ -381,26 +381,26 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 		// if b is not defined, or zero, copy a into c
 		if(b==NULL||b->num==NULL||isBigintegerZero(b->num)==M_TRUE){ // b is undefined or zero: return a
 			if(report)
-				outputInfo("Second rational argument undefined or zero.");
+				q2outputInfo("Second rational argument undefined or zero.");
 			if(a->num!=NULL){c->num=owned_biginteger(_getBigintegerCopy(a->num),Msubowner(owner_c,1));if(c->num==NULL)return MP_ERR;}
 			if(a->den!=NULL){c->den=owned_biginteger(_getBigintegerCopy(a->den),Msubowner(owner_c,1));if(c->den==NULL){FREE_BIGINTEGER(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
 		}else
 		if(a==NULL||a->num==NULL||isBigintegerZero(a->num)==M_TRUE){ // a is undefined or zero: return b
 			if(report)
-				outputInfo("First rational argument undefined or zero.");
+				q2outputInfo("First rational argument undefined or zero.");
 			if(b->num!=NULL){c->num=owned_biginteger(_getBigintegerCopy(b->num),Msubowner(owner_c,1));if(c->num==NULL)return MP_ERR;}
 			if(b->den!=NULL){c->den=owned_biginteger(_getBigintegerCopy(b->den),Msubowner(owner_c,1));if(c->den==NULL){FREE_BIGINTEGER(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
 		}else{
 			// ASSERT a and b both defined
 			if(report)
-				outputInfo("Subtracting two pure rationals.");
+				q2outputInfo("Subtracting two pure rationals.");
 			Mbiginteger *_num=NULL;
 			// MDH@05NOV2020: how about speeding things up by checking whether the denominators are the same?
 			// MDH@04DEC2020: I think it doesn't like it when one is NULL so we need to prevent that situation
 			//                although when both denominators are NULL there's the same as well
 			if((a->den==NULL&&b->den==NULL)||(a->den!=NULL&&b->den!=NULL&&(mp_cmp(MP_INT_POINTER(a->den),MP_INT_POINTER(b->den))==MP_EQ))){ // denominators are the same
 				if(report)
-					outputInfo("With equal denominators.");
+					q2outputInfo("With equal denominators.");
 				// NOTE c is supposed to be a rational with num and den undefined i.e. NULL as __rational() creates it
 				// TODO check validity of computation/ownership
 				status=_bisub(a->num,b->num,&_num);
@@ -422,13 +422,13 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 						}
 					}else{
 						FREE_BIGINTEGER(_num,owner);
-						outputError("Failed to compute the rational difference numerator");
+						q2outputError("Failed to compute the rational difference numerator");
 					}
 				}else
-					outputError("Failed to subtract the rational numerators");
+					q2outputError("Failed to subtract the rational numerators");
 			}else{
 				if(report)
-					outputInfo("With different denominators.");
+					q2outputInfo("With different denominators.");
 				Mbiginteger *_num1=NULL,*_num2=NULL,*_den=NULL;
 				if(a->den!=NULL||b->den!=NULL){status=_bimul(a->den,b->den,&_den);owned_biginteger(_den,owner);} // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
 				if(status==MP_OKAY)if(_den!=NULL&&mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
@@ -441,7 +441,7 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 				if(status!=MP_OKAY){ // numerator and denominator not computed both
 					if(_num!=NULL)FREE_BIGINTEGER(_num,owner);
 					if(_den!=NULL)FREE_BIGINTEGER(_den,owner);
-					outputError("Some error occurred!");
+					q2outputError("Some error occurred!");
 				}else{ // numerator and denominator computed
 					c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 					c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
@@ -454,7 +454,7 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 			}
 		}
 	}else
-		outputError("Not all rationals provided for computing the difference of two rationals");
+		q2outputError("Not all rationals provided for computing the difference of two rationals");
 	return status;
 }
 
@@ -476,64 +476,64 @@ mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	if(status==MP_OKAY){
 		status=_bimul(a->den,b->den,&_den);owned_biginteger(_den,owner); // multiply denominators to become the result denominator
 		if(status!=MP_OKAY)
-			outputMessage(M_ERROR_PREFIX,"Failed to multiply the denominators of two rationals (error code: %d).",status);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to multiply the denominators of two rationals (error code: %d).",status);
 		else
 		if(amVerboseDebugging())
-			outputInfo("Denominators of two rationals multiplied");
+			q2outputInfo("Denominators of two rationals multiplied");
 	}
 	if(status==MP_OKAY){
 		// MDH@02APR2020 I think we had a bug here because the denominator can be undefined so !_den|| replaced by _den&&
 		if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES){
 			status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-			outputError("Denominator of the sum of two rationals equal to zero");
+			q2outputError("Denominator of the sum of two rationals equal to zero");
 		}
 	}
 	////// OOPS the deltas are handled by _getRationalSum!!!! if(status==MP_OKAY){_delta=_floatsum(a->delta,b->delta);if(!_delta)if(a->delta||b->delta)status=MP_ERR;} // if we failed in adding the delta's error as well
 	if(status==MP_OKAY){
 		status=_bimul(a->num,b->den,&_num1);owned_biginteger(_num1,owner);
 		if(status!=MP_OKAY)
-			outputMessage(M_ERROR_PREFIX,"Failed to multiply the numerator and denominator of two rationals (error code: %d).",status);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to multiply the numerator and denominator of two rationals (error code: %d).",status);
 		else
 		if(amVerboseDebugging())
-			outputInfo("Numerator and denominator of two rationals multiplied.");
+			q2outputInfo("Numerator and denominator of two rationals multiplied.");
 	}
 	if(status==MP_OKAY){
 		status=_bimul(a->den,b->num,&_num2);owned_biginteger(_num2,owner);
 		if(status!=MP_OKAY)
-			outputMessage(M_ERROR_PREFIX,"Failed to multiply the denominator and numerator of two rationals (error code: %d).",status); // multiply denominator of a with numerator of b for the min term of the result numerator
+			q2outputMessage(M_ERROR_PREFIX,"Failed to multiply the denominator and numerator of two rationals (error code: %d).",status); // multiply denominator of a with numerator of b for the min term of the result numerator
 		else
 		if(amVerboseDebugging())
-			outputInfo("Denominator and numerator of two rationals multiplied.");
+			q2outputInfo("Denominator and numerator of two rationals multiplied.");
 	}
 	if(status==MP_OKAY){
 		status=_biadd(_num1,_num2,&_num);owned_biginteger(_num,owner);
 		if(status!=MP_OKAY)
-			outputMessage(M_ERROR_PREFIX,"Failed to add two rational numerators (error code: %d).",status); // add the numerator parts
+			q2outputMessage(M_ERROR_PREFIX,"Failed to add two rational numerators (error code: %d).",status); // add the numerator parts
 		else
 		if(amVerboseDebugging())
-			outputInfo("Numerators of two rationals added.");
+			q2outputInfo("Numerators of two rationals added.");
 	}
 	// loose the numerator parts (are not stored in the result rational anyway)
-	////outputInfo("Rational numerator parts to free.");
+	////q2outputInfo("Rational numerator parts to free.");
 	if(_num1!=NULL)FREE_BIGINTEGER(_num1,owner);
 	if(_num2!=NULL)FREE_BIGINTEGER(_num2,owner);
-	////outputInfo("Rational numerator parts freed.");
+	////q2outputInfo("Rational numerator parts freed.");
 	if(status!=MP_OKAY){ // numerator and denominator not computed both
-		outputInfo("Freeing new numerator and denominator when failing to compute the sum of two rationals");
+		q2outputInfo("Freeing new numerator and denominator when failing to compute the sum of two rationals");
 		if(_num!=NULL)FREE_BIGINTEGER(_num,owner);
 		if(_den!=NULL)FREE_BIGINTEGER(_den,owner);
 		//////if(_delta)free_float(_delta);
-		////outputInfo("New numerator, denominator and delta freed!");
+		////q2outputInfo("New numerator, denominator and delta freed!");
 	}else{ // numerator and denominator computed
 		////q2outputBiginteger("Storing numerator '",_num,"'");q2outputBiginteger(" and denominator '",_den,"'.\n");
 		// too bad we have to clear the current numerator and denominator pointers (if any)
-		if(c!=NULL&&c->num!=NULL){if(amVerboseDebugging())outputInfo("Freeing previous numerator.");FREE_BIGINTEGER(c->num,owner);}
-		if(c!=NULL&&c->den!=NULL){if(amVerboseDebugging())outputInfo("Freeing previous denominator.");FREE_BIGINTEGER(c->den,owner);}
-		/////outputInfo("Previous numerator and denominator released.");
+		if(c!=NULL&&c->num!=NULL){if(amVerboseDebugging())q2outputInfo("Freeing previous numerator.");FREE_BIGINTEGER(c->num,owner);}
+		if(c!=NULL&&c->den!=NULL){if(amVerboseDebugging())q2outputInfo("Freeing previous denominator.");FREE_BIGINTEGER(c->den,owner);}
+		/////q2outputInfo("Previous numerator and denominator released.");
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		/////outputInfo("Numerator and denominator stored.");
+		/////q2outputInfo("Numerator and denominator stored.");
 		// normalize the rational
-		/////outputInfo("Normalizing the sum rational.");
+		/////q2outputInfo("Normalizing the sum rational.");
 		c->normalized=false;
 		normalizeRational(c,owner_c);
 		// register the delta sum
@@ -639,14 +639,14 @@ Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * cons
 				if(_qadd(_pureRationalSum,owner,q1,q2)!=MP_OKAY){
 					FREE_RATIONAL(_pureRationalSum,owner);_pureRationalSum=NULL;
 					// if(amVerbose())
-					outputError("Failed to compute the sum of two pure rationals");
+					q2outputError("Failed to compute the sum of two pure rationals");
 				}
 			}else 
 			// if(amVerbose())
-				outputError("Failed to create the pure sum rational");
+				q2outputError("Failed to create the pure sum rational");
 		}else 
 		// if(amVerbose())
-		outputError("Both rationals should be pure, and are not");
+		q2outputError("Both rationals should be pure, and are not");
 	}
 	return disowned_rational(_pureRationalSum,owner);
 }/* VALIDATED */
@@ -673,11 +673,11 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
 				// if(q1->delta&&q2->delta)
 				if(!_rational->delta){
 					status=MP_ERR;
-					outputError("Failed to update the delta of the sum of two rationals");
+					q2outputError("Failed to update the delta of the sum of two rationals");
 				}
 			}
 		}else
-			outputMessage(M_ERROR_PREFIX,"Failed to compute the pure sum of two rationals (error code: %d).",status);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to compute the pure sum of two rationals (error code: %d).",status);
 		if(status!=MP_OKAY){
 			FREE_RATIONAL(_rational,owner);_rational=NULL;
 			// q2outputmessageprefix(M_ERROR_PREFIX);
@@ -685,7 +685,7 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
 			// q2outputRational(" and rational ",q2,".\n");
 		}
 	}else
-		outputError("Failed to create the rational for storing the sum of two rationals");
+		q2outputError("Failed to create the rational for storing the sum of two rationals");
 	return disowned_rational(_rational,owner);
 }
 /**
@@ -708,12 +708,12 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
 			// compute the delta
 			_rational->delta=owned_float(_floatdifference(q1->delta,q2->delta),Msubowner(owner,1));
 			// if failed to compute the delta mark error
-			if(q1->delta!=NULL&&q2->delta!=NULL)if(_rational->delta==NULL){outputError("Failed to compute the difference of two rational deltas");status=MP_ERR;}
+			if(q1->delta!=NULL&&q2->delta!=NULL)if(_rational->delta==NULL){q2outputError("Failed to compute the difference of two rational deltas");status=MP_ERR;}
 		}else
-			outputError("Failed to subtract two pure rationals");
-		if(status!=MP_OKAY){FREE_RATIONAL(_rational,owner);_rational=NULL;outputError("Failed to compute the difference of two rationals");}
+			q2outputError("Failed to subtract two pure rationals");
+		if(status!=MP_OKAY){FREE_RATIONAL(_rational,owner);_rational=NULL;q2outputError("Failed to compute the difference of two rationals");}
 	}else
-		outputError("Failed to create the rational for storing the difference of two rationals");
+		q2outputError("Failed to create the rational for storing the difference of two rationals");
 	return disowned_rational(_rational,owner);
 }
 /*
@@ -864,7 +864,7 @@ Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * cons
 		}
 		if(status!=MP_OKAY){FREE_RATIONAL(_rational,owner);_rational=NULL;}
 	}else
-		outputError("Failed to create the rational for storing the product of two rationals");
+		q2outputError("Failed to create the rational for storing the product of two rationals");
 	return disowned_rational(_rational,owner);
 }
 /**
@@ -896,10 +896,10 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
 				_rational->delta=owned_float(_getFloat(getLongDoubleRationalQuotient(q1->delta->ld,q2)),Msubowner(owner,1));
 		}else{
 			FREE_RATIONAL(_rational,owner);_rational=NULL;
-			outputError("Failed to compute the quotient of two rationals");
+			q2outputError("Failed to compute the quotient of two rationals");
 		}
 	}else
-		outputError("Failed to create the rational for storing the quotient of two rationals.");
+		q2outputError("Failed to create the rational for storing the quotient of two rationals.");
 	return disowned_rational(_rational,owner);
 }
 // MDH@05NOV2019: if we want to divide a rational by a big integer
@@ -921,9 +921,9 @@ Mrational* _getRationalBigintegerQuotient(Mrational const * const q,Mbiginteger 
 				_rationalBigintegerQuotient=owned_rational(_getRational(q->num,_newnum,newdelta,true),owner);
 				FREE_BIGINTEGER(_newnum,owner);
 			}else
-				outputError("Failed to multiply two big integers");
+				q2outputError("Failed to multiply two big integers");
 		}else 
-			outputError("Failed to copy a big integer");
+			q2outputError("Failed to copy a big integer");
 	}
 	return disowned_rational(_rationalBigintegerQuotient,owner);
 }
@@ -942,7 +942,7 @@ Mrational* _qsinorcos(Mrational const * const x,bool sin){Mallocationowner owner
 	if(x!=NULL){
 		if(amVerbose())
 		{
-			q2outputandcollect("Computing the %s",(sin?"sine":"cosine"));
+			q2output("Computing the %s",(sin?"sine":"cosine"));
 			q2outputRational(" of '",x,"'.\n");
 		}
 		uint32_t status=0,istatus=0;
@@ -992,7 +992,7 @@ Mrational* _qsinorcos(Mrational const * const x,bool sin){Mallocationowner owner
 				}else{ // accuracy reached, but still some iterations left
 					status=_qadd(_prodacc,owner,_prevprodacc,_prod);
 					if(_intermediateResult){
-						q2outputandcollect("Iteration %llu: ",iterations);
+						q2output("Iteration %llu: ",iterations);
 						istatus=_qcopy(_intermediateResult,owner,_prodacc);
 						if(istatus==MP_OKAY)q2outputRational("Incremental remainder: '",_intermediateResult,"'.\n");
 					}
@@ -1026,7 +1026,7 @@ Mrational* _qsinorcos(Mrational const * const x,bool sin){Mallocationowner owner
 
 		}else{
 			q2outputmessageprefix(M_ERROR_PREFIX);
-			q2outputandcollect("Failed to initialize the result of computing the %ssine",(sin?"":"co"));
+			q2output("Failed to initialize the result of computing the %ssine",(sin?"":"co"));
 			q2outputRational(" of '",x,"'.\n");
 		}
 		if(_intermediateResult)FREE_RATIONAL(_intermediateResult,owner);
@@ -1085,7 +1085,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){Mal
 			exponentText++; // point to the first character of the exponent
 			_exponent=owned_biginteger(__biginteger(),owner); // need it before calling mp_read_radix()
 			if(_exponent!=NULL&&(mp_read_radix(MP_INT_POINTER(_exponent),exponentText,10)!=MP_OKAY)){
-				outputMessage(M_ERROR_PREFIX,"Failed to extract the exponent from its text representation '%s'.\n",exponentText);
+				q2outputMessage(M_ERROR_PREFIX,"Failed to extract the exponent from its text representation '%s'.\n",exponentText);
 				FREE_BIGINTEGER(_exponent,owner);
 				_exponent=NULL;
 			}else
@@ -1177,7 +1177,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){Mal
 				}
 				FREE_BIGINTEGER(_decimalPartBiginteger,owner);
 			}else
-				outputMessage(M_ERROR_PREFIX,"Integer part of rational text '%s' invalid.\n",decimalText);
+				q2outputMessage(M_ERROR_PREFIX,"Integer part of rational text '%s' invalid.\n",decimalText);
 			// if we haven't got a rational that binded _numerator and _denominator free both of them
 			FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner);
 		}
@@ -1262,22 +1262,22 @@ bool normalizeRational(Mrational * const _rational,Mallocationowner owner_ration
 							{_rational->den=owned_biginteger(disowned_biginteger(_newden,owner),Msubowner(owner_rational,1));_newden=NULL;} // NOTE essential to NULL _newden because now bound
 							_rational->normalized=true;
 						}else
-								outputError("Failed to compute the new numerator and denominator");
+								q2outputError("Failed to compute the new numerator and denominator");
 						// _newnum or _newden needs to be freed when not currently NULL
 						if(_newnum)FREE_BIGINTEGER(_newnum,owner);
 						if(_newden)FREE_BIGINTEGER(_newden,owner);
 					}else // the GCD equals 1 which means that the thing is normalized!!!
 						_rational->normalized=true;
 				}else
-					outputError("Failed to compute the GCD");
+					q2outputError("Failed to compute the GCD");
 			}else // GCD=1, already normalized apparently
 				_rational->normalized=true;
 			FREE_BIGINTEGER(_gcd,owner); // OOPS essential!!
 		}else
-			outputError("Failed to create the GCD");
+			q2outputError("Failed to create the GCD");
 	}else{
 		_rational->normalized=true;
-		outputWarning("Normalized flag of rational not set although the denominator equals 1; flag set");
+		q2outputWarning("Normalized flag of rational not set although the denominator equals 1; flag set");
 	}
 	return _rational->normalized;
 }/* VALIDATED */
@@ -1292,7 +1292,7 @@ bool normalizeRational(Mrational * const _rational,Mallocationowner owner_ration
 Mrational* __rational(){Mallocationowner owner=getOwner(__LINE__);
 	Mrational* _rational=(Mrational*)CALLOC_1(sizeof(Mrational),'R',owner);
 	if(_rational==NULL)outputMemoryError("Failed to create a rational");
-	if(_rational->num!=NULL||_rational->den!=NULL||_rational->delta!=NULL)outputBug("New rational numerator, denominator and delta not all considered undefined");
+	if(_rational->num!=NULL||_rational->den!=NULL||_rational->delta!=NULL)q2outputBug("New rational numerator, denominator and delta not all considered undefined");
 	return disowned_rational(_rational,owner);
 }/* VALIDATED */
 
@@ -1321,7 +1321,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 		// get the delta in (for now we also store zero in a real i.e. the only requirement for delta is that it should be defined, i.e. not NaN or supernormal)
 		if(!isLongDoubleUndefined(delta)){ // we need a delta
 			_rational->delta=owned_float(_getFloat(delta),Msubowner(owner,1)); // store the delta if a valid value
-			if(_rational->delta==NULL){FREE_RATIONAL(_rational,owner);_rational=NULL;outputError("Failed to create the rational delta");}
+			if(_rational->delta==NULL){FREE_RATIONAL(_rational,owner);_rational=NULL;q2outputError("Failed to create the rational delta");}
 		}
 		if(_rational!=NULL){
 			Mbiginteger* _nonnullnumerator=owned_biginteger(_numerator!=NULL?_getBigintegerCopy(_numerator):_getBiginteger(1),owner); // MDH@25MAY2020: now making a copy, so _numerator itself will not end up 
@@ -1329,13 +1329,13 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 				// MDH@15AUG2019: we prefer the numerator to be negative instead of the denominator
 				// MDH@10OCT2019: TODO wouldn't it be better to be able to toggle the signs???? YES but I can't find a function in tommath to do so!!!!
 				if(_denominator!=NULL&&mp_isneg(MP_INT_POINTER(_denominator))==MP_YES){ // the given denominator is negative             
-					if(amVerboseDebugging())outputInfo("Moving the sign from the denominator to the numerator of the rational.");
+					if(amVerboseDebugging())q2outputInfo("Moving the sign from the denominator to the numerator of the rational.");
 					// we have to get negated versions of both the numerator and the denominator
 					// if we succeed in doing so we use those otherwise we stick to using the current ones
 					Mbiginteger *_negatedNumerator=owned_biginteger(_getBigintegerNeg(_nonnullnumerator),owner),*_negatedDenominator=owned_biginteger(_getBigintegerNeg(_denominator),owner);
 					// actually we need both or neither
 					if(_negatedNumerator!=NULL&&_negatedDenominator!=NULL){ // succeeded in negating the numerator and denominator
-						if(amVerbose())outputInfo("Using the negated numerator and denominator.");
+						if(amVerbose())q2outputInfo("Using the negated numerator and denominator.");
 						_rational->num=SUBOWNED(_negatedNumerator,1);
 						_rational->den=SUBOWNED(_negatedDenominator,1);
 						// NOTE that we do NOT free _numerator explicitly but if _numerator is not null, _nonnullnumerator will be equal to it and we're freeing the right thing, if _numerator is NULL we're freeing the created _getBiginteger(1) which is also the right thing to do
@@ -1356,7 +1356,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 						FREE_RATIONAL(_rational,owner);_rational=NULL;
 						FREE_BIGINTEGER(_negatedNumerator,owner);
 						FREE_BIGINTEGER(_negatedDenominator,owner);
-						outputError("Failed to move the sign from the denominator to the numerator of a rational");
+						q2outputError("Failed to move the sign from the denominator to the numerator of a rational");
 					}
 					// essential to free any numerator we created ourselves!!!!
 					if(_numerator==NULL)FREE_BIGINTEGER(_nonnullnumerator,owner);
@@ -1375,7 +1375,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputRational("Failed to normalize rational ",_rational,".\n");
 						} // normalize the rational if we are supposed to
-						if(_denominator&&!_rational->normalized)outputError("Failed to normalize a rational");else 
+						if(_denominator&&!_rational->normalized)q2outputError("Failed to normalize a rational");else 
 						if(amVerboseDebugging())q2outputRational("Rational after normalization: ",_rational,".\n");
 					}else
 					if(amVerboseDebugging())q2outputRational("Rational initialized: ",_rational,".\n");
@@ -1383,11 +1383,11 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 				///////// AS LONG AS WE FREE THE RATIONAL IN THE ELSE PART NO NEED TO DO: return _rational; // return whether normalized or not
 			}else{ // either _numerator NULL or _getBiginteger(1) NULL, in the last case nothing created that needs to be freed (except for _rational)
 				FREE_RATIONAL(_rational,owner);_rational=NULL;
-				outputError(_numerator!=NULL?"Undefined rational numerator":"Failed to create big integer 1");
+				q2outputError(_numerator!=NULL?"Undefined rational numerator":"Failed to create big integer 1");
 			}
 		}
 	}else
-		outputError("Failed to create a rational");
+		q2outputError("Failed to create a rational");
 	// if we still have _rational here and the freeifunbound flag is (still) set, free the passed in numerator and denominator!!!
 	// MDH@26MAY2020 given that we do NOT know the owner's of the numerator and denominator the caller needs to do that: if(!_rational)if(freeifunbound){FREE_BIGINTEGER(_numerator);FREE_BIGINTEGER(_denominator);}
 	return disowned_rational(_rational,owner);
@@ -1401,7 +1401,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
  * @return Mrational* the inserver of \p rational
  */
 Mrational* _getInverseRational(Mrational const * const _rational){Mallocationowner owner=getOwner(__LINE__);
-	if(_rational==NULL){outputError("No rational to invert");return NULL;}
+	if(_rational==NULL){q2outputError("No rational to invert");return NULL;}
 	Mrational* _inverseRational=NULL;
 	// for now only allow inverting pure rationals!!! with a delta that is either undefined or considered zero (might still be subnormal though)!!!
 	if(isFloatUndefined(_rational->delta)==M_TRUE||isFloatZero(_rational->delta)==M_TRUE){
@@ -1413,12 +1413,12 @@ Mrational* _getInverseRational(Mrational const * const _rational){Mallocationown
 		FREE_BIGINTEGER(_inverseNumerator,owner);
 		FREE_BIGINTEGER(_inverseDenominator,owner);
 		if(_inverseRational==NULL){
-			outputError("Failed to create the inverse rational");
+			q2outputError("Failed to create the inverse rational");
 			return NULL;
 		}
 		if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
 	}else // TODO we'd like to implement this sometime
-		outputError("Can't invert an unpure rational");
+		q2outputError("Can't invert an unpure rational");
 	return disowned_rational(_inverseRational,owner);
 }/* VALIDATED */
 
@@ -1485,7 +1485,7 @@ Mstring* _getRationalText(Mrational const * const _rational){Mallocationowner ow
 		}
 	}else
 	if(amVerbose())
-		outputInfo("No rational to determine the text representation of.");
+		q2outputInfo("No rational to determine the text representation of.");
 	// outputChar('p');
 	return disowned_string(_rationalText,owner);
 }/* VALIDATED */
@@ -1521,17 +1521,17 @@ size_t outputRational(const char* const prefix,const Mrational* const _rational,
  * @return the number of characters output
  */
 size_t q2outputRational(const char* const prefix,const Mrational* const _rational,const char* const suffix){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=(prefix!=NULL?q2outputandcollect("%s",prefix):0);
+	size_t written=(prefix!=NULL?q2output("%s",prefix):0);
 	if(_rational!=NULL){
 		Mstring* _rationalText=owned_string(_getRationalText(_rational),owner);
 		if(_rationalText){
-			written+=q2outputandcollect("%s",string(_rationalText));
+			written+=q2output("%s",string(_rationalText));
 			FREE_STRING(_rationalText,owner);
 		}else
-			q2outputandcollect("%s","no rational text representation");
+			q2output("%s","no rational text representation");
 	}else
-		written+=q2outputandcollect("%c",'?');
-	if(suffix!=NULL)written+=q2outputandcollect("%s",suffix);
+		written+=q2output("%c",'?');
+	if(suffix!=NULL)written+=q2output("%s",suffix);
 	return written;
 }/* VALIDATED */
 
@@ -1545,7 +1545,7 @@ size_t q2outputRational(const char* const prefix,const Mrational* const _rationa
 Mbiginteger* _rational2biginteger(Mrational* _rational){Mallocationowner owner=getOwner(__LINE__);
 	if(_rational==NULL)return NULL;
 	Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
-	if(_biginteger==NULL){outputError("Failed to create a big integer");return NULL;}
+	if(_biginteger==NULL){q2outputError("Failed to create a big integer");return NULL;}
 	if(_rational->den!=NULL){
 		// if the numerator is NULL or 0 _biginteger should remain what it is (i.e. 0)
 		if(_rational->num!=NULL&&isBigintegerZero(_rational->num)!=M_TRUE){
@@ -1556,9 +1556,9 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){Mallocationowner owner=g
 				if(absnum!=NULL){
 					if(mp_neg(MP_INT_POINTER(_rational->num),MP_INT_POINTER(absnum))!=MP_OKAY){
 						FREE_BIGINTEGER(absnum,owner);absnum=NULL;
-						outputError("Failed to negate a numerator truncating a rational");
+						q2outputError("Failed to negate a numerator truncating a rational");
 					}else
-						outputError("Failed to create a big integer");
+						q2outputError("Failed to create a big integer");
 				}
 			}else 
 				absnum=_rational->num;
@@ -1572,7 +1572,7 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){Mallocationowner owner=g
 				}else
 				if(neg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY){
 					FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
-					outputError("Failed to negate a big integer");
+					q2outputError("Failed to negate a big integer");
 				}
 				if(neg)FREE_BIGINTEGER(absnum,owner);
 			}else{
@@ -1582,7 +1582,7 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){Mallocationowner owner=g
 	}else{ // copy the numerator
 		if(mp_copy(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_biginteger))!=MP_OKAY){
 			FREE_BIGINTEGER(_biginteger,owner);_biginteger=NULL;
-			outputError("Failed to copy the rational numerator");
+			q2outputError("Failed to copy the rational numerator");
 		}
 	}
 	return disowned_biginteger(_biginteger,owner);
@@ -1673,9 +1673,9 @@ long double getRationalLongDouble(Mrational const * const _rational){
 				result=ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok but testing it just the same
 				if(report)output("Rational converted to long double %.*Lf'.\n",LDBL_DIG,result);
 			}else
-				outputError("Failed to convert a rational denominator to a long double");
+				q2outputError("Failed to convert a rational denominator to a long double");
 		}else
-			outputError("Failed to convert a rational numerator to a long double");
+			q2outputError("Failed to convert a rational numerator to a long double");
 	}
 	return result;
 }/* VALIDATED */
@@ -1696,11 +1696,11 @@ long double getUnpureRationalNumerator(Mbiginteger* numerator,Mbiginteger* denom
 			// an 'unpure' (fake) rational, we're forced to use ld to compute the 'true' numerator
 			if(denominator!=NULL){ // the denominator isn't 1
 				long double ldDenominator=mp_get_long_double(denominator);
-				if(isLongDoubleUndefined(ldDenominator)==M_TRUE){outputError("Failed to convert a rational denominator to a long double.");return M_LD_NAN;}
+				if(isLongDoubleUndefined(ldDenominator)==M_TRUE){q2outputError("Failed to convert a rational denominator to a long double.");return M_LD_NAN;}
 				if(isLongDoubleOne(ldDenominator)!=M_TRUE)ld*=ldDenominator; // if the denominator doesn't equal 1 multiply ld by it
 			}
 			long double ldNumerator=mp_get_long_double(numerator);
-			if(isLongDoubleUndefined(ldNumerator)==M_TRUE){outputError("Failed to convert a rational numerator to a long double.");return M_LD_NAN;}
+			if(isLongDoubleUndefined(ldNumerator)==M_TRUE){q2outputError("Failed to convert a rational numerator to a long double.");return M_LD_NAN;}
 			return ld+ldNumerator;
 		}
 	}
@@ -1788,7 +1788,7 @@ long long isRationalOne(Mrational const * const rational){
 		else // undefined or zero
 			result=(rational->den?(rational->num?mp_cmp(MP_INT_POINTER(rational->den),MP_INT_POINTER(rational->num))==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):M_TRUE));
 		if(amVerbose())
-			q2outputandcollect(": %s.\n",(result==M_LL_INVALID?"UNKNOWN":(result==M_TRUE?"YES":"NO")));
+			q2output(": %s.\n",(result==M_LL_INVALID?"UNKNOWN":(result==M_TRUE?"YES":"NO")));
 	}
 	return result;
 }
