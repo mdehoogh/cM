@@ -109,8 +109,8 @@ Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner o
 				long long arrayLength=getValueInteger(_array->values[--numberOfDimensions]);
 				if(arrayLength>0){
 					if(amVerbose()){
-						output("Filling %lld elements of array",arrayLength);
-						outputValue(" with ",fillValue,".\n");
+						q2outputandcollect("Filling %lld elements of array",arrayLength);
+						q2outputValue(" with ",fillValue,".\n");
 					}
 					_result=owned_array(_getArray("marray",arrayLength,fillValue),owner);
 					if(_array!=NULL){

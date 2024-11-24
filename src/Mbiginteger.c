@@ -27,7 +27,10 @@ Mbiginteger* _getNegatedBiginteger(Mbiginteger const * const biginteger){Malloca
 long long getBigintegerSign(Mbiginteger const * const biginteger){
 	if(!biginteger)return M_LL_INVALID;
 	long long result=(mp_iszero(MP_INT_POINTER(biginteger))==MP_YES?M_ZERO:(mp_isneg(MP_INT_POINTER(biginteger))==MP_YES?M_NEGATIVE:M_POSITIVE)); // OOPS, comparing with MP_YES essential!!!
-	if(amVerboseDebugging()){outputBiginteger("Sign of big integer '",biginteger,"':");output("%lld.\n",result);}
+	if(amVerboseDebugging()){
+		q2outputBiginteger("Sign of big integer '",biginteger,"':");
+		q2outputandcollect("%lld.\n",result);
+	}
 	return result;
 }
 /**

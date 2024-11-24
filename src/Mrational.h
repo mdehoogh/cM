@@ -23,7 +23,8 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 Mrational* _getInverseRational(Mrational const * const _rational);
 Mstring* _getRationalText(Mrational const * const _rational);
 Mbiginteger* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
-void outputRational(char const * const prefix,Mrational const * const _rational,char const * const postfix);
+size_t outputRational(char const * const prefix,Mrational const * const _rational,char const * const postfix);
+size_t q2outputRational(char const * const prefix,Mrational const * const _rational,char const * const postfix);
 
 mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b);
 mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b);

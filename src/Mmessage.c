@@ -906,22 +906,20 @@ size_t q2outputmessageprefix(char const * const messageprefix){
  * @returns the number of characters output
  */
 size_t outputInfo(char const * const info){
-	size_t result=0;
+	size_t written=0;
 	if(info!=NULL){
 		size_t l=strlen(info);
 		if(l>0){
-			if(M_INFO_PREFIX!=NULL&&*M_INFO_PREFIX){
-				q2outputandcollect("%s",M_INFO_PREFIX);
-				output("%s",M_MESSAGE_PREFIX);
-			}
-			result=q2outputandcollect("%s",info);
+			if(M_INFO_PREFIX!=NULL&&*M_INFO_PREFIX)
+				written=q2outputmessageprefix(M_INFO_PREFIX);
+			written+=q2outputandcollect("%s",info);
     	l--;
 			if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')
-				result+=q2outputandcollect("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-	    result+=q2outputandcollect("%c",'\n');// replacing: newline();
+				written+=q2outputandcollect("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+	    written+=q2outputandcollect("%c",'\n');// replacing: newline();
 		}
 	}
-	return result;
+	return written;
 }
 
 /**
@@ -936,10 +934,8 @@ size_t outputWarning(char const * const warning){
     if(l>0){
 			// MDH@19AUG2024: it's a nuisance if a warning does not end with a period and we have to add a period
 			//                so we can't directly call addMessageOfType() here
-			if(M_WARNING_PREFIX!=NULL&&*M_WARNING_PREFIX){
-				q2outputandcollect("%s",M_WARNING_PREFIX);
-				output("%s",M_MESSAGE_PREFIX);
-			}
+			if(M_WARNING_PREFIX!=NULL&&*M_WARNING_PREFIX)
+				result=q2outputmessageprefix(M_WARNING_PREFIX);
 			result=q2outputandcollect("%s",warning);
     	l--;
 			if(l>0)if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')

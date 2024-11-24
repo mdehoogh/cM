@@ -75,7 +75,8 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference!=NULL){
-				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
+				if(amVerbose())
+					q2outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
 				result=isRationalNegative(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
 			}else
@@ -95,7 +96,7 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference!=NULL){
 				if(amVerbose())
-					outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
+					q2outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
 				result=isDecimalNegative(_decimalDifference);
 				FREE_DECIMAL(_decimalDifference,owner);
 			}else
@@ -293,15 +294,15 @@ static Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner own
 					for(long long colIndex=0;colIndex<array2columns;colIndex++){
 						Mvalue* sumproductValue=productRowArrayValues[colIndex]; // which will be zero!!!
 						for(long long elementIndex=0;elementIndex<array1cols;elementIndex++){
-							output("Adding the product of ");
-							outputValue(NULL,rowArrayValues[elementIndex],NULL);
-							output(" and ");
-							outputValue(NULL,array2->values[elementIndex]->value._array->values[colIndex],NULL);
-							outputValue(" to ",sumproductValue,".\n");
+							q2outputandcollect("Adding the product of ");
+							q2outputValue(NULL,rowArrayValues[elementIndex],NULL);
+							q2outputandcollect(" and ");
+							q2outputValue(NULL,array2->values[elementIndex]->value._array->values[colIndex],NULL);
+							q2outputValue(" to ",sumproductValue,".\n");
 							sumproductValue=Madd(sumproductValue,Mmultiply(rowArrayValues[elementIndex],array2->values[elementIndex]->value._array->values[colIndex]));
 						}
-						output("Product value at cell (%lld,%lld)",rowIndex,colIndex);
-						outputValue(": ",sumproductValue,".\n");
+						q2outputandcollect("Product value at cell (%lld,%lld)",rowIndex,colIndex);
+						q2outputValue(": ",sumproductValue,".\n");
 						assignValue(&productRowArrayValues[colIndex],sumproductValue);
 					}
 				}
@@ -568,12 +569,12 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerboseDebugging())
-				{outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+				{q2outputBiginteger("Multiplying big integers '",_biginteger1,"'");q2outputBiginteger(" and '",_biginteger2,"'");}
 			_productBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_productBiginteger!=NULL&&mp_mul(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_productBiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_productBiginteger,owner);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
-			{outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
+			{q2outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
@@ -601,13 +602,13 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		Mbiginteger* _productBiginteger=NULL;
 		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
-			if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+			if(amVerbose()){q2outputBiginteger("Multiplying big integers '",_biginteger1,"'");q2outputBiginteger(" and '",_biginteger2,"'.\n");}
 			_productBiginteger=__biginteger();
 			if(!_productBiginteger)outputError("Failed to create the product big integer");else
 			if(mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){
 				FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
 			}else
-			if(amVerbose())outputBiginteger("Big integer product: '",_productBiginteger,"'.\n");
+			if(amVerbose())q2outputBiginteger("Big integer product: '",_productBiginteger,"'.\n");
 			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		}else
 			outputError("Failed to create two helper big integers");
@@ -617,7 +618,10 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	*/
 	// if either is rational do a rational multiplication
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
-		if(amVerbose()){outputValue("Multiplying rationals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		if(amVerbose()){
+			q2outputValue("Multiplying rationals '",_value1,"'");
+			q2outputValue(" and '",_value2,"'.\n");
+		}
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
 		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
 		Mrational* _productRational=owned_rational(_getRationalProduct(_rational1,_rational2),owner); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
@@ -635,7 +639,7 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	// if either is a decimal, compute the product decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		if(amVerboseDebugging())
-			{outputValue("Multiplying decimals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+			{q2outputValue("Multiplying decimals '",_value1,"'");q2outputValue(" and '",_value2,"'.\n");}
 		Mdecimal *_decimal1=getValueDecimal(_value1,NULL),*_decimal2=getValueDecimal(_value2,NULL); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		Mdecimal* _productDecimal=owned_decimal(_getDecimalProduct(_decimal1,_decimal2),owner); // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
@@ -646,7 +650,7 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerboseDebugging())
-		{outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		{q2outputValue("Multiplying integer/reals '",_value1,"'");q2outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
 		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
 	}
@@ -720,7 +724,8 @@ Mvalue* Mdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 	}
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
-		if(amVerbose()){outputValue("Dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		if(amVerbose())
+			{q2outputValue("Dividing (as) reals '",_value1,"'");q2outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
 		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1/ld2:M_LD_NAN);
 	}
@@ -953,10 +958,10 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 						assignValue(cumproduct+rowIndex,
 							Mmultiply(cumproduct[rowIndex-1],arrayRows[rowIndex]->value._array->values[rowIndex]));
 					assignValue(&determinantValue,cumproduct[numberOfRows-1]);
-					/////////outputValue("Initial value determinant: ",determinantValue,"\n");
+					/////////q2outputValue("Initial value determinant: ",determinantValue,"\n");
 					if(determinantValue!=NULL){
-						//if(amVerbose())
-							outputValue("Determining the determinant of ",_value,".\n");
+						if(amVerbose())
+							q2outputValue("Determining the determinant of ",_value,".\n");
 						// initialize permutation to the possible row indices
 						long long rowIndex=numberOfRows;while(--rowIndex>=0)permutation[rowIndex]=rowIndex;
 						bool neg=false;
@@ -966,11 +971,11 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 						while(1){ // replacing: i<numberOfRows
 							if(i>=numberOfRows||c[i]<i){
 								//if(amVerbose()){
-									output("\tUpdated determinant after %s product #%lld",(neg?"subtracting":"adding"),++count);
-									outputValue(" (",cumproduct[numberOfRows-1],") of cells");
+									q2outputandcollect("\tUpdated determinant after %s product #%lld",(neg?"subtracting":"adding"),++count);
+									q2outputValue(" (",cumproduct[numberOfRows-1],") of cells");
 									for(long long permIndex=0;permIndex<numberOfRows;permIndex++)
-										output(" (%lld,%lld)",permutation[permIndex],permIndex);
-									outputValue(": ",determinantValue,"\n");
+										q2outputandcollect(" (%lld,%lld)",permutation[permIndex],permIndex);
+									q2outputValue(": ",determinantValue,"\n");
 								//}
 								if(i>=numberOfRows)break;
 								swapi=(i%2?c[i]:0);
@@ -987,7 +992,7 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 								for(;swapi<numberOfRows;swapi++)
 									assignValue(cumproduct+swapi,
 										Mmultiply(cumproduct[swapi-1],arrayRows[permutation[swapi]]->value._array->values[swapi]));
-								//outputValue("Cum product: ",cumproduct[numberOfRows-1],"\n");
+								//q2outputValue("Cum product: ",cumproduct[numberOfRows-1],"\n");
 								// increment the determinant with the new cumulative product
 								if(neg){ // toggle to false
 									neg=false;
@@ -1032,7 +1037,7 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 						outputError("Failed to initialize the determinant");
 				}
 				if(amVerbose())
-					outputValue("Determinant: ",determinantValue,"\n");
+					q2outputValue("Determinant: ",determinantValue,"\n");
 				FREE_DISOWNED(permutation,numberOfRows,-'x',owner);
 				FREE_DISOWNED(c,numberOfRows,-'x',owner);
 				// MDH@06MAY2023: we can't just release the Mvalue pointers without getting rid of the values

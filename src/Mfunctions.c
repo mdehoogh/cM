@@ -113,7 +113,7 @@ static Mbiginteger* _getRoundedDecimalInteger(Mdecimal* _decimal){Mallocationown
 					_roundedDecimalInteger=owned_biginteger(_getBiginteger(dll),owner);
 				}else{
 					q2outputmessageprefix(M_ERROR_PREFIX);
-					outputDecimal("Failed to round decimal '",_decimal,"'"); // are we going to force wrap the decimal?? outputDecimal
+					q2outputDecimal("Failed to round decimal '",_decimal,"'"); // are we going to force wrap the decimal?? outputDecimal
 					q2outputandcollect(" (status: %.8x).\n",status);
 				}
 				FREE_DECIMAL(_roundDecimal,owner);
@@ -153,7 +153,10 @@ Mvalue* Mround(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
-		if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
+		if(amVerbose()){
+			q2outputValue("Applying sin() to '",_value,"' of type ");
+			q2outputandcollect("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
+		}
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
 		if(_value->type==VT_ARRAY)return _getValueOfArray(appliedToArray(_value->value._array,Msin,VT_UNDEFINED));
@@ -183,14 +186,14 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 					mpd_qdivmod(_qDecimal->mpd,_sineDecimal->mpd,_negatedDecimal->mpd,_piDecimal->mpd,_decimalContext,&status);
 					if((status&0xEFBF)==0){
 						if(!isDecimalZero(_sineDecimal)){ // non-zero input
-							if(amVerbose())outputDecimal("Number of integer multiples of pi: '",_qDecimal,"'.\n");
+							if(amVerbose())q2outputDecimal("Number of integer multiples of pi: '",_qDecimal,"'.\n");
 							// if the result of the integer division by pi is odd we have to negate the result as well
 							int odd=mpd_isodd(_qDecimal->mpd);
-							if(amVerbose())outputDecimal("Ready to approximate the sine of non-zero decimal '",_sineDecimal,"'.\n");
+							if(amVerbose())q2outputDecimal("Ready to approximate the sine of non-zero decimal '",_sineDecimal,"'.\n");
 							// by dividing the initial value by pi we get z/pi which we need to square to get the c part of (1-c)/1 which is the first product multiplier
 							mpd_qdiv(_dividedByPiDecimal->mpd,_sineDecimal->mpd,_piDecimal->mpd,_decimalContext,&status);
 							if((status&0xEFBF)==0){
-								if(amVerbose())outputDecimal("Divided by pi: '",_dividedByPiDecimal,"'.\n");
+								if(amVerbose())q2outputDecimal("Divided by pi: '",_dividedByPiDecimal,"'.\n");
 								// we know the sign of the sine will be positive for angles in (0,PI), so we can safely make the result negative if dealing with a negative input value
 								// the initial value of the sine decimal is the product of _negatedDecimal and the square of _dividedByPiRemainderDecimal
 								mpd_qmul(_squareDividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_decimalContext,&status);
@@ -198,24 +201,24 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 									/////////if(amVerbose())outputInfo("Product multiplier numerator subcomputed.");
 									mpd_qsub(_numeratorDecimal->mpd,_denominatorDecimal->mpd,_squareDividedByPiDecimal->mpd,_decimalContext,&status);
 									if((status&0xEFBF)==0){
-										if(amVerbose())outputDecimal("Multiplier: '",_numeratorDecimal,"' -> ");
+										if(amVerbose())q2outputDecimal("Multiplier: '",_numeratorDecimal,"' -> ");
 										// next we multiply the initial value of the product by the numerator alone (because the denominator is still equal to 1)			   
 										mpd_qmul(_sineDecimal->mpd,_sineDecimal->mpd,_numeratorDecimal->mpd,_decimalContext,&status);
-										///////////////if(amVerbose())outputDecimal("Second approximation to the sine: '",_sineDecimal,"'.\n");
+										///////////////if(amVerbose())q2outputDecimal("Second approximation to the sine: '",_sineDecimal,"'.\n");
 										int64_t count=M_LL_MAX;
 										while((status&0xEFBF)==0){
 											if(--count==0){outputInfo("Maximum number of iterations exceeded!");break;}
-											if(amVerbose())outputDecimal("Sine approximation: '",_sineDecimal,"'.\n");
+											if(amVerbose())q2outputDecimal("Sine approximation: '",_sineDecimal,"'.\n");
 											mpd_qadd(_2nplus1Decimal->mpd,_2nplus1Decimal->mpd,_twoDecimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break; // add 2 to 2n+1 to get 2(n+1)+1 so becoming 3, 5, 7, ....
 											// add _2nplus1Decimal to the numerator and denominator
 											mpd_qadd(_numeratorDecimal->mpd,_numeratorDecimal->mpd,_2nplus1Decimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break;
-											if(amVerbose())outputDecimal("Numerator: '",_numeratorDecimal,"'. ");
+											if(amVerbose())q2outputDecimal("Numerator: '",_numeratorDecimal,"'. ");
 											mpd_qadd(_denominatorDecimal->mpd,_denominatorDecimal->mpd,_2nplus1Decimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break;
-											if(amVerbose())outputDecimal("Denominatator: '",_denominatorDecimal,"'. ");
+											if(amVerbose())q2outputDecimal("Denominatator: '",_denominatorDecimal,"'. ");
 											// if the numerator equals the denominator we're actually done because that means that the multiplier will from now on equal 1
 											if(mpd_qcmp(_numeratorDecimal->mpd,_denominatorDecimal->mpd,&status)==0)break;if((status&0xEFBF)!=0)break;
 											mpd_qdiv(_multiplierDecimal->mpd,_numeratorDecimal->mpd,_denominatorDecimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break;
-											if(amVerbose())outputDecimal("Multiplier: '",_multiplierDecimal,"' -> ");
+											if(amVerbose())q2outputDecimal("Multiplier: '",_multiplierDecimal,"' -> ");
 											if(isDecimalOne(_multiplierDecimal))break; // we've reached the end within the given precision
 											// multiply _sineDecimal with the multiplier
 											mpd_qmul(_sineDecimal->mpd,_sineDecimal->mpd,_multiplierDecimal->mpd,_decimalContext,&status);
@@ -255,7 +258,10 @@ Mvalue* Msin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* Mcordicsin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value!=NULL){
-		if(amVerbose()){outputValue("Applying cordicsin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
+		if(amVerbose()){
+			q2outputValue("Applying cordicsin() to '",_value,"' of type ");
+			q2outputandcollect("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
+		}
 		/* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
@@ -275,7 +281,10 @@ Mvalue* Mcordicsin(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
  */
 Mvalue* Mcordiccos(Mvalue* _value){//Mallocationowner owner=getOwner(__LINE__);
 	if(_value){
-		if(amVerbose()){outputValue("Applying cordiccos() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
+		if(amVerbose()){
+			q2outputValue("Applying cordiccos() to '",_value,"' of type ");
+			q2outputandcollect("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);
+		}
 		/* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
 		if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
 		if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
@@ -540,22 +549,22 @@ static Mvalue* powll(long long ll1,long long ll2){
 	// ASSERT ll2 now always positive
 	Mbiginteger *_bi1=_getBiginteger(ll1),*_multiplier=_getBiginteger(ll1);
 	Mbiginteger *_power=_getBiginteger(1LL);
-	//////outputBiginteger("(",_multiplier,NULL);////outputBiginteger(",",_bi2,")");
+	//////q2outputBiginteger("(",_multiplier,NULL);////q2outputBiginteger(",",_bi2,")");
 	//////long long powerof2=1;
 	// we can compute the power ourselves, by simply using the bits from ll2, and adding what we need to the result so far which we put in _power
 	// which means we have to keep track of the power of 2 to multiply ll1 with (to add to the sum so far)
 	while(ll2>0){
 		//////output(" %lld",ll2);
-		/////outputBiginteger("+",_bi2,NULL);
+		/////q2outputBiginteger("+",_bi2,NULL);
 		if(ll2&1LL){
 			// TODO do error handling!!!!!
 			/* multiply ll1 with the power of two in _bi2
 			if(mp_mul_2d(_bi1->_bi,powerof2,_multiplier->_bi)!=MP_OKAY){free_biginteger(_power);_power=NULL;break;}
-			outputBiginteger(">",_multiplier,NULL);
+			q2outputBiginteger(">",_multiplier,NULL);
 			*/
 			// add addendum to _power
 			if(mp_mul(_power->_bi,_multiplier->_bi,_power->_bi)!=MP_OKAY){free_biginteger(_power);_power=NULL;break;}
-			/////////outputBiginteger("=",_power,NULL);
+			/////////q2outputBiginteger("=",_power,NULL);
 		}
 		if(mp_sqr(_multiplier->_bi,_multiplier->_bi)!=MP_OKAY){free_biginteger(_power);_power=NULL;break;}
 		ll2>>=1; // half ll2
@@ -866,7 +875,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 	if(textcount!=NULL){
 		*textcount=0;
 		if(textsValue!=NULL){
-			outputValue("Extracting text(s) from '",textsValue,"'.\n"); // DEBUGGING
+			q2outputValue("Extracting text(s) from '",textsValue,"'.\n"); // DEBUGGING
 			if(textsValue->type==VT_ARRAY){
 				Marray* textArray=textsValue->value._array;
 				if(textArray!=NULL){
@@ -1191,9 +1200,12 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		return NULL;
 	}
 	if(amVerboseDebugging())
-		outputValue("Argument of factorial() function: '",_value,"'.\n");
-	if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER)
-	{outputValue("\nERROR: Non-integer argument '",_value,"' to factorial() function!");return NULL;}
+		q2outputValue("Argument of factorial() function: '",_value,"'.\n");
+	if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){
+		q2outputmessageprefix(M_ERROR_PREFIX);
+		q2outputValue("Non-integer argument '",_value,"' to factorial() function!\n");
+		return NULL;
+	}
 	// some special cases (i.e. the input number is smaller than 2)
 	Mbiginteger* _finalmultiplier=NULL;
 	if(_value->type==VT_INTEGER){
@@ -1215,7 +1227,7 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		return NULL;
 	}
 	if(amVerboseDebugging())
-		outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
+		q2outputBiginteger("Final multiplier: '",_finalmultiplier,"'.\n");
 	Mbiginteger* _result=owned_biginteger(_getBiginteger(6),owner);
 	if(_result!=NULL){
 		clock_t then=(amVerbose()?clock():0);
@@ -1235,12 +1247,12 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		}else		
 			outputError("Failed to create big integer 3");
 		if(amVerboseDebugging())
-			{outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);}
+			{q2outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);}
 	}else
 		outputError("Failed to create big integer 6");
 	FREE_BIGINTEGER(_finalmultiplier,owner);
 	if(amVerboseDebugging())
-		outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
+		q2outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
 	return (_result!=NULL?_getValueOfBiginteger(disowned_biginteger(_result,owner)):NULL);
 	/* replacing:
 	// 39 is about the maximum that we can store in a long long

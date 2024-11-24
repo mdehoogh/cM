@@ -1523,7 +1523,7 @@ size_t getCommandLength(){return getUserInputLength()+getTotalNumberOfSuggestedC
 void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _promptTimestamp=owned_string(_getTimestamp(NULL),owner); // should return a disowned timestamp, so we do not need to obtain ownership that we need to detach on calling free_string
 	if(NULL==_promptTimestamp)return;
-	//outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
+	outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
 	FREE_STRING(_promptTimestamp,owner);
 }
 
@@ -2080,6 +2080,7 @@ static void outputToken(Mtoken const * const _token,Mcursormovement* _cursormove
 	// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: return position; // replacing: tokenCharacterCount;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
+
 // MDH@30APR2019: when a function returns to a variable and the other way round
 // MDH@26JUN2020: TODO has to be reviewed!!!
 /**

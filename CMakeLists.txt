@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # set the project name, version and used language
-project(cM VERSION 0.1.7 LANGUAGES C)
+project(cM VERSION 0.1.9 LANGUAGES C)
 
 # remember the build time
 string(TIMESTAMP BUILD_TIME "%d-%m-%Y %H:%M:%S")

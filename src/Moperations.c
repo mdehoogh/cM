@@ -389,10 +389,10 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
 			// this is done by negating the numerator but if the numerator equals NULL we should use -1
 			Mrational* rational=_value->value._rational;
 			if(rational!=NULL){
-				/////////outputValue("Negating rational '",_value,"'.\n");
+				/////////q2outputValue("Negating rational '",_value,"'.\n");
 				Mbiginteger* _biNumerator=owned_biginteger(rational->num?_getNegatedBiginteger(rational->num):_getBiginteger(-1),owner); // negating the numerator
 				if(_biNumerator!=NULL){
-					////////outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
+					////////q2outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
 					Mrational* _negRational=_getRational(_biNumerator,rational->den,(isFloatUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false);
 					FREE_BIGINTEGER(_biNumerator,owner);
 					return _getValueOfRational(disowned_rational(_negRational,owner));
@@ -479,7 +479,7 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerboseDebugging())
-				{outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+				{q2outputBiginteger("Adding big integers '",_biginteger1,"'");q2outputBiginteger(" and '",_biginteger2,"'");}
 			_sumBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_sumBiginteger!=NULL&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){
 				FREE_BIGINTEGER(_sumBiginteger,owner);_sumBiginteger=NULL;
@@ -487,7 +487,7 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 			}
 			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
-				outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
+				q2outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
 			outputError("Failed to convert an integer to a big integer");
 		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
@@ -557,7 +557,7 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerboseDebugging())
-			{outputValue("Adding integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+			{q2outputValue("Adding integer/reals '",_value1,"'");q2outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
 		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1+ld2:M_LD_NAN);
 	}
@@ -592,7 +592,7 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__
 Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value1||NULL==_value2)return NULL;
 	if(amVerboseDebugging())
-	{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
+		{q2outputValue("Subtracting '",_value2,"'");q2outputValue(" from '",_value1,"'.\n");}
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msubtract,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msubtract,true);
 	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,Msubtract,true);
@@ -601,7 +601,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(isValueZero(_value1)==M_TRUE)return Mneg(_value2);
 	if(isValueZero(_value2)==M_TRUE)return _value1;
 	if(amVerboseDebugging())
-	{outputValue("Subtracting scalar '",_value2,"'");outputValue(" from scalar '",_value1,"'.\n");}
+		{q2outputValue("Subtracting scalar '",_value2,"'");q2outputValue(" from scalar '",_value1,"'.\n");}
 	/*
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
@@ -631,12 +631,12 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 									:(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger)));
 		if(_biginteger1!=NULL&&_biginteger2!=NULL){
 			if(amVerboseDebugging())
-			{outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+				{q2outputBiginteger("Subtracting big integers '",_biginteger1,"'");q2outputBiginteger(" and '",_biginteger2,"'");}
 			_differenceBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_differenceBiginteger!=NULL&&mp_sub(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_differenceBiginteger))!=MP_OKAY)
 			{FREE_BIGINTEGER(_differenceBiginteger,owner);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
-			{outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
+				{q2outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert an integer to a big integer");
 		if(_value1->type==VT_TIME)smallinteger1=true; // MDH@16DEC2020: from here treat time value also as a small integer
@@ -661,7 +661,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		else 
 		if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(amVerboseDebugging())
-			{outputRational("Computing the difference of rational '",_rational1,"'");outputRational(" and rational '",_rational2,"'.\n");}
+			{q2outputRational("Computing the difference of rational '",_rational1,"'");outputRational(" and rational '",_rational2,"'.\n");}
 		Mrational* _differenceRational=owned_rational(_getRationalDifference(_rational1,_rational2),owner); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		else 
@@ -688,7 +688,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerboseDebugging())
-		{outputValue("Subtracting integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+			{q2outputValue("Subtracting integer/reals '",_value1,"'");q2outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
 		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2:M_LD_NAN);
 	}

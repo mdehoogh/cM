@@ -141,6 +141,7 @@ Marray* disowned_array(Marray * const _array,Mallocationowner owner_array);
 #endif
 Marray* _getArrayCopy(Marray const * const array);
 void outputArray(char const * const prefix,Marray const * const array,char const * const suffix);
+void q2outputArray(char const * const prefix,Marray const * const array,char const * const suffix);
 
 Mvalue* _getValueOfArray(Marray* _array);
 Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long long showAtEnd);
@@ -331,7 +332,10 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquotes,bool showmissings);
 
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
+void q2outputList(char const * const prefix,Mlist const * const list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
+
 void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
+void q2outputMap(char const * const prefix,Mmap const * const map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
 
 Mstring* _getValueText(Mvalue const * const _value,bool dequoted,bool showAll); // flag only applicable to string values!!!
 ///////Mvalue* _getStringValue(Mstring const * const _string); // MDH@28SEP2020: why wasn't this here so far?????

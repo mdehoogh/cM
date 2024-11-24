@@ -555,7 +555,7 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
  * @param _value
  */
 static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
-	//////if(amVerbose()){output("Value of type '%s'",VALUETYPENAMES[_value->type]);outputValue(" to free: '",_value,"'.\n");}
+	//////if(amVerbose()){q2outputandcollect("Value of type '%s'",VALUETYPENAMES[_value->type]);q2outputValue(" to free: '",_value,"'.\n");}
 	// I do not need to free the value itself, only the pointers inside it
 	if(_value!=NULL){
 		switch(_value->type){
@@ -610,13 +610,13 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 			checked++;
 			if(_valueListelement->_value!=NULL){
 				if(showInfo){
-					output("Checking value #%llu with id %llu",checked,_valueListelement->index);
-					/////outputValue(": '",_valueListelement->_value,"'");
-					output(". ");
+					q2outputandcollect("Checking value #%llu with id %llu",checked,_valueListelement->index);
+					/////q2outputValue(": '",_valueListelement->_value,"'");
+					q2outputandcollect(". ");
 				}
 				// if(showInfo)outputInfo("\tChecking the count!");
 				if(_valueListelement->_value->count==0){ // unused
-					if(showInfo)output("Freeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+					if(showInfo)q2outputandcollect("Freeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
 					free_value(_valueListelement->_value);_valueListelement->_value=NULL; // essential to NULL so removing the value list elements below becomes possible
 					// MDH@15MAR2023 moved below: tofree++;
 				}else
@@ -650,13 +650,13 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 					if(_valueList->numberOfElements>0)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
 					*/
 					FREE_DISOWNED_1(_valueListelement,'l',owner_valueListelement);
-					if(showInfo)if(removed%1000==0)output("M values removed so far: %llu.\n",removed);
+					if(showInfo)if(removed%1000==0)q2outputandcollect("M values removed so far: %llu.\n",removed);
 				}
 				// next to check!!!
 				_valueListelement=_nextValueListelement;
 			}
 			if(report)
-				output("Actual number of M values removed: %llu.\n",removed);
+				q2outputandcollect("Actual number of M values removed: %llu.\n",removed);
 			// update the first and last in the list (could both be NULL!!!)
 			_valueList->_first=_firstValueListelement;
 			_valueList->_last=_lastValueListelement;
@@ -666,7 +666,7 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
 				_valueListelement=_valueList->_first;
 				while(_valueListelement){left++;_valueListelement=_valueListelement->_next;}
 				long long unaccounted=checked;unaccounted-=(left+removed);
-				output("Number of M values left: %llu (unaccounted: %lld).\n",left,unaccounted);
+				q2outputandcollect("Number of M values left: %llu (unaccounted: %lld).\n",left,unaccounted);
 			}
 		}
 	}
@@ -814,7 +814,7 @@ Mvalue* _getValueOfDecimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/
 	if(NULL==_decimal)return NULL;
 	Mvalue* _decimalValue=__value("decimal");
 	if(_decimalValue!=NULL){
-		// outputDecimal("Wrapping decimal '",_decimal,"'.\n"); // DEBUG
+		// q2outputDecimal("Wrapping decimal '",_decimal,"'.\n"); // DEBUG
 		_decimalValue->type=VT_DECIMAL;
 		_decimalValue->value._decimal=(Misdisowned(_decimal)?owned_decimal(_decimal,owner_value_data):_decimal);
 	}else
@@ -2228,9 +2228,9 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
 	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
-		output(M_ERROR_PREFIX);
-		outputValue("Unable to add '",_value,"'");
-		output(" of type '%s' to a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
+		q2outputmessageprefix(M_ERROR_PREFIX);
+		q2outputValue("Unable to add '",_value,"'");
+		q2outputandcollect(" of type '%s' to a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
 		/////return 0;
 	}
 	// check validity of index first
@@ -2282,7 +2282,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		///////// if(Misdisowned(_value))SUBOWNED(OWNED(_value,owner_list),2); // MDH@15MAY2020: make _listelement owned by the given list
 	}else
 		_listelement->_value=_value;
-	// outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count); // DEBUG
+	// q2outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count); // DEBUG
 	// if replacing i.e. the index of _listelement matches index, we're done
 	// if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
 	if(_listelement->index!=index){ // insert or append
@@ -2294,7 +2294,7 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		// DECISION: NOT taking over the ownership of Mvalue as it is owned globally and should remain owned globally as such, the list itself should never free it itself, therefore commenting the following!!!!
 		/*
 		// MDH@24JAN2023: OOPS Have to take over the ownership of the _value as well!!!!!! TODO check whether this is ok to do!!!!!
-		if(Misowned(_listelement->_value))outputValue("List element value '",_listelement->_value,"' is not disowned!\n");else SUBOWNED(OWNED(_listelement->_value,owner_list),2); 
+		if(Misowned(_listelement->_value))q2outputValue("List element value '",_listelement->_value,"' is not disowned!\n");else SUBOWNED(OWNED(_listelement->_value,owner_list),2); 
 		*/
 
 		_listelement->index=index;
@@ -2307,25 +2307,25 @@ static Mlistelement* getAppendedListelement(Mlist * const _list,Mallocationowner
 		SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
 		/* MDH@15MAR2023: don't think ownership of the value should be taken over!!!!!
 		// MDH@24JAN2023: OOPS Have to take over the ownership of the _value as well!!!!!! TODO check whether this is ok to do!!!!!
-		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else outputValue("New list element value '",_listelement->_value,"' is not disowned!\n");
+		if(!Misowned(_listelement->_value))SUBOWNED(OWNED(_listelement->_value,owner_list),2);else q2outputValue("New list element value '",_listelement->_value,"' is not disowned!\n");
 		*/
 		// linking into the list
 		_listelement->_next=_list->_first;
 		_list->_first=_listelement;
 		if(NULL==_list->_last)_list->_last=_list->_first;
 		(_list->numberOfElements)++;
-		// if(amVerboseDebugging())outputValue("\tPrepending '",_listelement->_value,"'.\n");
+		// if(amVerboseDebugging())q2outputValue("\tPrepending '",_listelement->_value,"'.\n");
 		// we should increment the index of all elements (consuming _listelement on the go which is OK)
 		_nextListelement=_listelement;
 		while(_nextListelement!=NULL){
 			// if(amVerboseDebugging())
-			// {outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
+			// {q2outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
 			(_nextListelement->index)++;
-			// if(amVerboseDebugging()){outputValue("\tIndex of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);} // DEBUG
+			// if(amVerboseDebugging()){q2outputValue("\tIndex of '",_nextListelement->_value,"' incremented");q2outputandcollect(" to %llu.\n",_nextListelement->index);} // DEBUG
 			_nextListelement=_nextListelement->_next;
 			// if(amVerboseDebugging()){if(_nextListelement)outputInfo("\tA next element to consider!");else outputInfo("\tNo next element to consider!");}
 		}
-		//if(amVerboseDebugging()){outputValue("\t'",_listelement->_value,"' prepended to a list");output(" (now) with %llu elements.\n",_list->numberOfElements);}
+		//if(amVerboseDebugging()){q2outputValue("\t'",_listelement->_value,"' prepended to a list");q2outputandcollect(" (now) with %llu elements.\n",_list->numberOfElements);}
 	}
 	if(amDebugging())checkList(_list);
 	///////if(amVerbose())output("New list index: %llu.\n",_listelement->index);
@@ -2347,9 +2347,9 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 	// MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
 	if(_value!=NULL&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
 	if(_value->type!=_list->valuetype){
-		output(M_ERROR_PREFIX);
-		outputValue("Unable to insert '",_value,"'");
-		output(" of type '%s' into a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
+		q2outputmessageprefix(M_ERROR_PREFIX);
+		q2outputValue("Unable to insert '",_value,"'");
+		q2outputandcollect(" of type '%s' into a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
 		return 0;
 	}
 	// check validity of index first
@@ -2395,7 +2395,7 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 	// removing:}
 	// MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
 	if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
-	// outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count); // DEBUG
+	// q2outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count); // DEBUG
 	// if replacing i.e. the index of _listelement matches index, we're done
 	// if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
 	// MDH@23NOV2020: with inserting we always insert (or append), so no need to test _listelement->index!=index
@@ -2415,18 +2415,18 @@ long long insertedIntoList(Mlist * const _list,Mallocationowner owner_list,Mvalu
 		_list->_first=_listelement;
 		if(!_list->_last)_list->_last=_list->_first;
 		(_list->numberOfElements)++;
-		// if(amVerboseDebugging())outputValue("\tPrepending '",_listelement->_value,"'.\n");
+		// if(amVerboseDebugging())q2outputValue("\tPrepending '",_listelement->_value,"'.\n");
 		// we should increment the index of all elements (consuming _listelement on the go which is OK)
 		_nextListelement=_listelement;
 		while(_nextListelement){
 			// if(amVerboseDebugging())
-			// {outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
+			// {q2outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
 			(_nextListelement->index)++;
-			// if(amVerboseDebugging()){outputValue("\tIndex of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);} // DEBUG
+			// if(amVerboseDebugging()){q2outputValue("\tIndex of '",_nextListelement->_value,"' incremented");q2outputandcollect(" to %llu.\n",_nextListelement->index);} // DEBUG
 			_nextListelement=_nextListelement->_next;
 			// if(amVerboseDebugging()){if(_nextListelement)outputInfo("\tA next element to consider!");else outputInfo("\tNo next element to consider!");}
 		}
-		//if(amVerboseDebugging()){outputValue("\t'",_listelement->_value,"' prepended to a list");output(" (now) with %llu elements.\n",_list->numberOfElements);}
+		//if(amVerboseDebugging()){q2outputValue("\t'",_listelement->_value,"' prepended to a list");q2outputandcollect(" (now) with %llu elements.\n",_list->numberOfElements);}
 	}
 	*/
 	// MDH@23NOV2020: if we have a nextlistelement we should increment the index until it's no longer the same, i.e. all elements are shifted one position up
@@ -2486,7 +2486,7 @@ Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
 					Mlistelement* _listelement=_list->_first;
 					while(_listelement!=NULL){
 						if(_listelement->index==index){
-							// if(amVerboseDebugging())outputValue("\tFound with value '",_listelement->_value,"'.\n");
+							// if(amVerboseDebugging())q2outputValue("\tFound with value '",_listelement->_value,"'.\n");
 							return &(_listelement->_value);
 						}
 						if(_listelement->index>index)break; // couldn't find it!!!
@@ -2532,7 +2532,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 			// MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
 			if(NULL==_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
 				if(report)
-				{output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
+				{q2outputandcollect("Setting the value of attribute '%s'",attributeName);q2outputValue(" to '",_attributeValue,"'.\n");}
 				// MDH@22OCT2020: get the map element associated with the given attribute name (without creating it)
 				Mmapelement* _mapelement=getMapelement(_map,attributeName);
 				/* replacing:
@@ -2570,13 +2570,13 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 					result=M_TRUE;
 				}
 			}else{
-				output(M_ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a map: it is of the wrong type.\n");
+				q2outputmessageprefix(M_ERROR_PREFIX);q2outputValue("Unable to add '",_attributeValue,"' to a map: it is of the wrong type.\n");
 			}
 		}else 
 			outputError("Unable to change the map: it is immutable");
 	}else
 		outputError("No map or atribute name specified");
-	if(report)output("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
+	if(report)q2outputandcollect("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
 	return result;
 }/* VALIDATED */
 /**
@@ -2769,8 +2769,20 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
  */
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _listText=owned_string(_getListText(list,LLONG_MAX,LLONG_MAX),owner);
-	output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
-	FREE_STRING(_listText,owner);
+	output("%s%s%s",(prefix!=NULL?prefix:""),(_listText!=NULL?string(_listText):"?"),(suffix!=NULL?suffix:""));
+	if(_listText!=NULL)FREE_STRING(_listText,owner);
+}/* VALIDATED */
+/**
+ * @brief outputs M list \p list prefixed by \p prefix and suffixed by \p suffix
+ * 
+ * @param prefix 
+ * @param list 
+ * @param suffix 
+ */
+void q2outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _listText=owned_string(_getListText(list,LLONG_MAX,LLONG_MAX),owner);
+	q2outputandcollect("%s%s%s",(prefix!=NULL?prefix:""),(_listText!=NULL?string(_listText):"?"),(suffix!=NULL?suffix:""));
+	if(_listText!=NULL)FREE_STRING(_listText,owner);
 }/* VALIDATED */
 
 /**
@@ -2782,8 +2794,20 @@ void outputList(char const * const prefix,Mlist const * const list,char const * 
  */
 void outputArray(char const * const prefix,Marray const * const array,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _arrayText=owned_string(_getArrayText(array,LLONG_MAX,LLONG_MAX),owner);
-	output("%s%s%s",(prefix?prefix:""),string(_arrayText),(suffix?suffix:""));
-	FREE_STRING(_arrayText,owner);
+	output("%s%s%s",(prefix!=NULL?prefix:""),(_arrayText!=NULL?string(_arrayText):"?"),(suffix!=NULL?suffix:""));
+	if(_arrayText!=NULL)FREE_STRING(_arrayText,owner);
+}/* VALIDATED */
+/**
+ * @brief outputs M array \p array prefixed by \p prefix and suffixed by \p suffix
+ * 
+ * @param prefix 
+ * @param array 
+ * @param suffix 
+ */
+void q2outputArray(char const * const prefix,Marray const * const array,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _arrayText=owned_string(_getArrayText(array,LLONG_MAX,LLONG_MAX),owner);
+	q2outputandcollect("%s%s%s",(prefix!=NULL?prefix:""),(_arrayText!=NULL?string(_arrayText):"?"),(suffix!=NULL?suffix:""));
+	if(_arrayText!=NULL)FREE_STRING(_arrayText,owner);
 }/* VALIDATED */
 
 /**
@@ -2851,11 +2875,22 @@ Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquote
  * @param map 
  * @param suffix 
  */
-
 void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _mapText=owned_string(_getMapText(map,true,true,true),owner);
-	output("%s%s%s",(prefix?prefix:""),(_mapText?string(_mapText):""),(suffix?suffix:""));
-	FREE_STRING(_mapText,owner);
+	output("%s%s%s",(prefix!=NULL?prefix:""),(_mapText!=NULL?string(_mapText):""),(suffix!=NULL?suffix:""));
+	if(_mapText!=NULL)FREE_STRING(_mapText,owner);
+}/* VALIDATED */
+/**
+ * @brief outputs the M map \p _map prefixed by \p prefix and suffixed by \p suffix
+ * 
+ * @param prefix 
+ * @param map 
+ * @param suffix 
+ */
+void q2outputMap(char const * const prefix,Mmap const * const map,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _mapText=owned_string(_getMapText(map,true,true,true),owner);
+	output("%s%s%s",(prefix!=NULL?prefix:""),(_mapText!=NULL?string(_mapText):"?"),(suffix!=NULL?suffix:""));
+	if(_mapText!=NULL)FREE_STRING(_mapText,owner);
 }/* VALIDATED */ 
 
 // MDH@24OCT2019: if you want the value representation or perhaps the name of a constant depends on whether name is defined
@@ -3069,18 +3104,17 @@ size_t outputValue(char const * const prefix,Mvalue const * const value,char con
  * @return size_t the number of characters output
  */
 size_t q2outputValue(char const * const prefix,Mvalue const * const value, char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=0;
-	if(prefix!=NULL)written=q2outputandcollect("%s",prefix);
+	size_t written=(prefix!=NULL?q2outputandcollect("%s",prefix):0);
 	if(value!=NULL){
 		// output("(%s)%u",TOKENTYPE_STRING[value->type],value->type); // DEBUG
 		Mstring* _valueText=owned_string(_getValueText(value,false,true),owner); // free asap
 		if(_valueText!=NULL){
 			written+=q2outputandcollect("%s",string(_valueText));
 			FREE_STRING(_valueText,owner);
-			_valueText=NULL;
+			// obsolete: _valueText=NULL;
 		}
 	}else
-		written+=q2outputandcollect("%c",'-');
+		written+=q2outputandcollect("%c",'?');
 	if(suffix!=NULL)written+=q2outputandcollect("%s",suffix);
 	return written;
 }
@@ -3205,7 +3239,7 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
 				_resultBiginteger=owned_biginteger(__biginteger(),owner);
 				if(_resultBiginteger!=NULL&&mp_set_longdouble(_resultBiginteger,_value->value._float->ld)!=MP_OKAY)
 				{FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
-				if(NULL==_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+				if(NULL==_resultBiginteger)q2outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
 			}
 			break;
 		case VT_TEXT:
@@ -3213,7 +3247,7 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
 				_resultBiginteger=owned_biginteger(__biginteger(),owner);
 				if(_resultBiginteger!=NULL&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),_value->value._text->_c,10)!=MP_OKAY)
 				{FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
-				if(NULL==_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+				if(NULL==_resultBiginteger)q2outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
 			}
 			break;
 		case VT_TOKEN:
@@ -3221,7 +3255,7 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
 				_resultBiginteger=owned_biginteger(__biginteger(),owner);
 				if(_resultBiginteger!=NULL&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),string(_value->value._token->text),10)!=MP_OKAY)
 				{FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
-				if(NULL==_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+				if(NULL==_resultBiginteger)q2outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
 			}
 		case VT_REFERENCE: // TODO this may be hard
 			break;
@@ -3672,7 +3706,7 @@ long long isValueZero(Mvalue* value){
 	long long result=M_LL_INVALID;
 	if(value!=NULL){
 		if(amVerboseDebugging())
-			outputValue("Checking whether '",value,"' is zero");
+			q2outputValue("Checking whether '",value,"' is zero");
 		if(value->type==VT_INTEGER)result=isIntegerZero(value->value._integer);else
 		if(value->type==VT_BIGINTEGER)result=isBigintegerZero(value->value._biginteger);else
 		if(value->type==VT_FLOAT)result=isFloatZero(value->value._float);else
@@ -3694,7 +3728,7 @@ long long isValueOne(Mvalue* value){
 	long long result=M_LL_INVALID;
 	if(value!=NULL){
 		if(amVerboseDebugging())
-			outputValue("Checking whether '",value,"' equals one");
+			q2outputValue("Checking whether '",value,"' equals one");
 		if(value->type==VT_INTEGER)result=isIntegerOne(value->value._integer);else
 		if(value->type==VT_BIGINTEGER)result=isBigintegerOne(value->value._biginteger);else
 		if(value->type==VT_FLOAT)result=isFloatOne(value->value._float);else
@@ -3716,7 +3750,7 @@ long long isValuePositive(Mvalue* value){
 	long long result=M_LL_INVALID;
 	if(value){
 		if(amVerboseDebugging())
-			outputValue("Checking whether '",value,"' is positive");
+			q2outputValue("Checking whether '",value,"' is positive");
 		if(value->type==VT_INTEGER)result=isIntegerPositive(value->value._integer);else
 		if(value->type==VT_BIGINTEGER)result=isBigintegerPositive(value->value._biginteger);else
 		if(value->type==VT_FLOAT)result=isFloatPositive(value->value._float);else
@@ -3738,7 +3772,7 @@ long long isValueNegative(Mvalue* value){
 	long long result=M_LL_INVALID;
 	if(value){
 		if(amVerboseDebugging())
-			outputValue("Checking whether '",value,"' is negative");
+			q2outputValue("Checking whether '",value,"' is negative");
 		if(value->type==VT_INTEGER)result=isIntegerNegative(value->value._integer);else
 		if(value->type==VT_BIGINTEGER)result=isBigintegerNegative(value->value._biginteger);else
 		if(value->type==VT_FLOAT)result=isFloatNegative(value->value._float);else
@@ -3968,7 +4002,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
  * @param _value 
  */
 void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowner owner=getOwner(__LINE__);
-	// {outputValue("Storing '",_value,"'");output(" in %p.\n",_valueholder);} // DEBUG
+	// {q2outputValue("Storing '",_value,"'");q2outputandcollect(" in %p.\n",_valueholder);} // DEBUG
 	// ASSERT not a composite value (so like an end node)
 	if(*_valueholder!=NULL)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
 	// MDH@01NOV2019: it's a leap of faith to let assignValue() create copies of composite values i.e. instead of assigning _value to the *_valueholder we assign a new map or list value
@@ -3979,12 +4013,12 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowne
 			// NOTE the new map and list value get a reference count of 1 below as soon as they are bound to the value holder (as should be the case)
 			//	  wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
 			if(_value->type==VT_MAP){
-				// if(amVerbose()&&amDebugging())outputValue("Copying map ",_value,".\n");
+				// if(amVerboseDebugging())q2outputValue("Copying map ",_value,".\n");
 				_value=_getValueOfMap(_getMapCopy(_value->value._map));
 				// if(!_value)free_map(_mapCopy,owner);
 			}else
 			if(_value->type==VT_LIST){
-				// if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
+				// if(amVerboseDebugging())q2outputValue("Copying list ",_value,".\n");
 				_value=_getValueOfList(_getListCopy(_value->value._list));
 				// if(!_value)free_list(_listCopy,owner);
 			}else
@@ -4179,11 +4213,15 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner o
 								if(_remainder!=NULL){
 									_dividend=owned_biginteger(__biginteger(),owner);
 									if(_dividend!=NULL){
-										outputBiginteger("Integer dividing ",_twicenum,NULL);outputBiginteger(" by ",_twiceden,".\n");
+										q2outputBiginteger("Integer dividing ",_twicenum,NULL);
+										q2outputBiginteger(" by ",_twiceden,".\n");
 										bool success=(mp_div(MP_INT_POINTER(_twicenum),MP_INT_POINTER(_twiceden),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
 										// increment _dividend if _remainder larger than denominator
 										if(success){
-											outputBiginteger("Integer dividing ",_twicenum,NULL);outputBiginteger(" by ",_twiceden,"=");outputBiginteger(NULL,_dividend,NULL);outputBiginteger(":",_remainder,".\n");
+											q2outputBiginteger("Integer dividing ",_twicenum,NULL);
+											q2outputBiginteger(" by ",_twiceden,"=");
+											q2outputBiginteger(NULL,_dividend,NULL);
+											q2outputBiginteger(":",_remainder,".\n");
 											if(mp_cmp(MP_INT_POINTER(_remainder),MP_INT_POINTER(_rational->den))==MP_GT&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
 											if(neg&&mp_neg(MP_INT_POINTER(_dividend),MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
 										}
@@ -4294,7 +4332,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 					mpd_qtrunc(_truncDecimal->mpd,_decimal->mpd,mpd_context,&status);
 					if((status&0xEFBF)==0)return disowned_decimal(_truncDecimal,owner);
 					q2outputmessageprefix(M_ERROR_PREFIX);
-					outputDecimal("Failed to truncate decimal '",_decimal,"'");
+					q2outputDecimal("Failed to truncate decimal '",_decimal,"'");
 					q2outputandcollect(" (status: %.8x).\n",status);
 					FREE_DECIMAL(_truncDecimal,owner);
 				}
@@ -4306,7 +4344,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 					mpd_qfloor(_floorDecimal->mpd,_decimal->mpd,mpd_context,&status);
 					if((status&0xEFBF)==0)return disowned_decimal(_floorDecimal,owner);
 					q2outputmessageprefix(M_ERROR_PREFIX);
-					outputDecimal("Failed to floor decimal '",_decimal,"'");
+					q2outputDecimal("Failed to floor decimal '",_decimal,"'");
 					q2outputandcollect(" (status: %.8x).\n",status);
 					FREE_DECIMAL(_floorDecimal,owner);
 				}					
@@ -4317,7 +4355,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
 					mpd_qceil(_ceilDecimal->mpd,_decimal->mpd,mpd_context,&status);
 					if((status&0xEFBF)==0)return disowned_decimal(_ceilDecimal,owner);
 					q2outputmessageprefix(M_ERROR_PREFIX);
-					outputDecimal("Failed to ceil decimal '",_decimal,"'");
+					q2outputDecimal("Failed to ceil decimal '",_decimal,"'");
 					q2outputandcollect(" (status: %.8x).\n",status);
 					FREE_DECIMAL(_ceilDecimal,owner);
 				}
@@ -4345,7 +4383,7 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){Mallocationowner owner=getOwner
 				mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
 				if((status&0xEFBF)==0)return disowned_decimal(_roundDecimal,owner);
 				q2outputmessageprefix(M_ERROR_PREFIX);
-				outputDecimal("Failed to round decimal '",_decimal,"'");
+				q2outputDecimal("Failed to round decimal '",_decimal,"'");
 				q2outputandcollect(" (status: %.8x).\n",status);
 				FREE_DECIMAL(_roundDecimal,owner);
 			}
@@ -6904,7 +6942,7 @@ Mvalue* Mfreadlines(Mvalue* fileValue,Mvalue* numberOfLinesValue,Mvalue* listVal
 						Mlist* textLinesReadBefore=NULL;
 						if(listValue!=NULL){
 							if(listValue->type!=VT_LIST){
-								outputValue("Third argument to fReadlines() (",listValue,") not a list.\n");
+								q2outputValue("Third argument to fReadlines() (",listValue,") not a list.\n");
 							}else
 								textLinesReadBefore=listValue->value._list; 
 						}
@@ -7402,7 +7440,7 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 							lineListelement=lineListelement->_next;
 							if(lineListelementValue!=NULL){
 								if(fWriteValue(_file->_f,lineListelementValue,openedInBinaryMode)!=0){
-									q2outputmessageprefix(M_ERROR_PREFIX);outputValue("Failed to write '",lineListelementValue,"'.\n");
+									q2outputmessageprefix(M_ERROR_PREFIX);q2outputValue("Failed to write '",lineListelementValue,"'.\n");
 									break;
 								}
 								if(lineListelement!=NULL){
@@ -7436,7 +7474,7 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 							++values;
 							if(valueToWrite!=NULL){
 								if(fWriteValue(_file->_f,valueToWrite,openedInBinaryMode)!=0){
-									q2outputmessageprefix(M_ERROR_PREFIX);outputValue("Failed to write '",valueToWrite,"'.\n");
+									q2outputmessageprefix(M_ERROR_PREFIX);q2outputValue("Failed to write '",valueToWrite,"'.\n");
 									break;
 								}
 								// always write an end-of-line unless this is the last line to write in a file opened here
@@ -7669,7 +7707,7 @@ Mrational* _getRationalCopy(Mrational const * const _rational){Mallocationowner 
 Mrational* _getValueRational(Mvalue const * const value){Mallocationowner owner=getOwner(__LINE__);
 	Mrational* _rational=NULL;
 	if(value!=NULL){
-		if(amVerboseDebugging())outputValue("Extracting the rational from '",value,"'.\n");
+		if(amVerboseDebugging())q2outputValue("Extracting the rational from '",value,"'.\n");
 		// MDH@28MAR2023: _getValueBiginteger will return a new big integer if value does not wrap a big integer
 		//                in which case we need to free that new big integer as _getRational does NOT wrap the numerator/denominator
 		switch(value->type){
@@ -7803,7 +7841,7 @@ Mlist* _getTableOfLists(Mlist* columnNamesList/*,size_t numberOfRows*/,Mallocati
 			//	  
 			Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
 			if(columnNamesListValue!=NULL){
-				//////if(amVerbose())outputValue("Column names values table: '",columnNamesListValue,"'.\n");
+				//////if(amVerbose())q2outputValue("Column names values table: '",columnNamesListValue,"'.\n");
 				if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
 					/*
 					// MDH@23MAR2023: should we return lists or arrays????? perhaps better to return arrays

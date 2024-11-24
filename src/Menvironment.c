@@ -712,11 +712,11 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 		if(NULL==variable->_value){outputMessage(M_ERROR_PREFIX,"Variable '%s' not set!",name);return NULL;}
 		Mvalue* value=variable->_value; // should be a map, list or array
 		while(value!=NULL&&nextPropertySeparator!=NULL){
-			//////outputValue("'",value,"'");
+			//////q2outputValue("'",value,"'");
 			propertySeparator=nextPropertySeparator+1; // the first position after the 'dot' so containing the 
 			nextPropertySeparator=strchr(propertySeparator,M_PROPERTY_SEPARATOR_CHARACTER);
 			if(nextPropertySeparator!=NULL)*nextPropertySeparator='\0'; // replacing: propertySeparator[nextPropertySeparator-propertySeparator]='\0';
-			//////outputValue("'",value,"'");
+			//////q2outputValue("'",value,"'");
 			if(value->type==VT_MAP){
 				Mmap* map=value->value._map;
 				value=NULL;
@@ -1021,7 +1021,7 @@ Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 							}
 						}
 						if(variableValue==NULL)break;
-						//////outputValue("'",variableValue,"'");
+						//////q2outputValue("'",variableValue,"'");
 						if(variableValue->type==VT_MAP){
 							variableMap=variableValue->value._map;
 							/////outputMap("MAP(",variableMap,")");
@@ -1368,7 +1368,7 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 	// NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
 	if(NULL==name||strlen(name)==0){outputError("Cannot set the value: no variable name");return false;}
 	if(report)
-	{output("Setting the value of '%s'",name);outputValue(" to '",_value,"'.\n");}
+	{q2outputandcollect("Setting the value of '%s'",name);q2outputValue(" to '",_value,"'.\n");}
 	Mvariable* variable=getVariable(_environment,name,report);
 	if(variable!=NULL){
 		if(NULL==variable->_value||variable->unlockCode==0){
@@ -2133,8 +2133,8 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 										?IMMUTABLEVALUETYPECHARS[value->value._array->valuetype]
 										:MUTABLEVALUETYPECHARS[value->value._array->valuetype]),'\'');
 				}
-				output(M_ERROR_PREFIX);
-				outputValue("Cannot set the element type of locked array '",value,"'.\n");
+				q2outputmessageprefix(M_ERROR_PREFIX);
+				q2outputValue("Cannot set the element type of locked array '",value,"'.\n");
 			}else
 			if(value->type==VT_LIST){
 				if(value->value._list->unlockCode==0){
@@ -2144,8 +2144,8 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 											?IMMUTABLEVALUETYPECHARS[value->value._list->valuetype]
 											:MUTABLEVALUETYPECHARS[value->value._list->valuetype]),'\'');
 				}
-				output(M_ERROR_PREFIX);
-				outputValue("Cannot set the element type of locked list '",value,"'.\n");
+				q2outputmessageprefix(M_ERROR_PREFIX);
+				q2outputValue("Cannot set the element type of locked list '",value,"'.\n");
 			}else
 			if(value->type==VT_MAP){
 				if(value->value._map->unlockCode==0){
@@ -2154,11 +2154,11 @@ Mvalue* Mseteltype(Mvalue* compositeValue,Mvalue* valuetypeValue){
 											?IMMUTABLEVALUETYPECHARS[value->value._map->valuetype]
 											:MUTABLEVALUETYPECHARS[value->value._map->valuetype]),'\'');
 				}
-				output(M_ERROR_PREFIX);
-				outputValue("Cannot set the element type of locked map '",value,"'.\n");
+				q2outputmessageprefix(M_ERROR_PREFIX);
+				q2outputValue("Cannot set the element type of locked map '",value,"'.\n");
 			}else{
-				output(M_ERROR_PREFIX);
-				outputValue("Cannot set the element type of '",value,"': it is not a map, array or list!\n");
+				q2outputmessageprefix(M_ERROR_PREFIX);
+				q2outputValue("Cannot set the element type of '",value,"': it is not a map, array or list!\n");
 			}
 			/* replacing:
 			// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
@@ -3702,7 +3702,7 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 					_argumentMap->numberOfElements=numberOfArguments; // OOPS forgot this initially!!!
 					Mmapelement *_mapelement,*_prevmapelement=NULL;
 					for(size_t argumentIndex=0;argumentIndex<numberOfArguments;argumentIndex++){
-						/////////DEBUGGING outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
+						/////////DEBUGGING q2outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
 						_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 						_mapelement->_next=NULL; // TODO do we need this?????
 						if(argumentNames[argumentIndex]!=NULL){

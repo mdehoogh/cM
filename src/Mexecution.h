@@ -307,7 +307,9 @@ long long isStringUndefined(Mstring const * const str);
 long long isTokenUndefined(Mtoken const * const token);
 
 size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix);
+size_t q2outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix);
 size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix);
+size_t q2outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix);
 
 // starting with v0.1.4 we have file I/O support
 #include "sys/stat.h"

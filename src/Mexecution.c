@@ -253,7 +253,7 @@ long long getBigintegerInteger(Mbiginteger const * const biginteger){
 	long long result=M_LL_INVALID;
 	if(biginteger!=NULL){
 		if(amVerboseDebugging())
-			outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
+			q2outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
 		if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&
 				mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
 			result=mp_get_i64(MP_INT_POINTER(biginteger));
@@ -264,7 +264,7 @@ long long getBigintegerInteger(Mbiginteger const * const biginteger){
 				outputInfo("Big integer cannot be converted to a small integer.");
 	}
 	if(amVerboseDebugging())
-		output("Small integer result: %lld.\n",result);
+		outputMessage(M_INFO_PREFIX,"Small integer result: %lld.\n",result);
 	return result;
 }
 
@@ -2112,15 +2112,14 @@ Mstring* _getUndefinedValueText(){//Mallocationowner owner=getOwner(__LINE__);
  * @brief outputs the M big integer pointed to by \p _biginteger, with prefix \p prefix and suffix \p postfix
  * 
  * @param prefix 
- * @param _biginteger 
+ * @param biginteger 
  * @param postfix 
  * @return size_t the number of characters written
  */
-size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=0;
-	if(prefix)written=output("%s",prefix);
-	if(_biginteger){
-		Mstring* _bigintegerText=owned_string(_getBigintegerText(_biginteger),owner);
+size_t outputBiginteger(char const * const prefix,Mbiginteger const * const biginteger,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
+	size_t written=(prefix!=NULL?output("%s",prefix):0);
+	if(biginteger!=NULL){
+		Mstring* _bigintegerText=owned_string(_getBigintegerText(biginteger),owner);
 		if(_bigintegerText){
 			written+=output("%s",string(_bigintegerText));
 			FREE_STRING(_bigintegerText,owner);
@@ -2128,22 +2127,44 @@ size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _big
 				written+=output("no big integer text representation");
 	}else
 			written+=outputChar('?');
-	if(postfix)written+=output("%s",postfix);
+	if(postfix!=NULL)written+=output("%s",postfix);
 	return written;
 }/* VALIDATED */
+/**
+ * @brief outputs big integer \p biginteger prefixed by \p prefix and postfixed by \p postfix
+ * 
+ * @param prefix 
+ * @param biginteger 
+ * @param postfix 
+ * @return size_t the number of characters output
+ */
+size_t q2outputBiginteger(char const * const prefix,Mbiginteger const * const biginteger,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
+	size_t written=(prefix!=NULL?q2outputandcollect("%s",prefix):0);
+	if(biginteger!=NULL){
+		Mstring* _bigintegerText=owned_string(_getBigintegerText(biginteger),owner);
+		if(_bigintegerText){
+			written+=q2outputandcollect("%s",string(_bigintegerText));
+			FREE_STRING(_bigintegerText,owner);
+		}else
+				written+=q2outputandcollect("%s","no big integer text representation");
+	}else
+			written+=q2outputandcollect("%c",'?');
+	if(postfix!=NULL)written+=q2outputandcollect("%s",postfix);
+	return written;
+}/* VALIDATED */
+
 /**
  * @brief outputs the M decimal pointed to by \p _decimal prefixed by the C string pointed to by \p prefix and suffixed by the C string pointed to by \p postfix
  * 
  * @param prefix 
- * @param _decimal 
+ * @param decimal 
  * @param postfix 
  * @return size_t the number of characters written
  */
-size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=0;
-	if(prefix)written=output("%s",prefix);
-	if(_decimal!=NULL){
-		Mstring* _decimalText=owned_string(_getDecimalText(_decimal,false),owner);
+size_t outputDecimal(char const * const prefix,Mdecimal const * const decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
+	size_t written=(prefix!=NULL?output("%s",prefix):0);
+	if(decimal!=NULL){
+		Mstring* _decimalText=owned_string(_getDecimalText(decimal,false),owner);
 		if(_decimalText){
 			written+=output("%s",string(_decimalText));
 			FREE_STRING(_decimalText,owner);
@@ -2152,6 +2173,28 @@ size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,c
 	}else
 		written+=outputChar('?');
 	if(postfix)written+=output("%s",postfix);
+	return written;
+}/* VALIDATED */
+/**
+ * @brief outputs the M decimal pointed to by \p decimal prefixed by the C string pointed to by \p prefix and suffixed by the C string pointed to by \p postfix
+ * 
+ * @param prefix 
+ * @param decimal 
+ * @param postfix 
+ * @return size_t the number of characters written
+ */
+size_t q2outputDecimal(char const * const prefix,Mdecimal const * const decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
+	size_t written=(prefix!=NULL?q2outputandcollect("%s",prefix):0);
+	if(decimal!=NULL){
+		Mstring* _decimalText=owned_string(_getDecimalText(decimal,false),owner);
+		if(_decimalText){
+			written+=q2outputandcollect("%s",string(_decimalText));
+			FREE_STRING(_decimalText,owner);
+		}else
+			written+=q2outputandcollect("%s","no decimal text representation");
+	}else
+		written+=q2outputandcollect("%c",'?');
+	if(postfix!=NULL)written+=q2outputandcollect("%s",postfix);
 	return written;
 }/* VALIDATED */
 
