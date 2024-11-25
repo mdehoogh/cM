@@ -422,10 +422,10 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 							}
 							tableListelement=tableListelement->_next;
 						}while(tableListelement!=NULL&&++rowIndex<=table->numberOfElements);
-						/* DEBUG
+						////* DEBUG
 						for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++)
 							output("Column #%zu length: %zu.\n",columnIndex,_columnLengths[columnIndex]);
-						*/
+						///
 						// ready to show the cells
 						cellIndex=0;
 						written+=q2newline(true);
@@ -433,7 +433,7 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 							for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
 								cellTextLength=q2output("%s",string(_cells[cellIndex++]));
 								written+=cellTextLength;
-								while(cellTextLength<=_columnLengths[columnIndex]){written+=q2output("%c",' ');cellTextLength++;}
+								while(cellTextLength++<=_columnLengths[columnIndex])written+=q2output("%c",' ');
 							}
 							written+=q2newline(true);
 						}

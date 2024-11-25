@@ -858,17 +858,15 @@ static void registerMessage(){
 	if(!addMessageOfType(outputText,""))
 		outputSystemError("Failed to register a message!");
 }
+
 /**
- * @brief outputs (when \p echoToOutput is true) and collects outputText until \p newlinePosition
+ * @brief attempts to extracts the message line
  * 
- * @param newlinePosition 
- * @param echoToOutput outputs outputText until newlinePosition when true
+ * @param echoToOutput 
  */
-static void collectLine(char* newlinePosition,bool echoToOutput){
-	assert(newlinePosition);
+static void extractMessage(char* newlinePosition){
 	*newlinePosition='\0';
-	///output("Collecting line '%s'.\n",outputText);
-	if(echoToOutput)output("%s%c",outputText,'\n');
+	///output("Collecting line '%s'.\n",outputText); ///if(echoToOutput)output("%s%c",outputText,'\n');
 	// now we can check whether outputText is an error, bug or warning
 	if(strncmp(M_RESULT_PREFIX,outputText,resultPrefixLength)==0){
 		registerResult();
@@ -893,21 +891,144 @@ static void collectLine(char* newlinePosition,bool echoToOutput){
 		// we have to move the remaining text up
 		*(outputText+outputLength)='\0';
 	}else
-		q2outputMessage(M_ERROR_PREFIX,"Can't shorten the length of the output buffer (%zu) by %zu.\n",outputLength,shortened);
+		output("%s%sCan't shorten the length of the output buffer (%zu) by %zu.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,outputLength,shortened);
+}
+
+/**
+ * @brief reports an output message format error
+ * 
+ */
+static void reportOutputMessageFormatError(){
+	output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output message format error!");
 }
 /**
- * @brief attempts to extracts the message line
+ * @brief outputs an output message memory error
  * 
- * @param echoToOutput 
  */
-static void extractMessage(bool echoToOutput){
-	if(NULL==outputText)return;
-	char* newlinePosition=strchr(outputText,'\n');
-	if(newlinePosition!=NULL)collectLine(newlinePosition,echoToOutput);
+static void reportOutputMessageMemoryError(){
+	output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output message memory error!");
+}
+
+/**
+ * @brief collects without outputting formatted text
+ * 
+ * @param fmt 
+ * @param ... 
+ * @return size_t the number of characters collected
+ */
+size_t q2collect(char const * const fmt,...){
+	size_t written=0;
+	if(outputText!=NULL){
+		if(fmt!=NULL&&*fmt){
+			do{
+				///output("Output size: %llu - length: %llu - format: '%s'",outputSize,outputLength,fmt);
+			  va_list args;
+  			va_start(args,fmt);
+			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+				va_end(args);
+				///output("Collect count: %d\n",count);
+				if(count<=0){
+					///////outputText[outputLength]='\0'; // just in case
+					reportOutputMessageFormatError();
+					break;
+				}
+				if(outputLength+count<outputSize){ // success
+					written=count;
+					///////outputText[outputLength]='\0'; // just in case
+					///output(" - output length: %llu",outputLength);
+					// if we have a full line output that full line
+					///output("%s"," - output text: <<<<<<<");
+					//////output("%s",outputText);
+					///for(size_t i=0;i<outputSize&&outputText[i]!=0;i++)output("%c",outputText[i]);
+					///output("%s",">>>>>>>>>>\n");
+					outputText[outputLength+written]='\0';
+					char* newlinePosition=strchr(outputText+outputLength,'\n');
+					outputLength+=written;
+					if(newlinePosition!=NULL){
+						////output("Extracting message from '%s'.\n",outputText);
+						extractMessage(newlinePosition);
+					}
+					break;
+				}
+				outputSize+=64;
+				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				if(NULL==newOutputText){
+					reportOutputMessageMemoryError();
+					break;
+				}
+				outputText=newOutputText;
+			}while(true);
+		}else
+			output("%s%sNo format in queued output.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+	}else{ // directly pass along to output
+		output("%sNo output collector!\n",M_WARNING_PREFIX);
+	  va_list args;
+  	va_start(args,fmt);
+		vprintf(fmt,args);
+		va_end(args);
+	}
+	return written;
+}
+
+// All message methods essentially delegate to q2output()!!!
+/**
+ * @brief outputs and collects (in the current message being composed) formatted text
+ * @details (dependency) when changed, q2outputMessage() could should be synced accordingly!!
+ * @param fmt 
+ * @param ... 
+ * @return size_t the number of characters logged
+ */
+size_t q2output(char const * const fmt,...){
+	size_t written=0; // number of characters output
+	if(fmt!=NULL&&*fmt){
+		// 1. output
+		// MDH@24SEP2024: always output directly to stdout, and remember positive result!
+		va_list args;
+		va_start(args,fmt);
+		int count=vprintf(fmt,args);
+		va_end(args);
+		if(count<0){ // something went wrong!
+			int verror=ferror(stdout);
+			if(verror)output("%s%s: Error code %d writing queued output.\n",verror);
+		}
+		// 2. collect (if there's something to collect at all)
+		if(count!=0&&outputText!=NULL){ // supposed to collect
+			do{
+			  va_list args;
+  			va_start(args,fmt);
+			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
+				va_end(args);
+				if(count<=0){
+					//////outputText[outputLength]='\0'; // just in case
+					reportOutputMessageFormatError();
+					break;
+				}
+				if(outputLength+count<outputSize){ // success
+					written=count;
+					outputText[outputLength+written]='\0'; // before calling strchr ascertain to end outputText
+					// if we have a full line output that full line
+					////////printf("%s",outputText);
+					// search for the newline in the part added
+					char* newlinePosition=strchr(outputText+outputLength,'\n');
+					outputLength+=written; // new start
+					if(newlinePosition!=NULL)extractMessage(newlinePosition);
+					break;
+				}
+				outputSize+=64;
+				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				if(NULL==newOutputText){
+					reportOutputMessageMemoryError();
+					break;
+				}
+				outputText=newOutputText;
+			}while(true);
+		}
+	}
+	return written;
 }
 
 size_t q2outputmessageprefix(char const * const messageprefix){
-	return(messageprefix!=NULL?q2output("%s",messageprefix)+output("%s",M_MESSAGE_PREFIX):0);
+	return(messageprefix!=NULL&*messageprefix?q2output("%s",messageprefix)+output("%s",M_MESSAGE_PREFIX):0);
 }
 
 /**
@@ -917,19 +1038,18 @@ size_t q2outputmessageprefix(char const * const messageprefix){
  * @returns the number of characters output
  */
 size_t q2outputInfo(char const * const info){
-	size_t written=0;
 	if(info!=NULL){
 		size_t l=strlen(info);
 		if(l){
-			if(M_INFO_PREFIX!=NULL&&*M_INFO_PREFIX)written=q2outputmessageprefix(M_INFO_PREFIX);
+			size_t written=(M_INFO_PREFIX!=NULL&&*M_INFO_PREFIX?q2outputmessageprefix(M_INFO_PREFIX):0);
 			written+=q2output("%s",info);
-    	l--;
-			if(l>0)if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')
+			if(--l>0)
+			if(info[l]!='.'&&info[l]!='!'&&info[l]!='?')
 				written+=q2output("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-	    written+=q2output("%c",'\n');// replacing: newline();
+	    return written+q2newline(true);
 		}
 	}
-	return written;
+	return 0;
 }
 
 /**
@@ -938,22 +1058,21 @@ size_t q2outputInfo(char const * const info){
  * @param warning the warning text to output
  */
 size_t q2outputWarning(char const * const warning){
-	size_t result=0;
 	if(warning!=NULL){
     size_t l=strlen(warning);
     if(l){
 			// MDH@19AUG2024: it's a nuisance if a warning does not end with a period and we have to add a period
 			//                so we can't directly call addMessageOfType() here
-			if(M_WARNING_PREFIX!=NULL&&*M_WARNING_PREFIX)result=q2outputmessageprefix(M_WARNING_PREFIX);
-			result=q2output("%s",warning);
-    	l--;
-			if(l>0)if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')
-				result+=q2output("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=q2output("%c",'\n'); // replacing: newline();
+			size_t written=(M_WARNING_PREFIX!=NULL&&*M_WARNING_PREFIX?q2outputmessageprefix(M_WARNING_PREFIX):0);
+			written+=q2output("%s",warning);
+			if(--l>0)
+			if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')
+				written+=q2output("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+			return written+q2newline(true);
 		}
 	}
+	return 0;
 	///output("Warning length: %zu.\n",result);
-	return result;
 }
 
 /**
@@ -962,18 +1081,41 @@ size_t q2outputWarning(char const * const warning){
  * @param error the error text to output
  */
 size_t q2outputError(char const * const error){
-	size_t result=0;
 	if(error!=NULL){
   	size_t l=strlen(error);
   	if(l){
-			if(M_ERROR_PREFIX!=NULL&&*M_ERROR_PREFIX)result=q2outputmessageprefix(M_ERROR_PREFIX);
-  		result+=q2output("%s",error);
-    	l--;if(l>0)if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')result+=q2output("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    	result+=q2output("%c",'\n'); // replacing: newline();
+			size_t written=(M_ERROR_PREFIX!=NULL&&*M_ERROR_PREFIX?q2outputmessageprefix(M_ERROR_PREFIX):0);
+  		written+=q2output("%s",error);
+			if(--l>0)
+			if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')
+				written+=q2output("%c",'.'); // replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    	////written+=q2output("%c",'\n'); // replacing: newline();
+			return written+q2newline(true);
 		}
 	}
-	return result;
+	return 0;
 }
+
+/**
+ * @brief outputs \p bug prefixed by M_BUG_PREFIX, postfixing a period if not present in \p bug
+ * 
+ * @param bug the bug text
+ */
+size_t q2outputBug(char const * const bug){
+	if(bug!=NULL){
+		int l=strlen(bug);
+		if(l){
+			size_t written=(M_BUG_PREFIX!=NULL&&*M_BUG_PREFIX?q2outputmessageprefix(M_BUG_PREFIX):0);
+			written+=q2output("%s",bug);
+			if(--l>0)
+			if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')
+				written+=q2output("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+				///written+=q2output("%c",'\n'); //newline();
+			return written+q2newline(true);
+		}
+	}
+	return 0;
+} 
 
 /**
  * @brief outputs \p memoryerror prefixed by a memory error text
@@ -1002,25 +1144,6 @@ size_t outputErrorAndText(char const * const error,char const * const text){
 	return result+q2output("\n");
 }
 
-/**
- * @brief outputs \p bug prefixed by M_BUG_PREFIX, postfixing a period if not present in \p bug
- * 
- * @param bug the bug text
- */
-size_t q2outputBug(char const * const bug){
-	size_t result=0;
-	if(bug!=NULL){
-    size_t l=strlen(bug);
-		if(l>0){
-			if(M_BUG_PREFIX!=NULL&&*M_BUG_PREFIX)result=q2outputmessageprefix(M_BUG_PREFIX);
-			result+=q2output("%s",bug);
-			l--;if(l>0)if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')result+=q2output("%c",'.');// replacing: outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-			result+=q2output("%c",'\n'); //newline();
-		}
-	}
-	return result;
-} 
-
 // for now placing kbhit() here
 /**
  * @brief checks the console for a recent keystroke
@@ -1035,131 +1158,6 @@ int kbhit(){
 	return select(1,&fds,NULL,NULL,&tv);
 }
 
-/**
- * @brief reports an output message format error
- * 
- */
-static void reportOutputMessageFormatError(){
-	output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output message format error!");
-}
-/**
- * @brief outputs an output message memory error
- * 
- */
-static void reportOutputMessageMemoryError(){
-	output("%s%s%s\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,"Output message memory error!");
-}
-
-/**
- * @brief collects without outputting formatted text
- * 
- * @param fmt 
- * @param ... 
- * @return size_t the number of characters collected
- */
-size_t q2collect(char const * const fmt,...){
-	size_t result=0;
-	if(outputText!=NULL){
-		if(fmt!=NULL&&*fmt){
-			////output("Collecting!");
-			do{
-				///output("Output size: %llu - length: %llu - format: '%s'",outputSize,outputLength,fmt);
-			  va_list args;
-  			va_start(args,fmt);
-			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
-				va_end(args);
-				///output("Collect count: %d\n",count);
-				if(count<=0){
-					///////outputText[outputLength]='\0'; // just in case
-					reportOutputMessageFormatError();
-					break;
-				}
-				if(outputLength+count<outputSize){ // success
-					result=count;
-					outputLength+=result; // new start
-					///////outputText[outputLength]='\0'; // just in case
-					///output(" - output length: %llu",outputLength);
-					// if we have a full line output that full line
-					///output("%s"," - output text: <<<<<<<");
-					//////output("%s",outputText);
-					///for(size_t i=0;i<outputSize&&outputText[i]!=0;i++)output("%c",outputText[i]);
-					///output("%s",">>>>>>>>>>\n");
-					extractMessage(false);
-					///else output("%s!\n","No end-of-line");
-					break;
-				}
-				outputSize+=64;
-				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
-				if(NULL==newOutputText){
-					reportOutputMessageMemoryError();
-					break;
-				}
-				outputText=newOutputText;
-			}while(true);
-		}else{ // directly pass along to output
-			output("%sNo output collector!\n",M_WARNING_PREFIX);
-		  va_list args;
-  		va_start(args,fmt);
-			vprintf(fmt,args);
-			va_end(args);
-		}
-	}
-	return result;
-}
-
-/**
- * @brief outputs and collects (in the current message being composed) formatted text
- * @details (dependency) when changed, q2outputMessage() could should be synced accordingly!!
- * @param fmt 
- * @param ... 
- * @return size_t the number of characters logged
- */
-size_t q2output(char const * const fmt,...){
-	size_t result=0; // number of characters output
-	if(fmt!=NULL&&strlen(fmt)>0){
-		// 1. output
-		// MDH@24SEP2024: always output directly to stdout, and remember positive result!
-		va_list args;va_start(args,fmt);int count=vprintf(fmt,args);va_end(args);if(count>0)result=count;
-		// 2. collect
-		if(result>0&&outputText!=NULL){ // supposed to collect
-			do{
-			  va_list args;
-  			va_start(args,fmt);
-			 	int count=vsnprintf(outputText+outputLength,outputSize-outputLength,fmt,args);
-				va_end(args);
-				if(count<=0){
-					//////outputText[outputLength]='\0'; // just in case
-					reportOutputMessageFormatError();
-					break;
-				}
-				if(outputLength+count<outputSize){ // success
-					result+=count;
-					outputLength+=count; // new start
-					// if we have a full line output that full line
-					////////printf("%s",outputText);
-					extractMessage(false); // TODO shouldn't this be true???? DONE no
-					break;
-				}
-				outputSize+=64;
-				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
-				if(NULL==newOutputText){
-					reportOutputMessageMemoryError();
-					break;
-				}
-				outputText=newOutputText;
-			}while(true);
-		}
-		/*else{ // directly pass along to output
-			printf("%s%sNo output collector!\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
-		  va_list args;
-  		va_start(args,fmt);
-			vprintf(fmt,args);
-			va_end(args);
-		}
-		*/
-	}
-	return result;
-}
 /**
  * @brief outputs and collects a new line character
  * 
@@ -1191,9 +1189,13 @@ size_t q2outputMessage(char const * const messageType,char const * const fmt,...
 			written+=output("%s",M_MESSAGE_PREFIX); // output the message type followed by the message prefix
 	}
 	// the next part is similar to what q2output() does
-	if(fmt!=NULL&&strlen(fmt)>0){
+	if(fmt!=NULL&&*fmt){
 		// 1. output
-		va_list args;va_start(args,fmt);int count=vprintf(fmt,args);va_end(args);if(count>0)written+=count;
+		va_list args;va_start(args,fmt);int count=vprintf(fmt,args);va_end(args);
+		if(count<=0){
+			int verror=ferror(stdout);
+			if(verror)output("%s%sError code %d outputting a message.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,verror);
+		}
 		// 2. collect
 		if(outputText!=NULL){
 			do{
@@ -1207,12 +1209,18 @@ size_t q2outputMessage(char const * const messageType,char const * const fmt,...
 					break;
 				}
 				if(outputLength+count<outputSize){ // success
-					written+=count;
-					outputLength+=count; // new start
+					written=count;
+					outputLength+=count;
+					/* MDH@26NOV2024: not expecting an end-of-line in the message!!!
+					size_t newOutputLength=outputLength+count;
 					/// not here because assuming the message does not contain newline characters!!!
 					// if we have a full line output that full line
 					////////printf("%s",outputText);
-					extractMessage(false); // TODO shouldn't this be true?
+					outputText[newOutputLength]='\0';
+					char* newlinePosition=strchr(outputText+outputLength,'\n');
+					outputLength=newOutputLength;
+					if(newlinePosition!=NULL)extractMessage(newlinePosition);
+					*/
 					break;
 				}
 				outputSize+=64;
@@ -1245,10 +1253,6 @@ size_t q2collectMessage(char const * const messageType,char const * const fmt,..
 	size_t written=(messageType!=NULL&&*messageType?q2collect("%s",messageType):0);
 	// the next part is similar to what q2output() does
 	if(fmt!=NULL&&*fmt){
-		/* 1. output
-		va_list args;va_start(args,fmt);int count=vprintf(fmt,args);va_end(args);if(count>0)written+=count;
-		*/
-		// 2. collect
 		do{
 			va_list args;
 			va_start(args,fmt);
@@ -1260,12 +1264,8 @@ size_t q2collectMessage(char const * const messageType,char const * const fmt,..
 				break;
 			}
 			if(outputLength+count<outputSize){ // success
-				written+=count;
+				written=count;
 				outputLength+=count; // new start
-				/// not here because assuming the message does not contain newline characters!!!
-				// if we have a full line output that full line
-				////////printf("%s",outputText);
-				extractMessage(false);
 				break;
 			}
 			outputSize+=64;
