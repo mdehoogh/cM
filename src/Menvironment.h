@@ -71,6 +71,7 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
 
 Mmap* _getVariableNamesMap(Menvironment const * const environment); // MDH@14NOV2019: returns a map with the names of all local variables (in attribute '') and the names of the variables in the parent environment with the name of the parent environment!
 
+Mlist* getTableLines(Mlist const * const list,Mlist const * const minColumnWidthsList);
 size_t outputTable(Mlist const * const table); // MDH@25NOV2019: certain lists are now constructed and recognized as 'tables'
 
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue);

@@ -11351,7 +11351,23 @@ Mvalue* Mstats(Mvalue* sequenceValue){Mallocationowner owner=getOwner(__LINE__);
 	return(_statsMap?_getValueOfMap(disowned_map(_statsMap,owner)):NULL);
 }
 
-// MDH15SEP2024
+// MDH@02DEC2024
+/**
+ * @brief returns the list of lines corresponding to each row in \p tableValue with column widths specified in \p minColumnWidthsValue
+ * 
+ * @param tableValue 
+ * @param minColumnWidthsValue 
+ * @return Mvalue* 
+ */
+Mvalue* Mtablelines(Mvalue* tableValue,Mvalue* minColumnWidthsValue){
+	if(tableValue!=NULL&&tableValue->type==VT_LIST&&(minColumnWidthsValue==NULL||minColumnWidthsValue->type==VT_LIST)){
+		Mlist* tableLinesList=getTableLines(tableValue->value._list,minColumnWidthsValue!=NULL?minColumnWidthsValue->value._list:NULL);
+		if(tableLinesList!=NULL)return _getValueOfList(tableLinesList);
+	}
+	return NULL;
+}
+
+// MDH!15SEP2024
 /**
  * @brief outputs the table stored in \p tableValue
  * 
@@ -15179,13 +15195,14 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"messagecounts",Mmessagecounts,0,NULL,NULL)
 					||!registerFunction(_Menvironment,owner,"addmessage",Maddmessage,1,(char*[]){"message(text)"},NULL))
 			{
-				q2outputError("Failed to register the messages functions");
+				q2outputError("Failed to register the message functions");
 				return NULL;
 			}
 			//reportNumberOfAllocations("shellInitialized 40");
 
-			if(!registerFunction(_Menvironment,owner,"outputtable",Moutputtable,1,(char*[]){"table"},NULL)){
-				q2outputError("Failed to register the outputtable function");
+			if(!registerFunction(_Menvironment,owner,"outputtable",Moutputtable,1,(char*[]){"table"},NULL)
+					||!registerFunction(_Menvironment,owner,"tablelines",Mtablelines,2,(char*[]){"table","[minimum column widths(list)]"},NULL)){
+				q2outputError("Failed to register the outputtable and tablelines function");
 				return NULL;
 			}
 

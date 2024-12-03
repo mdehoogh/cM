@@ -300,23 +300,17 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
 	return NULL;
 }
 
-// MDH@25NOV2019: the first example of a list which is constructed as a table is the the values() table
-/**
- * @brief outputs an M list \p table containing a table
- * 
- * @param table the table to output
- * @return the number of characters written
- */
-size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__LINE__);
-	size_t written=0;
-	if(table!=NULL){
-		 if(table->numberOfElements>0&&table->_first!=NULL){
-			// the first list element is supposed to be contain the column names
-			if(table->valuetype==VT_LIST||table->valuetype==VT_ARRAY){ // DONE shouldn't we allow ARRAYs as the type as well?
+Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumnWidthsList){Mallocationowner owner=getOwner(__LINE__);
+	if(tableList!=NULL&&(tableList->valuetype==VT_LIST||tableList->valuetype==VT_ARRAY)){
+		Mlistelement* tableListelement=tableList->_first;
+		Mvalue* tablerowValue=(tableListelement!=NULL?tableListelement->_value:NULL);
+		if(tablerowValue!=NULL){
+			Mlist* _tableLinesList=owned_list(__list("getTableLines"),owner);
+			if(_tableLinesList!=NULL){
+				_tableLinesList->valuetype=VT_TEXT;
+				// the first list element is supposed to be contain the column names
 				// the width of the column names determines the width of the columns with an additional blank in between NO not an extra blank
 				//size_t numberOfRows=table->numberOfElements;
-				Mlistelement* tableListelement=table->_first;
-				Mvalue* tablerowValue=tableListelement->_value;
 				if(tablerowValue!=NULL){
 					size_t* _columnLengths=NULL;
 					size_t maximumNumberOfColumns,columnIndex;
@@ -381,11 +375,11 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 						}
 					}
 					q2outputMessage(M_INFO_PREFIX,"Maximum number of columns: %zu.",maximumNumberOfColumns);
-					Mstring** _cells=(_columnLengths!=NULL?calloc(table->numberOfElements*maximumNumberOfColumns,sizeof(Mstring*)):NULL);
+					Mstring** _cells=(_columnLengths!=NULL?calloc(tableList->numberOfElements*maximumNumberOfColumns,sizeof(Mstring*)):NULL);
 					if(_cells!=NULL){
 						// collect the separate lines to store in _cells
-						size_t cellTextLength,numberOfRows=table->numberOfElements,cellIndex=0,rowIndex=0;
-						tableListelement=table->_first;
+						size_t cellTextLength,numberOfRows=tableList->numberOfElements,cellIndex=0,rowIndex=0;
+						tableListelement=tableList->_first;
 						do{
 							tablerowValue=tableListelement->_value;
 							if(tablerowValue!=NULL&&(tablerowValue->type==VT_LIST||tablerowValue->type==VT_ARRAY)){
@@ -421,21 +415,30 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 								}
 							}
 							tableListelement=tableListelement->_next;
-						}while(tableListelement!=NULL&&++rowIndex<=table->numberOfElements);
+						}while(tableListelement!=NULL&&++rowIndex<=tableList->numberOfElements);
 						////* DEBUG
 						for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++)
 							output("Column #%zu length: %zu.\n",columnIndex,_columnLengths[columnIndex]);
 						///
-						// ready to show the cells
+						// ready to compose the lines from the cells
 						cellIndex=0;
-						written+=q2newline(true);
 						while(numberOfRows--){
+							Mstring* _rowString=owned_string(_getString("'"),owner);
+							if(_rowString==NULL){q2outputError("Failed to allocate memory for storing a table line");break;}
 							for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
-								cellTextLength=q2output("%s",string(_cells[cellIndex++]));
-								written+=cellTextLength;
-								while(cellTextLength++<=_columnLengths[columnIndex])written+=q2output("%c",' ');
+								////q2output("Cell #%zu: '%s'.\n",cellIndex,string(_cells[cellIndex]));
+								string_append(_rowString,string(_cells[cellIndex]));
+								if(columnIndex+1<maximumNumberOfColumns){
+									cellTextLength=string_length(_cells[cellIndex]);
+									while(cellTextLength++<=_columnLengths[columnIndex]&&string_append_char(_rowString,' ')!=NULL);
+								}
+								cellIndex++;
 							}
-							written+=q2newline(true);
+							Mvalue* rowStringValue=_getTextValue(string(_rowString));
+							if(NULL==rowStringValue)break; // assuming _rowString to be freed by _getTextValue!!!
+							if(appendedToList(_tableLinesList,owner,rowStringValue,M_LL_INVALID)<=0)
+								q2outputError("Failed to append the table line to the table list");
+							FREE_STRING(_rowString,owner);
 						}
 						/* replacing:
 						// ready to show the data rows 
@@ -495,17 +498,41 @@ size_t outputTable(Mlist const * const table){Mallocationowner owner=getOwner(__
 						free(_columnLengths); // essential bro'
 						while(cellIndex)FREE_STRING(_cells[--cellIndex],owner); // essential to release all created Mstring's
 						free(_cells);
-						written+=q2newline(true); // one newline() at the end!!
 					}else
-						q2outputError("Failed to prepare for displaying the table header.");
-				}else 
-					q2outputError("Header of table not a list.");
-			}else
-				q2outputMessage(M_ERROR_PREFIX,"Rows of assumed table not (all) lists or arrays but %s.",VALUETYPENAMES[table->valuetype]);
+						q2outputError("Failed to prepare for displaying the table header");
+				}
+				return disowned_list(_tableLinesList,owner);
+			}
+			q2outputError("Failed to create the lines list to return");
 		}else
-			q2outputWarning("The table to output is empty.");
-	}else
-		q2outputError("No table to output.");
+			q2outputError("Missing table header");
+	}
+	return NULL;
+}
+
+// MDH@25NOV2019: the first example of a list which is constructed as a table is the the values() table
+/**
+ * @brief outputs an M list \p table containing a table
+ * 
+ * @param table the table to output
+ * @return the number of characters written
+ */
+size_t outputTable(Mlist const * const tableList){Mallocationowner owner=getOwner(__LINE__);
+	size_t written=0;
+	Mlist* _tableLinesList=owned_list(getTableLines(tableList,NULL),owner);
+	if(_tableLinesList!=NULL){
+		written=q2newline(true);
+		size_t lineCount=_tableLinesList->numberOfElements;
+		if(lineCount){
+			Mlistelement* tableLinesListElement=_tableLinesList->_first;
+			while(tableLinesListElement!=NULL&&lineCount--){
+				written+=q2outputInfo(tableLinesListElement->_value->value._text->_c);
+				tableLinesListElement=tableLinesListElement->_next;
+				////////written+=q2newline(true);
+			}
+		}
+		FREE_LIST(_tableLinesList,owner);
+	}
 	return written;
 }
 /**
