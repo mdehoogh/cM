@@ -7997,7 +7997,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 		}else
 			q2outputError("Failed to compose the message type counts");
 	}else{
-		q2output("Retrieving all messages!\n");
+		///q2output("Retrieving all messages!\n");
 		_messages=_getFilteredMessages(NULL);
 	}
 	/* replacing:
@@ -8011,7 +8011,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 		messages=_getMessagesOfType(NULL);
 	*/
 	if(_messages!=NULL){
-		q2output("Number of messages: %zu.\n",_messages->count);
+		///q2output("Number of messages: %zu.\n",_messages->count);
 		char returnType='t'; // returns a table by default
 		if(returnTypeValue!=NULL&&returnTypeValue->type==VT_TEXT){
 			if(strlen(returnTypeValue->value._text->_c)>0){
@@ -8019,7 +8019,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 				if(returnType!='a'&&returnType!='m'&&returnType!='l')returnType='t';
 			}
 		}
-		q2output("Return type: %c.\n",returnType);
+		///q2output("Return type: %c.\n",returnType);
 		Marray* messagesArray=NULL;
 		Mlist* messagesList=NULL;
 		Mmap* messagesMap=NULL;

@@ -543,7 +543,7 @@ static size_t updateMessageTypeListNodeFiltered(MessageCounts const * const mess
  * @return Messages* the messages filtered by \p messageCounts
  */
 Messages* _getFilteredMessages(MessageCounts * const messageCounts){
-	outputMessageCounts(messageCounts);
+	///outputMessageCounts(messageCounts);
 	Messages* _messages=calloc(1,sizeof(Messages));
 	if(_messages!=NULL){
 		// we want to store for each message type how many messages to return
@@ -553,7 +553,7 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 		size_t totalMessageTypeCount=updateMessageTypeListNodeFiltered(messageCounts,&totalMessageCount);
 		// if there are NO messages to return, just return _messages as is
 		if(totalMessageCount==0)return _messages;
-		output("Total number of matching messages: %zu.\n",totalMessageCount);
+		///output("Total number of matching messages: %zu.\n",totalMessageCount);
 		// there are messages to return
 		// we need to start out from the right message nodes
 		MessageNode** messageTypeNodes=calloc(totalMessageTypeCount,sizeof(MessageNode*));

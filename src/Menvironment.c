@@ -374,7 +374,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 							*/
 						}
 					}
-					q2outputMessage(M_INFO_PREFIX,"Maximum number of columns: %zu.",maximumNumberOfColumns);
+					///q2outputMessage(M_INFO_PREFIX,"Maximum number of columns: %zu.",maximumNumberOfColumns);
 					Mstring** _cells=(_columnLengths!=NULL?calloc(tableList->numberOfElements*maximumNumberOfColumns,sizeof(Mstring*)):NULL);
 					if(_cells!=NULL){
 						// collect the separate lines to store in _cells
@@ -416,10 +416,10 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 							}
 							tableListelement=tableListelement->_next;
 						}while(tableListelement!=NULL&&++rowIndex<=tableList->numberOfElements);
-						////* DEBUG
+						/* DEBUG
 						for(size_t columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++)
 							output("Column #%zu length: %zu.\n",columnIndex,_columnLengths[columnIndex]);
-						///
+						*/
 						// ready to compose the lines from the cells
 						cellIndex=0;
 						while(numberOfRows--){
@@ -521,14 +521,14 @@ size_t outputTable(Mlist const * const tableList){Mallocationowner owner=getOwne
 	size_t written=0;
 	Mlist* _tableLinesList=owned_list(getTableLines(tableList,NULL),owner);
 	if(_tableLinesList!=NULL){
-		written=q2newline(true);
+		///////written=q2newline(true);
 		size_t lineCount=_tableLinesList->numberOfElements;
 		if(lineCount){
 			Mlistelement* tableLinesListElement=_tableLinesList->_first;
 			while(tableLinesListElement!=NULL&&lineCount--){
-				written+=q2outputInfo(tableLinesListElement->_value->value._text->_c);
+				written+=q2output(tableLinesListElement->_value->value._text->_c);
 				tableLinesListElement=tableLinesListElement->_next;
-				////////written+=q2newline(true);
+				written+=q2newline(true);
 			}
 		}
 		FREE_LIST(_tableLinesList,owner);
@@ -3992,7 +3992,8 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	if(!registerNoArgumentFunction(_environment,owner_environment,"break",Mbreak))return false;
 	if(!registerFunction(_environment,owner_environment,"return",Mreturn,1,(char*[]){"a result value"},(Mvalue*[]){NULL}))return false;
 
-	if(!registerFunction(_environment,owner_environment,"out",Mout,1,(char*[]){"a value to output"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"output",Moutput,1,(char*[]){"a value to output"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"outputlines",Moutputlines,1,(char*[]){"list/array to output"},(Mvalue*[]){NULL}))return false;
 
 	if(!registerFunction(_environment,owner_environment,"brgb",Mbrgb,3,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
 	if(!registerFunction(_environment,owner_environment,"trgb",Mtrgb,1,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;

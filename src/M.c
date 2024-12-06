@@ -6155,7 +6155,7 @@ Mvalue* Mvalues(Mvalue* variableNamesValue){//Mallocationowner owner=getOwner(__
 Mvalue* Min(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* result=NULL;
 	// value represents the text to write in front of the prompt for text i.e. it's a prompt text
-	Mout(value); // just get it out!!!!
+	Moutput(value); // just get it out!!!!
 	Mstring* _inText=owned_string(_getString("'"),owner); // initialize _inText to a a single quote character (as required by _getTextValue)
 	char c;
 	while(inputCharRead(&c)){ // should be Ok to use inputCharRead() here
@@ -6165,7 +6165,7 @@ Mvalue* Min(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		if(c==3){
 			string_setlength(_inText,1/*,owner*/);
 			outputChar('\n');
-			Mout(value);
+			Moutput(value);
 			continue;
 		}
 		if(c==127){

@@ -7047,7 +7047,8 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						//				to this purpose I've added an integer variable in which the actual decimal precision can be set
 						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
 						free(_realSignificantTokenText); // freed!!!
-						if(amVerboseDebugging())output("Real part string length: %u.\n",l);
+						if(amVerboseDebugging())
+							output("Real part string length: %u.\n",l);
 						if(getDP()<l)q2outputWarning("More decimals present in literal than expected. Rounding may occur.");
 						if(amVerboseDebugging())q2outputInfo("Decimal precision checked!");
 						Mdecimal* _decimal=owned_decimal(__decimal(get_default_mpd_context(),0,0),owner);

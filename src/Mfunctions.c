@@ -1273,12 +1273,49 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
  * @param _value 
  * @return Mvalue* the number of characters written
  */
-Mvalue* Mout(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Moutput(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _valueText=owned_string(_getValueText(_value,true,true),owner);
-	size_t result=string_length(_valueText);
+	long long result=string_length(_valueText);
 	if(result>0)output("%s",string(_valueText));
 	FREE_STRING(_valueText,owner);
 	return _getIntegerValue(result);
+}
+/**
+ * @brief outputs the elements of list or array stored in \p _value each on a separate line
+ * 
+ * @param _value the list/array wrapper
+ * @return Mvalue* the number of characters written
+ */
+Mvalue* Moutputlines(Mvalue* _value){
+	long long written=M_LL_INVALID;
+	if(_value!=NULL){
+		if(_value->type==VT_LIST){
+			written=0;
+			Mlist* list=_value->value._list;
+			if(list!=NULL){
+				Mlistelement* listelement=list->_first;
+				while(listelement!=NULL){
+					written+=Moutput(listelement->_value)->value._integer->ll;
+					written+=newline();
+					listelement=listelement->_next;
+				}
+			}
+		}else
+		if(_value->type==VT_ARRAY){
+			written=0;
+			Marray* array=_value->value._array;
+			if(array!=NULL){
+				size_t elementIndex=0;
+				while(elementIndex++<array->numberOfElements){
+					written+=Moutput(array->values[elementIndex])->value._integer->ll;
+					written+=newline();
+				}
+			}
+		}else
+			return Moutput(_value);
+
+	}
+	return _getIntegerValue(written);
 }
 
 // or by defining an rgb value
