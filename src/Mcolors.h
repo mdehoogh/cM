@@ -16,7 +16,7 @@ const char* getManualFeedforwardTextColor();
 const char* getIdentifierContinuationTextColor();
 const char* getFeedForwardTextColor();
 const char* getAutoCompletionTextColor();
-const char* getExpectedCharacterStackTextColor();
+const char* getFinisherStackTextColor();
 
 const char* getCommentColor();
 const char* getOperatorTokenColor(uint8_t opid);

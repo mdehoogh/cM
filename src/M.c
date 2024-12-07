@@ -922,7 +922,7 @@ void updateAutoCompletionText(){
 }
 
 // MDH@04DEC2023: 
-/* see _expectedCharacterStack MDH@04DEC2023: we're going to collect the enders in a single Mstring
+/* see _finisherStack MDH@04DEC2023: we're going to collect the enders in a single Mstring
 Mstring* _enders=NULL;
 Mallocationowner owner_enders=(Mallocationowner){MI_MAIN,__LINE__,1};
 */
@@ -1344,9 +1344,9 @@ Mtokenautocompletiontext*  getAutoCompletionTextOfCharacterPrepended(char c,bool
 */
 
 // MDH@13JUL2023: keeping track of the closers
-// MDH@13DEC2023: now renamed to _expectedCharacterStack indicating that these are the expected closing characters
-Mstring* _expectedCharacterStack=NULL;Mallocationowner owner_expectedCharacterStack=(Mallocationowner){MI_MAIN,__LINE__,1};
-///////void deleteFeedforwardClosers(){FREE_STRING(_expectedCharacterStack,owner_expectedCharacterStack);_expectedCharacterStack=NULL;}
+// MDH@13DEC2023: now renamed to _finisherStack indicating that these are the expected finishers
+Mstring* _finisherStack=NULL;Mallocationowner owner_finisherStack=(Mallocationowner){MI_MAIN,__LINE__,1};
+///////void deleteFeedforwardClosers(){FREE_STRING(_finisherStack,owner_finisherStack);_finisherStack=NULL;}
 
 // MDH@03OCT2019: it's essential to differentiate between current token dependent feed forward and other feed forward
 //				deleteLastTokenImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken stops being the current token or when the type of the current token changes
@@ -1490,7 +1490,7 @@ size_t getTotalNumberOfSuggestedCharacters(){
 	if(_manualFeedforwardText!=NULL)return string_length(_manualFeedforwardText);
 	size_t totalNumberOfSuggestedCharacters=(_identifierContinuationCharacters!=NULL?strlen(_identifierContinuationCharacters):0);
 	if(_immediateFeedforwardText!=NULL)totalNumberOfSuggestedCharacters+=string_length(_immediateFeedforwardText);
-	if(_expectedCharacterStack!=NULL)totalNumberOfSuggestedCharacters+=string_length(_expectedCharacterStack);
+	if(_finisherStack!=NULL)totalNumberOfSuggestedCharacters+=string_length(_finisherStack);
 	return totalNumberOfSuggestedCharacters;
 }
 
@@ -1504,7 +1504,7 @@ long long getNumberOfSuggestedCharacters(size_t suggestedTextSourceIndex){
 		case 1:return(_manualFeedforwardText!=NULL?string_length(_manualFeedforwardText):-1);
 		case 2:return(_identifierContinuationCharacters!=NULL?strlen(_identifierContinuationCharacters):-1);
 		case 3:return(_immediateFeedforwardText!=NULL?string_length(_immediateFeedforwardText):-1);
-		case 4:return(_expectedCharacterStack!=NULL?string_length(_expectedCharacterStack):-1);
+		case 4:return(_finisherStack!=NULL?string_length(_finisherStack):-1);
 	}
 	return -2;
 	//return(_suggestedText!=NULL?string_length(_suggestedText):0);
@@ -3508,22 +3508,22 @@ void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 }
 
 /**
- * @brief outputs expected characters stored in _expectedCharacterStack as part of the feedforward text
- * @details appends the expected characters to _suggestedText
+ * @brief outputs finishers stored in _finisherStack as part of the feedforward text
+ * @details appends the finishers to _suggestedText
  * @param _cursormovement the cursor movement updated to keep track of the current line and cursor position
  */
-void outputExpectedCharacters(Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
+void outputFinishers(Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_cursormovement)return;
-	Mchars *_chars=owned_chars(_getReversedChars(string(_expectedCharacterStack)),owner);
+	Mchars *_chars=owned_chars(_getReversedChars(string(_finisherStack)),owner);
 	if(NULL==_chars)return;
 	// MDH@16JAN2024: keep track of the source of the first character in the suggested text
 	//                this way there's no need to actually construct _suggestedText
-	outputCommandLineText(_chars->chars,_cursormovement,getExpectedCharacterStackTextColor(),-1);
+	outputCommandLineText(_chars->chars,_cursormovement,getFinisherStackTextColor(),-1);
 	// MDH@16JAN2024: updating suggestedTextSources
 	suggestedTextSources[++suggestedTextSources[0]]=4;
 	/* replacing:
 	if(string_append(_suggestedText,_chars->chars)!=NULL)
-		outputCommandLineText(_chars->chars,_cursormovement,getExpectedCharacterStackTextColor(),-1);
+		outputCommandLineText(_chars->chars,_cursormovement,getFinisherStackTextColor(),-1);
 	else
 		_cursormovement->written=0;
 	*/
@@ -3653,7 +3653,7 @@ char getFirstSuggestedCharacter(){
 		case 1:firstSuggestedCharacter=string_char(_manualFeedforwardText,0);break;
 		case 2:firstSuggestedCharacter=getFirstIdentifierContinuationCharacter();break;
 		case 3:firstSuggestedCharacter=string_char(_immediateFeedforwardText,0);break;
-		case 4:firstSuggestedCharacter=string_last_char(_expectedCharacterStack);break; // OOPS take the last character not the first!!!
+		case 4:firstSuggestedCharacter=string_last_char(_finisherStack);break; // OOPS take the last character not the first!!!
 	}
 	return firstSuggestedCharacter;
 }
@@ -3738,7 +3738,7 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			}
 			break;
 		case 4:
-			// expectedCharacterStack is a different ball park since it is kept updated based on the current input command
+			// finisherStack is a different ball park since it is kept updated based on the current input command
 			// and does not need to be adapted by explicitly removing the consumed 
 			break;
 		default:
@@ -3790,18 +3790,18 @@ bool removeFirstSuggestedCharacter(char inputChar){
 			}
 		}
 	}else
-	if(string_length(_expectedCharacterStack)>0){
-		char firstExpectedCharacter=string_last_char(_expectedCharacterStack);
-		if(inputChar!='\0'&&inputChar!=firstExpectedCharacter){
+	if(string_length(_finisherStack)>0){
+		char firstFinisher=string_last_char(_finisherStack);
+		if(inputChar!='\0'&&inputChar!=firstFinisher){
 			result=false;
-			q2outputMessage(M_ERROR_PREFIX,"First expected character '%c' does not match the consumed suggested character '%c'.",firstExpectedCharacter,inputChar);
+			q2outputMessage(M_ERROR_PREFIX,"First finisher '%c' does not match the consumed suggested character '%c'.",firstExpectedCharacter,inputChar);
 		}else{
-			string_declength(_expectedCharacterStack); // this way nothing can go wrong
+			string_declength(_finisherStack); // this way nothing can go wrong
 			///replacing:
-			///char expectedCharacterRemoved=firstExpectedCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
-			///if(expectedCharacterRemoved=='\0'||(inputChar!='\0'&&expectedCharacterRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
+			///char finisherRemoved=firstExpectedCharacterRemoved(); // MDH@02NOV2021: now reinstated to remove the first autocompletion character!!
+			///if(finisherRemoved=='\0'||(inputChar!='\0'&&finisherRemoved!=inputChar)){ // replacing: if(!deleteFirstAutoCompletionCharacter(suggestedChar,true)){ // replacing: if(suggestedChar!=string_removed_char(_autoCompletionText,0))
 			///	result=false;
-			///	q2outputMessage(M_ERROR_PREFIX,"Failed to remove the first expected character '%c'.",firstExpectedCharacter);
+			///	q2outputMessage(M_ERROR_PREFIX,"Failed to remove the first finisher '%c'.",firstExpectedCharacter);
 			///}
 		}
 	}
@@ -3882,7 +3882,7 @@ void showSuggestedText(){
 
 		// MDH@27DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
 		// MDH@17JAN2024: for now we show all
-		if(cursormovement.written==0)outputExpectedCharacters(&cursormovement);
+		if(cursormovement.written==0)outputFinishers(&cursormovement);
 
 	}else
 		outputManualFeedforwardCharacters(&cursormovement);
@@ -4165,26 +4165,26 @@ bool updateNumberOfLineCharacters(){
 // MDH@13DEC2023: after an input character is accepted (and successfully appended to the current command)
 //                it is used to update the expended characters accordingly
 /**
- * @brief updates the expected characters after appending \p inputChar successfully to the input command
+ * @brief updates the finisher stack after appending \p inputChar successfully to the input command
  * 
  * @param inputChar the accepted input character
- * @param currentToken the current input command token
- * @return int8_t positive on success, zero on input failure, negative on failing to update expected characters
+ * @param currentToken the current user input command token
+ * @return int8_t positive on success, zero on input failure, negative on failing to update the finisher stack
  */
-int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * const currentToken){
-	if(NULL==_expectedCharacterStack)return 0;
+int8_t finisherStackUpdatedOnAddition(char inputChar,Mtoken const * const currentToken){
+	if(NULL==_finisherStack)return 0;
 	if(currentToken!=NULL&&currentToken->type==TT_ERROR)return 0; // MDH@18JUN2024: when in an error do not append!!
-	// if the last expected character indicates we're in a string literal inputChar is considered part of that string literal
-	char lastExpectedCharacter=string_last_char(_expectedCharacterStack);
-	if(lastExpectedCharacter=='"'||lastExpectedCharacter=='\''){
+	// if the last finisher indicates we're in a string literal inputChar is considered part of that string literal
+	char lastFinisher=string_last_char(_finisherStack);
+	if(lastFinisher=='"'||lastFinisher=='\''){
 		// only when inputChar actually ends the current token
 		// (technically the end of string literal token could be escaped!!!)
-		if(inputChar==lastExpectedCharacter){
+		if(inputChar==lastFinisher){
 			if(isTokenFinished(currentToken)){
-				if(NULL==string_declength(_expectedCharacterStack)){
-					inputError("Failed to register '%c' as expected character",inputChar);
+				if(NULL==string_declength(_finisherStack)){
+					inputError("Failed to register '%c' as finisher",inputChar);
 					return -3;
-				} // 'removes' the last expected token by decrementing the string length
+				} // 'removes' the last finisher by decrementing the string length
 			}else{
 				inputInfo("Token is not finished!");
 				return 0;
@@ -4194,8 +4194,8 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 	if(inputChar=='"'||inputChar=='\''){ 
 		// could start a string literal
 		if(string_length(currentToken->text)==1){ // actually started the string literal (is NOT escaped)
-			if(NULL==string_append_char(_expectedCharacterStack,inputChar)){
-				inputError("Failed to register '%c' as expected character",inputChar);
+			if(NULL==string_append_char(_finisherStack,inputChar)){
+				inputError("Failed to register '%c' as finisher",inputChar);
 				return -1;
 			}
 		}
@@ -4203,14 +4203,14 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 	if(inputChar=='('){
 		// if this starts a function call argument list we're going to need to append comma's for each
 		// argument and a final closing parenthesis, but always the closing parenthesis is expected
-		if(NULL==string_append_char(_expectedCharacterStack,')')){
-			inputError("Failed to register ')' as expected character.");
+		if(NULL==string_append_char(_finisherStack,')')){
+			inputError("Failed to register ')' as finisher.");
 			return -2;
 		}
 		// MDH@03JUL2024: appending the expected commas as well is a nice feature BUT
 		//                BUT it is seriously interfering with updating the feed forward because
 		//                when a user does NOT enter these arguments but closes the function call with )
-		//                beforehand these expected characters will still remain on the expected character stack
+		//                beforehand these finishers will still remain on the finisher stack
 		//                and we really do not want that, 
 		//                now instead of keeping the commas in, for now, we just do NOT add them 
 		//                it's not that hard to enter a , so as feed forward not that immportant!!!!
@@ -4222,8 +4222,8 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 			free(_functionName);
 			if(numberOfFunctionParameters>=0){
 				///////inputInfo("Number of arguments in function '%s': %lld",function,numberOfFunctionParameters);
-				while(--numberOfFunctionParameters>0)if(string_append_char(_expectedCharacterStack,',')==NULL){
-					inputError("Failed to register ',' as expected character.");
+				while(--numberOfFunctionParameters>0)if(string_append_char(_finisherStack,',')==NULL){
+					inputError("Failed to register ',' as finisher.");
 					return -2;
 				}
 			}else{
@@ -4241,64 +4241,64 @@ int8_t expectedCharacterStackUpdatedOnAddition(char inputChar,Mtoken const * con
 		*/
 	}else
 	if(inputChar=='['){
-		if(string_append_char(_expectedCharacterStack,']')==NULL){
-			inputError("Failed to register ']' as expected character.");
+		if(string_append_char(_finisherStack,']')==NULL){
+			inputError("Failed to register ']' as finisher.");
 			return -2;
 		}
 	}else
 	if(inputChar=='{'){
-		if(NULL==string_append_char(_expectedCharacterStack,'}')){
-			inputError("Failed to register '}' as expected character.");
+		if(NULL==string_append_char(_finisherStack,'}')){
+			inputError("Failed to register '}' as finisher.");
 			return -2;
 		}
 	}else
 	if(inputChar==','){
-		if(string_last_char(_expectedCharacterStack)==','){
-			if(NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove expected character ','.");
+		if(string_last_char(_finisherStack)==','){
+			if(NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove finisher ','.");
 				return -3;
 			}
 		}
 	}else
 	if(inputChar==')'){
-		// MDH@01JUL2024: TODO the problem here is that we could be closing an call before having entered all arguments in which case we've got a couple of commas in the expected character stack
+		// MDH@01JUL2024: TODO the problem here is that we could be closing an call before having entered all arguments in which case we've got a couple of commas in the finisher stack
 		//                     in front of the closing parenthesis, that we should get rid of first
-		while(string_last_char(_expectedCharacterStack==',')){
-			if(NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove expected character ','.");
+		while(string_last_char(_finisherStack==',')){
+			if(NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove finisher ','.");
 				return -3;
 			}
 		}
-		if(string_last_char(_expectedCharacterStack)==')'){
-			if(NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove expected character ')'.");
+		if(string_last_char(_finisherStack)==')'){
+			if(NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove finisher ')'.");
 				return -3;
 			}
 		}
 	}else
 	if(inputChar==']'){
-		if(string_last_char(_expectedCharacterStack)==']'){
-			if(NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove expected character ']'.");
+		if(string_last_char(_finisherStack)==']'){
+			if(NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove finisher ']'.");
 				return -3;
 			}
 		}
 	}else
 	if(inputChar=='}'){
-		if(string_last_char(_expectedCharacterStack)=='}'){
-			if(NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove expected character '}'.");
+		if(string_last_char(_finisherStack)=='}'){
+			if(NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove finisher '}'.");
 				return -3;
 			}
 		}
 	}
 	if(amVerbose())
-		inputInfo("'%c+%c': expected characters: '%s' (%zu).",lastExpectedCharacter,inputChar,string(_expectedCharacterStack),string_length(_expectedCharacterStack));
+		inputInfo("'%c+%c': finishers: '%s' (%zu).",lastFinisher,inputChar,string(_finisherStack),string_length(_finisherStack));
 	return 1;
 }
 
 // MDH@14DEC2023: 
-int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * const token){
+int8_t finisherStackUpdatedOnRemoval(char removedChar,Mtoken const * const token){
 	if(!removedChar)return 0;
 	if(NULL==token)return 0;
 	// let's take care of the quote characters first
@@ -4307,13 +4307,13 @@ int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * co
 		if(token->type==TT_DQSTRING&&string_length(token->text)>0){ // end or escape double quote removed
 			// if not behind the \ escape character, we're removed the finishing double quote, and are moving
 			// back into the string literal which means we have to expect the double quote again
-			if(string_last_char(token->text)!='\\'&&NULL==string_append_char(_expectedCharacterStack,'"')){
-				inputError("Failed to register '\"' as expected character.");
+			if(string_last_char(token->text)!='\\'&&NULL==string_append_char(_finisherStack,'"')){
+				inputError("Failed to register '\"' as finisher.");
 				return -1;
 			}
 		}else // starting quote removed, which means there must be a corresponding expected end quote to remove!!
-		if(string_last_char(_expectedCharacterStack)!='"'||NULL==string_declength(_expectedCharacterStack)){
-			inputError("Failed to remove the expected double quote.");
+		if(string_last_char(_finisherStack)!='"'||NULL==string_declength(_finisherStack)){
+			inputError("Missing finishing double quote.");
 			return -1;
 		}
 	}else
@@ -4322,45 +4322,45 @@ int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * co
 		if(token->type==TT_SQSTRING&&string_length(token->text)>0){ // end or escape single quote removed
 			// if not behind the \ escape character, we're removed the finishing single quote, and are moving
 			// back into the string literal which means we have to expect the single quote again
-			if(string_last_char(token->text)!='\\'&&NULL==string_append_char(_expectedCharacterStack,'\'')){
-				inputError("Failed to register '\'' as expected character.");
+			if(string_last_char(token->text)!='\\'&&NULL==string_append_char(_finisherStack,'\'')){
+				inputError("Failed to register '\'' as finisher.");
 				return -1;
 			}
 		}else // starting quote removed, which means there must be a corresponding expected end quote to remove!!
-		if(string_last_char(_expectedCharacterStack)!='\''||NULL==string_declength(_expectedCharacterStack)){
-			inputError("Failed to remove the expected single quote.");
+		if(string_last_char(_finisherStack)!='\''||NULL==string_declength(_finisherStack)){
+			inputError("Failed to remove the single quote finisher: it is missing.");
 			return -1;
 		}
 	}else
-	// a removed character could move it back onto the expected character stack
+	// a removed character could move it back onto the finisher stack
 	// but let's deal with being in a string literal first, because if we are in a string literal
-	// no character we delete actually should be placed on the expected character stack
+	// no character we delete actually should be placed on the finisher stack
 	if(token->type!=TT_SQSTRING&&token->type!=TT_DQSTRING){
 		if(removedChar==','||removedChar==')'||removedChar==']'||removedChar=='}'){
-			if(NULL==string_append_char(_expectedCharacterStack,removedChar)){
-				inputError("Failed to append '%c' to the expected character stack.",removedChar);
+			if(NULL==string_append_char(_finisherStack,removedChar)){
+				inputError("Failed to append '%c' to the finisher stack.",removedChar);
 				return -1;
 			}
 		}else
 		if(removedChar=='('){
-			// if the start of something that is closed is removed, so should the associated expected character
-			char lastExpectedCharacter=string_last_char(_expectedCharacterStack);
-			if(lastExpectedCharacter!=')'||NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove ')' from the expected character stack.");
+			// if the start of something that is closed is removed, so should the associated finisher
+			char lastFinisher=string_last_char(_finisherStack);
+			if(lastFinisher!=')'||NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove ')' from the finisher stack.");
 				return -1;
 			}
 		}else
 		if(removedChar=='['){
-			char lastExpectedCharacter=string_last_char(_expectedCharacterStack);
-			if(lastExpectedCharacter!=']'||NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove ']' from the expected character stack.");
+			char lastFinisher=string_last_char(_finisherStack);
+			if(lastFinisher!=']'||NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove ']' from the finisher stack.");
 				return -1;
 			}
 		}else
 		if(removedChar=='{'){
-			char lastExpectedCharacter=string_last_char(_expectedCharacterStack);
-			if(lastExpectedCharacter!='}'||NULL==string_declength(_expectedCharacterStack)){
-				inputError("Failed to remove '}' from the expected characters.");
+			char lastFinisher=string_last_char(_finisherStack);
+			if(lastFinisher!='}'||NULL==string_declength(_finisherStack)){
+				inputError("Failed to remove '}' from the finishers.");
 				return -1;
 			}
 		}
@@ -4371,13 +4371,13 @@ int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * co
 				if(string_last_char(token->text)!='\\'){ // the removed character is not escaped
 					if(token->type==TT_SQSTRING){
 						// only when the closing quote was removed, should it be placed on the stack
-						if(removedChar=='\''&&NULL==string_append_char(_expectedCharacterStack,removedChar)){
-							inputError("Failed to register removed character '\'' on the expected character stack.");
+						if(removedChar=='\''&&NULL==string_append_char(_finisherStack,removedChar)){
+							inputError("Failed to register removed character '\'' on the finisher stack.");
 							return -1;
 						}
 					}else{ // a double quoted string
-						if(removedChar=='"'&&NULL==string_append_char(_expectedCharacterStack,removedChar)){
-							inputError("Failed to register removed character '\"' on the expected character stack.");
+						if(removedChar=='"'&&NULL==string_append_char(_finisherStack,removedChar)){
+							inputError("Failed to register removed character '\"' on the finisher stack.");
 							return -1;
 						}
 					}
@@ -4385,7 +4385,7 @@ int8_t expectedCharacterStackUpdatedOnRemoval(char removedChar,Mtoken const * co
 			}
 		}
 	}*/
-	/////inputInfo("Expected character stack after removing '%c': '%s' (%zu).",removedChar,string(_expectedCharacterStack),string_length(_expectedCharacterStack));
+	/////inputInfo("Expected character stack after removing '%c': '%s' (%zu).",removedChar,string(_finisherStack),string_length(_finisherStack));
 	return 1;
 }
 
@@ -4421,7 +4421,7 @@ void setUserInputCommand(Mcommand* command){
 	// NOTE command is either an existing command (commandIndex>0) or a new command (commandIndex=0)
 	//	  so if it is a registered command we should NOT obtain ownership
 	_userInputCommand=command; // MDH@24MAY2020: take over ownership!!!!
-	/// string_setlength(_expectedCharacterStack,0); // MDH@13DEC2023 TODO: is there a better place to do this??????
+	/// string_setlength(_finisherStack,0); // MDH@13DEC2023 TODO: is there a better place to do this??????
 	// replacing: _userInputCommand->_lastToken=_userInputCommand->_firstToken=pCommand;
 	numberOfLineCommandCharacters=outputCommand(_userInputCommand); // MDH@24SEP2020: essential to 'sync' numberOfLineCommandCharacters to the number of command characters on the last command line
 	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=(_userInputCommand?inIdentifierToken(_userInputCommand->_lastToken):false); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
@@ -4936,7 +4936,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 	
 	/* MDH@20JAN2024 removing: doing the following was moved into removedTokenCharacter and therefore is no longer needed here
 	// MDH@14DEC2023: TODO implement how to respond
-	switch(expectedCharacterStackUpdatedOnRemoval(removedCharacter,_userInputCommand->_lastToken)){
+	switch(finisherStackUpdatedOnRemoval(removedCharacter,_userInputCommand->_lastToken)){
 		case -1:break; // something went wrong!!!
 		case 0: break; // invalid input
 		case 1: break; // success
@@ -5052,15 +5052,15 @@ char removedTokenCharacter(bool endOfInput){
 			if(endOfInput){
 				if(!tokenRemoved)
 					tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,true/*endOfInput*/);
-				// MDH@20JAN2024: calling expectedCharacterStackUpdatedOnRemoval() called here because thie function
+				// MDH@20JAN2024: calling finisherStackUpdatedOnRemoval() called here because thie function
 				//                is called both on left-arrow and backspace and those are exacly the two situations where
-				//                we need to update expectedCharacterStack due to removing the last token character from the user
+				//                we need to update finisherStack due to removing the last token character from the user
 				//                input command
 				// TODO should we do this whether or not tokenRemoved is true or not?????
-				// MDH@15DEC2023: we need to update the expected character stack as if c was acutally
+				// MDH@15DEC2023: we need to update the finisher stack as if c was acutally
 				//                removed as it is no longer part of the current user input command
-				//                (essentially we always need to keep _expectedCharacterStack correct)
-				switch(expectedCharacterStackUpdatedOnRemoval(tokenCharacterRemoved,_userInputCommand->_lastToken)){
+				//                (essentially we always need to keep _finisherStack correct)
+				switch(finisherStackUpdatedOnRemoval(tokenCharacterRemoved,_userInputCommand->_lastToken)){
 					case -1:break;
 					case 0 :break;
 					case 1 :break;
@@ -5098,7 +5098,7 @@ bool removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 	if(_userInputCommand!=NULL){ // we still have a command being evaluated (NOTE that removedTokenCharacter() can actually set _userInputCommand->_firstToken to NULL)
 		if(_userInputCommand->_lastToken==_userInputCommand->_firstToken&&
 				string_length(_userInputCommand->_firstToken->text)==0){
-			string_setlength(_expectedCharacterStack,0); // MDH@14DEC2023: unfortunate I have to do this here
+			string_setlength(_finisherStack,0); // MDH@14DEC2023: unfortunate I have to do this here
 			// MDH@20OCT2021 already in cancelCommand(): if(amVerboseDebugging())inputInfo("%s","Cancelling the command.");
 			cancelCommand();
 			// MDH@20OCT2021 already in cancelCommand(): if(amVerboseDebugging())inputInfo("%s","Command cancelled.");
@@ -5175,7 +5175,7 @@ static void newCommandLine(bool newline){
 }
 
 /* MDH@13DEC2023:
-		whenever inputChar gets accepted (and added to the current command we should update _expectedCharacterStack based
+		whenever inputChar gets accepted (and added to the current command we should update _finisherStack based
 		on inputChar and possible the current or previous token type
 */
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
@@ -5396,7 +5396,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		updateLastTokenAutoCompletionText(/*acceptedFirstSuggestedCharacterDeleted*/false); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
 		
 		// MDH@13DEC2023 TODO how to respond appropriately to some error???????
-		switch(expectedCharacterStackUpdatedOnAddition(inputChar,newLastCommandToEvaluateToken)){
+		switch(finisherStackUpdatedOnAddition(inputChar,newLastCommandToEvaluateToken)){
 			case 0: break;
 			case -1:break; // input error
 			case -2:break; // appending inputChar failed
@@ -7015,8 +7015,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	//                     and consume them one by one, whereas in arrays or maps the amount of elements is unlimited, and the element separator that we expect
 	//                     will always be the comma, which is a nuisance because it would prevent showing the closing parentheses to the user, unless
 	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
-	_expectedCharacterStack=owned_string(__string(),owner_expectedCharacterStack);
-	if(NULL==_expectedCharacterStack)
+	_finisherStack=owned_string(__string(),owner_finisherStack);
+	if(NULL==_finisherStack)
 		q2outputError("Failed to feed forward closing parentheses!");
 
 	_suggestedText=owned_string(__string(),owner_suggestedText);
@@ -7179,7 +7179,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0/*,owner_immediateFeedforwardText*/);
-				//// MDH@13DEC2023 NOT HERE: string_setlength(_expectedCharacterStack,0); // MDH@13JUL2023: get rid of the current list of feed forward closers
+				//// MDH@13DEC2023 NOT HERE: string_setlength(_finisherStack,0); // MDH@13JUL2023: get rid of the current list of feed forward closers
 
 				////outputChar('A');
 				if(/*!_manualFeedforwardText||*/string_length(_manualFeedforwardText)==0)
@@ -7215,7 +7215,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										string(_manualFeedforwardText),
 										(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters:""),
 										string(_immediateFeedforwardText),
-										string(_expectedCharacterStack));
+										string(_finisherStack));
 
 			// ask the user for input
 			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
@@ -8085,7 +8085,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			outputChar('\n');
 
 			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
-				string_setlength(_expectedCharacterStack,0); // MDH@13DEC2023: is there a better place to do this?????
+				string_setlength(_finisherStack,0); // MDH@13DEC2023: is there a better place to do this?????
 				// if _userInputCommand->_firstToken is set, we have a command to evaluate
 				/*
 				Mtoken* _userInputCommand->_firstTokenToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!

@@ -118,11 +118,11 @@ const char* getManualFeedforwardTextColor(){return MANUAL_FEED_FORWARD_TEXT_COLO
 const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for identifier continuation text
 
 /**
- * @brief Get the FeedforwardCloser Text Color object
+ * @brief returns the text color of (user input command) finishers
  * 
- * @return const char* the current color scheme feedforward closer text color
+ * @return const char* the text color of finishers in the current color scheme
  */
-const char* getExpectedCharacterStackTextColor(){return FEEDFORWARD_CLOSER_TEXT_COLORS[colorscheme];} // MDH@27OCT2021: special color for generated auto completion text
+const char* getFinisherStackTextColor(){return FEEDFORWARD_CLOSER_TEXT_COLORS[colorscheme];} // MDH@27OCT2021: special color for generated auto completion text
 
 /**
  * @brief returns the current color scheme auto completion text color

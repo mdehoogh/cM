@@ -2989,7 +2989,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 				_token->argument=prevToken->expr->prev->argument;
 			}else
 				_token->argument=prevToken->argument;
-			if(inputInfoFunction)(*inputInfoFunction)("Argument: %lld.",_token->argument);
+			///if(inputInfoFunction)(*inputInfoFunction)("Argument: %lld.",_token->argument);
 			//////outputChar('L');
 			/////if(amDebugging())inputInfo("E6");
 			// should we change the argument??????
