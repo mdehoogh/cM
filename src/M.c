@@ -202,7 +202,7 @@ static void outputTokenTypeColor(TokenType tokenType){
  * @param _token 
  */
 static void outputTokenColor(Mtoken* _token){
-	if(_token)outputTokenTypeColor(_token->type);
+	if(NULL!=_token)outputTokenTypeColor(_token->type);
 	///////printf("[%d]",_userInputCommand->_lastToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
 }
@@ -4162,6 +4162,23 @@ bool updateNumberOfLineCharacters(){
 	return true;
 }
 
+// MDH@07DEC2024: some helper constants and functions
+static const char* FINISHERS=")]}";
+static const char* OPENERS="([{";
+static int8_t getFinisherIndex(char finisher){
+	char* finisherPosition=(finisher?strchr(FINISHERS,finisher):NULL);
+	return(NULL==finisherPosition?-1:finisherPosition-FINISHERS);
+}
+static int8_t getOpenerIndex(char opener){
+	char* openerPosition=(opener?strchr(OPENERS,opener):NULL);
+	return(NULL==openerPosition?-1:openerPosition-OPENERS);
+}
+static bool isAnUnmatchedFinisher(char const ch){
+	int8_t finisherIndex=getFinisherIndex(ch);
+	char lastFinisher=string_last_char(_finisherStack);
+	////inputInfo("%d-%c",finisherIndex,(lastFinisher?lastFinisher:'?');
+	return(finisherIndex>=0&&string_last_char(_finisherStack)!=FINISHERS[finisherIndex]);
+}
 // MDH@13DEC2023: after an input character is accepted (and successfully appended to the current command)
 //                it is used to update the expended characters accordingly
 /**
@@ -4199,7 +4216,46 @@ int8_t finisherStackUpdatedOnAddition(char inputChar,Mtoken const * const curren
 				return -1;
 			}
 		}
-	}else
+	}else{
+		int8_t openerIndex=getOpenerIndex(inputChar);
+		if(openerIndex>=0){
+			if(NULL==string_append_char(_finisherStack,FINISHERS[openerIndex])){
+				inputError("Failed to register the finisher of '%c'",inputChar);
+				return -2;
+			}
+		}else{ // not an opener
+			int8_t finisherIndex=getFinisherIndex(inputChar);
+			if(finisherIndex>=0){
+				// TODO perhaps removing the comma finishers should also be done with the other finishers????
+				if(inputChar=')'){
+					while(string_last_char(_finisherStack)==','){
+						if(NULL==string_declength(_finisherStack)){
+							inputError("Failed to remove a comma finisher");
+							return -3;
+						}
+					}
+				}
+				if(string_last_char(_finisherStack)==FINISHERS[finisherIndex]){
+					if(NULL==string_declength(_finisherStack)){
+						inputError("Failed to remove finisher '%c'",inputChar);
+						return -3;
+					}
+				}else // unexpected finisher
+					return -4;
+
+			}else{ // not a finisher
+				if(inputChar==','){
+					if(string_last_char(_finisherStack)==','){
+						if(NULL==string_declength(_finisherStack)){
+							inputError("Failed to remove finisher ','.");
+							return -3;
+						}
+					}
+				}
+			}
+		}
+	}
+	/* replacing:
 	if(inputChar=='('){
 		// if this starts a function call argument list we're going to need to append comma's for each
 		// argument and a final closing parenthesis, but always the closing parenthesis is expected
@@ -4214,23 +4270,23 @@ int8_t finisherStackUpdatedOnAddition(char inputChar,Mtoken const * const curren
 		//                and we really do not want that, 
 		//                now instead of keeping the commas in, for now, we just do NOT add them 
 		//                it's not that hard to enter a , so as feed forward not that immportant!!!!
-		/*
-		Mtoken* prevToken=currentToken->prev;
-		if(currentToken->type==TT_FUNCTION_CALL){
-			char* _functionName=_getSignificantTokenCharacters(prevToken);
-			long long numberOfFunctionParameters=getNumberOfFunctionParameters(functionName);
-			free(_functionName);
-			if(numberOfFunctionParameters>=0){
-				///////inputInfo("Number of arguments in function '%s': %lld",function,numberOfFunctionParameters);
-				while(--numberOfFunctionParameters>0)if(string_append_char(_finisherStack,',')==NULL){
-					inputError("Failed to register ',' as finisher.");
-					return -2;
-				}
-			}else{
-				inputError("Unknown function '%s'.",_functionName);
-				return -2;
-			}
-		}
+		///*
+		//Mtoken* prevToken=currentToken->prev;
+		//if(currentToken->type==TT_FUNCTION_CALL){
+	  //	char* _functionName=_getSignificantTokenCharacters(prevToken);
+		//	long long numberOfFunctionParameters=getNumberOfFunctionParameters(functionName);
+		//	free(_functionName);
+		//	if(numberOfFunctionParameters>=0){
+		//		///////inputInfo("Number of arguments in function '%s': %lld",function,numberOfFunctionParameters);
+		//		while(--numberOfFunctionParameters>0)if(string_append_char(_finisherStack,',')==NULL){
+		//			inputError("Failed to register ',' as finisher.");
+		//			return -2;
+		//		}
+		//	}else{
+		//		inputError("Unknown function '%s'.",_functionName);
+		//		return -2;
+		//	}
+		//}
 		////else{
 		///	if(prevToken!=NULL)
 		///		inputInfo("Previous token of type %s.",TOKENTYPE_STRING[prevToken->type]);
@@ -4238,7 +4294,7 @@ int8_t finisherStackUpdatedOnAddition(char inputChar,Mtoken const * const curren
 		///		inputInfo("Not a function call");
 		///	return 1;
 		///}
-		*/
+		// *
 	}else
 	if(inputChar=='['){
 		if(string_append_char(_finisherStack,']')==NULL){
@@ -4274,7 +4330,8 @@ int8_t finisherStackUpdatedOnAddition(char inputChar,Mtoken const * const curren
 				inputError("Failed to remove finisher ')'.");
 				return -3;
 			}
-		}
+		}else // unexpected finisher
+			return -4;
 	}else
 	if(inputChar==']'){
 		if(string_last_char(_finisherStack)==']'){
@@ -4282,7 +4339,8 @@ int8_t finisherStackUpdatedOnAddition(char inputChar,Mtoken const * const curren
 				inputError("Failed to remove finisher ']'.");
 				return -3;
 			}
-		}
+		}else // unexpected finisher
+			return -4;
 	}else
 	if(inputChar=='}'){
 		if(string_last_char(_finisherStack)=='}'){
@@ -4290,17 +4348,26 @@ int8_t finisherStackUpdatedOnAddition(char inputChar,Mtoken const * const curren
 				inputError("Failed to remove finisher '}'.");
 				return -3;
 			}
-		}
+		}else // unexpected finisher
+			return -4;
 	}
+	*/
 	if(amVerbose())
 		inputInfo("'%c+%c': finishers: '%s' (%zu).",lastFinisher,inputChar,string(_finisherStack),string_length(_finisherStack));
 	return 1;
 }
 
 // MDH@14DEC2023: 
+/**
+ * @brief updates the finisher stack by removing the last added finisher if it equals removed finisher \p removedChar
+ * @details returns -1 when the \p removedChar is not the expected finisher
+ * @param removedChar 
+ * @param token the current last token
+ * @return int8_t 1 on success, 0 on input error (undefined), -1 when some error occurred (see @details)
+ */
 int8_t finisherStackUpdatedOnRemoval(char removedChar,Mtoken const * const token){
 	if(!removedChar)return 0;
-	if(NULL==token)return 0;
+	if(NULL==token/*||token->type==TT_ERROR*/)return 0;
 	// let's take care of the quote characters first
 	if(removedChar=='"'){
 		// 3 possibilities: removing the starting quote, the end quote and an escaped quote
@@ -4989,30 +5056,32 @@ char removedTokenCharacter(bool endOfInput){
 	// MDH@30OCT2019: ASSERT there's something to 'remove'
 	// MDH@03SEP2019: 
 	char tokenCharacterRemoved='\0';
+	bool errorTokenCharacter=false; // MDH@07DEC2024: whether or not the removed character is part of an error token
 	if(_userInputCommand!=NULL){ // should ALWAYS be the case
 		size_t tokenCharacterPosition=0;
 		// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
 		Mtoken* lastToken=_userInputCommand->_lastToken;
-		if(lastToken==NULL)
-			q2outputBug("Last command token vanished!");
-		else
-		while(1){
-			tokenCharacterPosition=string_length(lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): getUserInputLength()-_userInputCommand->_lastToken->offset;
+		if(lastToken!=NULL){
+			if(lastToken->type==TT_ERROR)errorTokenCharacter=true;
+			while(1){
+				tokenCharacterPosition=string_length(lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): getUserInputLength()-_userInputCommand->_lastToken->offset;
 #ifdef __DEBUG__
-			printf("%d",tokenCharacterPosition);
+				printf("%d",tokenCharacterPosition);
 #endif
-			if(tokenCharacterPosition>0)break;
+				if(tokenCharacterPosition>0)break;
 #ifdef __DEBUG__
-			outputChar('.');
+				outputChar('.');
 #endif		
-			// ASSERT token lastToken is empty, so to be skipped!!!
-			// MDH@12APR2024: since we should NOT allow removing the first token (with offset 0) which NOW can have a predecessor we have to demand that lastToken->offset is positive
-			//                TODO alternatively we could check against _userInputCommand->_firstToken
-			if(lastToken==_userInputCommand->_firstToken)break; // if lastToken is already _userInputCommand->_firstToken (because it's offset is zero) we should not allow lastToken to become 'less'
-			lastToken=lastToken->prev;
-			if(NULL==lastToken)break; // never allow _userInputCommand->_lastToken to become NULL!!!!
-			_userInputCommand->_lastToken=lastToken;
-		}
+				// ASSERT token lastToken is empty, so to be skipped!!!
+				// MDH@12APR2024: since we should NOT allow removing the first token (with offset 0) which NOW can have a predecessor we have to demand that lastToken->offset is positive
+				//                TODO alternatively we could check against _userInputCommand->_firstToken
+				if(lastToken==_userInputCommand->_firstToken)break; // if lastToken is already _userInputCommand->_firstToken (because it's offset is zero) we should not allow lastToken to become 'less'
+				lastToken=lastToken->prev;
+				if(NULL==lastToken)break; // never allow _userInputCommand->_lastToken to become NULL!!!!
+				_userInputCommand->_lastToken=lastToken;
+			}
+		}else
+			q2outputBug("Last command token vanished!");
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: should be called whenever _userInputCommand->_lastToken changes...
 		// MDH@28JUN2023: testing tokenCharacterPosition for being positive is probably easier
 		if(tokenCharacterPosition>0){ // replacing: _userInputCommand->_lastToken!=NULL)
@@ -5060,6 +5129,7 @@ char removedTokenCharacter(bool endOfInput){
 				// MDH@15DEC2023: we need to update the finisher stack as if c was acutally
 				//                removed as it is no longer part of the current user input command
 				//                (essentially we always need to keep _finisherStack correct)
+				if(!errorTokenCharacter)
 				switch(finisherStackUpdatedOnRemoval(tokenCharacterRemoved,_userInputCommand->_lastToken)){
 					case -1:break;
 					case 0 :break;
@@ -5258,6 +5328,16 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 		result|=NEW_TOKEN_CHARACTER;
 		//////outputLine("Owning the last command token!");
 		_userInputCommand->_lastToken=owned_token(newLastCommandToEvaluateToken,Msubowner(owner_userInputCommand,1)); // MDH@28MAY2020: take over ownership of the new last command token
+		// MDH@08DEC2024: the right place for the semantic check on the validity of this new token 
+		//                is here JIT before switching to the new token color!!!!
+		if(newLastCommandToEvaluateToken->type!=TT_ERROR){
+			char *firstTokenChar=string_last_char(newLastCommandToEvaluateToken->text);
+			// if this is a unmatched finisher it is incorrect to have it here
+			if(isAnUnmatchedFinisher(firstTokenChar)){
+				inputError("Unmatched finisher not allowed.");
+				newLastCommandToEvaluateToken->type=TT_ERROR;
+			}
+		}
 		//////outputLine("Last command token owned!");
 		outputUserInputCommandTokenColor();
 	}else{
@@ -5401,6 +5481,9 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 			case -1:break; // input error
 			case -2:break; // appending inputChar failed
 			case -3:break; // removing inputChar failed
+			case -4: // inputChar is a finisher but not matching the last finisher, which should NOT be allowed!!!
+				newLastCommandToEvaluateToken->type=TT_ERROR;
+				break;
 		}
 		// MDH@13DEC2023 END
 		
@@ -7216,11 +7299,14 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters:""),
 										string(_immediateFeedforwardText),
 										string(_finisherStack));
-
+			/*else
+				clearInfo();*/
 			// ask the user for input
 			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
 			if(!inputCharReadNonBlocking(&inputChar,&updateNumberOfLineCharacters))break; // let's see how the terminal window wraps... &updateNumberOfLineCharacters))break;
 
+			clearInfo();
+			
 			// outputChar(inputChar);
 
 			// hide the suggested text again before processing the character read

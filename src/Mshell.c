@@ -2346,7 +2346,11 @@ Mtoken* commandCharacterAppended(Mcommand* command/*,Mallocationowner owner_comm
 			//                TODO come up with a better idea to do this because theoretically lastCommandToken should be reowned at the moment it is assigned
 			//                     the problem here is that when we skipped comments, we would be returning a lastCommandToken which is NOT the registered last token
 			//                     and that's what's causing the problems!!!!
+			
+			/////bool tokenToReturnError;
 			tokenToReturn=disowned_token(owned_token(_getNewCommandToken(command->_lastToken/* replacing: lastCommandToken */,newTokenType,true),owner),owner);
+			/////if(tokenToReturn!=NULL)if(tokenToReturnError)tokenToReturn->type==TT_ERROR; // MDH@08DEC2024
+
 			lastCommandToken=tokenToReturn; // MDH@18JUL2023: continue with tokenToReturn
 
 			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(false); // MDH@28FEB2020: a bit of a nuisance...
@@ -3158,7 +3162,8 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
  * @param newTokenType 
  * @return Mtoken* a new token following \p prevToken of type \p newTokenType
  */
-static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInput){Mallocationowner owner=getOwner(__LINE__);
+static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInput,bool* const error){Mallocationowner owner=getOwner(__LINE__);
+	*error=false; // MDH@08DEC2024: no error yet
 	Mtoken* _token=owned_token(__token(),owner);
 	if(_token!=NULL){
 		_token->text=owned_string(__string(),Msubowner(owner,1));
@@ -3183,7 +3188,10 @@ static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInpu
 
 			// MDH@10APR2024: we can put the following code in a separate function possibly adapting newTokenType
 			_token->type=newTokenType; // we need to do this because tokenPropertiesPropagated initializes its local newTokenType to the type of the successor of prevToken 
-			if(!tokenPropertiesPropagated(prevToken,onInput))newTokenType=TT_ERROR;
+			if(!tokenPropertiesPropagated(prevToken,onInput)){
+				if(inputErrorFunction)(*inputErrorFunction)("Failed to propagate token properties!");
+				*error=1; // replacing: newTokenType=TT_ERROR;
+			}
 		}
 		/////if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): _token->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
@@ -3210,7 +3218,7 @@ static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInpu
 			q2outputError("Failed to create a new token");
 		return NULL;
 	}
-	_token->type=newTokenType;
+	// MDH@08DEC2024: removing: _token->type=newTokenType;
 	return disowned_token(_token,owner);
 }
 
@@ -3226,19 +3234,26 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool on
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//				but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=owned_token(_getNewToken(lastCommandToken,tokenType,onInput),owner);
+	bool newTokenError; // MDH@08DEC2024: set to true when propagaging the errors fail
+	Mtoken* _newCommandToken=owned_token(_getNewToken(lastCommandToken,tokenType,onInput,&newTokenError),owner);
 	// MDH@10APR2024 TODO: the following is weird because _getToken could change the type of _newCommandToken to TT_ERROR which would be overwritten again by the following 
 	if(_newCommandToken!=NULL){
+		// MDH@08DEC2024: now using newTokenError to indicate an error creating the new token
+		if(newTokenError)_newCommandToken->type=TT_ERROR;
+		/* MDH@08DEC2024: replacing
+		// MDH@07DEC2024: if the new command token's type was changed to error, we leave it like that
+		//                otherwise we revert back to the presented token type (as we did before!!!!!)
 		if(tokenType!=TT_ERROR&&_newCommandToken->type==TT_ERROR){
 			if(onInput)
-				if(inputErrorFunction)(*inputErrorFunction)("Assumed new error token type corrected!\n");else;
+				if(inputInfoFunction)(*inputInfoFunction)("New command token considered erroneous!");else;
 			//else q2outputError("Assumed new error token type corrected");
-		}
+		}else // TODO TODO TODO this else was not here before, because why would I correct the new token type???????
 		setTokenType(_newCommandToken,tokenType);
+		*/
 	}else
 	if(amVerboseDebugging())
 		if(onInput)
-			if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token.\n");else;
+			if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token.");else;
 		else
 			q2outputError("Failed to create a command token");
 	return disowned_token(_newCommandToken,owner);
