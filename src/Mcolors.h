@@ -17,6 +17,7 @@ const char* getIdentifierContinuationTextColor();
 const char* getFeedForwardTextColor();
 const char* getAutoCompletionTextColor();
 const char* getFinisherStackTextColor();
+const char* getUnreachableFinisherStackTextColor(); // MDH@10DEC2024
 
 const char* getCommentColor();
 const char* getOperatorTokenColor(uint8_t opid);

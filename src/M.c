@@ -1932,7 +1932,8 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 			// careful: leftOnLine could now be zero, essentially we know that characters will be written on successive lines
 			while(1){
 				if(leftOnLine==0){
-					size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
+					size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,false);
+					setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
 					if(prompted)_cursormovement->lines++; // MDH@15OCT2020 replacing:	_cursormovement->skipped+=prompted;
 					leftOnLine=maximumNumberOfLineCommandCharacters; // NOTE: so leftOnLine is the total number of command characters that we can fit after the prompt
 				}
@@ -3516,9 +3517,11 @@ void outputFinishers(Mcursormovement* _cursormovement){Mallocationowner owner=ge
 	if(NULL==_cursormovement)return;
 	Mchars *_chars=owned_chars(_getReversedChars(string(_finisherStack)),owner);
 	if(NULL==_chars)return;
+
 	// MDH@16JAN2024: keep track of the source of the first character in the suggested text
 	//                this way there's no need to actually construct _suggestedText
-	outputCommandLineText(_chars->chars,_cursormovement,getFinisherStackTextColor(),-1);
+	outputCommandLineText(_chars->chars,_cursormovement,
+		(_cursormovement->written==0?getFinisherStackTextColor():getUnreachableFinisherStackTextColor()),-1);
 	// MDH@16JAN2024: updating suggestedTextSources
 	suggestedTextSources[++suggestedTextSources[0]]=4;
 	/* replacing:
@@ -3882,11 +3885,13 @@ void showSuggestedText(){
 
 		// MDH@27DEC2023: if we do not have any suggested text yet, show the last feedforward closer character
 		// MDH@17JAN2024: for now we show all
-		if(cursormovement.written==0)outputFinishers(&cursormovement);
+		///// MDH@10DEC2024: always showing the output finishers!!!! outputFinishers(&cursormovement);
 
 	}else
 		outputManualFeedforwardCharacters(&cursormovement);
 	
+	outputFinishers(&cursormovement); // MDH@10DEC2024: now always showing the finishers
+
 	// MDH@21JAN2024: suggestedTextSources[0] should point to the first suggested text to use
 	if(suggestedTextSources[0])suggestedTextSources[0]=1;
 	//// replacing: outputAutoCompletionCharacters(&cursormovement);
