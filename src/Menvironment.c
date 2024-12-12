@@ -3959,41 +3959,41 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	if(!registerFunction(_environment,owner_environment,"irands",Mirands,2,(char*[]){"the number of random integers to return","the upper bound to the random non-negative integer to generate"},(Mvalue*[]){NULL,NULL}))return false;
 
 	// math functions
-	if(!registerFunction(_environment,owner_environment,"cos",Mcos,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false; // replacing: completedFloatFunction(...)
-	if(!registerFunction(_environment,owner_environment,"cordiccos",Mcordiccos,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"sin",Msin,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"cordicsin",Mcordicsin,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"tan",Mtan,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"cosh",Mcosh,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"sinh",Msinh,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"tanh",Mtanh,1,(char*[]){"angle in radians"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"sqrt",Msqrt,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"log",Mlog,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"log10",Mlog10,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"floor",Mfloor,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"trunc",Mtrunc,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"round",Mround,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"ceil",Mceil,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"exp",Mexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
-	if(!registerFunction(_environment,owner_environment,"dexp",Mdexp,1,(char*[]){"a numeric value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"cos",Mcos,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false; // replacing: completedFloatFunction(...)
+	if(!registerFunction(_environment,owner_environment,"cordiccos",Mcordiccos,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"sin",Msin,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"cordicsin",Mcordicsin,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"tan",Mtan,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"cosh",Mcosh,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"sinh",Msinh,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"tanh",Mtanh,1,(char*[]){"angle(radians)"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"sqrt",Msqrt,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"log",Mlog,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"log10",Mlog10,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"floor",Mfloor,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"trunc",Mtrunc,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"round",Mround,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"ceil",Mceil,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"exp",Mexp,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"dexp",Mdexp,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 	// MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag MDH@17AUG2023: immutable flag removed again, use lock() to make a variable or complex value immutable
-	if(!registerFunction(_environment,owner_environment,"vartype",Mvartype,1,(char*[]){"a variable/property name"},(Mvalue*[]){NULL}))return false; // MDH@26SEP2023
-	if(!registerFunction(_environment,owner_environment,"setvartype",Msetvartype,2,(char*[]){"a variable/property name","a value type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false; // MDH@26SEP2023
-	if(!registerFunction(_environment,owner_environment,"eltype",Meltype,1,(char*[]){"a ((referenced) variable/property name with) composite value"},(Mvalue*[]){NULL}))return false; // MDH@26SEP2023
-	if(!registerFunction(_environment,owner_environment,"seteltype",Mseteltype,2,(char*[]){"a ((referenced) variable/property/reference name with) composite value","a value type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false; // MDH@26SEP2023
-	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
-	if(!registerFunction(_environment,owner_environment,"lock",Mlock,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
-	if(!registerFunction(_environment,owner_environment,"locked",Mlocked,1,(char*[]){"a variable name or complex value"},(Mvalue*[]){NULL}))return false;
-	if(!registerFunction(_environment,owner_environment,"settype",Msettype,2,(char*[]){"a variable name or complex value","a type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false;
-	if(!registerFunction(_environment,owner_environment,"unlock",Munlock,2,(char*[]){"a variable name or complex value","the unlock code"},(Mvalue*[]){NULL,NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"vartype",Mvartype,1,(char*[]){"variable/property name"},(Mvalue*[]){NULL}))return false; // MDH@26SEP2023
+	if(!registerFunction(_environment,owner_environment,"setvartype",Msetvartype,2,(char*[]){"variable/property name","a value type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false; // MDH@26SEP2023
+	if(!registerFunction(_environment,owner_environment,"eltype",Meltype,1,(char*[]){"((referenced) variable/property name with) composite value"},(Mvalue*[]){NULL}))return false; // MDH@26SEP2023
+	if(!registerFunction(_environment,owner_environment,"seteltype",Mseteltype,2,(char*[]){"((referenced) variable/property/reference name with) composite value","a value type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false; // MDH@26SEP2023
+	if(!registerFunction(_environment,owner_environment,"type",Mtype,1,(char*[]){"variable name|complex value"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"lock",Mlock,1,(char*[]){"variable name|complex value"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"locked",Mlocked,1,(char*[]){"variable name|complex value"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"settype",Msettype,2,(char*[]){"variable name|complex value","a type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false;
+	if(!registerFunction(_environment,owner_environment,"unlock",Munlock,2,(char*[]){"variable name|complex value","the unlock code"},(Mvalue*[]){NULL,NULL}))return false;
 
-	if(!registerFunction(_environment,owner_environment,"pow",Mpow,1,(char*[]){"a value"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"pow",Mpow,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
 
 	if(!registerNoArgumentFunction(_environment,owner_environment,"break",Mbreak))return false;
-	if(!registerFunction(_environment,owner_environment,"return",Mreturn,1,(char*[]){"a result value"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"return",Mreturn,1,(char*[]){"result value"},(Mvalue*[]){NULL}))return false;
 
-	if(!registerFunction(_environment,owner_environment,"output",Moutput,1,(char*[]){"a value to output"},(Mvalue*[]){NULL}))return false;
-	if(!registerFunction(_environment,owner_environment,"outputlines",Moutputlines,1,(char*[]){"list/array to output"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"output",Moutput,1,(char*[]){"any"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"outputlines",Moutputlines,1,(char*[]){"list|array"},(Mvalue*[]){NULL}))return false;
 
 	if(!registerFunction(_environment,owner_environment,"brgb",Mbrgb,3,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
 	if(!registerFunction(_environment,owner_environment,"trgb",Mtrgb,1,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;

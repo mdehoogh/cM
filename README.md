@@ -26,4 +26,6 @@ no series expansion is ever necessary. This is all fine with a single precision.
 precision as with my decimals, you can keep halving until you're below the accuracy of the decimal precision. Of course, you can't substitute zero at that point, you'll end up with zero as result. I'm gonna think a little more 
 about this problem.
 
-(to be continued)
+12 December 2024
+Now working on fixing the placeholder feature, which is implemented by using ? to indicate a function call argument or a list or array element, like cos(?). Somehow the expr property is not set correctly on the expression being asked by M to replace ? and therefore will not get it executed properly.
+

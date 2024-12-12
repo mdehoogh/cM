@@ -2823,6 +2823,13 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 		///outputChar('A');
 		// initialize _token and newTokenType
 		Mtoken* _token=prevToken->next;
+		output("Propagating token properties from '%s' of type '%s' to '%s' of type '%s'.\n"
+			,string(prevToken->text),TOKENTYPE_STRING[prevToken->type]
+			,string(_token->text),TOKENTYPE_STRING[_token->type]); // DEBUGGING
+		if(prevToken->expr!=NULL)
+			output("\tProperty expr of (previous token)",string(prevToken->expr->text),TOKENTYPE_STRING[prevToken->expr->type]);
+		else
+			output("\tProperty expr of previous token not set!\n");
 		newTokenType=_token->type;
 		//////outputChar('B');
 		// now we have the block of code copied from _getToken
@@ -2881,14 +2888,30 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 			//				TODO this is checked afterwards, so perhaps we should do that here?????
 			if(_token->expr!=NULL){
 				_token->expr=_token->expr->expr;
+				if(NULL==_token->expr)q2outputError("Property expr removed!"); // DEBUGGING
 				///_token->argument=_token->expr->argument;
-			}else 
+			}else{
 				newTokenType=TT_ERROR;
+				q2outputError("No expr property to propagate!");
+			}
 		}
 		// we still have to recognize an error
 		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)
-		if(NULL==_token->expr)
+		if(NULL==_token->expr){
 			newTokenType=TT_ERROR;
+			q2outputError("No expr property to propagate to end of list, function or array!");
+		}
+
+		// DEBUGGING
+		if(NULL==_token->expr)
+			q2outputMessage(M_WARNING_PREFIX,"Property expr not set from token '%s' of type '%s'!",
+				string(prevToken->text),TOKENTYPE_STRING[prevToken->type]);
+		else
+			q2outputMessage(M_INFO_PREFIX,"Token expr of '%s' of type '%s' set to token '%s' of type '%s"
+				,string(_token->text),TOKENTYPE_STRING[_token->type]
+				,string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]
+				);
+
 		//////outputChar('E');
 		/* replacing:
 		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP){
@@ -3032,13 +3055,15 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 									// //////outputChar('C');
 									if(amVerboseDebugging())
 										if(inputInfoFunction)(*inputInfoFunction)("Local variables map identified!");
+										else q2outputMessage(M_INFO_PREFIX,"Local variables map identified!");
 										//q2outputValue("Local variables map:",localVariablesMapValue,"'.\n");
 									if(!pushLocalvariables(localVariablesMapValue,_token->envid)){
 										// //////outputChar('D');
 										newTokenType=TT_ERROR; // TODO I suppose we could have a separate TT_BUG token type perhaps?????
-										logToOutputFile("Failed to push the local variables map!\n");
+										q2outputError("Failed to push the local variables map");
 										if(!onInput||inputErrorFunction)
-											if(onInput)(*inputErrorFunction)("Failed to register local variables!");else q2outputError("Failed to register local variables!");
+											if(onInput)(*inputErrorFunction)("Failed to register local variables!");
+											else q2outputError("Failed to register local variables!");
 									}
 									// //////outputChar('E');
 								}else{ // it's not a map which it should be
@@ -3059,33 +3084,38 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 							if(_token->expr->argument==-3){ // already reached the total number of expected arguments
 								newTokenType=TT_ERROR;
 								if(!onInput||inputErrorFunction)
-								if(onInput)(*inputErrorFunction)("Another argument not allowed.");// else q2outputError("Another argument not allowed");
+								if(onInput)(*inputErrorFunction)("Another argument not allowed.\n");
+								else q2outputError("Another argument not allowed");
 							}else{
 								_token->expr->argument=_token->expr->argument+1;
 								if(amVerboseDebugging())
 								if(!onInput||inputInfoFunction)
-								if(onInput)(*inputInfoFunction)("Number of expected arguments: %lld.",-_token->expr->argument-3);
-								//else output("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
+								if(onInput)(*inputInfoFunction)("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
+								else q2outputMessage(M_ERROR_PREFIX,"Number of expected arguments: %lld",-_token->expr->argument-3);
 							}
 							//////outputChar('P');
 						}else{
 							if(!onInput||inputInfoFunction)
-							if(onInput)(*inputInfoFunction)("Number of expected arguments unknown!");
-							//else output("Number of expected arguments unknown!\n");
+							if(onInput)(*inputInfoFunction)("Number of expected arguments unknown!\n");
+							else q2outputError("Number of expected arguments unknown!");
 						}
 					}else
 					if(_token->expr->type!=TT_LIST&&_token->expr->type!=TT_MAP&&_token->expr->type!=TT_EXPRESSION){
 						// MDH@10APR2023: now allowed in TT_EXPR, so that we can have array results
 						newTokenType=TT_ERROR;
-						if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[_token->expr->type]);
+						if(!onInput||inputErrorFunction)
+						if(onInput)(*inputErrorFunction)("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[_token->expr->type]);
+						else q2outputMessage(M_ERROR_PREFIX,"Comma not allowed in expression of type '%s'",TOKENTYPE_STRING[_token->expr->type]);
 					}else // MDH@01AUG2024: we need to keep track of the number of comma's we've had
 						_token->argument++; // same as what we do with functions
 					//////outputChar('Q');
 				}else{ // a comma should always match either a map or list or expression start
 					newTokenType=TT_ERROR;
 					if(!onInput||inputErrorFunction)
-					if(onInput)(*inputErrorFunction)("Comma not allowed outside map, list, array or function call!");
-					else q2outputError("Comma not allowed outside map, list, array or function call");
+					if(onInput)
+						(*inputErrorFunction)("Comma not allowed outside map, list, array or function call!");
+					else 
+						q2outputError("Comma not allowed outside map, list, array or function call");
 				}
 			}else
 			if(newTokenType==TT_LIST||newTokenType==TT_EXPRESSION)
@@ -3189,7 +3219,10 @@ static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInpu
 			// MDH@10APR2024: we can put the following code in a separate function possibly adapting newTokenType
 			_token->type=newTokenType; // we need to do this because tokenPropertiesPropagated initializes its local newTokenType to the type of the successor of prevToken 
 			if(!tokenPropertiesPropagated(prevToken,onInput)){
-				if(inputErrorFunction)(*inputErrorFunction)("Failed to propagate token properties!");
+				if(onInput)
+					if(inputErrorFunction)(*inputErrorFunction)("Failed to propagate token properties!");else;
+				else
+					q2outputError("Failed to propagate token properties!");
 				*error=1; // replacing: newTokenType=TT_ERROR;
 			}
 		}
@@ -15451,14 +15484,17 @@ bool addBlockCommand(Mcommand const * const command){
 			output("Propagating token properties.\n");
 			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
 			while(tokenPropertiesPropagated(token,false)){
-				output("Properties of '");outputToken(token);output("' propagated!\n");
+				output("Properties of token '");outputToken(token);output("' propagated!\n");
 				token=token->next;
 				if(token==NULL){output("No further tokens to propagate properties from.\n");break;}
 				output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
 				if(token->type==TT_PLACEHOLDER){output("Bumped into a placeholder token.\n");break;} // done
 				if(token->type==TT_ERROR){q2outputBug("Some error occurred initializing the embedded command");break;}
 			}
-			output("Token properties propagated.\n");
+			if(token!=NULL)
+				q2outputError("Not all token properties propagated adding a block command!");
+			else
+				output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
 			block->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
 			block->insertedBlockCommands++;

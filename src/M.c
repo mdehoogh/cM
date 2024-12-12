@@ -1546,16 +1546,27 @@ void incrementPromptCommandCount(){
 		getExecutionEnvironment()->commandCount++;
 }
 
-size_t getNewPromptCommandIndex(char* environmentName,size_t defaultPromptCommandCount){Mallocationowner owner=getOwner(__LINE__);
+// MDH@11AUG2024: if we want to be able to set the message id to the actual prompt we need to collect
+//                the prompt characters first
+Mstring* prompt=NULL;Mallocationowner owner_prompt=(Mallocationowner){MI_MAIN,__LINE__,1}; // the gobal variable to store the prompt in!!
+/**
+ * @brief returns the new prompt command index
+ * 
+ * @param environmentName 
+ * @param defaultPromptCommandCount 
+ * @return size_t 
+ */
+size_t getNewPromptCommandIndex(char const * const environmentName,size_t defaultPromptCommandCount){Mallocationowner owner=getOwner(__LINE__);
 	// when inside a block of commands show the block name
 	if(blockCommandLevel>0){
 		Mstring* _blockName=owned_string(_getBlockName(),owner);
 		if(_blockName!=NULL){
-			promptLength+=output(string(_blockName));
+			string_append(prompt,string(_blockName));promptLength+=string_length(_blockName);
+			// replacing: promptLength+=output("%s",string(_blockName));
 			FREE_STRING(_blockName,owner);
 		}
-		if(getCurrentBlock()->subcommandBlockType=='1')return 0; // MDH@16APR2024: if only a single command expected no need to display the command index!!
-		return(getCurrentBlock()->insertedBlockCommands+1);
+		// MDH@16APR2024: if only a single command expected no need to display the command index!!
+		return(getCurrentBlock()->subcommandBlockType=='1'?0:getCurrentBlock()->insertedBlockCommands+1);
 	}
 	// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
 	if(getCurrentFunctionBodyInput()!=NULL&&environmentName!=NULL)
@@ -1563,14 +1574,12 @@ size_t getNewPromptCommandIndex(char* environmentName,size_t defaultPromptComman
 	return defaultPromptCommandCount+1;
 }
 
-// MDH@11AUG2024: if we want to be able to set the message id to the actual prompt we need to collect
-//                the prompt characters first
-Mstring* prompt=NULL;Mallocationowner owner_prompt=(Mallocationowner){MI_MAIN,__LINE__,1}; // the gobal variable to store the prompt in!!
 /**
  * @brief shows the prompt and sets the global prompt length \p promptLength accordingly
  * 
  */
 void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
+	assert(prompt);
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
 	numberOfLineCommandCharacters=0; // MDH@22JUN2020: here as well as in showContinuedPrompt()
@@ -1602,6 +1611,7 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				char* environmentName=(environment!=NULL&&environment->_name!=NULL?environment->_name->chars:NULL);
 				*/
 				if(_environmentName!=NULL){
+					////output("/%s/",string(_environmentName));
 					// MDH@11AUG2024: ascertain to append the environment name to the prompt M string
 					string_append(prompt,string(_environmentName));
 					/*
@@ -6662,7 +6672,7 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 	bool result=true;
 	Mblock* endedBlock=endBlock();
 	if(endedBlock!=NULL){
-		output("Block ended!\n");
+		////output("Block ended!\n");
 		blockCommandLevel--;
 		// once a block ended successfully we're back in the environment containing the perhaps now
 		// completed command
@@ -6674,14 +6684,19 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 		// MDH@15APR2024: remove a subcommand separator
 		if(removeSubcommandSeparator){
 			Mtoken* separatorToken=endedBlock->insertToken;
-			if(separatorToken->type==TT_LISTELEMENT){
-				nextPlaceholderToken->prev=separatorToken->prev;
-				separatorToken->prev->next=nextPlaceholderToken;
-				separatorToken->next=NULL;FREE_TOKEN(separatorToken,owner_userInputCommand); // release the separator token
-				/* replacing:
-				separatorToken->prev->next=separatorToken->next;
-				separatorToken->next->prev=separatorToken->prev;
-				*/
+			if(separatorToken!=NULL){
+				output("Removing subcommand separator token '%s' of type '%s'.",string(separatorToken->text),TOKENTYPE_STRING[separatorToken->type]);
+				if(separatorToken->type==TT_LISTELEMENT){
+					nextPlaceholderToken->prev=separatorToken->prev;
+					separatorToken->prev->next=nextPlaceholderToken;
+					separatorToken->next=NULL;
+					FREE_TOKEN(separatorToken,owner_userInputCommand); // release the separator token
+					/* replacing:
+					separatorToken->prev->next=separatorToken->next;
+					separatorToken->next->prev=separatorToken->prev;
+					*/
+				}else
+					q2outputWarning("Separator token of the a list separator!");
 			}
 		}
 		getCurrentBlock()->continuationToken=NULL; // in case we actually processed the last one
@@ -8376,7 +8391,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								}else
 									switchToControlMode("Failed to embed a command separator.");
 							}else{
-								if(!endSubcommandBlock(false))
+								// TODO should we always remove the subcommand separator????
+								if(!endSubcommandBlock(true))
 									switchToControlMode("Failed to end a subcommand block!");
 							}
 						}
