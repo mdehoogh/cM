@@ -2811,11 +2811,12 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 
 /**
  * @brief propagates the properties of \p prevToken assuming newTokenType to be the successors 
- * 
+ * @details token properties are either propagated by starting a new token in a command (onInput=true) or
+ *          when propagating token properties when adding subcommand tokens (onInput=false)
  * @param prevToken 
- * @param newTokenType 
- * @return true 
- * @return false 
+ * @param onInput whether or not we should ignore turn unexpected list element tokens into error tokens 
+ * @return true when newTokenType was not set to TT_ERROR
+ * @return false when newTokenType was set to TT_ERROR
  */
 static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInput){
 	TokenType newTokenType=TT_ERROR; // assume failure
@@ -2823,6 +2824,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 		///outputChar('A');
 		// initialize _token and newTokenType
 		Mtoken* _token=prevToken->next;
+		/*
 		output("Propagating token properties from '%s' of type '%s' to '%s' of type '%s'.\n"
 			,string(prevToken->text),TOKENTYPE_STRING[prevToken->type]
 			,string(_token->text),TOKENTYPE_STRING[_token->type]); // DEBUGGING
@@ -2830,6 +2832,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 			output("\tProperty expr of (previous token)",string(prevToken->expr->text),TOKENTYPE_STRING[prevToken->expr->type]);
 		else
 			output("\tProperty expr of previous token not set!\n");
+		*/
 		newTokenType=_token->type;
 		//////outputChar('B');
 		// now we have the block of code copied from _getToken
@@ -2899,10 +2902,10 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 		if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)
 		if(NULL==_token->expr){
 			newTokenType=TT_ERROR;
-			q2outputError("No expr property to propagate to end of list, function or array!");
+			////q2outputError("No expr property to propagate to end of list, function or array!");
 		}
 
-		// DEBUGGING
+		/* DEBUGGING
 		if(NULL==_token->expr)
 			q2outputMessage(M_WARNING_PREFIX,"Property expr not set from token '%s' of type '%s'!",
 				string(prevToken->text),TOKENTYPE_STRING[prevToken->type]);
@@ -2911,6 +2914,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 				,string(_token->text),TOKENTYPE_STRING[_token->type]
 				,string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]
 				);
+		*/
 
 		//////outputChar('E');
 		/* replacing:
@@ -3109,13 +3113,15 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 					}else // MDH@01AUG2024: we need to keep track of the number of comma's we've had
 						_token->argument++; // same as what we do with functions
 					//////outputChar('Q');
-				}else{ // a comma should always match either a map or list or expression start
-					newTokenType=TT_ERROR;
-					if(!onInput||inputErrorFunction)
-					if(onInput)
-						(*inputErrorFunction)("Comma not allowed outside map, list, array or function call!");
-					else 
-						q2outputError("Comma not allowed outside map, list, array or function call");
+				}else{ // a comma should always match either a map or list or array or function call or expression start
+					if(onInput){ // MDH@25DEC2024: do not consider this to be an error if we're propagating block command tokens!!!!
+						newTokenType=TT_ERROR;
+						if(!onInput||inputErrorFunction)
+						if(onInput)
+							(*inputErrorFunction)("Comma not allowed outside map, list, array or function call!");
+						else 
+							q2outputError("Comma not allowed outside map, list, array or function call");
+					}
 				}
 			}else
 			if(newTokenType==TT_LIST||newTokenType==TT_EXPRESSION)
@@ -3310,11 +3316,15 @@ Mcommand* _getNewCommand(bool withFirstToken,Mtoken const * const offsetToken){M
 				// if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
 				_command->_firstToken=firstToken;
 				_command->_lastToken=firstToken;
+				// MDH@12DEC2024: should we actually set firstToken->expr to NULL here if offsetToken!=NULL??????
+				// 
 				firstToken->expr=NULL;
 				if(offsetToken!=NULL){ // we'll have to reset some of the properties since _firstToken now has a prev TODO should it have one????
 					firstToken->offset=0;
 					firstToken->argument=0; // TODO what other properties to reset???
-				}
+				}/*else // MDH@12DEC2024: let's only NULL expr property when offsetToken also is NULL!!!
+					firstToken->expr=NULL;*/
+
 			}else{ // too bad, out of memory!
 				FREE_DISOWNED_1(_command,'K',owner);_command=NULL;
 				// if(amVerboseDebugging())
@@ -5268,7 +5278,9 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 						q2output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(NULL==expressionToken)break; // NOTE shouldn't happen though
-					if(NULL==expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
+					if(NULL==expressionToken->expr||expressionToken->expr==expr)
+					if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)
+					break;
 					unevaluatedToken->next=owned_token(_getEvaluatableTokenCopy(expressionToken),owner); // set next to the copy of the expression token
 					unevaluatedToken=unevaluatedToken->next;
 				}
@@ -15433,7 +15445,7 @@ bool blocksInitialized(){
  */
 bool addBlockCommand(Mcommand const * const command){
 	if(command!=NULL&&command->_firstToken!=NULL){
-		output("Embedding a block command!\n");
+		///output("Embedding a block command!\n");
 		// TODO the problem with the environment itself is that we do not know who owns it 
 		//      unless we know every execution environment is essentially wrapped inside an Mvalue in which case we know who owns it!!
 		Mblock* block=_lastBlock;
@@ -15442,7 +15454,7 @@ bool addBlockCommand(Mcommand const * const command){
 			//                we do not need offsetToken anymore and can use the continuationToken in the parent env.
 			Mblock* hostBlock=block->prev;
 			if(NULL==hostBlock){q2outputBug("No host command environment");return false;}
-			output("Embedding environment available.\n");
+			///output("Embedding environment available.\n");
 			Mtoken* nextInsertToken=hostBlock->continuationToken;
 			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
 			output("Continuation token of embedded command available.\n");
@@ -15453,7 +15465,7 @@ bool addBlockCommand(Mcommand const * const command){
 			/* moved over to M.c where addBlockCommand is called!
 			if(blockEnvironment->blockCommandsInserted){ // the placeholder token has been replaced by a command
 				// insert a command separator
-				output("Embedding a command separator.\n");
+				///output("Embedding a command separator.\n");
 				Mtoken* listelementToken=owned_token(_getNewCommandToken(blockEnvironment->insertToken,TT_LISTELEMENT),Msubowner(owner_command,1));
 				if(listelementToken==NULL){q2outputError("Failed to embed a command separator");return false;}
 				listelementToken->text=owned_string(_getString(","),Msubowner(owner_command,2));
@@ -15478,23 +15490,26 @@ bool addBlockCommand(Mcommand const * const command){
 			// connect end of command to where the super command continues
 			command->_lastToken->next=nextInsertToken; // links the command's last token to the continuation token
 			nextInsertToken->prev=command->_lastToken; // and back
-			output("Command fully embedded.\n");
+			///output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
 			// propagate the offset token properties until bumping in a placeholder token (if any)
-			output("Propagating token properties.\n");
+			///q2output("Propagating token properties.\n");
 			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
-			while(tokenPropertiesPropagated(token,false)){
-				output("Properties of token '");outputToken(token);output("' propagated!\n");
+			while(token!=NULL){
+				if(!tokenPropertiesPropagated(token,false)){
+					q2outputError("Not all token properties propagated adding a block command!");
+					break;
+				}
+				///output("Properties of token '");outputToken(token);output("' propagated!\n");
 				token=token->next;
-				if(token==NULL){output("No further tokens to propagate properties from.\n");break;}
-				output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
-				if(token->type==TT_PLACEHOLDER){output("Bumped into a placeholder token.\n");break;} // done
+				if(token==NULL){
+					q2output("No further tokens to propagate properties from.\n");
+					break;
+				}
+				///output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
+				if(token->type==TT_PLACEHOLDER){q2output("Bumped into a placeholder token.\n");break;} // done
 				if(token->type==TT_ERROR){q2outputBug("Some error occurred initializing the embedded command");break;}
 			}
-			if(token!=NULL)
-				q2outputError("Not all token properties propagated adding a block command!");
-			else
-				output("Token properties propagated.\n");
 			// NOTE that environment->continuationToken essentially remains the same!!!!
 			block->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
 			block->insertedBlockCommands++;

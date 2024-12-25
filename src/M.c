@@ -6685,18 +6685,19 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 		if(removeSubcommandSeparator){
 			Mtoken* separatorToken=endedBlock->insertToken;
 			if(separatorToken!=NULL){
-				output("Removing subcommand separator token '%s' of type '%s'.",string(separatorToken->text),TOKENTYPE_STRING[separatorToken->type]);
-				if(separatorToken->type==TT_LISTELEMENT){
-					nextPlaceholderToken->prev=separatorToken->prev;
-					separatorToken->prev->next=nextPlaceholderToken;
-					separatorToken->next=NULL;
-					FREE_TOKEN(separatorToken,owner_userInputCommand); // release the separator token
-					/* replacing:
-					separatorToken->prev->next=separatorToken->next;
-					separatorToken->next->prev=separatorToken->prev;
-					*/
-				}else
-					q2outputWarning("Separator token of the a list separator!");
+				///output("Removing subcommand separator token '%s' of type '%s'.\n",string(separatorToken->text),TOKENTYPE_STRING[separatorToken->type]);
+				if(separatorToken->type!=TT_LISTELEMENT){
+					if(separatorToken->type!=TT_ERROR)
+						q2output("%sSeparator token not a list separator but of type '%s'!\n",M_WARNING_PREFIX,TOKENTYPE_STRING[separatorToken->type]);
+				}
+				nextPlaceholderToken->prev=separatorToken->prev;
+				separatorToken->prev->next=nextPlaceholderToken;
+				separatorToken->next=NULL;
+				FREE_TOKEN(separatorToken,owner_userInputCommand); // release the separator token
+				/* replacing:
+				separatorToken->prev->next=separatorToken->next;
+				separatorToken->next->prev=separatorToken->prev;
+				*/
 			}
 		}
 		getCurrentBlock()->continuationToken=NULL; // in case we actually processed the last one
@@ -8331,11 +8332,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					}*/
 					else // the user input command is NOT incomplete
 					if(blockCommandLevel>0){ // (still) inside a block
-						output("Embedding the subcommand.\n");
+						///output("Embedding the subcommand.\n");
 						// does this user input command designate an end of block?????
 						// MDH@08APR2024: if we always also add the end() command to the current block we can still use it by executing end() [and know it was a placeholder command!!!!!!]
 						if(addBlockCommand(_userInputCommand)){
-							output("Subcommand embedded.\n");
+							///output("Subcommand embedded.\n");
 							// MDH@08APR2024: get rid of the current user input command (_userInputCommand can be set though when we returned to block command level 0)
 							// check if this command actually ends the current block!!!
 							Mblock* block=getCurrentBlock();
@@ -8371,13 +8372,13 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							*/
 							_userInputCommand->_firstToken->next=NULL;
 							FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL;
-							output("Embedded command freed!\n");
+							///output("Embedded command freed!\n");
 							// end any block we're supposed to end
 							if(!endOfBlock){ // no block to end, so we should
 								// block not ended yet, so we're going to have another command to embed
 								// so we need to insert a command separator
 								// environment->insertToken points to the last inserted token
-								output("Embedding a command separator.\n");
+								///output("Embedding a command separator.\n");
 								Mtoken* nextInsertToken=block->insertToken->next;
 								Mtoken* listelementToken=owned_token(_getNewCommandToken(block->insertToken,TT_LISTELEMENT,false),Msubowner(owner_userInputCommand,1));
 								if(listelementToken!=NULL){
