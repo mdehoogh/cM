@@ -2891,7 +2891,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 			//				TODO this is checked afterwards, so perhaps we should do that here?????
 			if(_token->expr!=NULL){
 				_token->expr=_token->expr->expr;
-				if(NULL==_token->expr)q2outputError("Property expr removed!"); // DEBUGGING
+				///if(NULL==_token->expr)q2outputInfo("Property expr removed!"); // DEBUGGING
 				///_token->argument=_token->expr->argument;
 			}else{
 				newTokenType=TT_ERROR;
@@ -15457,7 +15457,7 @@ bool addBlockCommand(Mcommand const * const command){
 			///output("Embedding environment available.\n");
 			Mtoken* nextInsertToken=hostBlock->continuationToken;
 			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
-			output("Continuation token of embedded command available.\n");
+			q2outputMessage(M_INFO_PREFIX,"Continuation token of embedded command available");
 			/*
 			Mtoken* offsetToken=environment->insertToken;
 			Mtoken* nextInsertToken=offsetToken->next;
@@ -15478,7 +15478,8 @@ bool addBlockCommand(Mcommand const * const command){
 			*/
 			// MDH@12APR2024: insertToken is now connected to command->_firstToken (and back)
 			// skip over _firstToken to the first significant command token
-			Mtoken* firstSignificantCommandToken=command->_firstToken->next;
+			Mtoken* firstSignificantCommandToken=
+				(command->_firstToken->type==TT_EXPRESSION?command->_firstToken->next:command->_firstToken);
 			if(firstSignificantCommandToken!=NULL){
 				if(block->insertToken!=NULL){
 					block->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????

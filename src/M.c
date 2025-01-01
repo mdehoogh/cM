@@ -1619,6 +1619,10 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 						promptLength=output(string(_environmentName));
 						*/
 				}
+				// MDH@01JAN2025: instead of a numeric value in the sequence of commands we might have a non-numeric 'property'
+				//                when entering function call arguments one at a time BUT
+				//                it may be even more convenient to add an environment with every argument start with the
+				//                argument info as name NOTE that a question mark behind it would truely indicate this
 				// MDH@18APR2024: now asking getNewPromptCommandIndex for the command index to use in the prompt
 				size_t newPromptCommandIndex=getNewPromptCommandIndex(string(_environmentName),environment->commandCount);
 				if(newPromptCommandIndex){
@@ -6664,7 +6668,7 @@ bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 /**
  * @brief ends the current subcommand block
  * 
- * @param executeCompletedCommand whether or not to execute the final completed command
+ * @param removeSubcommandSeparator whether or not to remove a subcommand separator (at the end of a block)
  * @return true 
  * @return false 
  */
@@ -6683,21 +6687,28 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 		Mtoken* nextPlaceholderToken=getCurrentBlock()->continuationToken;
 		// MDH@15APR2024: remove a subcommand separator
 		if(removeSubcommandSeparator){
+			// will check whether or not we should actually remove the insertToken of the endedBlock (only when it's a list element)
 			Mtoken* separatorToken=endedBlock->insertToken;
 			if(separatorToken!=NULL){
 				///output("Removing subcommand separator token '%s' of type '%s'.\n",string(separatorToken->text),TOKENTYPE_STRING[separatorToken->type]);
-				if(separatorToken->type!=TT_LISTELEMENT){
-					if(separatorToken->type!=TT_ERROR)
-						q2output("%sSeparator token not a list separator but of type '%s'!\n",M_WARNING_PREFIX,TOKENTYPE_STRING[separatorToken->type]);
+				// MDH@01JAN2025: TODO preferably shouldn't need to correct any separator token marked as an error token!!!
+				if(separatorToken->type==TT_ERROR&&string_char(separatorToken->text,0)==',')
+					separatorToken->type==TT_LISTELEMENT;
+				if(separatorToken->type==TT_LISTELEMENT){
+					// MDH@01JAN2025: not forgetting to update the insertToken!!!
+					endedBlock->insertToken=separatorToken->prev;
+					nextPlaceholderToken->prev=endedBlock->insertToken;
+					separatorToken->prev->next=nextPlaceholderToken;
+					separatorToken->next=NULL;
+					FREE_TOKEN(separatorToken,owner_userInputCommand); // release the separator token
+					/* replacing:
+					separatorToken->prev->next=separatorToken->next;
+					separatorToken->next->prev=separatorToken->prev;
+					*/
+				}else{
+					q2outputmessageprefix(M_WARNING_PREFIX);
+					q2output("Not removing supposed separator token '%s' of type '%s'!\n",string(separatorToken->text),TOKENTYPE_STRING[separatorToken->type]);
 				}
-				nextPlaceholderToken->prev=separatorToken->prev;
-				separatorToken->prev->next=nextPlaceholderToken;
-				separatorToken->next=NULL;
-				FREE_TOKEN(separatorToken,owner_userInputCommand); // release the separator token
-				/* replacing:
-				separatorToken->prev->next=separatorToken->next;
-				separatorToken->next->prev=separatorToken->prev;
-				*/
 			}
 		}
 		getCurrentBlock()->continuationToken=NULL; // in case we actually processed the last one
