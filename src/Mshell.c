@@ -15457,7 +15457,7 @@ bool addBlockCommand(Mcommand const * const command){
 			///output("Embedding environment available.\n");
 			Mtoken* nextInsertToken=hostBlock->continuationToken;
 			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
-			q2outputMessage(M_INFO_PREFIX,"Continuation token of embedded command available");
+			///q2outputMessage(M_INFO_PREFIX,"Continuation token of embedded command available.");
 			/*
 			Mtoken* offsetToken=environment->insertToken;
 			Mtoken* nextInsertToken=offsetToken->next;
@@ -15494,7 +15494,7 @@ bool addBlockCommand(Mcommand const * const command){
 			///output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
 			// propagate the offset token properties until bumping in a placeholder token (if any)
-			///q2output("Propagating token properties.\n");
+			q2output("Propagating token properties.\n");
 			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
 			while(token!=NULL){
 				if(!tokenPropertiesPropagated(token,false)){
@@ -15508,12 +15508,19 @@ bool addBlockCommand(Mcommand const * const command){
 					break;
 				}
 				///output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
-				if(token->type==TT_PLACEHOLDER){q2output("Bumped into a placeholder token.\n");break;} // done
-				if(token->type==TT_ERROR){q2outputBug("Some error occurred initializing the embedded command");break;}
+				if(token->type==TT_PLACEHOLDER){
+					///q2output("Bumped into a placeholder token.\n");
+					break;
+				} // done
+				if(token->type==TT_ERROR){
+					q2outputBug("Some error occurred initializing the embedded command");
+					break;
+				}
 			}
 			// NOTE that environment->continuationToken essentially remains the same!!!!
 			block->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
 			block->insertedBlockCommands++;
+			q2output("Another block command inserted.\n");
 			return true;
 			// not ending the block yet but if we do we'd know where to continue searching for the next placeholder!!
 			//////environment->continuationToken=nextInsertToken; // where to continue searching for the next plave holder token
@@ -15546,19 +15553,31 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 	if(_lastBlock!=NULL&&placeholderToken!=NULL){
 		Mblock* _block=owned_block(_getNewBlock(),owner);
 		if(_block!=NULL){
-			////output("Subcommand block created!\n");
+			q2output("Subcommand block created!\n");
 			///////int8_t blockKeywordId=-1;
 			Mstring* _blockName=owned_string(__string(),owner);
 			if(_blockName!=NULL){
 				Mtoken* startExpressionToken=placeholderToken->expr;
-				Mtoken* functionNameToken=(startExpressionToken!=NULL&&startExpressionToken->type==TT_FUNCTION_CALL?startExpressionToken->prev:NULL);
-				if(functionNameToken!=NULL){
-					char* _functionName=_getSignificantTokenCharacters(functionNameToken);
-					if(_functionName!=NULL){
-						string_append_chars(_blockName,_functionName,strlen(_functionName));
-						///output("Function name appended!\n");
-						free(_functionName);
-					}
+				// TODO are we naming list and array literals as well??????
+				Mtoken* functionNameToken=NULL;
+				if(startExpressionToken!=NULL){
+					if(startExpressionToken->type==TT_FUNCTION_CALL)
+						functionNameToken=startExpressionToken->prev;
+				}
+				char* _functionName=NULL;
+				if(functionNameToken!=NULL)
+					_functionName=_getSignificantTokenCharacters(functionNameToken);
+				else
+				if(startExpressionToken!=NULL)
+				if(startExpressionToken->type==TT_EXPRESSION)
+					_functionName="list";
+				else
+				if(startExpressionToken->type==TT_LIST)
+					_functionName="array";
+				if(_functionName!=NULL){
+					string_append_chars(_blockName,_functionName,strlen(_functionName));
+					///output("Function name appended!\n");
+					if(functionNameToken!=NULL)free(_functionName);
 				}
 				///output("Getting the placeholder text.\n");
 				char* _placeholderText=_getSignificantTokenCharacters(placeholderToken);
@@ -15634,7 +15653,13 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 						}
 					}else*/ 
 					// the default is determined by the type of the token following
-					_block->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'\0':'1');
+					// MDH@03JAN2025: if we're dealing with a function argument, we only allow a single expression to be input
+					if(prevPlaceholderToken!=NULL
+							&&(prevPlaceholderToken->type==TT_FUNCTION_CALL||prevPlaceholderToken->type==TT_LISTELEMENT)){
+						_block->subcommandBlockType='1';
+						q2output("Single sub command requested!\n");
+					}else
+						_block->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'\0':'1');
 					if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
 					if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
 					// register the continuation token and the insert token

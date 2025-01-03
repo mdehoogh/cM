@@ -1558,16 +1558,6 @@ Mstring* prompt=NULL;Mallocationowner owner_prompt=(Mallocationowner){MI_MAIN,__
  */
 size_t getNewPromptCommandIndex(char const * const environmentName,size_t defaultPromptCommandCount){Mallocationowner owner=getOwner(__LINE__);
 	// when inside a block of commands show the block name
-	if(blockCommandLevel>0){
-		Mstring* _blockName=owned_string(_getBlockName(),owner);
-		if(_blockName!=NULL){
-			string_append(prompt,string(_blockName));promptLength+=string_length(_blockName);
-			// replacing: promptLength+=output("%s",string(_blockName));
-			FREE_STRING(_blockName,owner);
-		}
-		// MDH@16APR2024: if only a single command expected no need to display the command index!!
-		return(getCurrentBlock()->subcommandBlockType=='1'?0:getCurrentBlock()->insertedBlockCommands+1);
-	}
 	// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
 	if(getCurrentFunctionBodyInput()!=NULL&&environmentName!=NULL)
 		return getNumberOfFunctionCommands(environmentName)+1;	// replacing: printf("%lu",(commandCount+1));
@@ -1623,8 +1613,30 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				//                when entering function call arguments one at a time BUT
 				//                it may be even more convenient to add an environment with every argument start with the
 				//                argument info as name NOTE that a question mark behind it would truely indicate this
-				// MDH@18APR2024: now asking getNewPromptCommandIndex for the command index to use in the prompt
-				size_t newPromptCommandIndex=getNewPromptCommandIndex(string(_environmentName),environment->commandCount);
+				size_t newPromptCommandIndex=0;
+				// MDH@03JAN2025: it's preferred to only change the prompt in here, and not in getNewPromptIndex
+				if(blockCommandLevel>0){
+					Mblock* currentBlock=getCurrentBlock();
+					Mstring* _blockName=owned_string(_getBlockName(),owner);
+					if(_blockName!=NULL){
+						string_append(prompt,string(_blockName));promptLength+=string_length(_blockName);
+						// replacing: promptLength+=output("%s",string(_blockName));
+						FREE_STRING(_blockName,owner);
+					}
+					// MDH@16APR2024: if only a single command expected no need to display the command index!!
+					// MDH@03JAN2025: but we can still display the argument we're looking for
+					if(currentBlock->subcommandBlockType=='1'){
+						if(currentBlock->insertToken!=NULL){
+							if(currentBlock->insertToken->type==TT_FUNCTION_CALL||currentBlock->insertToken->type==TT_LISTELEMENT){
+								string_append_char(prompt,'#');promptLength++;
+								string_append(prompt,string_remainder(currentBlock->insertToken->text,1));
+								promptLength+=string_length(currentBlock->insertToken)-1;
+							}
+						}
+					}else
+						newPromptCommandIndex=getCurrentBlock()->insertedBlockCommands+1;
+				}else
+					newPromptCommandIndex=getNewPromptCommandIndex(string(_environmentName),environment->commandCount);
 				if(newPromptCommandIndex){
 					string_append_char(prompt,'[');
 					string_append_ull(prompt,newPromptCommandIndex);
@@ -6719,10 +6731,12 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 		while(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_PLACEHOLDER)
 			nextPlaceholderToken=nextPlaceholderToken->next;
 		if(nextPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
+			q2output("New placeholder encountered!\n");
 			//////int8_t nextBlockKeywordId=getPlaceholderBlockKeywordId(nextPlaceholderToken);
 			if(startBlock(NULL,nextPlaceholderToken,Msubowner(owner_userInputCommand,1))){
-				output("Next subcommand block environment activated!\n"); ///DEBUGGING
-				nextPlaceholderToken->next=NULL;FREE_TOKEN(nextPlaceholderToken,owner_userInputCommand);
+				q2output("Next subcommand block environment activated!\n"); ///DEBUGGING
+				nextPlaceholderToken->next=NULL;
+				FREE_TOKEN(nextPlaceholderToken,owner_userInputCommand);
 				////////////_userInputCommand=NULL;
 				blockCommandLevel++;
 			}else{
@@ -6738,7 +6752,7 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 				getCurrentBlock()->incompleteCommand=NULL;
 				completedBlockCommand->_firstToken->next=NULL;
 				FREE_COMMAND(completedBlockCommand,owner_userInputCommand);
-				output("Subcommand released.\n");
+				q2output("Subcommand released.\n");
 			}else{
 				result=false;
 				q2outputError("Failed to add the completed subcommand");

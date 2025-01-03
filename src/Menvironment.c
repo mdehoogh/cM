@@ -3987,7 +3987,7 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 	if(!registerFunction(_environment,owner_environment,"settype",Msettype,2,(char*[]){"variable name|complex value","a type character"},(Mvalue*[]){NULL,_getTextValue("'u")}))return false;
 	if(!registerFunction(_environment,owner_environment,"unlock",Munlock,2,(char*[]){"variable name|complex value","the unlock code"},(Mvalue*[]){NULL,NULL}))return false;
 
-	if(!registerFunction(_environment,owner_environment,"pow",Mpow,1,(char*[]){"number"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT)}))return false;
+	if(!registerFunction(_environment,owner_environment,"pow",Mpow,2,(char*[]){"base","exponent"},(Mvalue*[]){getValueZeroOfType(VT_FLOAT),NULL}))return false;
 
 	if(!registerNoArgumentFunction(_environment,owner_environment,"break",Mbreak))return false;
 	if(!registerFunction(_environment,owner_environment,"return",Mreturn,1,(char*[]){"result value"},(Mvalue*[]){NULL}))return false;
