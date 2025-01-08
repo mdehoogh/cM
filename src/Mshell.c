@@ -2815,10 +2815,11 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
  *          when propagating token properties when adding subcommand tokens (onInput=false)
  * @param prevToken 
  * @param onInput whether or not we should ignore turn unexpected list element tokens into error tokens 
+ * @param subcommand whether or not this is property propagation of inserting a nested command
  * @return true when newTokenType was not set to TT_ERROR
  * @return false when newTokenType was set to TT_ERROR
  */
-static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInput){
+static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInput,bool subcommand){
 	TokenType newTokenType=TT_ERROR; // assume failure
 	if(prevToken!=NULL&&prevToken->next!=NULL){
 		///outputChar('A');
@@ -2852,6 +2853,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 		// take special care when the new token ends a list, map or function call
 		// MDH@29OCT2019: no need for \p first anymore (that we used previously) because testing for the first TT_EXPRESSION can also be done by looking at the text in the expression
 		//				TODO in time we should change the first token into a WHITESPACE token
+		if(!subcommand)
 		if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_length(prevToken->text)>0&&string_char(prevToken->text,0)!=' ')){
 			_token->expr=prevToken;
 			_token->argument=1;
@@ -2890,6 +2892,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 			// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't _token->expr will most likely be NULL
 			//				TODO this is checked afterwards, so perhaps we should do that here?????
 			if(_token->expr!=NULL){
+				if(!subcommand) // MDH@07JAN2025
 				_token->expr=_token->expr->expr;
 				///if(NULL==_token->expr)q2outputInfo("Property expr removed!"); // DEBUGGING
 				///_token->argument=_token->expr->argument;
@@ -3014,6 +3017,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 			// BUG FIX aha end of function call does not always end a function call, but an expression (a single opening parenthesis without a function name in front of it), so explicitly checking for that!!!
 			// MDH@02AUG2024: if we also want to count elements finishing a list, just like we do with function calls
 			//                we're going to have to do the same when a list ends
+			if(!subcommand) // MDH@07JAN2025
 			if((prevToken->expr!=NULL)
 				&&((prevToken->type==TT_END_OF_FUNCTION_CALL&&(prevToken->expr->type==TT_FUNCTION_CALL||prevToken->expr->type==TT_EXPRESSION))
 					||(prevToken->type==TT_END_OF_LIST&&prevToken->expr->type==TT_LIST))){
@@ -3224,7 +3228,7 @@ static Mtoken* _getNewToken(Mtoken* prevToken,TokenType newTokenType,bool onInpu
 
 			// MDH@10APR2024: we can put the following code in a separate function possibly adapting newTokenType
 			_token->type=newTokenType; // we need to do this because tokenPropertiesPropagated initializes its local newTokenType to the type of the successor of prevToken 
-			if(!tokenPropertiesPropagated(prevToken,onInput)){
+			if(!tokenPropertiesPropagated(prevToken,onInput,false)){
 				if(onInput)
 					if(inputErrorFunction)(*inputErrorFunction)("Failed to propagate token properties!");else;
 				else
@@ -15457,6 +15461,7 @@ bool addBlockCommand(Mcommand const * const command){
 			///output("Embedding environment available.\n");
 			Mtoken* nextInsertToken=hostBlock->continuationToken;
 			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
+			q2output("Next insert token: '%s'.\n",string(nextInsertToken->text)); // DEBUGGING
 			///q2outputMessage(M_INFO_PREFIX,"Continuation token of embedded command available.");
 			/*
 			Mtoken* offsetToken=environment->insertToken;
@@ -15493,20 +15498,23 @@ bool addBlockCommand(Mcommand const * const command){
 			nextInsertToken->prev=command->_lastToken; // and back
 			///output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
-			// propagate the offset token properties until bumping in a placeholder token (if any)
+			// propagate the offset token properties until bumping into a placeholder token (if any)
 			q2output("Propagating token properties.\n");
 			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
 			while(token!=NULL){
-				if(!tokenPropertiesPropagated(token,false)){
+				if(!tokenPropertiesPropagated(token,false,true)){
 					q2outputError("Not all token properties propagated adding a block command!");
 					break;
 				}
-				///output("Properties of token '");outputToken(token);output("' propagated!\n");
+				q2output("Properties of token '%s' propagated",string(token->text));
+				///q2outputToken(token);output("' propagated!\n");
 				token=token->next;
 				if(token==NULL){
+					q2output(".\n");
 					q2output("No further tokens to propagate properties from.\n");
 					break;
 				}
+				q2output("to '%s'.\n",string(token->text));
 				///output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
 				if(token->type==TT_PLACEHOLDER){
 					///q2output("Bumped into a placeholder token.\n");
@@ -15551,6 +15559,7 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 	// command is allowed to be NULL which means do not replace the incompleteCommand!!
 	// we have to add a new execution environment
 	if(_lastBlock!=NULL&&placeholderToken!=NULL){
+		q2output("Placeholder token: '%s'.\n",string(placeholderToken->text));
 		Mblock* _block=owned_block(_getNewBlock(),owner);
 		if(_block!=NULL){
 			q2output("Subcommand block created!\n");
@@ -15561,9 +15570,11 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 				// TODO are we naming list and array literals as well??????
 				Mtoken* functionNameToken=NULL;
 				if(startExpressionToken!=NULL){
+					q2output("Start expression token: '%s'.\n",string(startExpressionToken->text)); // DEBUGGING
 					if(startExpressionToken->type==TT_FUNCTION_CALL)
 						functionNameToken=startExpressionToken->prev;
-				}
+				}else
+					q2output("No start expression token!\n");
 				char* _functionName=NULL;
 				if(functionNameToken!=NULL)
 					_functionName=_getSignificantTokenCharacters(functionNameToken);
