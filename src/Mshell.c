@@ -5271,7 +5271,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 		}
 		*/
 		listElementIndex++;
-		///if(amVerboseDebugging())
+		if(amVerboseDebugging())
 			q2outputMessage(M_INFO_PREFIX,"Processing list element #%llu starting with token '%s' of type '%s'.",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		Mvalue* _listElementValue=NULL;
 		if(firstElementToNotEvaluate>0&&listElementIndex>=firstElementToNotEvaluate){ // copy the tokens in the argument
@@ -5280,11 +5280,11 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
 			Mtoken* _firstUnevaluatedToken=owned_token(_getEvaluatableTokenCopy(expressionToken),owner);
 			if(_firstUnevaluatedToken!=NULL){
-				///if(amVerboseDebugging())
+				if(amVerboseDebugging())
 					q2output("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 				while(unevaluatedToken!=NULL){
-					///if(amVerboseDebugging())
+					if(amVerboseDebugging())
 						q2output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(NULL==expressionToken)break; // NOTE shouldn't happen though
@@ -5294,7 +5294,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 					unevaluatedToken->next=owned_token(_getEvaluatableTokenCopy(expressionToken),owner); // set next to the copy of the expression token
 					unevaluatedToken=unevaluatedToken->next;
 				}
-				///if(amVerboseDebugging())
+				if(amVerboseDebugging())
 					q2newline(true);
 				_listElementValue=_getValueOfToken(disowned_token(_firstUnevaluatedToken,owner));
 			}
@@ -5302,7 +5302,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
-			///if(amVerboseDebugging())
+			if(amVerboseDebugging())
 				q2outputValue("List element value: '",_listElementValue,"'.\n");
 		}
 		/* MDH@08JAN2025: user is allowed to  NULL elements
@@ -6085,7 +6085,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															if(NULL==_valueholders[valueholderIndex+numberOfNewValueholders])
-																q2outputMessage(M_ERROR_PREFIX,"Failed to set list element #%zd.\n",valueholderIndex+numberOfNewValueholders);
+																q2outputMessage(M_ERROR_PREFIX,"Failed to set list element #%zd.",valueholderIndex+numberOfNewValueholders);
 														}
 													}
 												}
@@ -6248,7 +6248,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 			// MDH@26MAR2020: BUT in order to be able to put a value into the variable we need the address of the value pointer, i.e. the value holder so to speak
 			//				i.e. we need a pointer to where the value pointer is stored, could we be using & on the value pointer being returned to get at the holder?????????
 			// MDH@28MAR2020: if we allow item index elements to be lists we need an array of value holders
-			output("Looking for value holder '%s'.\n",_valuereference->_name->chars);
+			if(report)
+				q2output("Looking for value holder '%s'.\n",_valuereference->_name->chars);
 			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name->chars);
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 			if(valueholder!=NULL&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_ARRAY||(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
@@ -6256,7 +6257,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 				if(NULL==itemidList->_first)
 					if(appendedToList(itemidList,owner_valuereference,(*valueholder)->type==VT_LIST||(*valueholder)->type==VT_ARRAY?_getIntegerValue(M_LL_INVALID):_getTextValue("'"),M_LL_INVALID)<0)
 						return false;
-				outputList("Looking for elements '",itemidList,"'.\n");
+				if(report)
+					outputList("Looking for elements '",itemidList,"'.\n");
 				result=true;
 				if(report)
 					q2outputInfo("************ Element(s) to set.");
