@@ -4920,7 +4920,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//						unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
 		int8_t variableExistsIndicator=0; // assuming invalid
-		if(lastCommandToken->argument!=1){
+		///if(lastCommandToken->argument!=1){ // MDH@08JAN2025 BUG FIX: commented out because wouldn't accept NULL as existing variable in (NULL) otherwise which it should of course!!
 			// MDH@25FEB2021: A HA I was looking for this!!!
 			if(!existsAsLocalVariable(_identifierName,lastCommandToken->envid)&&
 					!existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid)){
@@ -4960,10 +4960,10 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 				variableExistsIndicator=3; // assumed to exist, but whether a function or not cannot be determined
 				inputInfo("'%s' is initialized in the command.",_identifierName);
 			}
-		}else{
+		/*}else{
 			variableExistsIndicator=-3; // assumed to NOT exist but whether a function or not cannot be determined
-			inputInfo("'%s' is local, so it cannot be a existing variable.",_identifierName);
-		}
+			inputInfo("'%s' is local, so it cannot be a existing variable (%d).",_identifierName,lastCommandToken->argument);
+		}*/
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(variableExistsIndicator<0){ // apparently does NOT exist
 				// inputInfo("'%s' not an existing variable.",_identifierName);

@@ -5263,10 +5263,16 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
 	while((expressionToken=nextEnvironmentExpressionToken())!=NULL){
-		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
+		/*
+		if(expressionToken->type==endTokenType){
+			///if(amVerboseDebugging())
+			q2output("Won't process list expression token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			break; // missing elements should be skipped but counted
+		}
+		*/
 		listElementIndex++;
-		if(amVerboseDebugging())
-			q2outputMessage(M_INFO_PREFIX,"Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		///if(amVerboseDebugging())
+			q2outputMessage(M_INFO_PREFIX,"Processing list element #%llu starting with token '%s' of type '%s'.",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		Mvalue* _listElementValue=NULL;
 		if(firstElementToNotEvaluate>0&&listElementIndex>=firstElementToNotEvaluate){ // copy the tokens in the argument
 			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
@@ -5274,11 +5280,11 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
 			Mtoken* _firstUnevaluatedToken=owned_token(_getEvaluatableTokenCopy(expressionToken),owner);
 			if(_firstUnevaluatedToken!=NULL){
-				if(amVerboseDebugging())
+				///if(amVerboseDebugging())
 					q2output("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 				while(unevaluatedToken!=NULL){
-					if(amVerboseDebugging())
+					///if(amVerboseDebugging())
 						q2output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(NULL==expressionToken)break; // NOTE shouldn't happen though
@@ -5288,7 +5294,7 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 					unevaluatedToken->next=owned_token(_getEvaluatableTokenCopy(expressionToken),owner); // set next to the copy of the expression token
 					unevaluatedToken=unevaluatedToken->next;
 				}
-				if(amVerboseDebugging())
+				///if(amVerboseDebugging())
 					q2newline(true);
 				_listElementValue=_getValueOfToken(disowned_token(_firstUnevaluatedToken,owner));
 			}
@@ -5296,14 +5302,16 @@ static Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfEle
 			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
-			if(amVerboseDebugging())
+			///if(amVerboseDebugging())
 				q2outputValue("List element value: '",_listElementValue,"'.\n");
 		}
+		/* MDH@08JAN2025: user is allowed to  NULL elements
 		if(NULL==_listElementValue){
 			if(amVerboseDebugging())
 				q2outputMessage(NULL,"List element missing!");
 			continue;
 		} // undefined list elements should NEVER be added to the list
+		*/
 		if(amVerboseDebugging())
 			if(expressionToken!=NULL)
 				output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
@@ -6100,7 +6108,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						// MDH@31MAR2020: supposedly we have ALL value holders to which _newValue needs to be assigned!!!
 						if(result){
 							if(report)
-								output("Storing the values of %d elements.\n",numberOfValueholders);
+								q2output("Storing the values of %d elements.\n",numberOfValueholders);
 							// MDH@19OCT2020: if the result contains a single element we return the first element (which is an Mvalue* and therefore does not need to be owned here)
 							if(numberOfValueholders>1){
 								// convert the values to a list
@@ -6116,6 +6124,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										break;
 									}
 								}
+								outputList("Referenced list: ",_resultList,".\n"); // DEBUGGING
 								referencedValue=_getValueOfList(disowned_list(_resultList,owner)); // the result
 							}else
 								referencedValue=*_valueholders[0];
