@@ -1885,7 +1885,8 @@ void promptForUserInput(){
 	enableRawmode(0);
 	resetOutputColor();
 	newline();
-	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
+	if(inputMode!=IM_COMMAND||blockCommandLevel==0)
+		outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	initializeNumberOfLineCharacters(); // MDH@24JUN2020: determine the number of line characters available!!!
 	//////if(inputMode==IM_COMMAND)
@@ -2263,7 +2264,8 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(NULL==
 		if(commandIndex>0)_registeredcommands[commandCount].previousCommandIndex=commandCount-commandIndex+1; // will be positive for any positive commandIndex, because commandIndex is in [1,commandCount-1)
 		commandCount++;
 		// should be done before executing a command!!!! environment->commandCount++;
-		if(amVerboseDebugging())outputLine("Command registered!");
+		if(amVerboseDebugging())
+			outputLine("Command registered!");
 		return true;
 	}
 	// should be added to the function body
@@ -6718,8 +6720,10 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 					separatorToken->next->prev=separatorToken->prev;
 					*/
 				}else{
+					/*
 					q2outputmessageprefix(M_WARNING_PREFIX);
 					q2output("Not removing supposed separator token '%s' of type '%s'!\n",string(separatorToken->text),TOKENTYPE_STRING[separatorToken->type]);
+					*/
 				}
 			}
 		}
@@ -6731,10 +6735,12 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 		while(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_PLACEHOLDER)
 			nextPlaceholderToken=nextPlaceholderToken->next;
 		if(nextPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
-			q2output("New placeholder encountered!\n");
+			if(amVerboseDebugging())
+				q2output("New placeholder encountered!\n");
 			//////int8_t nextBlockKeywordId=getPlaceholderBlockKeywordId(nextPlaceholderToken);
 			if(startBlock(NULL,nextPlaceholderToken,Msubowner(owner_userInputCommand,1))){
-				q2output("Next subcommand block environment activated!\n"); ///DEBUGGING
+				if(amVerboseDebugging())
+					q2output("Next subcommand block environment activated!\n"); ///DEBUGGING
 				nextPlaceholderToken->next=NULL;
 				FREE_TOKEN(nextPlaceholderToken,owner_userInputCommand);
 				////////////_userInputCommand=NULL;
@@ -6752,7 +6758,8 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 				getCurrentBlock()->incompleteCommand=NULL;
 				completedBlockCommand->_firstToken->next=NULL;
 				FREE_COMMAND(completedBlockCommand,owner_userInputCommand);
-				q2output("Subcommand released.\n");
+				if(amVerboseDebugging())
+					q2output("Subcommand released.\n");
 			}else{
 				result=false;
 				q2outputError("Failed to add the completed subcommand");
@@ -7198,7 +7205,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// the main user input loop
 	while(1){ // command loop
 
-		outputTotalMemoryUsage(); // have to think about this though
+		if(inputMode==IM_COMMAND)
+			if(blockCommandLevel==0)
+				outputTotalMemoryUsage(); // TODO have to think about this though
 
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
 		promptForUserInput();
@@ -8275,7 +8284,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						*/
 						// can we find the block keyword id?????? don't think we actually need it, hmmm although we need to know if it's a function that will create an environment!!!!!
 						if(startBlock(_userInputCommand,firstPlaceholderToken,Msubowner(owner_userInputCommand,1))){
-							output("Subcommand block activated!\n"); ///DEBUGGING
+							if(amVerboseDebugging())
+								q2output("Subcommand block activated!\n"); ///DEBUGGING
 							// get rid of the placeholder token
 							firstPlaceholderToken->next=NULL;FREE_TOKEN(firstPlaceholderToken,owner_userInputCommand);
 							/*
@@ -8462,7 +8472,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			}else // Return key in control mode, always to return to command input!!
 				switchToCommandMode();
 		}
-		showSeparatorLine();
+		if(inputMode!=IM_COMMAND||blockCommandLevel==0)
+			showSeparatorLine();
 		if(!allocationMarkAdded())
 			q2outputError("Failed to add a new memory allocation mark");
 	}

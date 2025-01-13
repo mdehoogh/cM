@@ -2821,14 +2821,16 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
  */
 static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInput,bool subcommand){
 	TokenType newTokenType=TT_ERROR; // assume failure
-	if(prevToken!=NULL&&prevToken->next!=NULL){
+	Mtoken* _token=(prevToken!=NULL?prevToken->next:NULL);
+	if(_token!=NULL){
 		///outputChar('A');
-		// initialize _token and newTokenType
-		Mtoken* _token=prevToken->next;
 		/*
-		output("Propagating token properties from '%s' of type '%s' to '%s' of type '%s'.\n"
-			,string(prevToken->text),TOKENTYPE_STRING[prevToken->type]
-			,string(_token->text),TOKENTYPE_STRING[_token->type]); // DEBUGGING
+		if(!subcommand)
+			q2output("Propagating token properties from '%s' of type '%s' to '%s' of type '%s'.\n"
+				,string(prevToken->text),TOKENTYPE_STRING[prevToken->type]
+				,string(_token->text),TOKENTYPE_STRING[_token->type]); // DEBUGGING
+				*/
+		/*
 		if(prevToken->expr!=NULL)
 			output("\tProperty expr of (previous token)",string(prevToken->expr->text),TOKENTYPE_STRING[prevToken->expr->type]);
 		else
@@ -4436,7 +4438,9 @@ Mvalue* Md(Mvalue* value,Mvalue* precisionValue){Mallocationowner owner=getOwner
 	if(value!=NULL&&value->type!=VT_DECIMAL){
 		Mdecimal* _decimal=NULL;
 		mpd_context_t* mpd_context=(precisionValue!=NULL?get_mpd_context(getValueInteger(precisionValue)):NULL);
-		if(mpd_context!=NULL)output("Requested precision: %d.\n",mpd_context->prec);else output("No precision specified!\n");
+		if(amVerboseDebugging())
+			if(mpd_context!=NULL)q2output("Requested precision: %d.\n",mpd_context->prec);
+			else q2outputWarning("No precision specified!");
 		switch(value->type){
 			// TODO all other types_
 			case VT_INTEGER:_decimal=owned_decimal(__decimal(mpd_context,value->value._integer->ll,0),owner);break;
@@ -4769,36 +4773,40 @@ Mvalue* Mf(Mvalue* value){
  * @param format a wrapped integer determining whether to left-align or right-align the text representation
  * @return Mvalue* the wrapped M text equivalent of \p value
  */
-Mvalue* Mt(Mvalue* value,Mvalue* format){if(format!=NULL&&format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mt(Mvalue* value,Mvalue* format){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
-	// MDH@10DEC2020: this is a bit of an issue with time values in that _getValueText technically returns the epoch time text representation
-	//				and not the timestamp (calendar time)
-	// MDH@26APR2024: using _getValueText might be a problem when stringifying arrays and lists, because 
-	Mstring* _valueText=owned_string(_getValueText(value,true,true),owner); // typically dequoted
-	if(_valueText!=NULL){
-		if(amVerbose())
-		{q2outputValue("Text representation of '",value,"' before formatting: ");q2output("'%s'.\n",string(_valueText));}
-		if(format!=NULL){
-			if(format->type==VT_INTEGER){
-				long long ll=format->value._integer->ll;
-				if(ll>0){ // left-aligned in ll positions
-					ll-=string_length(_valueText); // number of blanks to append
-					while(--ll>=0)if(!string_append_char(_valueText,' '))break;
-				}else
-				if(ll<0){ // right-aligned in -ll positions
-					ll+=string_length(_valueText); // - number of blanks to prepend
-					while(++ll<=0)if(!string_insert_char(_valueText,0,' '))break;
+	if(value!=NULL&&(format==NULL||format->type==VT_INTEGER)){
+		// MDH@10DEC2020: this is a bit of an issue with time values in that _getValueText technically returns the epoch time text representation
+		//				and not the timestamp (calendar time)
+		// MDH@26APR2024: using _getValueText might be a problem when stringifying arrays and lists, because 
+		Mstring* _valueText=owned_string(_getValueText(value,true,true),owner); // typically dequoted
+		if(_valueText!=NULL){
+			if(amVerbose())
+			{q2outputValue("Text representation of '",value,"' before formatting: ");q2output("'%s'.\n",string(_valueText));}
+			if(format!=NULL){
+				if(format->type==VT_INTEGER){
+					long long ll=format->value._integer->ll;
+					if(ll>0){ // left-aligned in ll positions
+						ll-=string_length(_valueText); // number of blanks to append
+						while(--ll>=0)if(!string_append_char(_valueText,' '))break;
+					}else
+					if(ll<0){ // right-aligned in -ll positions
+						ll+=string_length(_valueText); // - number of blanks to prepend
+						while(++ll<=0)if(!string_insert_char(_valueText,0,' '))break;
+					}
 				}
 			}
+			if(string_insert_char(_valueText,0,(value->type==VT_TEXT?value->value._text->presuffix:'\''))){ // prepend a quote character otherwise we're in trouble in _getTextValue
+				if(amVerbose())
+					{q2outputValue("Text representation of '",value,"': ");q2output("'%s'.\n",string(_valueText));}
+				_result=_getTextValue(string(_valueText));
+			}else
+				q2outputError("Failed to prepend a quote character to a text representation");
+			FREE_STRING(_valueText,owner);
 		}
-		if(string_insert_char(_valueText,0,(value->type==VT_TEXT?value->value._text->presuffix:'\''))){ // prepend a quote character otherwise we're in trouble in _getTextValue
-			if(amVerbose())
-				{q2outputValue("Text representation of '",value,"': ");q2output("'%s'.\n",string(_valueText));}
-			_result=_getTextValue(string(_valueText));
-		}else
-			q2outputError("Failed to prepend a quote character to a text representation");
-		FREE_STRING(_valueText,owner);
-	}
+	}else
+	if(value!=NULL)
+		q2outputError("Invalid second argument to the t() function");
 	return _result;
 }
 
@@ -14978,11 +14986,11 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 					||!registerFunction(_Menvironment,owner,"a",Ma,1,(char*[]){"(list|map)"},NULL) // MDH@25NOV2020: conversion to an array
 					||!registerFunction(_Menvironment,owner,"m",Mm,1,(char*[]){"(list|array)"},NULL) // MDH@25NOV2020: conversion to a map
 					||!registerFunction(_Menvironment,owner,"b",Mb,1,(char*[]){"(number)"},NULL)
-					||!registerFunction(_Menvironment,owner,"t",Mt,2,(char*[]){"(number)","(any)"},NULL)
+					||!registerFunction(_Menvironment,owner,"t",Mt,2,(char*[]){"(any)","[width(i)]"},NULL)
 					||!registerFunction(_Menvironment,owner,"f",Mf,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"q",Mq,1,(char*[]){"(number)"},NULL)
 					||!registerFunction(_Menvironment,owner,"Q",MQ,1,(char*[]){"(number)"},NULL)
-					||!registerFunction(_Menvironment,owner,"d",Md,2,(char*[]){"number","precision"},NULL)
+					||!registerFunction(_Menvironment,owner,"d",Md,2,(char*[]){"number","precision(i)"},NULL)
 					||!registerFunction(_Menvironment,owner,"precision",Mprecision,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"o",Mo,1,(char*[]){"(any)"},NULL)
 					||!registerFunction(_Menvironment,owner,"O",MO,1,(char*[]){"(any)"},NULL)){
@@ -15472,7 +15480,8 @@ bool addBlockCommand(Mcommand const * const command){
 			///output("Embedding environment available.\n");
 			Mtoken* nextInsertToken=hostBlock->continuationToken;
 			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
-			q2output("Next insert token: '%s'.\n",string(nextInsertToken->text)); // DEBUGGING
+			if(amVerboseDebugging())
+				q2output("Next insert token: '%s'.\n",string(nextInsertToken->text)); // DEBUGGING
 			///q2outputMessage(M_INFO_PREFIX,"Continuation token of embedded command available.");
 			/*
 			Mtoken* offsetToken=environment->insertToken;
@@ -15510,22 +15519,25 @@ bool addBlockCommand(Mcommand const * const command){
 			///output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
 			// propagate the offset token properties until bumping into a placeholder token (if any)
-			q2output("Propagating token properties.\n");
+			if(amVerboseDebugging())
+				q2output("Propagating token properties.\n");
 			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
 			while(token!=NULL){
 				if(!tokenPropertiesPropagated(token,false,true)){
 					q2outputError("Not all token properties propagated adding a block command!");
 					break;
 				}
-				q2output("Properties of token '%s' propagated",string(token->text));
+				if(amVerboseDebugging())
+					q2output("Properties of token '%s' propagated",string(token->text));
 				///q2outputToken(token);output("' propagated!\n");
 				token=token->next;
-				if(token==NULL){
+				if(NULL==token){
 					q2output(".\n");
 					q2output("No further tokens to propagate properties from.\n");
 					break;
 				}
-				q2output("to '%s'.\n",string(token->text));
+				if(amVerboseDebugging())
+					q2output("to '%s'.\n",string(token->text));
 				///output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
 				if(token->type==TT_PLACEHOLDER){
 					///q2output("Bumped into a placeholder token.\n");
@@ -15539,7 +15551,8 @@ bool addBlockCommand(Mcommand const * const command){
 			// NOTE that environment->continuationToken essentially remains the same!!!!
 			block->insertToken=command->_lastToken; // TODO technically it ought to be the prev of hostEnvironment->continuationToken
 			block->insertedBlockCommands++;
-			q2output("Another block command inserted.\n");
+			if(amVerboseDebugging())
+				q2output("Another block command inserted.\n");
 			return true;
 			// not ending the block yet but if we do we'd know where to continue searching for the next placeholder!!
 			//////environment->continuationToken=nextInsertToken; // where to continue searching for the next plave holder token
@@ -15570,10 +15583,12 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 	// command is allowed to be NULL which means do not replace the incompleteCommand!!
 	// we have to add a new execution environment
 	if(_lastBlock!=NULL&&placeholderToken!=NULL){
-		q2output("Placeholder token: '%s'.\n",string(placeholderToken->text));
+		if(amVerboseDebugging())
+			q2output("Placeholder token: '%s'.\n",string(placeholderToken->text));
 		Mblock* _block=owned_block(_getNewBlock(),owner);
 		if(_block!=NULL){
-			q2output("Subcommand block created!\n");
+			if(amVerboseDebugging())
+				q2output("Subcommand block created!\n");
 			///////int8_t blockKeywordId=-1;
 			Mstring* _blockName=owned_string(__string(),owner);
 			if(_blockName!=NULL){
@@ -15581,7 +15596,8 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 				// TODO are we naming list and array literals as well??????
 				Mtoken* functionNameToken=NULL;
 				if(startExpressionToken!=NULL){
-					q2output("Start expression token: '%s'.\n",string(startExpressionToken->text)); // DEBUGGING
+					if(amVerboseDebugging())
+						q2output("Start expression token: '%s'.\n",string(startExpressionToken->text)); // DEBUGGING
 					if(startExpressionToken->type==TT_FUNCTION_CALL)
 						functionNameToken=startExpressionToken->prev;
 				}else
@@ -15679,7 +15695,8 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 					if(prevPlaceholderToken!=NULL
 							&&(prevPlaceholderToken->type==TT_FUNCTION_CALL||prevPlaceholderToken->type==TT_LISTELEMENT)){
 						_block->subcommandBlockType='1';
-						q2output("Single sub command requested!\n");
+						if(amVerboseDebugging())
+							q2output("Single sub command requested!\n");
 					}else
 						_block->subcommandBlockType=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT?'\0':'1');
 					if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
