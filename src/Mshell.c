@@ -458,6 +458,21 @@ void setOutputCommandInfoFunction(OutputCommandInfoFunction* _outputCommandInfoF
  */
 static InputCharReadFunction* inputCharReadFunction=NULL;
 
+/**
+ * @brief outputs token \p token
+ * 
+ * @param token 
+ */
+void outputCommandToken(uint16_t tokenIndex,Mtoken const * const token){
+	output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,getTokenSignificantCharacterCount(token),string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
+	if(token->expr!=NULL)
+		output("\n%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
+	else
+		output("\t%s\n","Not part of another expression!");
+	if(token->prevIdentifier!=NULL)
+		output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
+}
+
 // MDH@04MAR2020: the default version outputs the command the same way as within a session except without the colors
 /**
  * @brief outputs M command \p command
@@ -486,14 +501,7 @@ void outputCommandInfo(Mcommand const * const command){
 	uint16_t tokenIndex=0;
 	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
 	while(token!=NULL){
-		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,getTokenSignificantCharacterCount(token),string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
-		if(token->expr!=NULL)
-			output("\n%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
-		else
-			output("\t%s\n","Not part of another expression!");
-		if(token->prevIdentifier!=NULL)
-			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
+		outputCommandToken(++tokenIndex,token);
 		token=token->next;
 	}
 }
@@ -3091,23 +3099,24 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 						}else
 						if(_token->expr->argument<-2){ // MDH@20DEC2022: a known number of expected arguments
 							//////outputChar('O');
+							/* TODO is the following correct????
 							if(_token->expr->argument==-3){ // already reached the total number of expected arguments
 								newTokenType=TT_ERROR;
 								if(!onInput||inputErrorFunction)
 								if(onInput)(*inputErrorFunction)("Another argument not allowed.\n");
 								else q2outputError("Another argument not allowed");
-							}else{
+							}else{*/
 								_token->expr->argument=_token->expr->argument+1;
 								if(amVerboseDebugging())
-								if(!onInput||inputInfoFunction)
-								if(onInput)(*inputInfoFunction)("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
-								else q2outputMessage(M_ERROR_PREFIX,"Number of expected arguments: %lld",-_token->expr->argument-3);
-							}
+									if(!onInput||inputInfoFunction)
+									if(onInput)(*inputInfoFunction)("Number of expected arguments: %lld.\n",-_token->expr->argument-3);
+									else q2outputMessage(M_ERROR_PREFIX,"Number of expected arguments: %lld",-_token->expr->argument-3);
+							//}
 							//////outputChar('P');
 						}else{
 							if(!onInput||inputInfoFunction)
-							if(onInput)(*inputInfoFunction)("Number of expected arguments unknown!\n");
-							else q2outputError("Number of expected arguments unknown!");
+							if(onInput)(*inputInfoFunction)("Number of expected arguments (%lld) unknown!\n",-_token->expr->argument-3);
+							else q2outputMessage(M_ERROR_PREFIX,"Number of expected arguments (%lld) unknown!",-_token->expr->argument-3);
 						}
 					}else
 					if(_token->expr->type!=TT_LIST&&_token->expr->type!=TT_MAP&&_token->expr->type!=TT_EXPRESSION){

@@ -699,11 +699,11 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
 	// NOTE leaving it to _qmul to deal with NULL rational input (which should never happen though)
 	Mrational* _rational=owned_rational(__rational(),owner);
 	if(_rational!=NULL){
-		if(amVerbose())
+		if(amVerboseDebugging())
 			{q2outputRational("Subtracting '",q2,"'");outputRational(" from '",q1,"'.\n");}
 		mp_err status=_qsub(_rational,owner,q1,q2);
 		if(status==MP_OKAY){
-			if(amVerbose())
+			if(amVerboseDebugging())
 				{q2outputRational("Difference '",_rational,"'.\n");}
 			// compute the delta
 			_rational->delta=owned_float(_floatdifference(q1->delta,q2->delta),Msubowner(owner,1));
@@ -1737,7 +1737,7 @@ long long getRationalSign(Mrational const * const rational){
 		long double ld=getFloatLongDouble(rational->delta);
 		rationalSign=(isLongDoubleUndefined(ld)==M_TRUE?getBigintegerSign(rational->num):getLongDoubleSign(getUnpureRationalNumerator(rational->num,rational->den,ld)));
 	}
-	if(amVerbose())
+	if(amVerboseDebugging())
 		{q2outputRational("Sign of rational '",rational,"':");output("%lld.\n",rationalSign);}
 	return rationalSign;
 }
@@ -1779,7 +1779,7 @@ long long isRationalZero(Mrational const * const rational){
 long long isRationalOne(Mrational const * const rational){
 	long long result=M_LL_INVALID;
 	if(isRationalUndefined(rational)==M_FALSE){
-		if(amVerbose())
+		if(amVerboseDebugging())
 			q2outputRational("Checking if '",rational,"' equals one");
 		long double ld=getFloatLongDouble(rational->delta);
 		// without a delta, a rational equals 1 when the numerator and denominator are the same
@@ -1787,7 +1787,7 @@ long long isRationalOne(Mrational const * const rational){
 			result=(isLongDoubleOne(getUnpureRationalNumerator(rational->num,rational->den,ld))?M_TRUE:M_FALSE);
 		else // undefined or zero
 			result=(rational->den?(rational->num?mp_cmp(MP_INT_POINTER(rational->den),MP_INT_POINTER(rational->num))==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):M_TRUE));
-		if(amVerbose())
+		if(amVerboseDebugging())
 			q2output(": %s.\n",(result==M_LL_INVALID?"UNKNOWN":(result==M_TRUE?"YES":"NO")));
 	}
 	return result;

@@ -1407,7 +1407,8 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 				///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
 				assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
 				if(report){
-					Mstring* _valueText=owned_string(_getValueText(variable->_value,false,true),owner);
+					// MDH@14JAN2025: best to NOT show all, because that may be too much to display
+					Mstring* _valueText=owned_string(_getValueText(variable->_value,false,false),owner);
 					if(_valueText!=NULL){
 						output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
 						FREE_STRING(_valueText,owner);
@@ -1478,7 +1479,7 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 	Mvariable* variable=getVariable(_environment,name,amVerbose());
 	if(variable!=NULL){
 		if(NULL==variable->_value||variable->unlockCode==0){
-			if(amVerbose())
+			if(amVerboseDebugging())
 				output("Variable '%s' to set.\n",variable->_name);
 			// _value needs to be of the right type
 			// MDH@03NOV2019: unless it's null (i.e. the type of _value->type is VT_UNDEFINED)
@@ -1486,8 +1487,9 @@ bool setVariable(Menvironment * const _environment,char * const name,Mvalue cons
 				if(variable->_value!=NULL)decrementReferenceCount(variable->_value); // decrement the reference count on the current value
 				variable->_value=_value;
 				if(variable->_value!=NULL)incrementReferenceCount(variable->_value);
-				if(amVerbose()){
-					Mstring* _valueText=owned_string(_getValueText(variable->_value,false,true),owner);
+				if(amVerboseDebugging()){
+					// MDH@14JAN2025: not showing all!!!
+					Mstring* _valueText=owned_string(_getValueText(variable->_value,false,false),owner);
 					if(_valueText!=NULL){
 						output("Value '%s' (reference count: %zd) assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
 						FREE_STRING(_valueText,owner);

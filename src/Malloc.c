@@ -362,17 +362,17 @@ static long long addAllocation(Mallocationtypeowner allocationowner/*,signed cha
 	// MDH@14APR2020: there's room for improvement here
 	assert(allocationowner!=NULL);
 	// if(count<=0)return -2; // invalid input
-	if(!allocations._owners)return -1; // no allocation characters
+	if(NULL==allocations._owners)return -1; // no allocation characters
 	OUTPUT_INFO("Remembering an allocation of type '%c'.\n"/*,count*/,allocationowner->allocationType);
 	// MDH@21APR2020: consuming count is easier I suppose
 	// removing: long long newl=allocations.l+count;
 	// while(--count>=0){ // replacing: newl>allocations.l
 	if(allocations.l==allocations.size){ // MDH@18JAN2023 replacing: !(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
-			OUTPUT_INFO("%s","Expanding allocations.");
-			Malloc** newAllocationOwners=realloc(allocations._owners,(allocations.l+16)*sizeof(Malloc*));
-			if(!newAllocationOwners){q2outputError("Allocation could not be remembered.");return 0;} // realloc failure
-			allocations._owners=newAllocationOwners;
-			allocations.size=allocations.l+16;
+		OUTPUT_INFO("%s","Expanding allocations.");
+		Malloc** newAllocationOwners=realloc(allocations._owners,(allocations.l+16)*sizeof(Malloc*));
+		if(NULL==newAllocationOwners){q2outputError("Allocation could not be remembered.");return 0;} // realloc failure
+		allocations._owners=newAllocationOwners;
+		allocations.size=allocations.l+16;
 	}
 	// MDH@14JAN2023 now passed in: Mallocationownertype allocationowner={owner,type};
 	allocations._owners[allocations.l]=allocationowner;
@@ -793,9 +793,10 @@ size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
 		// when starting can't say whether we start with null pointers or non-null pointers
 		// we should skip all non null pointers at the start to ascertain firstNullIndex is truely on the first nulled pointer
 		while(firstNullIndex<allocations.l&&owners[firstNullIndex]!=NULL)firstNullIndex++;
-		size_t blocksMoved=0;
+		size_t blocksMoved=0,adapted=0;
 		while(firstNullIndex<allocations.l){ // there could still be non null pointers to move
-			if(veryverbose)printf("\tDetecting block #%zu of active allocations to move to #%zu.\n",++blocksMoved,firstNullIndex);
+			if(veryverbose)
+				printf("\tDetecting block #%zu of active allocations to move to #%zu.\n",++blocksMoved,firstNullIndex);
 			/////////if(verbose)printf("\t\tFirst null allocation index: %ld.\n",firstNullIndex);
 			// find the first non null index starting from the first position behind the nextNullIndex
 			firstNonNullIndex=firstNullIndex;
@@ -810,12 +811,16 @@ size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
 			nextNullIndex=firstNonNullIndex;
 			while(++nextNullIndex<allocations.l&&owners[nextNullIndex]!=NULL);
 			moved=nextNullIndex-firstNonNullIndex; // the number of active allocation pointers to move
-			if(veryverbose)printf("\t\tMoving %zu allocation pointers #%zu through #%zu back by %zu to #%zu.\n",moved,firstNonNullIndex,nextNullIndex-1,removed,firstNullIndex);
+			if(veryverbose)
+				printf("\t\tMoving %zu allocation pointers #%zu through #%zu back by %zu to #%zu.\n",moved,firstNonNullIndex,nextNullIndex-1,removed,firstNullIndex);
 			memmove(owners+firstNullIndex,owners+firstNonNullIndex,sizeof(Mallocationtypeowner)*moved);
-			if(veryverbose)printf("\t\t%zu active allocations moved.\n",moved);
+			if(veryverbose)
+				printf("\t\t%zu active allocations moved.\n",moved);
 			memset(owners+firstNullIndex+moved,0,sizeof(Mallocationtypeowner)*removed); // 'moving' the nulls behind
-			if(veryverbose)printf("\t\t%zu null allocations set!\n",removed);
+			if(veryverbose)
+				printf("\t\t%zu null allocations set!\n",removed);
 			// adjust the allocation indices of the moved block consuming moved
+			if(moved)
 			while(moved--){
 				if(owners[firstNullIndex])
 					owners[firstNullIndex]->allocationIndex=firstNullIndex;
@@ -823,7 +828,8 @@ size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
 					q2outputMessage(M_BUG_PREFIX,"Null allocation pointer encountered at #%zu.",firstNullIndex);
 				firstNullIndex++;
 			}
-			if(veryverbose)printf("\t\tAllocation indices adapted!\n");
+			if(verbose)
+				printf("\t\tAllocation indices (%zu) adapted!\n",++adapted);
 			/* replacing:
 			// we can now start moving immediately one by one
 			if(verbose)printf("\t\tMoving non-null allocations starting at #%zu by %zu positions.\n",firstNonNullIndex,removed);
@@ -849,11 +855,13 @@ size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
 			// NOTE we're not changing l as it is associated with the number of allocated pointers in total
 			allocations.l-=removed;
 			// we might realloc allocation._owners if we removed sufficient nulled pointers?????
-			if(verbose)printf("Number of allocations left after removing %zu nulled allocations: %zu.\n",removed,allocations.l);
+			if(verbose)
+				printf("Number of allocations left after removing %zu nulled allocations: %zu.\n",removed,allocations.l);
 			///////printf("Out of %zu allocations left to be nulled: %zu.\n",allocations.l,allocations.nulled);
 		}
 	}else
-	if(verbose)printf("No nulled allocations to remove!\n");
+	if(verbose)
+		printf("No nulled allocations to remove!\n");
 	return (nr_allocations-allocations.l);
 }
 

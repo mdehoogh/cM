@@ -186,3 +186,5 @@ bool isTokenUnfinished(Mtoken const * const token);
 bool isTokenFinished(Mtoken const * const token);
 void finishToken(Mtoken * const token);
 void unfinishToken(Mtoken * const token);
+
+uint8_t compareTokens(Mtoken * const * token1,Mtoken * const * token2);

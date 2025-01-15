@@ -4726,17 +4726,28 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	{q2outputError("Failed to duplicate the current user input command");return false;}
 	
 	// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
-	if(amVerboseDebugging())inputInfo("Preparing the user input command for editing.");
+	if(amVerboseDebugging())
+		inputInfo("Preparing the user input command for editing.");
 	////////////else output("Copying the user input command!\n");
 
 	///// NOT NEEDED using the false flag in _getNewCommand()!!!! _newUserInputCommand->_lastToken=NULL;_newUserInputCommand->_firstToken=NULL;
-	Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
+	Mtoken *_newLastToken=NULL,*_tokenToCopy=_userInputCommand->_firstToken;
 	// the essence is that _userInputCommand->_lastToken points to the last token in _userInputCommand->_firstToken
 	// NOTE theoretically _userInputCommand->_lastToken could be NULL due to _getToken() failing to create a new token
-	while(_tokenToCopy){
+	uint16_t tokenIndex=0;
+	while(_tokenToCopy!=NULL){
+		tokenIndex++;
 		// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to _userInputCommand->_lastToken!!!
-		_newUserInputCommand->_lastToken=owned_token(_getNewCommandToken(_newUserInputCommand->_lastToken,_tokenToCopy->type,false),Msubowner(owner,1));
-		if(NULL==_newUserInputCommand->_lastToken)break;
+		_newLastToken=owned_token(_getNewCommandToken(_newUserInputCommand->_lastToken,_tokenToCopy->type,true),Msubowner(owner,1));
+		_newUserInputCommand->_lastToken=_newLastToken;
+		if(NULL==_newLastToken)break;
+		/* DEBUGGING
+		if(_tokenToCopy->argument!=_newLastToken->argument){
+			inputInfo("New arg field (%lld) of new token '%s' of type '%s' does not match copied arg field (%lld).",_newLastToken->argument,string(_newLastToken->text),TOKENTYPE_STRING[_newLastToken->type],_newLastToken->argument);
+			output("Copied token:\n");outputCommandToken(tokenIndex,_tokenToCopy);
+			output("Token copy:\n");outputCommandToken(tokenIndex,_newLastToken);
+		}
+		*/
 		// replacing: if(!setLastUserInputCommandToken(_getNewCommandToken(_userInputCommand->_lastToken,_tokenToCopy->type)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
 		/* MDH@23SEP2019 replacing:
 		_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,_tokenToCopy->type);
@@ -4755,39 +4766,50 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 		// MDH@29OCT2019: if we want to do it right we should check who's referencing back to _tokenToCopy
 		Mtoken *referencedToken=_tokenToCopy->expr;
 		if(_tokenToCopy->expr!=NULL){ // some token referenced
-			Mtoken *referencedToken=_tokenToCopy,*newReferencedToken=_newUserInputCommand->_lastToken;
+			Mtoken *referencedToken=_tokenToCopy,*newReferencedToken=_newLastToken;
 			// move back until we find the token referenced (and we should find it)
 			while(referencedToken!=_tokenToCopy->expr)
 			{referencedToken=referencedToken->prev;newReferencedToken=newReferencedToken->prev;}
 			// ASSERT referencedToken now equals the token in the original command being referenced (which could be itself obviously), and newReferencedToken is a token in the new user input command that should be pointed to!!!
-			if(newReferencedToken)
-				_newUserInputCommand->_lastToken->expr=newReferencedToken;
+			if(newReferencedToken!=NULL)
+				_newLastToken->expr=newReferencedToken;
 			else 
 				inputError("%s%sFailed to synchronize a token reference.",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 		}else // nothing pointed to, so just in case
-			_newUserInputCommand->_lastToken->expr=NULL;
+			_newLastToken->expr=NULL;
 		// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
 		
-		setTokenSignificantCharacterCount(_newUserInputCommand->_lastToken,getTokenSignificantCharacterCount(_tokenToCopy));
+		setTokenSignificantCharacterCount(_newLastToken,getTokenSignificantCharacterCount(_tokenToCopy));
 		// if failing to copy the text over get rid of the command constructed so far, and break
-		_newUserInputCommand->_lastToken->text=owned_string(_stringCopy(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over
-		if(NULL==_newUserInputCommand->_lastToken->text){
-			_newUserInputCommand->_lastToken=NULL;
+		_newLastToken->text=owned_string(_stringCopy(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over
+		if(NULL==_newLastToken->text){
+			_newUserInputCommand->_lastToken=_newLastToken=NULL;
 			break;
 		} // TODO perhaps we'd have to do a little more than just this?????
 		// MDH@24APR2019 obsolete: getCommandLength()+=string_length(_userInputCommand->_lastToken->text);
 		// MDH@24SEP2020 DONE some additional fields to copy over (NOT the offset is that is set automatically)
-		_newUserInputCommand->_lastToken->argument=_tokenToCopy->argument;
-		_newUserInputCommand->_lastToken->offset=_tokenToCopy->offset;
-		_newUserInputCommand->_lastToken->position=_tokenToCopy->position;
-		_newUserInputCommand->_lastToken->envid=_tokenToCopy->envid;
-		_newUserInputCommand->_lastToken->prevIdentifier=_tokenToCopy->prevIdentifier;
+		/* MDH@15JAN2024: I'm under the impression that the argument field is adjusted in the process of
+		                  adding arguments, which means we should not sync the argument field!!!!
+		_newLastToken->argument=_tokenToCopy->argument;
+		*/
+		_newLastToken->offset=_tokenToCopy->offset;
+		_newLastToken->position=_tokenToCopy->position;
+		_newLastToken->envid=_tokenToCopy->envid;
+		_newLastToken->prevIdentifier=_tokenToCopy->prevIdentifier;
 		// (M_MODULE_DEBUGGING&MM_MAIN): output("[%zd]",_newUserInputCommand->_lastToken->position);
 #ifdef __DEBUG__
 		printf("%d:%s",_userInputCommand->_lastToken->type,string(_userInputCommand->_lastToken->text));
 #endif
 		if(NULL==_newUserInputCommand->_firstToken)
 			_newUserInputCommand->_firstToken=_newUserInputCommand->_lastToken; // TODO=DONE will never happen???? it does here
+		
+		if(amVerboseDebugging()){
+			uint8_t equalTokens=compareTokens(_tokenToCopy,_newUserInputCommand->_lastToken);
+			if(equalTokens){
+				q2outputMessage(M_ERROR_PREFIX,"Copied token '%s' not equal with error code '%d'.",string(_tokenToCopy->text),equalTokens);
+			}
+		}
+
 		// get the next token to copy...
 		_tokenToCopy=_tokenToCopy->next;
 	}
@@ -4799,6 +4821,10 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
 	////////output("Owning the new user input command!\n");
 	_userInputCommand=owned_command(disowned_command(_newUserInputCommand,owner),owner_userInputCommand); // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
+	/* DEBUGGING
+	q2output("Copied command:\n");
+	outputCommandInfo(_userInputCommand);
+	*/
 	return true;
 }
 
@@ -6647,7 +6673,7 @@ bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 		// if(amVerboseDebugging())
 		if(amVerbose/*Debugging*/())
 			q2outputInfo("Removing unreferenced values.");
-		size_t removedValueCount=getNumberOfRemovedValues(amVerbose()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
+		size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amVerboseDebugging()); // MDH@12MAY2020: (M_MODULE_DEBUGGING&MM_MAIN) needs to be set to view information on the values released
 		if(amVerbose()){
 			if(removedValueCount)
 				output("Number of garbage collected values: %lu.\n",removedValueCount);
@@ -8246,7 +8272,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand!=NULL&&_userInputCommand->_firstToken!=NULL){ // technically something to process (not necessarily evaluate!)
 					
-					if(amVerboseDebugging())
+					////if(amVerboseDebugging())
 						outputCommandInfo(_userInputCommand); // now defined in Mshell.c/h
 
 					// MDH@18MAR2024: if this user input command is a block command we should collect it in the current environment, and NOT execute it

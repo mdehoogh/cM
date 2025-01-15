@@ -85,3 +85,17 @@ void unfinishToken(Mtoken * const token){
 	if(token!=NULL)token->significantCharacterCount=0;
 	else q2outputBug("Can't finish an undefined token.");
 }
+
+uint8_t compareTokens(Mtoken const * const token1,Mtoken const * const token2){
+	assert(token1!=NULL&&token2!=NULL);
+	uint16_t result=0;
+	if(token1->type!=token2->type)result|=1;
+	if(token1->significantCharacterCount!=token2->significantCharacterCount)result|=2;
+	if(token1->offset!=token2->offset)result|=4;
+	if(token1->position!=token2->position)result|=8;
+	if(!string_equal(token1->text,token2->text))result|=16;
+	if(token1->argument!=token2->argument)result|=32;
+	if(token1->envid!=token2->envid)result|=64;
+	if(token->element!=token2->element)result|=128;
+	return result;
+}

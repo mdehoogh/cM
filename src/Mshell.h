@@ -122,6 +122,7 @@ Mvalue* Mstats(Mvalue* _sequenceValue);
 
 Mvalue* Moutputtable(Mvalue* tableValue);
 
+void outputCommandToken(uint16_t tokenIndex,Mtoken const * const token);
 void outputCommandInfo(Mcommand const * const _command);
 
 // and finally obtaining a root environment
