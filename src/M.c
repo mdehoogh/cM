@@ -8272,7 +8272,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand!=NULL&&_userInputCommand->_firstToken!=NULL){ // technically something to process (not necessarily evaluate!)
 					
-					////if(amVerboseDebugging())
+					if(amVerboseDebugging())
 						outputCommandInfo(_userInputCommand); // now defined in Mshell.c/h
 
 					// MDH@18MAR2024: if this user input command is a block command we should collect it in the current environment, and NOT execute it

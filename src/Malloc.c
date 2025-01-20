@@ -261,6 +261,14 @@ struct{
 	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
 }allocations={0,0,0,NULL};
 
+// MDH@20JAN2025: we're going to keep track of the registered allocations in another way from now on
+typedef struct allocations_t{
+	uint64_t freed;
+	uint64_t full;
+	void* pointers[64];
+}allocations_t;
+allocations_t* _allocations=NULL; // the global variable storing the allocations
+
 /**
  * @brief returns the index of allocation type \p allocationType
  * 
@@ -1858,7 +1866,7 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 	if(allocations.l>0){output("\t%lld registered allocations released...\n",allocations.l);allocations.l=0;}
 	*/
    
-	if(_allocationMarks){
+	if(_allocationMarks!=NULL){
 		if(numberOfAllocationMarks*numberOfAllocationMarkTypes>0)output("\tReleasing %llu allocation marks of %llu registered allocation types...\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
 		free(_allocationMarks);_allocationMarks=NULL;
 		output("\tAllocation marks released...\n");
