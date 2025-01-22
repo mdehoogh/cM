@@ -6118,7 +6118,10 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									if(_flattenedIndexList!=NULL)FREE_LIST(_flattenedIndexList,owner);
 								}
 								// if all the valueholders are NULL we break????
-								int valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
+								int valueholderIndex=numberOfValueholders;
+								while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)
+								;
+								if(valueholderIndex<0){result=false;break;}
 								indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
 							}
 						}
@@ -6578,7 +6581,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 							}
 							// if all the valueholders are NULL we break????
 							long long valueholderIndex=numberOfValueholders;
-							while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");
+							while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)
+							;
 							if(valueholderIndex<0){result=false;break;}
 							// how about putting the flattenedIndexList back????
 

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <time.h>
+#include <limits.h>
 
 #include "Malloc.h"
 
@@ -16,15 +17,124 @@ extern char const * const M_BUG_PREFIX;
 
 // MDH@26MAY2020: all char types changed to signed char so we can use the sign bit to indicate that it's a variable sized allocation unless we make all types variable sized
 #ifndef __PRODUCTION__
+
+// MDH@20JAN2025 (v0.1.10): we're going to keep track of the registered allocations in another way from now on
+#define ALLOCATION_INDEX_BYTES 4
+#define ALLOCATION_INDEX_BITS 32
+
+// the number of bytes determines what integer to use (>=C23)
+typedef uint32_t allocationindex_t;
+
 /**
  * @brief the structure holding the allocation index, owner and allocation type that is prefixed to every dynamically allocated memory by Malloc, Mcalloc and Mrealloc
  * 
  */
-typedef struct{
-	int32_t allocationIndex; // MDH@19MAY2020: assuming 32 bits will suffice
+typedef struct Malloc{
+	allocationindex_t allocationIndex; // MDH@19MAY2020: assuming 32 bits will suffice
 	Mallocationowner owner; // MDH@19MAY2020: storing the owner id as well
 	signed char allocationType;
 }Malloc;
+/**
+ * @brief defines the tree nodes containing pointers to at least 256 sub nodes
+ * 
+ */
+typedef struct allocationnodes_t{
+	struct allocationnodes_t* nodes[256]; // the 64 pointers to the next allocations_t (unless this is the last allocation_t structure)
+	uint8_t firstnonfullnodeindex; // either the position of the first available pointer or the first NULL pointer
+}allocationnodes_t;
+/**
+ * @brief defines the final node containing the Malloc* pointers associated with the allocation index
+ * 
+ */
+typedef struct allocationpointers_t{
+	Malloc* pointers[256];
+	uint8_t firstnullallocationindex;
+}allocationpointers_t;
+
+allocationnodes_t* _allocationnodesRoot=NULL; // the global variable storing the allocations
+/**
+ * @brief all 31 bits set means that we haven't been able to store the allocation pointer at some valid index
+ * @details if we didn't manage to find a spot to register the Malloc pointer at we return UNAVAILABLE_ALLOCATION_INDEX
+ * 
+ */
+static const allocationindex_t UNAVAILABLE_ALLOCATION_INDEX=0;
+
+/**
+ * @brief initializes _allocations
+ * 
+ */
+static void allocationsInitialized(){
+	if(NULL==_allocationnodesRoot){
+		_allocationnodesRoot=calloc(1,sizeof(allocationnodes_t));
+	}
+}
+/**
+ * @brief sets the allocation index of _allocation
+ * 
+ * @param _allocation 
+ * @return uint32_t 
+ */
+static bool setAllocationIndex(Malloc* const _alloc){
+	if(NULL==_allocationnodesRoot)return false;
+	if(NULL==_alloc)return false;
+	// assume failure
+	_alloc->allocationIndex=UNAVAILABLE_ALLOCATION_INDEX;
+	allocationnodes_t* levelallocationnodes;
+	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot}; // pointer to the first allocation node
+	allocationindex_t newAllocationIndex=0; // to hold the allocation index
+	int level=0,levelIndex;
+	// 1. determine all pointers of all allocation nodes (except the last one)
+	while(level<ALLOCATION_INDEX_BYTES){
+		levelallocationnodes=allocationnodes[level];
+		levelIndex=levelallocationnodes->firstnonfullnodeindex;
+		if(NULL==levelallocationnodes->nodes[levelIndex])
+			levelallocationnodes->nodes[levelIndex]=calloc(1,sizeof(allocationnodes_t));
+		allocationnodes[++level]=levelallocationnodes->nodes[levelIndex];
+		if(NULL==allocationnodes[level])return false; // failure to set the required pointer
+		newAllocationIndex<<=8;
+		newAllocationIndex+=levelIndex;
+	}
+	// next to determine the last
+	/* NOTE can't happen!!
+	if(NULL==allocationnodes[level]){
+		levelallocationnodes[level]=calloc(1,sizeof(allocationpointers_t));
+		if(NULL==levelallocationnodes){output("ERROR: Failed to allocate allocations register block.\n");return false;}
+	}
+	*/
+	allocationpointers_t* allocationpointers=(allocationnodes_t*)(allocationnodes[level]);
+	while(allocationpointers->pointers[allocationpointers->firstnullallocationindex]){
+		if(allocationpointers->firstnullallocationindex==255)return false;
+		allocationpointers->firstnullallocationindex++;
+	}
+	allocationpointers->pointers[allocationpointers->firstnullallocationindex]=_alloc;
+	_alloc->allocationIndex=(newAllocationIndex<<8)+allocationpointers->firstnullallocationindex;
+	// we need to find a new NULL element to set
+	while(allocationpointers->firstnullallocationindex!=255)
+	if(allocationpointers->pointers[++allocationpointers->firstnullallocationindex]==NULL)break;
+	if(allocationpointers->pointers[allocationpointers->firstnullallocationindex]!=NULL){ // full now
+		// we have to increment the previous allocationnodes first, because we can't use this one anymore!!
+		// for this we need to know the allocationnodes that lead up to the allocation pointers
+		while(level>0){
+			levelallocationnodes=allocationnodes[--level];
+			// we need to increment firstnonfull... until we find one that is NULL again
+			uint8_t first=levelallocationnodes->firstnonfullnodeindex;
+			while(first!=255){ // as long as there are successors that might be NULL
+				levelallocationnodes->firstnonfullnodeindex=(++first);
+				if(NULL==levelallocationnodes->nodes[first])break;
+			}
+			// if we're on a NULL node, we're done, otherwise we have to increment the first of the nodes one level up
+			if(levelallocationnodes->nodes[levelallocationnodes->firstnonfullnodeindex]==NULL)break;
+		}
+	}
+	return true;
+}
+static bool freeAllocationIndex(allocationindex_t allocationIndex){
+	if(allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return false;
+
+	return false;
+}
+// MDH@20JAN2025: END new allocations functionality (first in v0.1.10)
+
 // MDH@22MAY2020: assuming that the moduleId is below 1024, and the functionId below 1024^2
 //Mallocationowner getOwner(uint16_t moduleId,uint32_t functionId){return(Mallocationowner){0,moduleId,0,functionId};}
 #endif
@@ -261,14 +371,6 @@ struct{
 	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
 }allocations={0,0,0,NULL};
 
-// MDH@20JAN2025: we're going to keep track of the registered allocations in another way from now on
-typedef struct allocations_t{
-	uint64_t freed;
-	uint64_t full;
-	void* pointers[64];
-}allocations_t;
-allocations_t* _allocations=NULL; // the global variable storing the allocations
-
 /**
  * @brief returns the index of allocation type \p allocationType
  * 
@@ -369,9 +471,12 @@ static long long addAllocation(Mallocationtypeowner allocationowner/*,signed cha
 	// I suppose that the allocation might fail but we do NOT want to loose allocations._chars over it
 	// MDH@14APR2020: there's room for improvement here
 	assert(allocationowner!=NULL);
+	// MDH@22JAN2025
+	setAllocationIndex(allocationowner);
+	/* replacing:
 	// if(count<=0)return -2; // invalid input
 	if(NULL==allocations._owners)return -1; // no allocation characters
-	OUTPUT_INFO("Remembering an allocation of type '%c'.\n"/*,count*/,allocationowner->allocationType);
+	OUTPUT_INFO("Remembering an allocation of type '%c'.\n",allocationowner->allocationType);
 	// MDH@21APR2020: consuming count is easier I suppose
 	// removing: long long newl=allocations.l+count;
 	// while(--count>=0){ // replacing: newl>allocations.l
@@ -394,6 +499,7 @@ static long long addAllocation(Mallocationtypeowner allocationowner/*,signed cha
 			,allocations.l);
 	// }
 	return allocations.l++; // returning the position where the allocation is stored, and incrementing the length of the allocations unless we replace allocations.l by allocations.lastIndex
+	*/
 }
 
 /**
@@ -1874,8 +1980,14 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 	numberOfAllocationMarks=0;numberOfAllocationMarkTypes=0;
 
 #ifndef __PRODUCTION__
+
+	// MDH@22JAN2025: allocations is now replaced by using index allocations
+	allocationsInitialized();
+	if(NULL==_allocationnodesRoot)
+			output("\t%s%sFailed to initialize memory allocation management.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+	/* replacing:
 	if(!allocations._owners){
-		allocations._owners=calloc(16,sizeof(Malloc*/*ationownertype*/)); // starting out with one block
+		allocations._owners=calloc(16,sizeof(Malloc*)); // starting out with one block
 		if(!allocations._owners){
 			output("\t%sFailed to initialize memory allocation management.\n",M_ERROR_PREFIX);
 			return false;
@@ -1885,6 +1997,7 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 		allocations.nulled=0;
 		output("\tMemory allocation management initialized...\n");
 	}
+	*/
 
 	// keep all current allocation types (if any)
 	if(numberOfAllocationTypes==0){
