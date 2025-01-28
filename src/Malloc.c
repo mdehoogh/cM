@@ -21,7 +21,6 @@ extern char const * const M_BUG_PREFIX;
 // MDH@20JAN2025 (v0.1.10): we're going to keep track of the registered allocations in another way from now on
 #define ALLOCATION_INDEX_BYTES 4
 #define ALLOCATION_INDEX_BITS 32
-
 // the number of bytes determines what integer to use (>=C23)
 typedef uint32_t allocationindex_t;
 
@@ -35,22 +34,46 @@ typedef struct Malloc{
 	signed char allocationType;
 }Malloc;
 /**
+ * @brief the total number of child nodes
+ * 
+ */
+#define ALLOCATION_NODES_SIZE 256
+/**
+ * @brief the maximum child node index
+ * 
+ */
+#define MAX_ALLOCATION_NODE_INDEX 255
+/**
+ * @brief the number of bits needed to store an allocation node index
+ * 
+ */
+#define ALLOCATION_NODE_INDEX_BITS 8
+/**
  * @brief defines the tree nodes containing pointers to at least 256 sub nodes
  * 
  */
 typedef struct allocationnodes_t{
-	struct allocationnodes_t* nodes[256]; // the 64 pointers to the next allocations_t (unless this is the last allocation_t structure)
-	uint8_t firstnonfullnodeindex; // either the position of the first available pointer or the first NULL pointer
+	struct allocationnodes_t* nodes[ALLOCATION_NODES_SIZE]; // the 64 pointers to the next allocations_t (unless this is the last allocation_t structure)
+	unsigned NULLs:ALLOCATION_NODE_INDEX_BITS; // the number of not used elements in nodes
+	unsigned usable:ALLOCATION_NODE_INDEX_BITS; // the number of not full nodes (so there's room in them)
+	unsigned firstnonfullnodeindex:ALLOCATION_NODE_INDEX_BITS; // either the position of the first available pointer or the first NULL pointer
+	// instead of updating field firstnonfullnodeindex when it no longer can have more children
+	// we can mark it as full, allowing us to increment firstnonfullmodeindex on the next allocation!!
+	unsigned firstnodeindexisfull:1; // whether or not the first non full node index is full
 }allocationnodes_t;
 /**
  * @brief defines the final node containing the Malloc* pointers associated with the allocation index
  * 
  */
 typedef struct allocationpointers_t{
-	Malloc* pointers[256];
-	uint8_t firstnullallocationindex;
+	Malloc* pointers[ALLOCATION_NODES_SIZE];
+	unsigned NULLs:ALLOCATION_NODE_INDEX_BITS; // the number of NULL (and therefore available) elements 
+	unsigned firstnullpointerindex:ALLOCATION_NODE_INDEX_BITS;
 }allocationpointers_t;
-
+/**
+ * @brief the root node of the allocations history
+ * 
+ */
 allocationnodes_t* _allocationnodesRoot=NULL; // the global variable storing the allocations
 /**
  * @brief all 31 bits set means that we haven't been able to store the allocation pointer at some valid index
@@ -66,7 +89,29 @@ static const allocationindex_t UNAVAILABLE_ALLOCATION_INDEX=0;
 static void allocationsInitialized(){
 	if(NULL==_allocationnodesRoot){
 		_allocationnodesRoot=calloc(1,sizeof(allocationnodes_t));
+		// the problem here is that _allocationnodesRoot->NULLs and _allocationnodesRoot->notfulls
+		// will both be 0 at this moment, and thus _allocationnodesRoot->first is NULL and unoccupied
 	}
+}
+/**
+ * @brief updates the first non null node index assuming the current one is full
+ * @details guarantees to find the next non NULL node that is not full or the first NULL node
+ * @param allocationnodes 
+ */
+static void updateFirstNonFullNodeIndex(allocationnodes_t* const allocationnodes){
+	assert(allocationnodes!=NULL);
+	allocationnodes_t* nextallocationnodes;
+	if(allocationnodes->usable){ // there are (non NULL) usable nodes pointers
+		do{
+			nextallocationnodes=allocationnodes->nodes[++allocationnodes->firstnonfullnodeindex];
+			// as long as this is a full node we have to keep looking
+		}while(NULL==nextallocationnodes||(!nextallocationnodes->usable&&!nextallocationnodes->NULLs));
+	}else{ // there are no usable nodes anymore, so we should choose the first NULL node
+		do{
+			nextallocationnodes=allocationnodes->nodes[++allocationnodes->firstnonfullnodeindex];
+		}while(nextallocationnodes!=NULL);
+	}
+	allocationnodes->firstnodeindexisfull=0; // since it doesn't point to a full nodes block
 }
 /**
  * @brief sets the allocation index of _allocation
@@ -74,23 +119,61 @@ static void allocationsInitialized(){
  * @param _allocation 
  * @return uint32_t 
  */
-static bool setAllocationIndex(Malloc* const _alloc){
-	if(NULL==_allocationnodesRoot)return false;
-	if(NULL==_alloc)return false;
+static uint8_t setAllocationIndex(Malloc* const _alloc){
+	if(NULL==_alloc)return 1;
+	outputChar('A');
 	// assume failure
 	_alloc->allocationIndex=UNAVAILABLE_ALLOCATION_INDEX;
-	allocationnodes_t* levelallocationnodes;
+	outputChar('B');
+	if(NULL==_allocationnodesRoot)return 2;
+	outputChar('C');
+	/////if(!_allocationnodesRoot->NULLs&&!_allocationnodesRoot->usable)return 3; // TODO is it convenient to check here?????
+	outputChar('D');
+	allocationnodes_t *levelallocationnodes,*nextlevelallocationnodes;
 	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot}; // pointer to the first allocation node
 	allocationindex_t newAllocationIndex=0; // to hold the allocation index
 	int level=0,levelIndex;
-	// 1. determine all pointers of all allocation nodes (except the last one)
-	while(level<ALLOCATION_INDEX_BYTES){
-		levelallocationnodes=allocationnodes[level];
+	// 1. determine all remaining pointers to allocation nodes
+	while(level<ALLOCATION_INDEX_BYTES-1){
+		outputChar(level+48);
+		levelallocationnodes=allocationnodes[level]; // ASSERT must not be NULL!!
+		outputChar('E');
+		////assert(levelallocationnodes!=NULL);
+		////if(!levelallocationnodes->NULLs&&!levelallocationnodes->usable)return 3; // TODO is it convenient to check here?????
+		// assuming that field firstnonfullnodeindex has available entries
+		// CORRECTION I've added the full flag to check whether firstnonfullnodeindex is full!!
+		if(levelallocationnodes->firstnodeindexisfull)
+			updateFirstNonFullNodeIndex(levelallocationnodes);
+		outputChar('F');
+		////assert(!levelallocationnodes->firstnodeindexisfull);
 		levelIndex=levelallocationnodes->firstnonfullnodeindex;
-		if(NULL==levelallocationnodes->nodes[levelIndex])
-			levelallocationnodes->nodes[levelIndex]=calloc(1,sizeof(allocationnodes_t));
-		allocationnodes[++level]=levelallocationnodes->nodes[levelIndex];
-		if(NULL==allocationnodes[level])return false; // failure to set the required pointer
+		nextlevelallocationnodes=levelallocationnodes->nodes[levelIndex];
+		outputChar('G');
+		if(NULL==nextlevelallocationnodes){
+			// this may be the case after creation of levelallocationnodes before it is properly
+			// initialized
+			outputChar('H');
+			nextlevelallocationnodes=calloc(1,sizeof(allocationnodes_t));
+			if(NULL==nextlevelallocationnodes){
+				output("%s%sFailed to allocate a new allocation history block.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
+				return 4;
+			}
+			outputChar('I');
+			levelallocationnodes->nodes[levelIndex]=nextlevelallocationnodes;
+			// another node made non-NULL, so the NULLs need to be decremented, and the notfulls incremented
+			if(levelallocationnodes->NULLs)
+				levelallocationnodes->NULLs--;
+			else
+				levelallocationnodes->NULLs=MAX_ALLOCATION_NODE_INDEX; // the number of NULLs we have left
+			outputChar('J');
+			levelallocationnodes->usable++; // of all the node elements that are available, 1 is not full
+		}else{
+			// check if the nodes collection is full, if it is we can't continue
+			if(!levelallocationnodes->NULLs&&!levelallocationnodes->usable)return 5;
+			// if it's not full, shouldn't we find a NULL element to use?????
+		}
+		outputChar('K');
+		allocationnodes[++level]=nextlevelallocationnodes;
 		newAllocationIndex<<=8;
 		newAllocationIndex+=levelIndex;
 	}
@@ -102,12 +185,63 @@ static bool setAllocationIndex(Malloc* const _alloc){
 	}
 	*/
 	allocationpointers_t* allocationpointers=(allocationnodes_t*)(allocationnodes[level]);
-	while(allocationpointers->pointers[allocationpointers->firstnullallocationindex]){
-		if(allocationpointers->firstnullallocationindex==255)return false;
-		allocationpointers->firstnullallocationindex++;
+	outputChar('L');
+	// find the first NULL pointer element
+	int count=ALLOCATION_NODES_SIZE;
+	while(allocationpointers->pointers[allocationpointers->firstnullpointerindex]!=NULL){
+		outputChar('M');
+		/*
+		if(allocationpointers->firstnullallocationindex==255)
+			allocationpointers->firstnullallocationindex=0;
+		else*/
+			allocationpointers->firstnullpointerindex++;
+		if(!--count){
+			output("%s%sNo available allocation pointer elements found.\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
+			return 6;
+		}
 	}
-	allocationpointers->pointers[allocationpointers->firstnullallocationindex]=_alloc;
-	_alloc->allocationIndex=(newAllocationIndex<<8)+allocationpointers->firstnullallocationindex;
+	outputChar('N');
+	allocationpointers->pointers[allocationpointers->firstnullpointerindex]=_alloc;
+	_alloc->allocationIndex=(newAllocationIndex<<8)+allocationpointers->firstnullpointerindex;
+	outputChar('O');
+	allocationpointers->NULLs--;
+	// we might be full now!!!!
+	if(!allocationpointers->NULLs){ // no more NULL pointers
+		// it's sufficient to mark the current nodes pointer as full
+		while(level>0){
+			outputChar('P');
+			levelallocationnodes=allocationnodes[--level];
+			levelallocationnodes->firstnodeindexisfull=1;
+			// decrement the usable
+			levelallocationnodes->usable--;
+			// if not full yet, we're done, otherwise we have to do the same to previous allocation tree nodes
+			if(levelallocationnodes->usable||levelallocationnodes->NULLs)break;
+			/*
+			// TODO I think we should update first
+			// if field usable is not 0 yet, or there are NULLs 
+			if(levelallocationnodes->usable){
+				// TODO problem any non-NULL node pointer could be full as well!!!
+				do{
+					if(levelallocationnodes->firstnonfullnodeindex==255)
+						levelallocationnodes->firstnonfullnodeindex=0;
+					else
+						levelallocationnodes->firstnonfullnodeindex++;
+				}while(NULL==levelallocationnodes->nodes[levelallocationnodes->firstnonfullnodeindex]);
+				break;
+			}
+			if(levelallocationnodes->NULLs){
+				do{
+					///if(levelallocationnodes->firstnonfullnodeindex==255)
+					///	levelallocationnodes->firstnonfullnodeindex=0;
+					///else
+						levelallocationnodes->firstnonfullnodeindex++;
+				}while(levelallocationnodes->nodes[levelallocationnodes->firstnonfullnodeindex]!=NULL);
+				break;
+			}
+			*/
+		}
+	}
+	/* MDH@28JAN2025: no need to find a new element here because we're already doing that up there!!
 	// we need to find a new NULL element to set
 	while(allocationpointers->firstnullallocationindex!=255)
 	if(allocationpointers->pointers[++allocationpointers->firstnullallocationindex]==NULL)break;
@@ -126,12 +260,53 @@ static bool setAllocationIndex(Malloc* const _alloc){
 			if(levelallocationnodes->nodes[levelallocationnodes->firstnonfullnodeindex]==NULL)break;
 		}
 	}
-	return true;
+	*/
+	outputChar('\n');
+	return 0;
 }
-static bool freeAllocationIndex(allocationindex_t allocationIndex){
-	if(allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return false;
-
-	return false;
+static uint8_t freeAllocationIndex(Malloc* const _alloc){
+	if(NULL==_alloc)return 1;
+	if(NULL==_allocationnodesRoot)return 2;
+	if(_alloc->allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return 3;
+	unsigned allocationIndex=_alloc->allocationIndex;
+	// extract indices!!!
+	uint8_t indices[ALLOCATION_INDEX_BYTES];
+	int level=ALLOCATION_INDEX_BYTES;
+	while(--level>=0){
+		indices[level]=(allocationIndex&&0xFF);
+		allocationIndex>>=8;
+	}
+	// determine allocationnodes pointers
+	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot};
+	allocationnodes_t* levelallocationnode;
+	level=0;
+	while(level<ALLOCATION_INDEX_BYTES){
+		levelallocationnode=allocationnodes[level]->nodes[indices[level]];
+		allocationnodes[++level]=levelallocationnode;
+	}
+	// the last allocationnodes[ALLOCATION_INDEX_BYTES-1] points to the last
+	level=ALLOCATION_INDEX_BYTES-1;
+	bool full=(!allocationnodes[level]->NULLs);
+	allocationnodes[level]->nodes[indices[level]]=NULL; // free the stored pointer
+	allocationnodes[level]->NULLs++;
+	// as long as the level nodes are considered full we have to unfull them
+	while(full){
+		levelallocationnode=allocationnodes[--level];
+		// if the indices at this level equals the current node index, clear the is full flag
+		if(indices[level]==levelallocationnode->firstnonfullnodeindex)
+			levelallocationnode->firstnodeindexisfull=0;
+		full=(!levelallocationnode->NULLs&&!levelallocationnode->usable);
+		levelallocationnode->usable++; // another usable one, and therefore not full anymore
+		if(!level)break;
+	}
+	/*
+	if(indices[level]<allocationnodes[level]->firstnonfullnodeindex)
+		allocationnodes[level]->firstnonfullnodeindex=indices[level];
+	// obviously we're not full anymore, so if we were we have to adapt the first on the previous level
+	--level;
+	full=(allocationnodes[level]->firstnonfullnodeindex==255&&allocationnodes[level]->nodes[255]!=NULL);
+	*/
+	return true;
 }
 // MDH@20JAN2025: END new allocations functionality (first in v0.1.10)
 
@@ -473,6 +648,7 @@ static long long addAllocation(Mallocationtypeowner allocationowner/*,signed cha
 	assert(allocationowner!=NULL);
 	// MDH@22JAN2025
 	setAllocationIndex(allocationowner);
+	return allocationowner->allocationIndex;
 	/* replacing:
 	// if(count<=0)return -2; // invalid input
 	if(NULL==allocations._owners)return -1; // no allocation characters
