@@ -55,11 +55,11 @@ typedef struct Malloc{
 typedef struct allocationnodes_t{
 	struct allocationnodes_t* nodes[ALLOCATION_NODES_SIZE]; // the 64 pointers to the next allocations_t (unless this is the last allocation_t structure)
 	unsigned NULLs:ALLOCATION_NODE_INDEX_BITS; // the number of not used elements in nodes
-	unsigned usable:ALLOCATION_NODE_INDEX_BITS; // the number of not full nodes (so there's room in them)
-	unsigned firstnonfullnodeindex:ALLOCATION_NODE_INDEX_BITS; // either the position of the first available pointer or the first NULL pointer
+	unsigned usables:ALLOCATION_NODE_INDEX_BITS; // the number of not full nodes (so there's room in them)
+	unsigned currentNodeIndex:ALLOCATION_NODE_INDEX_BITS; // either the position of the first available pointer or the first NULL pointer
 	// instead of updating field firstnonfullnodeindex when it no longer can have more children
 	// we can mark it as full, allowing us to increment firstnonfullmodeindex on the next allocation!!
-	unsigned firstnodeindexisfull:1; // whether or not the first non full node index is full
+	unsigned currentNodeIndexIsValid:1; // whether or not the first non full node index is full
 }allocationnodes_t;
 /**
  * @brief defines the final node containing the Malloc* pointers associated with the allocation index
@@ -101,17 +101,17 @@ static void allocationsInitialized(){
 static void updateFirstNonFullNodeIndex(allocationnodes_t* const allocationnodes){
 	assert(allocationnodes!=NULL);
 	allocationnodes_t* nextallocationnodes;
-	if(allocationnodes->usable){ // there are (non NULL) usable nodes pointers
+	if(allocationnodes->usables){ // there are (non NULL) usable nodes pointers
 		do{
-			nextallocationnodes=allocationnodes->nodes[++allocationnodes->firstnonfullnodeindex];
+			nextallocationnodes=allocationnodes->nodes[++allocationnodes->currentNodeIndex];
 			// as long as this is a full node we have to keep looking
-		}while(NULL==nextallocationnodes||(!nextallocationnodes->usable&&!nextallocationnodes->NULLs));
+		}while(NULL==nextallocationnodes||(!nextallocationnodes->usables&&!nextallocationnodes->NULLs));
 	}else{ // there are no usable nodes anymore, so we should choose the first NULL node
 		do{
-			nextallocationnodes=allocationnodes->nodes[++allocationnodes->firstnonfullnodeindex];
+			nextallocationnodes=allocationnodes->nodes[++allocationnodes->currentNodeIndex];
 		}while(nextallocationnodes!=NULL);
 	}
-	allocationnodes->firstnodeindexisfull=0; // since it doesn't point to a full nodes block
+	allocationnodes->currentNodeIndexIsValid=1; // since it doesn't point to a full nodes block
 }
 /**
  * @brief sets the allocation index of _allocation
@@ -127,7 +127,7 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 	outputChar('B');
 	if(NULL==_allocationnodesRoot)return 2;
 	outputChar('C');
-	/////if(!_allocationnodesRoot->NULLs&&!_allocationnodesRoot->usable)return 3; // TODO is it convenient to check here?????
+	/////if(!_allocationnodesRoot->NULLs&&!_allocationnodesRoot->usables)return 3; // TODO is it convenient to check here?????
 	outputChar('D');
 	allocationnodes_t *levelallocationnodes,*nextlevelallocationnodes;
 	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot}; // pointer to the first allocation node
@@ -139,14 +139,14 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 		levelallocationnodes=allocationnodes[level]; // ASSERT must not be NULL!!
 		outputChar('E');
 		////assert(levelallocationnodes!=NULL);
-		////if(!levelallocationnodes->NULLs&&!levelallocationnodes->usable)return 3; // TODO is it convenient to check here?????
+		////if(!levelallocationnodes->NULLs&&!levelallocationnodes->usables)return 3; // TODO is it convenient to check here?????
 		// assuming that field firstnonfullnodeindex has available entries
 		// CORRECTION I've added the full flag to check whether firstnonfullnodeindex is full!!
-		if(levelallocationnodes->firstnodeindexisfull)
+		if(levelallocationnodes->currentNodeIndexIsValid)
 			updateFirstNonFullNodeIndex(levelallocationnodes);
 		outputChar('F');
-		////assert(!levelallocationnodes->firstnodeindexisfull);
-		levelIndex=levelallocationnodes->firstnonfullnodeindex;
+		////assert(!levelallocationnodes->currentNodeIndexIsValid);
+		levelIndex=levelallocationnodes->currentNodeIndex;
 		nextlevelallocationnodes=levelallocationnodes->nodes[levelIndex];
 		outputChar('G');
 		if(NULL==nextlevelallocationnodes){
@@ -166,10 +166,10 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 			else
 				levelallocationnodes->NULLs=MAX_ALLOCATION_NODE_INDEX; // the number of NULLs we have left
 			outputChar('J');
-			levelallocationnodes->usable++; // of all the node elements that are available, 1 is not full
+			levelallocationnodes->usables++; // of all the node elements that are available, 1 is not full
 		}else{
 			// check if the nodes collection is full, if it is we can't continue
-			if(!levelallocationnodes->NULLs&&!levelallocationnodes->usable)return 5;
+			if(!levelallocationnodes->NULLs&&!levelallocationnodes->usables)return 5;
 			// if it's not full, shouldn't we find a NULL element to use?????
 		}
 		outputChar('K');
@@ -211,31 +211,31 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 		while(level>0){
 			outputChar('P');
 			levelallocationnodes=allocationnodes[--level];
-			levelallocationnodes->firstnodeindexisfull=1;
+			levelallocationnodes->currentNodeIndexIsValid=0;
 			// decrement the usable
-			levelallocationnodes->usable--;
+			levelallocationnodes->usables--;
 			// if not full yet, we're done, otherwise we have to do the same to previous allocation tree nodes
-			if(levelallocationnodes->usable||levelallocationnodes->NULLs)break;
+			if(levelallocationnodes->usables||levelallocationnodes->NULLs)break;
 			/*
 			// TODO I think we should update first
 			// if field usable is not 0 yet, or there are NULLs 
-			if(levelallocationnodes->usable){
+			if(levelallocationnodes->usables){
 				// TODO problem any non-NULL node pointer could be full as well!!!
 				do{
-					if(levelallocationnodes->firstnonfullnodeindex==255)
-						levelallocationnodes->firstnonfullnodeindex=0;
+					if(levelallocationnodes->currentNodeIndex==255)
+						levelallocationnodes->currentNodeIndex=0;
 					else
-						levelallocationnodes->firstnonfullnodeindex++;
-				}while(NULL==levelallocationnodes->nodes[levelallocationnodes->firstnonfullnodeindex]);
+						levelallocationnodes->currentNodeIndex++;
+				}while(NULL==levelallocationnodes->nodes[levelallocationnodes->currentNodeIndex]);
 				break;
 			}
 			if(levelallocationnodes->NULLs){
 				do{
-					///if(levelallocationnodes->firstnonfullnodeindex==255)
-					///	levelallocationnodes->firstnonfullnodeindex=0;
+					///if(levelallocationnodes->currentNodeIndex==255)
+					///	levelallocationnodes->currentNodeIndex=0;
 					///else
-						levelallocationnodes->firstnonfullnodeindex++;
-				}while(levelallocationnodes->nodes[levelallocationnodes->firstnonfullnodeindex]!=NULL);
+						levelallocationnodes->currentNodeIndex++;
+				}while(levelallocationnodes->nodes[levelallocationnodes->currentNodeIndex]!=NULL);
 				break;
 			}
 			*/
@@ -251,60 +251,84 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 		while(level>0){
 			levelallocationnodes=allocationnodes[--level];
 			// we need to increment firstnonfull... until we find one that is NULL again
-			uint8_t first=levelallocationnodes->firstnonfullnodeindex;
+			uint8_t first=levelallocationnodes->currentNodeIndex;
 			while(first!=255){ // as long as there are successors that might be NULL
-				levelallocationnodes->firstnonfullnodeindex=(++first);
+				levelallocationnodes->currentNodeIndex=(++first);
 				if(NULL==levelallocationnodes->nodes[first])break;
 			}
 			// if we're on a NULL node, we're done, otherwise we have to increment the first of the nodes one level up
-			if(levelallocationnodes->nodes[levelallocationnodes->firstnonfullnodeindex]==NULL)break;
+			if(levelallocationnodes->nodes[levelallocationnodes->currentNodeIndex]==NULL)break;
 		}
 	}
 	*/
+	output("[%llu]",_alloc->allocationIndex);
 	outputChar('\n');
 	return 0;
 }
 static uint8_t freeAllocationIndex(Malloc* const _alloc){
+	outputChar('a');
 	if(NULL==_alloc)return 1;
+	outputChar('b');
 	if(NULL==_allocationnodesRoot)return 2;
+	outputChar('c');
 	if(_alloc->allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return 3;
+	outputChar('d');
 	unsigned allocationIndex=_alloc->allocationIndex;
+	outputChar('e');
 	// extract indices!!!
 	uint8_t indices[ALLOCATION_INDEX_BYTES];
 	int level=ALLOCATION_INDEX_BYTES;
 	while(--level>=0){
+		outputChar(level+48);
 		indices[level]=(allocationIndex&&0xFF);
+		outputChar('f');
 		allocationIndex>>=8;
+		outputChar('g');
 	}
 	// determine allocationnodes pointers
 	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot};
+	outputChar('h');
 	allocationnodes_t* levelallocationnode;
 	level=0;
 	while(level<ALLOCATION_INDEX_BYTES){
+		outputChar(level+48);
 		levelallocationnode=allocationnodes[level]->nodes[indices[level]];
+		outputChar('i');
 		allocationnodes[++level]=levelallocationnode;
+		outputChar('j');
 	}
+	outputChar('k');
 	// the last allocationnodes[ALLOCATION_INDEX_BYTES-1] points to the last
 	level=ALLOCATION_INDEX_BYTES-1;
 	bool full=(!allocationnodes[level]->NULLs);
+	outputChar('l');
 	allocationnodes[level]->nodes[indices[level]]=NULL; // free the stored pointer
+	outputChar('m');
 	allocationnodes[level]->NULLs++;
+	outputChar('n');
 	// as long as the level nodes are considered full we have to unfull them
 	while(full){
+		outputChar(level+48);
 		levelallocationnode=allocationnodes[--level];
+		outputChar('o');
 		// if the indices at this level equals the current node index, clear the is full flag
-		if(indices[level]==levelallocationnode->firstnonfullnodeindex)
-			levelallocationnode->firstnodeindexisfull=0;
-		full=(!levelallocationnode->NULLs&&!levelallocationnode->usable);
-		levelallocationnode->usable++; // another usable one, and therefore not full anymore
+		if(indices[level]==levelallocationnode->currentNodeIndex)
+			levelallocationnode->currentNodeIndexIsValid=1;
+		outputChar('p');
+		full=(!levelallocationnode->NULLs&&!levelallocationnode->usables);
+		outputChar('q');
+		levelallocationnode->usables++; // another usable one, and therefore not full anymore
+		outputChar('r');
 		if(!level)break;
+		outputChar('s');
 	}
+	outputChar('\n');
 	/*
-	if(indices[level]<allocationnodes[level]->firstnonfullnodeindex)
-		allocationnodes[level]->firstnonfullnodeindex=indices[level];
+	if(indices[level]<allocationnodes[level]->currentNodeIndex)
+		allocationnodes[level]->currentNodeIndex=indices[level];
 	// obviously we're not full anymore, so if we were we have to adapt the first on the previous level
 	--level;
-	full=(allocationnodes[level]->firstnonfullnodeindex==255&&allocationnodes[level]->nodes[255]!=NULL);
+	full=(allocationnodes[level]->currentNodeIndex==255&&allocationnodes[level]->nodes[255]!=NULL);
 	*/
 	return true;
 }
@@ -482,6 +506,7 @@ static uint8_t getTextRepresentationLength(unsigned long long units){
 	uint8_t textRepresentationLength=1;while(units>9){units/=10;textRepresentationLength+=1;}return textRepresentationLength;
 }
 
+static size_t allocationMarksSize=0,oldAllocationMarksSize=0;
 /**
  * @brief updates the allocation type marks (module local)
  * 
@@ -496,9 +521,10 @@ static bool updateAllocationTypeMarks(){
 		if(numberOfNewAllocationMarkTypes>0){
 			// outputAllocationTypeMarks();
 			unsigned long long totalnumberOfAllocationMarks=numberOfAllocationTypes*numberOfAllocationMarks; // the number of allocation type mark elements we need
-			size_t allocationMarksSize=sizeof(Mallocationmark)*totalnumberOfAllocationMarks; // the maximum size we need
-			Mallocationmark* newAllocationTypeMarks=(!_allocationMarks?malloc(allocationMarksSize):realloc(_allocationMarks,allocationMarksSize));
-			if(newAllocationTypeMarks){
+			allocationMarksSize=sizeof(Mallocationmark)*totalnumberOfAllocationMarks; // the maximum size we need
+			Mallocationmark* newAllocationTypeMarks=(NULL==_allocationMarks?unmanaged_malloc(allocationMarksSize):unmanaged_realloc(_allocationMarks,oldAllocationMarksSize,allocationMarksSize));
+			if(newAllocationTypeMarks!=NULL){
+				oldAllocationMarksSize=allocationMarksSize;
 				_allocationMarks=newAllocationTypeMarks;
 				// we'll have to do some shifting...
 				// because we do NOT need to shift the first mark we can use unsigned long long for allocationTypeMark
@@ -581,11 +607,11 @@ static long long getNewAllocationTypeIndex(signed char allocationType,size_t siz
 			if(newAllocationTypeIndex<0){ // doesn't exist yet
 					bool fixedsize=(allocationType>0);
 					OUTPUT_INFO("New allocation type #%lld: '%c'(=%i) of %s size %zd!\n",numberOfAllocationTypes,allocationType,allocationType,(fixedsize?"variable":"fixed"),size);
-					Mallocationsize* _allocationTypeSizeHistogram=(fixedsize?NULL:calloc(1,sizeof(Mallocationsize)));
-					if(fixedsize||_allocationTypeSizeHistogram){
+					Mallocationsize* _allocationTypeSizeHistogram=(fixedsize?NULL:unmanaged_calloc(1,sizeof(Mallocationsize)));
+					if(fixedsize||_allocationTypeSizeHistogram!=NULL){
 						// how about allocating memory for the histogram beforehand?
-						void* newAllocationTypes=realloc(_allocationTypes,sizeof(Mallocationtype)*(numberOfAllocationTypes+1));
-						if(newAllocationTypes){   
+						void* newAllocationTypes=unmanaged_realloc(_allocationTypes,sizeof(Mallocationtype)*numberOfAllocationTypes,sizeof(Mallocationtype)*(numberOfAllocationTypes+1));
+						if(newAllocationTypes!=NULL){
 							OUTPUT_INFO("%s","New allocation type record created.");
 							newAllocationTypeIndex=numberOfAllocationTypes++;
 							OUTPUT_INFO("Number of allocation types: %lld.",numberOfAllocationTypes);
@@ -612,7 +638,8 @@ static long long getNewAllocationTypeIndex(signed char allocationType,size_t siz
 							}else
 								_allocationTypes[newAllocationTypeIndex].count=count;
 						}else{
-							if(_allocationTypeSizeHistogram!=NULL)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
+							if(_allocationTypeSizeHistogram!=NULL)
+								unmanaged_free(_allocationTypeSizeHistogram,sizeof(Mallocationsize)); // MDH@14APR2020: don't forget to free what we've allocated beforehand
 							q2outputMessage(M_ERROR_PREFIX,"Failed to register new allocation type '%c'.\n",allocationType);
 						}
 					}else
@@ -744,12 +771,12 @@ if(type!=0&&size>0&&count>0){
 				;
 				if(category<0){ // does not yet exist
 						OUTPUT_INFO("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",numberOfHistogramCategories+1,count,size,type);
-						if(histogram)
-								histogram=realloc(histogram,sizeof(Mallocationsize)*(numberOfHistogramCategories+1));
+						if(histogram!=NULL)
+								histogram=unmanaged_realloc(histogram,sizeof(Mallocationsize)*numberOfHistogramCategories,sizeof(Mallocationsize)*(numberOfHistogramCategories+1));
 						else
-								histogram=malloc(sizeof(Mallocationsize));
-						if(!histogram)return -1;
-						if(histogram){
+								histogram=unmanaged_malloc(sizeof(Mallocationsize));
+						if(NULL==histogram)return -1;
+						if(histogram!=NULL){
 								_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
 								category=numberOfHistogramCategories; // MDH@04MAY2020: the negative value of the count represents the number of histogram categories
 								_allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
@@ -823,12 +850,12 @@ static long long registerAllocation(Mallocationtypeowner allocationtypeowner/*,u
 						;
 						if(category<0){ // does not yet exist
 							OUTPUT_INFO("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",numberOfHistogramCategories+1,count,size,type);
-							if(histogram)
-								histogram=realloc(histogram,sizeof(Mallocationsize)*(numberOfHistogramCategories+1));
+							if(histogram!=NULL)
+								histogram=unmanaged_realloc(histogram,sizeof(Mallocationsize)*numberOfHistogramCategories,sizeof(Mallocationsize)*(numberOfHistogramCategories+1));
 							else
-								histogram=malloc(sizeof(Mallocationsize));
-							if(!histogram)return -1;
-							if(histogram){
+								histogram=unmanaged_malloc(sizeof(Mallocationsize));
+							if(NULL==histogram)return -1;
+							if(histogram!=NULL){
 								_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
 								category=numberOfHistogramCategories; // MDH@04MAY2020: the negative value of the count represents the number of histogram categories
 								_allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
@@ -993,8 +1020,8 @@ static long long getAllocationTypeSize(unsigned long long allocationTypeIndex,un
 void outputAllocationTypeMarks(char* linePrefix){
 	size_t size;
 	unsigned long long freed,occupied,totaloccupied,totalfreed;
-	uint8_t *_allocationTypeColumnLengths=calloc(numberOfAllocationMarkTypes,sizeof(uint8_t)); // all zero
-	if(_allocationTypeColumnLengths){
+	uint8_t *_allocationTypeColumnLengths=unmanaged_calloc(numberOfAllocationMarkTypes,sizeof(uint8_t)); // all zero
+	if(_allocationTypeColumnLengths!=NULL){
 		unsigned long long units,allocationMarkIndex=0; // the successor of the last active allocation mark (which supposedly is the oldest)
 		uint8_t unitsTextLength=0;
 		while(allocationMarkIndex<numberOfAllocationMarks){
@@ -1060,7 +1087,7 @@ void outputAllocationTypeMarks(char* linePrefix){
 			}
 			allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks; // increment the allocation mark index
 		}
-		free(_allocationTypeColumnLengths);
+		unmanaged_free(_allocationTypeColumnLengths,sizeof(uint8_t));
 	}
 }
 
@@ -1213,7 +1240,7 @@ void reportAllocations(char* title,char* prefix){
  */
 Mallocationtype* _getAllocationTypes(){
 	size_t allocationTypesSize=(_allocationTypes?numberOfAllocationTypes*sizeof(Mallocationtype):0);
-	return(allocationTypesSize>0?memcpy(malloc(allocationTypesSize),_allocationTypes,allocationTypesSize):NULL);
+	return(allocationTypesSize>0?memcpy(unmanaged_malloc(allocationTypesSize),_allocationTypes,allocationTypesSize):NULL);
 }
 
 // MDH@19NOV2019: 
@@ -1238,6 +1265,7 @@ bool resetAllocationManagement(){
 
 }
 
+static size_t oldNumberOfAllocationTypeMarks=0;
 // MDH@25NOV2019: markAllocationTypes() remembers the current allocation type counts in the 4th and 5th element
 // MDH@11MAY2020: either we can use a reusable allocation mark or append one
 /**
@@ -1248,19 +1276,20 @@ bool resetAllocationManagement(){
  */
 bool allocationMarkAdded(){
 	// output("Last active allocation mark before: %llu.\n",lastActiveAllocationMark); // DEBUG
-	if(_allocationMarks){
+	if(_allocationMarks!=NULL){
 		// if we can't increment the last active allocation mark without bumping into the first active allocation mark we have to add an allocation mark
 		unsigned long long newLastActiveAllocationMark=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
 		// output("New last active allocation mark: %llu.\n",newLastActiveAllocationMark); // DEBUG
 		if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
-			char** newAllocationTypeMarkIds=realloc(_allocationMarkTimestamps,(numberOfAllocationMarks+1)*sizeof(char*));
-			if(!newAllocationTypeMarkIds)return false;
+			char** newAllocationTypeMarkIds=unmanaged_realloc(_allocationMarkTimestamps,numberOfAllocationMarks*sizeof(char*),(numberOfAllocationMarks+1)*sizeof(char*));
+			if(NULL==newAllocationTypeMarkIds)return false;
 			_allocationMarkTimestamps=newAllocationTypeMarkIds;
 			_allocationMarkTimestamps[numberOfAllocationMarks]=NULL; // because we haven't set it yet!!!!
 			// MDH@07MAY2020: we have to add a new mark
 			size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
-			Mallocationmark* newAllocationTypeMarks=realloc(_allocationMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark));
-			if(!newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
+			Mallocationmark* newAllocationTypeMarks=unmanaged_realloc(_allocationMarks,oldNumberOfAllocationTypeMarks*sizeof(Mallocationmark),newNumberOfAllocationTypeMarks*sizeof(Mallocationmark));
+			if(NULL==newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
+			oldNumberOfAllocationTypeMarks=newNumberOfAllocationTypeMarks;
 			_allocationMarks=newAllocationTypeMarks;
 			// if newLastActiveAllocationMark is now 0, we would be appending the mark instead of inserting
 			if(newLastActiveAllocationMark>0){ // we need room at where the first active allocation mark is now (the oldest allocation mark)
@@ -1274,8 +1303,8 @@ bool allocationMarkAdded(){
 			firstActiveAllocationMark=(newLastActiveAllocationMark+1)%numberOfAllocationMarks;
 		}else
 		// free the mark id that is going to be replaced!!!!
-		if(_allocationMarkTimestamps[newLastActiveAllocationMark]){
-			free(_allocationMarkTimestamps[newLastActiveAllocationMark]);
+		if(_allocationMarkTimestamps[newLastActiveAllocationMark]!=NULL){
+			free(_allocationMarkTimestamps[newLastActiveAllocationMark]); // since created with strdup() which does not call an unmanaged dynamic allocation function
 			_allocationMarkTimestamps[newLastActiveAllocationMark]=NULL; // MDH@15JUN2020: might be an issue if we don't!!!
 		}
 		// we have to make room for the new allocation and copy the current last active mark over
@@ -1295,21 +1324,28 @@ bool allocationMarkAdded(){
 
    }else{
 
-		_allocationMarkTimestamps=calloc(1,sizeof(char*));
-		if(!_allocationMarkTimestamps)return false;
+		_allocationMarkTimestamps=unmanaged_calloc(1,sizeof(char*));
+		if(NULL==_allocationMarkTimestamps)return false;
 
-		_allocationMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
-		if(!_allocationMarks){
-			free(_allocationMarkTimestamps);_allocationMarkTimestamps=NULL;
+		_allocationMarks=unmanaged_calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
+		if(NULL==_allocationMarks){
+			unmanaged_free(_allocationMarkTimestamps,sizeof(char*));
+			_allocationMarkTimestamps=NULL;
 			q2outputError("\tFailed to initialize allocation marks registration");
 			return false;
 		}
-		numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;
+		numberOfAllocationMarks=1;
+		firstActiveAllocationMark=0;
+		lastActiveAllocationMark=0;
+		numberOfAllocationMarkTypes=numberOfAllocationTypes;
 		OUTPUT_INFO("\t%s","Allocation marks registration initialized...");	
 	}
  
 	// output("Last active allocation mark after: %llu.\n",lastActiveAllocationMark); // DEBUG
-	time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
+	time_t now=time(NULL);
+	struct tm * nowlocal=localtime(&now);
+	char hms[9];
+	strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
 	_allocationMarkTimestamps[lastActiveAllocationMark]=strdup(hms); // TODO for now assume that strdup() will NOT fail!!!! of course if it does it will return NULL so that's OK
 	// output("Allocation type mark id #%llu: '%s'.\n",lastActiveAllocationMark,_allocationMarkTimestamps[lastActiveAllocationMark]); // DEBUG
 	return true;
@@ -2149,10 +2185,13 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 	*/
    
 	if(_allocationMarks!=NULL){
-		if(numberOfAllocationMarks*numberOfAllocationMarkTypes>0)output("\tReleasing %llu allocation marks of %llu registered allocation types...\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
-		free(_allocationMarks);_allocationMarks=NULL;
+		if(numberOfAllocationMarks*numberOfAllocationMarkTypes>0)
+			output("\tReleasing %llu allocation marks of %llu registered allocation types...\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
+		unmanaged_free(_allocationMarks,oldAllocationMarksSize);
+		oldAllocationMarksSize=0;
+		_allocationMarks=NULL;
 		output("\tAllocation marks released...\n");
-	} 
+	}
 	numberOfAllocationMarks=0;numberOfAllocationMarkTypes=0;
 
 #ifndef __PRODUCTION__
@@ -2191,10 +2230,10 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 #endif
 	// MDH@12MAY2020: I suppose that if we have allocation types we can create them
 	// assuming we have a single (global) allocation type (i.e. *)
-	if(!_allocationMarkTimestamps){
-		_allocationMarkTimestamps=calloc(1,sizeof(char*)); // a single char* that is initialized to NULL!!!!
-		if(!_allocationMarkTimestamps){
-			output("\t%sFailed to initialize the memory allocation marks.\n",M_ERROR_PREFIX);
+	if(NULL==_allocationMarkTimestamps){
+		_allocationMarkTimestamps=unmanaged_calloc(1,sizeof(char*)); // a single char* that is initialized to NULL!!!!
+		if(NULL==_allocationMarkTimestamps){
+			output("\t%s%sFailed to initialize the memory allocation marks.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 			return false;
 		}
 	}
@@ -2202,16 +2241,18 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 	time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
 
 	_allocationMarkTimestamps[0]=strdup(hms);
-	if(!_allocationMarkTimestamps[0]){
-		free(_allocationMarkTimestamps);_allocationMarkTimestamps=NULL;
-		output("\t%sFailed to initialize the allocation mark timestamps.\n",M_ERROR_PREFIX);
+	if(NULL==_allocationMarkTimestamps[0]){
+		unmanaged_free(_allocationMarkTimestamps,sizeof(char*));
+		_allocationMarkTimestamps=NULL;
+		output("\t%s%sFailed to initialize the allocation mark timestamps.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 		return false;
 	}
 
-	_allocationMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
-	if(!_allocationMarks){
-		free(_allocationMarkTimestamps);_allocationMarkTimestamps=NULL;
-		output("\t%sFailed to initialize the memory allocation mark management.\n",M_ERROR_PREFIX);
+	_allocationMarks=unmanaged_calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
+	if(NULL==_allocationMarks){
+		unmanaged_free(_allocationMarkTimestamps,sizeof(char*));
+		_allocationMarkTimestamps=NULL;
+		output("\t%s%sFailed to initialize the memory allocation mark management.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 		return false;
 	}
 	

@@ -8,6 +8,13 @@
 
 #include "Moutput.h"
 
+// MDH@29JAN2025: unmanaged dynamic memory allocation keeping track of the number of unmanaged bytes
+void* unmanaged_malloc(size_t size);
+void* unmanaged_calloc(size_t count,size_t size);
+void* unmanaged_realloc(void* ptr,size_t oldsize,size_t newsize);
+void unmanaged_free(void* ptr,size_t size);
+unsigned long long getNumberOfUnmanagedBytes();
+
 /* possibly move to a separate module in the future
 // support for multiple message streams stored in a double-linked message stream list (_messageStreamStack)
 bool pushMessageStream(FILE* stream,char const * const source,char const * const messageType);

@@ -7891,7 +7891,7 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 			if(numberOfArrayElements){
 				output("Retrieving %zu message types from array.\n",numberOfArrayElements);
 				// accept only text elements
-				_messageCounts->messagecounts=calloc(numberOfArrayElements,sizeof(MessageCount));
+				_messageCounts->messagecounts=unmanaged_calloc(numberOfArrayElements,sizeof(MessageCount));
 				if(_messageCounts->messagecounts!=NULL){
 					Mvalue* arrayElementValue;
 					size_t messageCountIndex=0;
@@ -7912,7 +7912,7 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 			size_t numberOfListElements=(list!=NULL?list->numberOfElements:0);
 			if(numberOfListElements){
 				// accept only text elements
-				_messageCounts->messagecounts=calloc(numberOfListElements,sizeof(MessageCount));
+				_messageCounts->messagecounts=unmanaged_calloc(numberOfListElements,sizeof(MessageCount));
 				if(_messageCounts->messagecounts!=NULL){
 					Mvalue* listElementValue;
 					size_t messageCountIndex=0;
@@ -7936,7 +7936,7 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 			size_t numberOfMapElements=(map!=NULL?map->numberOfElements:0);
 			if(numberOfMapElements){
 				// accept only text elements
-				_messageCounts->messagecounts=calloc(numberOfMapElements,sizeof(MessageCount));
+				_messageCounts->messagecounts=unmanaged_calloc(numberOfMapElements,sizeof(MessageCount));
 				if(_messageCounts->messagecounts!=NULL){
 					Mvariable* mapElementVariable;
 					Mvalue* mapElementValue;
@@ -7960,7 +7960,7 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 			}
 		}else{ // single value message type
 			_messageCounts->count=1;
-			_messageCounts->messagecounts=calloc(1,sizeof(MessageCount));
+			_messageCounts->messagecounts=unmanaged_calloc(1,sizeof(MessageCount));
 			if(_messageCounts->messagecounts!=NULL){
 				if(messageTypeValue->type!=VT_TEXT){
 					Mstring* _valueText=owned_string(_getValueText(messageTypeValue,true,true),owner);

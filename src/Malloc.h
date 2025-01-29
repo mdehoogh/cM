@@ -127,10 +127,10 @@ void* Mdisowned(void* ptr,Mallocationowner owner);
 #define SUBOWNED(ptr,level) Msubowned((ptr),(level))
 #else
 // use the system methods
-#define MALLOC(size,type,owner) malloc((nitems)*(size))
-#define CALLOC(size,type,owner) calloc(1,(size))
-#define FREE(ptr,count,type) free(ptr)
-#define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc((ptr),(to_nitems)*(size))
+#define MALLOC(size,type,owner) unmanaged_malloc((nitems)*(size))
+#define CALLOC(size,type,owner) unmanaged_calloc(1,(size))
+#define FREE(ptr,count,type) unmanaged_free(ptr)
+#define REALLOC(ptr,from_nitems,to_nitems,size,type) unmanaged_realloc((ptr),(to_nitems)*(size))
 #define DISOWNED(ptr,owner) (ptr)
 #define OWNED(ptr,owner) (ptr)
 #define SUBOWNED(ptr,level) (ptr)

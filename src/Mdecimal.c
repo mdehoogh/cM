@@ -823,15 +823,18 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
 			mpd_qsetprec(mpd_contexts[mpd_context_count-1],decimalprecision);
 		}else{
 			if(amVerbose())output("About to create the decimal context with precision %lld.\n",decimalprecision);
-			mpd_context=(mpd_context_t*)malloc(sizeof(mpd_context_t));
+			mpd_context=(mpd_context_t*)unmanaged_malloc(sizeof(mpd_context_t));
 			if(mpd_context){
 				if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
 				// initialize the new context to the default context (specification)
 				mpd_init(mpd_context,decimalprecision);
 				if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_context));
 				// try to append this context
-				mpd_context_t** new_mpd_contexts=(mpd_context_count>0?realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t*)):malloc(sizeof(mpd_context_t))); // realloc will work anyway
-				if(new_mpd_contexts){
+				mpd_context_t** new_mpd_contexts=
+					(mpd_context_count>0
+						?unmanaged_realloc(mpd_contexts,mpd_context_count*sizeof(mpd_context_t*),(mpd_context_count+1)*sizeof(mpd_context_t*))
+						:unmanaged_malloc(sizeof(mpd_context_t))); // realloc will work anyway
+				if(new_mpd_contexts!=NULL){
 					mpd_contexts=new_mpd_contexts;
 					mpd_contexts[mpd_context_count++]=mpd_context;
 					if(amVerbose())output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
@@ -843,7 +846,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
 		////Mdecimalraphandler=MMdecimalraphandler;
 	}
 	// reset the status, so we can use the context as if it were new
-	if(mpd_context)mpd_qsetstatus(mpd_context,0); // using the setter is preferred over ->status=0 assignment
+	if(mpd_context!=NULL)mpd_qsetstatus(mpd_context,0); // using the setter is preferred over ->status=0 assignment
 	return mpd_context;
 }// VALIDATED */
 
@@ -1727,7 +1730,8 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 					free_mpd(_sinsquared);
 					// done if the CORDIC tangens equals zero!!!!
 					if(mpd_iszero(_cordictangent))break;
-					Msincoselement* _cordicElement=calloc(1,sizeof(Msincoselement));
+					Msincoselement* _cordicElement=unmanaged_calloc(1,sizeof(Msincoselement));
+					// YET_TODO when is _cordicElement freed?????
 					if(_cordicElement==NULL){q2outputError("Failed to create a CORDIC element.");break;}
 					_cordicElement->_angle=get_mpd_copy(mpd_context,_cordicangle);
 					_cordicElement->_cosine=get_mpd_copy(mpd_context,_cordiccosine);

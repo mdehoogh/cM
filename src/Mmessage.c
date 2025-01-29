@@ -17,6 +17,33 @@ extern const char* const M_RESULT_PREFIX;
 extern const char* const M_MESSAGE_PREFIX;
 /////extern const char* const M_RESULT_PREFIX="RESULT: "; // MDH@28AUG2024: for results
 
+// MDH@29JAN2025: keeping track of the number of unmanaged dynamic memory
+static unsigned long long unmanaged_bytes=0;
+void* unmanaged_malloc(size_t size){
+	void* ptr=malloc(size);
+	if(ptr!=NULL)unmanaged_bytes+=size;
+	return ptr;
+}
+void* unmanaged_calloc(size_t count,size_t size){
+	void* ptr=calloc(count,size);
+	if(ptr!=NULL)unmanaged_bytes+=(count*size);
+	return ptr;
+}
+void* unmanaged_realloc(void* ptr,size_t oldsize,size_t newsize){
+	void* newptr=(ptr!=NULL?realloc(ptr,newsize):NULL);
+	if(newptr!=NULL){unmanaged_bytes-=oldsize;unmanaged_bytes+=newsize;}
+	return newptr;
+}
+void unmanaged_free(void* ptr,size_t size){
+	if(NULL==ptr)return;
+	free(ptr);
+	unmanaged_bytes-=size;
+}
+unsigned long long getNumberOfUnmanagedBytes(){
+	return unmanaged_bytes;
+}
+// MDH@29JAN2025 END
+
 typedef struct MessageStream{
 	char* source;
 	char* messageType; // the type of the messages it is allowed to receive
@@ -63,7 +90,7 @@ bool pushMessageStream(FILE* stream,char const * const source,char const * const
 	if(source!=NULL&&stream!=NULL){
 		MessageStream* messageStream=getMessageStream(source,messageType);
 		if(NULL==messageStream){ // haven't got it yet
-			messageStream=calloc(1,sizeof(MessageStream));
+			messageStream=unmanaged_calloc(1,sizeof(MessageStream));
 			if(messageStream!=NULL){
 				messageStream->stream=stream;
 				messageStream->source=strdup(source);
@@ -224,7 +251,7 @@ static MessageTypeListNode* getMessageTypeListNode(char const * const messageTyp
 	return messageTypeListNode;
 }
 static MessageTypeListNode* getNewMessageTypeListNode(char const * const messageType){
-	MessageTypeListNode* newMessageTypeListNode=calloc(1,sizeof(MessageTypeListNode));
+	MessageTypeListNode* newMessageTypeListNode=unmanaged_calloc(1,sizeof(MessageTypeListNode));
 	if(newMessageTypeListNode!=NULL){
 		newMessageTypeListNode->next=NULL; // should not be required though!!!
 		newMessageTypeListNode->messageType=strdup(messageType);
@@ -291,10 +318,10 @@ bool addMessageOfType(char const * const messageText,char const * const messageT
 	MessageTypeListNode *messageTypeListNode=_getMessageTypeListNode(messageType);
 	if(messageTypeListNode!=NULL){
 		///output("Registering message '%s' of type '%s'.\n",messageText,messageType);
-		MessageNode* messageNode=calloc(1,sizeof(MessageNode));
+		MessageNode* messageNode=unmanaged_calloc(1,sizeof(MessageNode));
 		if(messageNode!=NULL){
 			//// malloc() above changed to calloc()!!! messageNode->next=NULL; // essential bro'
-			messageNode->message=calloc(1,sizeof(Message));
+			messageNode->message=unmanaged_calloc(1,sizeof(Message));
 			if(NULL==messageNode->message){
 				free(messageNode);
 				q2outputError("Failed to allocate message");
@@ -544,7 +571,7 @@ static size_t updateMessageTypeListNodeFiltered(MessageCounts const * const mess
  */
 Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 	///outputMessageCounts(messageCounts);
-	Messages* _messages=calloc(1,sizeof(Messages));
+	Messages* _messages=unmanaged_calloc(1,sizeof(Messages));
 	if(_messages!=NULL){
 		// we want to store for each message type how many messages to return
 		// we could well store this amount with the message type itself
@@ -556,8 +583,8 @@ Messages* _getFilteredMessages(MessageCounts * const messageCounts){
 		///output("Total number of matching messages: %zu.\n",totalMessageCount);
 		// there are messages to return
 		// we need to start out from the right message nodes
-		MessageNode** messageTypeNodes=calloc(totalMessageTypeCount,sizeof(MessageNode*));
-		char** messageTypes=calloc(totalMessageTypeCount,sizeof(char*));
+		MessageNode** messageTypeNodes=unmanaged_calloc(totalMessageTypeCount,sizeof(MessageNode*));
+		char** messageTypes=unmanaged_calloc(totalMessageTypeCount,sizeof(char*));
 		if(messageTypeNodes!=NULL&&messageTypes!=NULL){
 			///output("Total number of matching messages: %zu.\n",totalMessageCount);
 			_messages->messages=calloc(totalMessageCount,sizeof(Message*));
@@ -784,7 +811,7 @@ long long removeMessages(MessageCounts const * const messageCounts){
  * @return MessageCounts* 
  */
 MessageCounts* _getMessageCounts(){
-	MessageCounts* messageCounts=calloc(1,sizeof(MessageCounts));
+	MessageCounts* messageCounts=unmanaged_calloc(1,sizeof(MessageCounts));
 	if(messageCounts!=NULL){
 		size_t totalMessageTypeCount=0;
 		MessageTypeListNode* messageTypeListNode=firstMessageTypeListNode;
@@ -793,7 +820,7 @@ MessageCounts* _getMessageCounts(){
 			messageTypeListNode=messageTypeListNode->next;
 		}
 		if(totalMessageTypeCount>0){
-			messageCounts->messagecounts=calloc(totalMessageTypeCount,sizeof(MessageCount));
+			messageCounts->messagecounts=unmanaged_calloc(totalMessageTypeCount,sizeof(MessageCount));
 			if(messageCounts->messagecounts!=NULL){
 				messageCounts->count=totalMessageTypeCount;
 				totalMessageTypeCount=0;
@@ -951,7 +978,7 @@ size_t q2collect(char const * const fmt,...){
 					break;
 				}
 				outputSize+=64;
-				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				char* newOutputText=unmanaged_realloc(outputText,sizeof(char)*(outputSize-64),sizeof(char)*outputSize);
 				if(NULL==newOutputText){
 					reportOutputMessageMemoryError();
 					break;
@@ -1015,7 +1042,7 @@ size_t q2output(char const * const fmt,...){
 					break;
 				}
 				outputSize+=64;
-				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				char* newOutputText=unmanaged_realloc(outputText,sizeof(char)*(outputSize-64),sizeof(char)*outputSize);
 				if(NULL==newOutputText){
 					reportOutputMessageMemoryError();
 					break;
@@ -1224,7 +1251,7 @@ size_t q2outputMessage(char const * const messageType,char const * const fmt,...
 					break;
 				}
 				outputSize+=64;
-				char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+				char* newOutputText=unmanaged_realloc(outputText,sizeof(char)*(outputSize-64),sizeof(char)*outputSize);
 				if(NULL==newOutputText){
 					reportOutputMessageMemoryError();
 					break;
@@ -1269,7 +1296,7 @@ size_t q2collectMessage(char const * const messageType,char const * const fmt,..
 				break;
 			}
 			outputSize+=64;
-			char* newOutputText=realloc(outputText,sizeof(char)*outputSize);
+			char* newOutputText=unmanaged_realloc(outputText,sizeof(char)*(outputSize-64),sizeof(char)*outputSize);
 			if(NULL==newOutputText){
 				reportOutputMessageMemoryError();
 				break;
@@ -1288,7 +1315,7 @@ bool outputCollectorInitialized(){
 	warningPrefixLength=strlen(M_WARNING_PREFIX);
 	resultPrefixLength=strlen(M_RESULT_PREFIX);
 	outputLength=0;outputSize=256;
-	outputText=calloc(256,sizeof(char)); // should suffice
+	outputText=unmanaged_calloc(256,sizeof(char)); // should suffice
 	return(outputText!=NULL);
 }
 

@@ -320,7 +320,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
 							maximumNumberOfColumns=tablerowValueList->numberOfElements;
 							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
-							_columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
+							_columnLengths=unmanaged_calloc(maximumNumberOfColumns,sizeof(size_t));
 							/*
 							if(_columnLengths!=NULL){
 								// get the value text of all elements in the header list
@@ -353,7 +353,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
 							maximumNumberOfColumns=tablerowValueArray->numberOfElements;
 							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
-							_columnLengths=calloc(maximumNumberOfColumns,sizeof(size_t));
+							_columnLengths=unmanaged_calloc(maximumNumberOfColumns,sizeof(size_t));
 							/*
 							if(_columnLengths!=NULL){
 								// get the value text of all elements in the header list
@@ -375,7 +375,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 						}
 					}
 					///q2outputMessage(M_INFO_PREFIX,"Maximum number of columns: %zu.",maximumNumberOfColumns);
-					Mstring** _cells=(_columnLengths!=NULL?calloc(tableList->numberOfElements*maximumNumberOfColumns,sizeof(Mstring*)):NULL);
+					Mstring** _cells=(_columnLengths!=NULL?unmanaged_calloc(tableList->numberOfElements*maximumNumberOfColumns,sizeof(Mstring*)):NULL);
 					if(_cells!=NULL){
 						// collect the separate lines to store in _cells
 						size_t cellTextLength,numberOfRows=tableList->numberOfElements,cellIndex=0,rowIndex=0;
@@ -497,7 +497,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 						*/
 						free(_columnLengths); // essential bro'
 						while(cellIndex)FREE_STRING(_cells[--cellIndex],owner); // essential to release all created Mstring's
-						free(_cells);
+						unmanaged_free(_cells,tableList->numberOfElements*maximumNumberOfColumns*sizeof(Mstring*));
 					}else
 						q2outputError("Failed to prepare for displaying the table header");
 				}
