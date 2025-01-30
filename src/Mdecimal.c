@@ -810,12 +810,17 @@ mpd_context_t** mpd_contexts=NULL; // keep track of all decimal contexts
 //
 mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
 	mpd_context_t* mpd_context=NULL; // the context we will be returning
-	if(amVerbose())output("Retrieving the decimal context with precision %lld.\n",decimalprecision);
+	if(amVerbose())
+		output("Retrieving the decimal context with precision %lld.\n",decimalprecision);
 	// locate the context with the requested decimal precision
 	int mpd_context_index=mpd_context_count;
-	while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimalprecision){mpd_context=mpd_contexts[mpd_context_index];break;}
+	while(--mpd_context_index>=0)
+	if(mpd_getprec(mpd_contexts[mpd_context_index])==decimalprecision){
+		mpd_context=mpd_contexts[mpd_context_index];
+		break;
+	}
 	// if we haven't found a match, try to get one
-	if(!mpd_context){ // wasn't found
+	if(NULL==mpd_context){ // wasn't found
 		// TODO perhaps re-using is not such a good idea...
 		if(mpd_context_count>=MAXIMUM_NUMBER_OF_CONTEXTS){ // re-use the last one
 			mpd_context=mpd_contexts[mpd_context_count-1];
@@ -824,11 +829,13 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
 		}else{
 			if(amVerbose())output("About to create the decimal context with precision %lld.\n",decimalprecision);
 			mpd_context=(mpd_context_t*)unmanaged_malloc(sizeof(mpd_context_t));
-			if(mpd_context){
-				if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
+			if(mpd_context!=NULL){
+				if(amVerbose())
+					output("New decimal context with precision %lld created.\n",decimalprecision);
 				// initialize the new context to the default context (specification)
 				mpd_init(mpd_context,decimalprecision);
-				if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_context));
+				if(amVerbose())
+					output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_context));
 				// try to append this context
 				mpd_context_t** new_mpd_contexts=
 					(mpd_context_count>0
@@ -837,9 +844,13 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
 				if(new_mpd_contexts!=NULL){
 					mpd_contexts=new_mpd_contexts;
 					mpd_contexts[mpd_context_count++]=mpd_context;
-					if(amVerbose())output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
-				}else
+					if(amVerbose())
+						output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
+				}else{
+					// since we haven't stored the allocated mpd_context, we have to free it!!!
+					unmanaged_free(mpd_context,sizeof(mpd_context_t));mpd_context=NULL;
 					q2outputMessage(M_ERROR_PREFIX,"Failed to return a decimal context with precision %u.",decimalprecision);
+				}
 			}else
 				q2outputError("Failed to create a new decimal context");
 		}
@@ -1019,18 +1030,22 @@ Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){Ma
 	if(d1!=NULL&&d2!=NULL){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
 			mpd_context_t* mpd_context=get_mpd_context(MAX(d1->prec,d2->prec)); // MDH@13AUG2023: need to use the same decimal
-			Mrational *_r1=owned_rational(_getDecimalRational(d1),owner),*_r2=owned_rational(_getDecimalRational(d2),owner);
-			if(_r1!=NULL&&_r2!=NULL){
-				Mrational* _r=owned_rational(_getRationalSum(_r1,_r2),owner); // compute the sum of two rationals
-				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r,mpd_context),owner);
-					FREE_RATIONAL(_r,owner);
+			if(mpd_context!=NULL){
+				Mrational *_r1=owned_rational(_getDecimalRational(d1),owner),
+									*_r2=owned_rational(_getDecimalRational(d2),owner);
+				if(_r1!=NULL&&_r2!=NULL){
+					Mrational* _r=owned_rational(_getRationalSum(_r1,_r2),owner); // compute the sum of two rationals
+					if(_r!=NULL){
+						_decimal=owned_decimal(_getRationalDecimal(_r,mpd_context),owner);
+						FREE_RATIONAL(_r,owner);
+					}else
+						q2outputError("Failed to compute the sum of two rational decimals");
 				}else
-					q2outputError("Failed to compute the sum of two rational decimals");
+					q2outputError("Failed to convert a decimal to a rational");
+				FREE_RATIONAL(_r1,owner);
+				FREE_RATIONAL(_r2,owner);
 			}else
-				q2outputError("Failed to convert a decimal to a rational");
-			FREE_RATIONAL(_r1,owner);
-			FREE_RATIONAL(_r2,owner);
+				q2outputError("Failed to obtain a decimal context");
 		}else // pure decimals
 			_decimal=owned_decimal(_dadd(d1,d2),owner); // just add
 	}
@@ -1081,7 +1096,11 @@ Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const
 			if(_r1!=NULL&&_r2!=NULL){
 				Mrational* _r=owned_rational(_getRationalDifference(_r1,_r2),owner); // compute the product of two rationals
 				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
+					mpd_context_t* mpd_context=get_mpd_context(MAX(d1->prec,d2->prec));
+					if(mpd_context!=NULL)
+						_decimal=owned_decimal(_getRationalDecimal(_r,mpd_context),owner);
+					else
+						q2outputError("Failed to obtain a decimal context");
 					FREE_RATIONAL(_r,owner);
 				}else
 					q2outputError("Failed to compute the difference of two rationalized decimals");
@@ -1139,7 +1158,11 @@ Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d
 			if(_r1!=NULL&&_r2!=NULL){
 				Mrational* _r=owned_rational(_getRationalQuotient(_r1,_r2),owner); // compute the quotient of two rationals
 				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
+					mpd_context_t* mpd_context=get_mpd_context(MAX(d1->prec,d2->prec));
+					if(mpd_context!=NULL)
+						_decimal=owned_decimal(_getRationalDecimal(_r,mpd_context),owner);
+					else
+						q2outputError("Failed to obtain a decimal context");
 					FREE_RATIONAL(_r,owner);
 				}else
 					q2outputError("Failed to compute the quotient of two rationals");
@@ -1201,7 +1224,11 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
 			if(_r1!=NULL&&_r2!=NULL){
 				Mrational* _r=owned_rational(_getRationalProduct(_r1,_r2),owner); // compute the product of two rationals
 				if(_r!=NULL){
-					_decimal=owned_decimal(_getRationalDecimal(_r,get_mpd_context(MAX(d1->prec,d2->prec))),owner);
+					mpd_context_t* mpd_context=get_mpd_context(MAX(d1->prec,d2->prec));
+					if(mpd_context!=NULL)
+						_decimal=owned_decimal(_getRationalDecimal(_r,mpd_context),owner);
+					else
+						q2outputError("Failed to obtain a decimal context");
 					FREE_RATIONAL(_r,owner);
 				}else
 					q2outputError("Failed to compute the product of two rational decimals");
@@ -1291,7 +1318,8 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 		clock_t now=0,then=(!amVerbose()?clock():-1); // if not running verbose, show number of iterations executed per second
 		// DONE:TODO don't do this because you do need to free whatever was allocated!!!
 		if(lasts!=NULL&&t!=NULL&&s!=NULL&&n!=NULL&&na!=NULL&&d!=NULL&&da!=NULL&&d8!=NULL&&d32!=NULL){
-			if(amVerbose())q2outputInfo("\tInitial helper decimals created!");
+			if(amVerbose())
+				q2outputInfo("\tInitial helper decimals created!");
 			unsigned long long iter=0;
 			if(amVerbose()){
 				output("\tIteration %u:",iter);

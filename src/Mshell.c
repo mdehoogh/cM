@@ -4448,8 +4448,10 @@ Mvalue* Md(Mvalue* value,Mvalue* precisionValue){Mallocationowner owner=getOwner
 		Mdecimal* _decimal=NULL;
 		mpd_context_t* mpd_context=(precisionValue!=NULL?get_mpd_context(getValueInteger(precisionValue)):NULL);
 		if(amVerboseDebugging())
-			if(mpd_context!=NULL)q2output("Requested precision: %d.\n",mpd_context->prec);
-			else q2outputWarning("No precision specified!");
+			if(mpd_context!=NULL)
+				q2output("Requested precision: %d.\n",mpd_context->prec);
+		if(NULL==mpd_context)
+			q2outputWarning("No decimal precision available!");
 		switch(value->type){
 			// TODO all other types_
 			case VT_INTEGER:_decimal=owned_decimal(__decimal(mpd_context,value->value._integer->ll,0),owner);break;
