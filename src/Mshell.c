@@ -15299,6 +15299,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			}
 			//reportNumberOfAllocations("shellInitialized 40");
 
+			if(!registerFunction(_Menvironment,owner,"allocationhistorycounts",Mallocationhistorycounts,0,NULL,NULL))
+				q2outputError("Failed to register the allocationhistorycounts() function");
+				
 			if(!registerFunction(_Menvironment,owner,"outputtable",Moutputtable,1,(char*[]){"table"},NULL)
 					||!registerFunction(_Menvironment,owner,"tablelines",Mtablelines,2,(char*[]){"table","[minimum column widths(list)]"},NULL)){
 				q2outputError("Failed to register the outputtable and tablelines function");

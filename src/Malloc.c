@@ -517,6 +517,37 @@ unsigned long long getAllocationsRemembered(){
 unsigned long long getAllocationsFreed(){
 	return allocationsFreed;
 }
+void obtainAllocationHistoryCounts(unsigned long long counts[257]){
+	memset(counts,257,sizeof(unsigned long long));
+	if(NULL==_allocationnodesRoot)return;
+	// I need to iterate over all allocation nodes, we can do that by iterating over
+	// all indices, we know we're done once all indices are negative
+	int indices[ALLOCATION_INDEX_BYTES-1];
+	int level=ALLOCATION_INDEX_BYTES-1;
+	for(;level>=0;level--)indices[level]=255;
+	// as long as the first index is non-negative
+	allocationnodes_t* allocationnodes;
+	do{
+		// determine allocationpointers based on the current indices
+		allocationnodes=_allocationnodesRoot;
+		for(level=0;level<ALLOCATION_INDEX_BYTES-1;level++){
+			allocationnodes=allocationnodes->nodes[indices[level]];
+			if(NULL==allocationnodes)break;
+		}
+		// distinguish empty from not being empty because when empty there are no pointers set, otherwise all are set
+		// when NULLs field equals 0
+		if(allocationnodes!=NULL)counts[allocationnodes->notEmpty?256-allocationnodes->NULLs:0]++;
+		// decrement indices
+		level=ALLOCATION_INDEX_BYTES-1;
+		while(--level>=0){
+			if(indices[level]>0){indices[level]--;break;}
+			// indices[level] must be zero
+			if(level==0)return; // if this is the top-level we've traversed the entire tree
+			indices[level]=255;
+		}
+	}while(1);
+}
+
 // MDH@20JAN2025: END new allocations functionality (first in v0.1.10)
 
 // MDH@22MAY2020: assuming that the moduleId is below 1024, and the functionId below 1024^2

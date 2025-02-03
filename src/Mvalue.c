@@ -8236,3 +8236,20 @@ Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
 		q2outputError("Failed to extract the message counts");
 	return messageCountsValue;
 }
+
+Mvalue* Mallocationhistorycounts(){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _allocationHistoryCountsMap=owned_map(_getMap("allocationhistorycounts"),owner);
+	if(NULL==_allocationHistoryCountsMap)return NULL;
+	unsigned long long allocationHistoryCounts[257];
+	obtainAllocationHistoryCounts(allocationHistoryCounts);
+	char countindexString[20];
+	unsigned long long count;
+	for(int countIndex=0;countIndex<257;countIndex++){
+		count=allocationHistoryCounts[countIndex];
+		if(!count)continue;
+		snprintf(countindexString,20,"%d",countIndex);
+		if(appendedToMap(_allocationHistoryCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history count #%d.",countIndex);
+	}
+	return _getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner));
+}
