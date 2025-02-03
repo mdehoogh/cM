@@ -621,7 +621,7 @@ long double getDecimalLongDouble(Mdecimal* _decimal){
  * @return Mdecimal* the decimal equivalent of rational \p _rational in decimal context \p mpd_context
  */
 Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t const * mpd_context){Mallocationowner owner=getOwner(__LINE__);
-	if(!_rational){q2outputError("No rational to convert to a decimal");return NULL;}
+	if(NULL==_rational){q2outputError("No rational to convert to a decimal");return NULL;}
 	// _decimalText is a local variable that when set should be freed before returning!!!
 	Mstring* _decimalText=NULL;
 	Mbiginteger *numerator=_rational->num,*denominator=_rational->den; // shortcut to the rational numerator and denominator
@@ -650,7 +650,8 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 					*/
 					uint64_t remainderIndex,remainderCount=0; // where we found a match
 					long long decimalsLeft=mpd_context->prec+2; // stop as soon as we have sufficient decimals
-					if(amVerbose())output("Number of decimals to determine: %llu.\n",decimalsLeft);
+					if(amVerbose())
+						output("Number of decimals to determine: %llu.\n",decimalsLeft);
 					Mstring* _digitText; // for storing the dividend digit character
 					MbigintegerListelement* _remainderListelement=NULL;
 					bool failure=false;
@@ -667,7 +668,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 							remainderIndex++;
 							_remainderListelement=_remainderListelement->_next;
 						}
-						if(_remainderListelement){ // we know the repeating part, so no need to add the remainder anymore!!!
+						if(_remainderListelement!=NULL){ // we know the repeating part, so no need to add the remainder anymore!!!
 							repeating=(remainderCount-remainderIndex); // replacing: _remainderList->numberOfElements-remainderIndex);
 							if(amVerbose())output("Number of repeating decimals: %llu.\n",repeating);
 							break;
@@ -675,7 +676,11 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 
 						// remainder hasn't appeared before so store it in the list of remainders
 						_remainderListelement=(MbigintegerListelement*)CALLOC_1(sizeof(MbigintegerListelement),'b',owner); // NOTE re-use of _remainderListelement
-						if(_remainderListelement==NULL){q2outputError("Failed to create a big integer list element for storing the new remainder");_p=NULL;break;}
+						if(_remainderListelement==NULL){
+							q2outputError("Failed to create a big integer list element for storing the new remainder");
+							_p=NULL;
+							break;
+						}
 
 						// at this point we have a new remainder list element (in _remainderListelement) that should be bound or freed
 						_remainderListelement->_biginteger=owned_biginteger(_getBigintegerCopy(_remainder),owner); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
@@ -686,7 +691,10 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 							break;
 						}
 						// 'store' _remainderListelement in the list (this means that we can be certain that _remainderListelement will be freed after the loop ends)
-						if(lastRemainderListelement==NULL)_firstRemainderListelement=_remainderListelement;else lastRemainderListelement->_next=_remainderListelement;
+						if(lastRemainderListelement==NULL)
+							_firstRemainderListelement=_remainderListelement;
+						else 
+							lastRemainderListelement->_next=_remainderListelement;
 						lastRemainderListelement=_remainderListelement; // replace lastRemainderListelement with the new big integer list element
 						remainderCount++;
 						/* replacing:
@@ -707,7 +715,8 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 							_p=NULL;
 							break;
 						}
-						if(amVerboseDebugging()){q2outputBiginteger("Digit: '",_digit,"'");q2outputBiginteger(" and remainder '",_remainder,"'.\n");}
+						if(amVerboseDebugging())
+						{q2outputBiginteger("Digit: '",_digit,"'");q2outputBiginteger(" and remainder '",_remainder,"'.\n");}
 
 						// append the dividend to the decimal text
 						// NOTE that _digitText is freed as soon as possible
@@ -720,11 +729,13 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 						_p=string_append(_p,string(_digitText));
 						FREE_STRING(_digitText,owner); // MDH@11JUN2020: disowns it and frees it
 
-						if(amVerboseDebugging())if(_p!=NULL)q2output("Decimal text so far: '%s'.\n",string(_p));
+						if(amVerboseDebugging())
+							if(_p!=NULL)q2output("Decimal text so far: '%s'.\n",string(_p));
 
 						// if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
 						if(isBigintegerZero(_remainderListelement->_biginteger)){
-							if(amVerbose())q2outputMessage(M_INFO_PREFIX,"%s","Remainder is zero, so the decimal is finished.");
+							if(amVerbose())
+								q2outputMessage(M_INFO_PREFIX,"%s","Remainder is zero, so the decimal is finished.");
 							break;
 						}
 					}

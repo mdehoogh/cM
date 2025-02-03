@@ -34,6 +34,22 @@ typedef struct Malloc{
 	signed char allocationType;
 }Malloc;
 /**
+ * @brief temporary type definition of a allocation type and owner 
+ * 
+ */
+typedef Malloc *Mallocationtypeowner; // a bit weird though to have to do it this way!!!!
+/**
+ * @brief allocations stores all dynamically allocated pointers, allowing checking for memory leaks
+ * 
+ */
+struct{
+	size_t nulled; // MDH@17JAN2023: keep track of the number of NULLed pointers as well as the amount removed so far (that end up at the end of l allocated pointers)
+	size_t l; // the number of allocation types stored
+	size_t size; // the total number of available allocation pointers
+	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
+}allocations={0,0,0,NULL};
+
+/**
  * @brief the total number of child nodes
  * 
  */
@@ -60,6 +76,7 @@ typedef struct allocationnodes_t{
 	// instead of updating field firstnonfullnodeindex when it no longer can have more children
 	// we can mark it as full, allowing us to increment firstnonfullmodeindex on the next allocation!!
 	unsigned currentNodeIndexIsValid:1; // whether or not the first non full node index is full
+	unsigned notEmpty:1; // whether or not empty
 }allocationnodes_t;
 /**
  * @brief defines the final node containing the Malloc* pointers associated with the allocation index
@@ -68,13 +85,16 @@ typedef struct allocationnodes_t{
 typedef struct allocationpointers_t{
 	Malloc* pointers[ALLOCATION_NODES_SIZE];
 	unsigned NULLs:ALLOCATION_NODE_INDEX_BITS; // the number of NULL (and therefore available) elements 
+	unsigned notFulls:ALLOCATION_NODE_INDEX_BITS; // unused but always zero to indicate that there are no not fulls!!!
 	unsigned firstnullpointerindex:ALLOCATION_NODE_INDEX_BITS;
+	unsigned notEmpty:1;
 }allocationpointers_t;
 /**
  * @brief the root node of the allocations history
  * 
  */
 allocationnodes_t* _allocationnodesRoot=NULL; // the global variable storing the allocations
+unsigned long long allocationsSet=0,allocationsFreed=0;
 /**
  * @brief all 31 bits set means that we haven't been able to store the allocation pointer at some valid index
  * @details if we didn't manage to find a spot to register the Malloc pointer at we return UNAVAILABLE_ALLOCATION_INDEX
@@ -100,34 +120,49 @@ static void allocationsInitialized(){
  */
 static void updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
 	assert(allocationnodes!=NULL&&!allocationnodes->currentNodeIndexIsValid);
-	// NOTE if both usables and NULLs is 0, we won't be able to find a valid
+	// NOTE if both nonFulls and NULLs is 0, we won't be able to find a valid
 	allocationnodes_t* nextallocationnodes;
-	// if there are non fulls we can find one to use
+	// it's preferable to use a non-full non-NULL entry if there is one
 	if(allocationnodes->notFulls){ // this will never be the case on initialization!!!
+		output("NEW NOT FULL ALLOCATION INDEX AFTER %d",allocationnodes->currentNodeIndex); // DEBUGGING
+		// let's go back because the not fulls are more likely to be behind the current node index!!!
+		// the main problem here is that nextallocationnodes could well be the one containing the allocation pointers
+		// which DOES NOT have a notFulls but only a NULLs, we can solve this by adding a notFulls to allocationpointers_t
+		// which will always remain 0
 		do{
-			nextallocationnodes=allocationnodes->nodes[++allocationnodes->currentNodeIndex];
+			nextallocationnodes=allocationnodes->nodes[--allocationnodes->currentNodeIndex];
 			// as long as this is a full node we have to keep looking
 		}while(NULL==nextallocationnodes||(!nextallocationnodes->notFulls&&!nextallocationnodes->NULLs));
+		output(":%d WITH NOT FULLS %d and NOT NULLS %d",allocationnodes->currentNodeIndex,nextallocationnodes->notFulls,nextallocationnodes->NULLs);
 		// we've updated ->currentNodeIndex to point to a non full node
 		allocationnodes->currentNodeIndexIsValid=1; // since it doesn't point to a full nodes block
 	}else{
+		// QUESTION if the currently selected one is now NULL, this means it became empty, and was freed
+		//          we could either re-use it or find another NULL entry, point is it might be the only NULL one
+		//         in which case re-using is the only option
+		// ANSWER  re-using is actually easier because we do not have to look for another NULL entry
+		//         (which may not be there at all)
 		nextallocationnodes=allocationnodes->nodes[allocationnodes->currentNodeIndex];
 		// when not NULL (and thus full), and there are still NULLs find a NULL
 		if(nextallocationnodes!=NULL&&allocationnodes->NULLs){ // there are no usable nodes anymore, so we should choose the first NULL node
+			output("NEXT NULL OF %d NULLS AFTER %d",allocationnodes->NULLs,allocationnodes->currentNodeIndex);
 			do{
 				nextallocationnodes=allocationnodes->nodes[++allocationnodes->currentNodeIndex];
 			}while(nextallocationnodes!=NULL);
+			output(":%d",allocationnodes->currentNodeIndex);
 			allocationnodes->currentNodeIndexIsValid=1; // since it doesn't point to a full nodes block
 		}
 		// if NULL (which it should be, we try to create it)
 		if(NULL==nextallocationnodes){ // e.g. when initializing
+			output("CREATING NEW ALLOCATION NODE AT INDEX %d",allocationnodes->currentNodeIndex);
 			nextallocationnodes=unmanaged_calloc(1,sizeof(allocationnodes_t));
 			if(nextallocationnodes!=NULL){
 				allocationnodes->nodes[allocationnodes->currentNodeIndex]=nextallocationnodes;
 				allocationnodes->NULLs--; // one less NULL nodes entry (will go from 0->255 on initialization)
 				allocationnodes->notFulls++; // one more notFulls (adding this one)
 				allocationnodes->currentNodeIndexIsValid=1;
-			}
+			}else
+				q2outputError("Failed to create a new allocation history node");
 		}
 	}
 }
@@ -139,40 +174,49 @@ static void updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
  */
 static uint8_t setAllocationIndex(Malloc* const _alloc){
 	if(NULL==_alloc)return 1;
-	outputChar('A');
+	///outputChar('A');
 	// assume failure
 	_alloc->allocationIndex=UNAVAILABLE_ALLOCATION_INDEX;
-	outputChar('B');
+	///outputChar('B');
 	if(NULL==_allocationnodesRoot)return 2;
-	outputChar('C');
+	bool reoccupied=false;
+	///outputChar('C');
 	/////if(!_allocationnodesRoot->NULLs&&!_allocationnodesRoot->notFulls)return 3; // TODO is it convenient to check here?????
-	outputChar('D');
+	///outputChar('D');
 	allocationnodes_t *levelallocationnodes,*nextlevelallocationnodes;
 	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot}; // pointer to the first allocation node
 	allocationindex_t newAllocationIndex=0; // to hold the allocation index
 	int level=0,levelIndex;
+	output("+++++++++");
 	// 1. determine all remaining pointers to allocation nodes
 	while(level<ALLOCATION_INDEX_BYTES-1){
-		outputChar(level+48);
+		output(">LEVEL %d:",level);
+		///outputChar(level+48);
 		levelallocationnodes=allocationnodes[level]; // ASSERT must not be NULL!!
-		outputChar('E');
+		///outputChar('E');
 		////assert(levelallocationnodes!=NULL);
 		////if(!levelallocationnodes->NULLs&&!levelallocationnodes->notFulls)return 3; // TODO is it convenient to check here?????
 		// assuming that field firstnonfullnodeindex has available entries
 		// CORRECTION I've added the full flag to check whether firstnonfullnodeindex is full!!
 		// NOTE the current node index should not be valid when pointing on a NULL or full non-NULL nodes pointers
 		if(!levelallocationnodes->currentNodeIndexIsValid){
+			output(" UPDATE NI REQUIRED ");
 			updateCurrentNodeIndex(levelallocationnodes);
 			if(!levelallocationnodes->currentNodeIndexIsValid){
+				// MDH@31JAN2025: clean up if we failed to create a new allocation node!!!
+				if(NULL==levelallocationnodes->nodes[levelallocationnodes->currentNodeIndex]){
+
+				}
 				output("%s%sFailed to update the current nodes index in storing an allocation pointer.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 				return 3;
 			}
+			output(" NEW CURRENT NODE INDEX[%d]=%llu",level,levelallocationnodes->currentNodeIndex);
 		}
-		outputChar('F');
+		///outputChar('F');
 		////assert(!levelallocationnodes->currentNodeIndexIsValid);
 		levelIndex=levelallocationnodes->currentNodeIndex;
 		nextlevelallocationnodes=levelallocationnodes->nodes[levelIndex];
-		outputChar('G');
+		///outputChar('G');
 		/* NOTE should NOT happen anymore!!!!
 		if(NULL==nextlevelallocationnodes){
 			// this may be the case after creation of levelallocationnodes before it is properly
@@ -195,14 +239,19 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 		}else{
 			*/
 			// check if the nodes collection is full, if it is we can't continue
-			if(!levelallocationnodes->NULLs&&!levelallocationnodes->notFulls)return 5;
+			if(!levelallocationnodes->NULLs&&!levelallocationnodes->notFulls){
+				output("!!!FULL WHICH IS NOT ALLOWED!!!");
+				return 5;
+			}
 			// if it's not full, shouldn't we find a NULL element to use?????
 		//////}
-		outputChar('K');
+		///outputChar('K');
 		allocationnodes[++level]=nextlevelallocationnodes;
+		output("NULLs at level %d:%d",level,nextlevelallocationnodes->NULLs);
 		newAllocationIndex<<=8;
 		newAllocationIndex+=levelIndex;
 	}
+	output("\nNew allocation offset: %d.\n",newAllocationIndex);
 	// next to determine the last
 	/* NOTE can't happen!!
 	if(NULL==allocationnodes[level]){
@@ -211,31 +260,45 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 	}
 	*/
 	allocationpointers_t* allocationpointers=(allocationnodes_t*)(allocationnodes[level]);
-	outputChar('L');
+	///outputChar('L');
+	int count2=0;
+	for(int i=0;i<=255;i++)if(allocationpointers->pointers[i]==NULL)count2++;
+	output("<Number of deteted NULLs in pointers node: %d>",count2);
+
+	if(allocationpointers->notEmpty&&!allocationpointers->NULLs){
+		output("%s%sNo NULLs left in allocation history pointers record!\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
+		if(!count2)return 6;
+	}
 	// find the first NULL pointer element
 	int count=ALLOCATION_NODES_SIZE;
 	while(allocationpointers->pointers[allocationpointers->firstnullpointerindex]!=NULL){
-		outputChar('M');
+		///////outputChar('M');
 		/*
 		if(allocationpointers->firstnullallocationindex==255)
 			allocationpointers->firstnullallocationindex=0;
 		else*/
 			allocationpointers->firstnullpointerindex++;
+		output(":%llu",allocationpointers->firstnullpointerindex);
 		if(!--count){
 			output("%s%sNo available allocation pointer elements found.\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
-			return 6;
+			return 7;
 		}
+		
 	}
-	outputChar('N');
+	///outputChar('N');
 	allocationpointers->pointers[allocationpointers->firstnullpointerindex]=_alloc;
+	allocationpointers->notEmpty=1; // definitely not empty now!!!
 	_alloc->allocationIndex=(newAllocationIndex<<8)+allocationpointers->firstnullpointerindex;
-	outputChar('O');
+	// allocations.l is still being used to check the range of available allocation history indices
+	if(_alloc->allocationIndex>=allocations.l)allocations.l=_alloc->allocationIndex+1;
+	///outputChar('O');
 	allocationpointers->NULLs--;
+	output("Allocation pointer NULLs: %d.\n",allocationpointers->NULLs);
 	// we might be full now!!!!
 	if(!allocationpointers->NULLs){ // no more NULL pointers
 		// it's sufficient to mark the current nodes pointer as full
 		while(level>0){
-			outputChar('P');
+			///outputChar('P');
 			levelallocationnodes=allocationnodes[--level];
 			levelallocationnodes->currentNodeIndexIsValid=0;
 			// decrement the notFulls
@@ -287,56 +350,92 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 		}
 	}
 	*/
-	output("[%llu]",_alloc->allocationIndex);
+	output("+[%llu]",_alloc->allocationIndex);
+	//if(amVerboseDebugging())
+	{
+		outputChar(':');
+		for(int level=0;level<ALLOCATION_INDEX_BYTES-1;level++){
+			output("(NI=%d,IV=%d,NF=%d,NS=%d)"
+							,allocationnodes[level]->currentNodeIndex
+							,allocationnodes[level]->currentNodeIndexIsValid
+							,allocationnodes[level]->notFulls
+							,allocationnodes[level]->NULLs);
+			outputChar('>');
+		}
+		output("(%d,%d)",allocationpointers->firstnullpointerindex,allocationpointers->NULLs);
+	}
 	outputChar('\n');
+	allocationsSet++;
+	return 0;
+}
+/**
+ * @brief replaces the allocation with index \p allocationIndex by \p _newalloc
+ * 
+ * @param _newalloc 
+ * @param allocationIndex 
+ * @return uint8_t zero on success, nonzero on failure
+ */
+static uint8_t replaceAllocationAtIndex(allocationindex_t allocationIndex,Malloc const * const _newalloc){
 	return 0;
 }
 static uint8_t freeAllocationIndex(Malloc* const _alloc){
-	outputChar('a');
+	///outputChar('a');
 	if(NULL==_alloc)return 1;
+	output("-[%lld]",_alloc->allocationIndex);
 	outputChar('b');
 	if(NULL==_allocationnodesRoot)return 2;
 	outputChar('c');
-	if(_alloc->allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return 3;
+	allocationindex_t allocationIndex=_alloc->allocationIndex;
 	outputChar('d');
-	unsigned allocationIndex=_alloc->allocationIndex;
+	if(allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return 3;
 	outputChar('e');
+	output(" ALLOCATION INDEX: %d ",allocationIndex);
 	// extract indices!!!
-	uint8_t indices[ALLOCATION_INDEX_BYTES];
+	allocationindex_t indices[ALLOCATION_INDEX_BYTES];
 	int level=ALLOCATION_INDEX_BYTES;
-	while(--level>=0){
+	while(--level>0){
 		outputChar(level+48);
-		indices[level]=(allocationIndex&&0xFF);
+		indices[level]=(allocationIndex&0xFF);
 		outputChar('f');
 		allocationIndex>>=8;
 		outputChar('g');
 	}
+	indices[0]=allocationIndex;
+	output("INDICES:(");for(int i=0;i<ALLOCATION_INDEX_BYTES;i++)output(" %d:%d",i,indices[i]);outputChar(')'); // DEBUGGING
 	// determine allocationnodes pointers
 	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot};
 	outputChar('h');
 	allocationnodes_t* levelallocationnode;
-	level=0;
-	while(level<ALLOCATION_INDEX_BYTES){
-		outputChar(level+48);
-		levelallocationnode=allocationnodes[level]->nodes[indices[level]];
+	//////level=0;
+	while(level<ALLOCATION_INDEX_BYTES-1){
 		outputChar('i');
+		outputChar(level+48);
+		output(":%d",indices[level]);
+		levelallocationnode=allocationnodes[level]->nodes[indices[level]];
 		allocationnodes[++level]=levelallocationnode;
 		outputChar('j');
 	}
 	outputChar('k');
+	outputChar(level+48);
 	// the last allocationnodes[ALLOCATION_INDEX_BYTES-1] points to the last
-	level=ALLOCATION_INDEX_BYTES-1;
-	bool full=(!allocationnodes[level]->NULLs);
-	outputChar('l');
-	allocationnodes[level]->nodes[indices[level]]=NULL; // free the stored pointer
-	outputChar('m');
-	allocationnodes[level]->NULLs++;
+	allocationpointers_t* allocationpointers=(allocationpointers_t*)allocationnodes[level];
+	//////level=ALLOCATION_INDEX_BYTES-1;
+	bool full=(!allocationpointers->NULLs);
+	outputChar(full?'L':'l');
+	if(allocationpointers->pointers[indices[level]]!=NULL){
+		output("NULLing %d",indices[level]);
+		allocationpointers->pointers[indices[level]]=NULL; // free the stored pointer
+		outputChar('m');
+		allocationpointers->NULLs++;
+		output("%d",allocationpointers->NULLs);
+	}else
+		output("***** BUG BUG BUG BUG BUG NOTHING TO NULL AT INDEX %d *****",indices[level]);
 	outputChar('n');
 	// as long as the level nodes are considered full we have to unfull them
 	while(full){
+		outputChar('o');
 		outputChar(level+48);
 		levelallocationnode=allocationnodes[--level];
-		outputChar('o');
 		// if the indices at this level equals the current node index, clear the is full flag
 		if(indices[level]==levelallocationnode->currentNodeIndex)
 			levelallocationnode->currentNodeIndexIsValid=1;
@@ -348,6 +447,28 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 		if(!level)break;
 		outputChar('s');
 	}
+	////output("\n\t-[%llu]",allocationIndex);
+	//if(amVerboseDebugging())
+	{
+		outputChar(':');
+		for(level=0;level<ALLOCATION_INDEX_BYTES-1;level++){
+			if(NULL==allocationnodes[level]){
+				output("(?)");
+				continue;
+			}
+			output("(NI=%d,IV=%d,NF=%d,NS=%d)"
+							,allocationnodes[level]->currentNodeIndex
+							,allocationnodes[level]->currentNodeIndexIsValid
+							,allocationnodes[level]->notFulls
+							,allocationnodes[level]->NULLs);
+			outputChar('>');
+		}
+		allocationpointers_t* allocationpointers=(allocationpointers_t*)allocationnodes[level];
+		if(NULL==allocationpointers)
+			output("(?)");
+		else
+			output("(%d,%d)",allocationpointers->firstnullpointerindex,allocationpointers->NULLs);
+	}
 	outputChar('\n');
 	/*
 	if(indices[level]<allocationnodes[level]->currentNodeIndex)
@@ -356,7 +477,45 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 	--level;
 	full=(allocationnodes[level]->currentNodeIndex==255&&allocationnodes[level]->nodes[255]!=NULL);
 	*/
+	if(!allocationsFreed)
+		output("%s%sNo allocations left to free!",M_BUG_PREFIX,M_MESSAGE_PREFIX);
+	else
+		allocationsFreed--;
 	return true;
+}
+static Malloc* getAllocationAtIndex(allocationindex_t allocationIndex){
+	// TODO return the pointer stored at allocationIndex
+	if(allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return NULL;
+	///outputChar('e');
+	// extract indices!!!
+	uint8_t indices[ALLOCATION_INDEX_BYTES];
+	int level=ALLOCATION_INDEX_BYTES;
+	while(--level>=0){
+		///outputChar(level+48);
+		indices[level]=(allocationIndex&&0xFF);
+		///outputChar('f');
+		allocationIndex>>=8;
+		///outputChar('g');
+	}
+	// determine allocationnodes pointers
+	///outputChar('h');
+	allocationnodes_t* levelallocationnode=_allocationnodesRoot;
+	for(level=0;level<ALLOCATION_INDEX_BYTES-1;level++){
+		///outputChar(level+48);
+		levelallocationnode=levelallocationnode->nodes[indices[level]];
+		if(NULL==levelallocationnode){
+			output("%s%sUndefied allocation history node at level %d.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,level);
+			return NULL;
+		}
+		///outputChar('i');
+	}
+	return (Malloc*)levelallocationnode->nodes[indices[level]];
+}
+unsigned long long getAllocationsRemembered(){
+	return allocationsSet-allocationsFreed;
+}
+unsigned long long getAllocationsFreed(){
+	return allocationsFreed;
 }
 // MDH@20JAN2025: END new allocations functionality (first in v0.1.10)
 
@@ -366,11 +525,7 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 // we need a local something to store the allocation types in
 // MDH@18MAY2020: we are not just going to store the allocation type (a char) but also the id of the owner (i.e. every allocation will be owned)
 // MDH@14JAN2023: since we're no longer storing type and owner but the direct pointer itself we no longer need this type
-/**
- * @brief temporary type definition of a allocation type and owner 
- * 
- */
-typedef Malloc *Mallocationtypeowner; // a bit weird though to have to do it this way!!!!
+
 /* replacing:
 typedef struct{
 	Mallocationowner owner;
@@ -585,18 +740,6 @@ static bool updateAllocationTypeMarks(){
 // MDH@07MAY2020 END
 
 // helper functions
-
-
-/**
- * @brief allocations stores all dynamically allocated pointers, allowing checking for memory leaks
- * 
- */
-struct{
-	size_t nulled; // MDH@17JAN2023: keep track of the number of NULLed pointers as well as the amount removed so far (that end up at the end of l allocated pointers)
-	size_t l; // the number of allocation types stored
-	size_t size; // the total number of available allocation pointers
-	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
-}allocations={0,0,0,NULL};
 
 /**
  * @brief returns the index of allocation type \p allocationType
@@ -1117,14 +1260,19 @@ void outputAllocationTypeMarks(char* linePrefix){
 	}
 }
 
-// MDH@17JAN2023: every now and then we should shrink the allocations
+// MDH@31JAN2025: not using _owners anymore!!!
 /**
  * @brief deletes all nulled allocations, shifting all non-null allocations to become contiguous again
  * 
  * @param verbose when true, outputs diagnostic messages
  * @return size_t the number of nulled allocations
  */
+size_t nulledAllocationsRemoved(bool verbose,bool veryverborse){
+	return 0;
+}
+/* 
 size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
+	// MDH@17JAN2023: every now and then we should shrink the allocations
 	size_t nr_allocations=allocations.l;
 	if(allocations.nulled){ // there are nulled allocation pointers
 		if(verbose)
@@ -1173,23 +1321,23 @@ size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
 			}
 			if(verbose)
 				printf("\t\tAllocation indices (%zu) adapted!\n",++adapted);
-			/* replacing:
-			// we can now start moving immediately one by one
-			if(verbose)printf("\t\tMoving non-null allocations starting at #%zu by %zu positions.\n",firstNonNullIndex,removed);
-			do{
-				if(verbose)printf("\t\t\tMoving allocation #%ld to #%ld.\n",firstNonNullIndex,firstNullIndex);
-				owners[firstNullIndex]=owners[firstNonNullIndex];
-				owners[firstNonNullIndex]=NULL; // could be overwritten though at some point though (or not), but if we do not change allocations.l we have to prevent getting duplicate pointers!!!!!
-				owners[firstNullIndex]->allocationIndex=firstNullIndex; // update the allocation index to match the new location index
-				firstNullIndex++;
-			}while(++firstNonNullIndex<allocations.l&&owners[firstNonNullIndex]!=NULL);
-			*/
+			//// replacing:
+			///// we can now start moving immediately one by one
+			///if(verbose)printf("\t\tMoving non-null allocations starting at #%zu by %zu positions.\n",firstNonNullIndex,removed);
+			///do{
+			///	if(verbose)printf("\t\t\tMoving allocation #%ld to #%ld.\n",firstNonNullIndex,firstNullIndex);
+			///	owners[firstNullIndex]=owners[firstNonNullIndex];
+			///	owners[firstNonNullIndex]=NULL; // could be overwritten though at some point though (or not), but if we do not change allocations.l we have to prevent getting duplicate pointers!!!!!
+			///	owners[firstNullIndex]->allocationIndex=firstNullIndex; // update the allocation index to match the new location index
+			///	firstNullIndex++;
+			///}while(++firstNonNullIndex<allocations.l&&owners[firstNonNullIndex]!=NULL);
+			///*
 			
-			/* MDH@18JAN2023: since firstNullIndex points to the first not-written position this is where we should put the next non null!!!!
-			// ASSERT firstNonNullIndex has hit the first null pointer after the block of non null pointers we just moved!!!!
-			firstNullIndex=firstNonNullIndex-removed; // since we've moved removed items in total, firstNullIndex is the first position behind the current first null position!!
-			printf("\tFirst new null index: %d.\n",firstNullIndex);
-			*/
+			//// MDH@18JAN2023: since firstNullIndex points to the first not-written position this is where we should put the next non null!!!!
+			///// ASSERT firstNonNullIndex has hit the first null pointer after the block of non null pointers we just moved!!!!
+			///firstNullIndex=firstNonNullIndex-removed; // since we've moved removed items in total, firstNullIndex is the first position behind the current first null position!!
+			///printf("\tFirst new null index: %d.\n",firstNullIndex);
+			/// MDH@18JAN2023 END commented out
 		}
 		if(removed){
 			//printf("\tNumber of removed nulled pointers: %d.\n",removed);
@@ -1207,6 +1355,7 @@ size_t nulledAllocationsRemoved(bool verbose,bool veryverbose){
 		printf("No nulled allocations to remove!\n");
 	return (nr_allocations-allocations.l);
 }
+*/
 
 /**
  * @brief returns the number of allocations
@@ -1223,12 +1372,17 @@ size_t getNumberOfAllocations(){
 void reportNumberOfAllocations(char const * const prefix){
 	printf("(%s) Number of allocations: %zu.\n",prefix,allocations.l);
 }
+
 /**
  * @brief reports the allocations by type
  * 
  * @param title the title text
  * @param prefix the indentation text
  */
+void reportAllocations(char* title,char* prefix){
+	output("reportAllocations() is currently not implemented!\n");
+}
+/*
 void reportAllocations(char* title,char* prefix){
 	printf("%s",title);
 	// let's collect the counts per allocation type
@@ -1258,6 +1412,7 @@ void reportAllocations(char* title,char* prefix){
 	}else
 		printf("%sNo allocations!\n",prefix);
 }
+*/
 
 /**
  * @brief returns a (dynamically allocated) copy pointer of all allocation types
@@ -1611,16 +1766,22 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.freed);
 		// you can only disown what you own!!
 		if(owner.disowned==0&&owner.id>0){
+			// MDH@31JAN2025: I've replaced _owners by tree-like storing starting at allocationNodesRoot
+			//                so we won't be able to actually verify that the owner is correctly stored
+			//                (it would have sufficed to compare the Mallocationowner* actually)
 			// let's toggle the ownership if it matches
+			/*
 			Mallocationowner *_owner=&(allocations._owners[_alloc->allocationIndex]->owner);
 			if(_owner->id==owner.id){
 				allocations._owners[_alloc->allocationIndex]->owner.disowned=1; // replacing: _owner->disowned=1;
+			*/
 				_alloc->owner.disowned=1; // TODO we might have to comment this out in due course
-			}else
+			/*}else
 				q2outputMessage(M_BUG_PREFIX,"\t%s:%u(%s%u%s%s) can't disown the allocation owned by %s:%u(%s%u%s%s)."
 					,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
 					,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 					);
+			*/
 		}else
 			q2outputMessage(M_BUG_PREFIX,"\t%s:%u(%s%u%s%s) can't disown the allocation owned by %s:%u(%s%u%s%s): it is invalid."
 			,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
@@ -1642,7 +1803,7 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
  * @result void* ptr when owning succeeded, NULL otherwise
  */
 void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
-	if(!ptr)return NULL;
+	if(NULL==ptr)return NULL;
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
 	// OUTPUT_INFO("\tPointer allocation=(%i,%i,%x).\n",_alloc->allocationIndex,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.id);
 	OUTPUT_INFO("%p: %s:%u(%s%u%s%s) taking over allocation owned by %s:%u(%s%u%s%s).\n",_alloc
@@ -1654,23 +1815,29 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 	// OUTPUT_INFO("Owned %p:\n",_alloc);
 	// printf("%s","U");
 	if(_alloc->allocationIndex>=0){
+		/* MDH@31JAN2025: no longer access to the stored allocation pointer through the _owners field
 		Mallocationowner *_owner=&(allocations._owners[_alloc->allocationIndex]->owner); // MDH@02JUN2020: pointing to where the owner of the allocation is registered
 		OUTPUT_INFO("\tAllocation #%i=%s:%u(%s%u%s%s).\n",_alloc->allocationIndex
 			,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 			);
+		*/
 		if(owner.disowned==0&&owner.id>0&&owner.freed==0){
 			// pass ownership to owner if ptr is currently disowned
 			// printf("%s","X");
-			if(_alloc->owner.disowned!=_owner->disowned)q2outputMessage(M_BUG_PREFIX,"\tUnsynced ownership flags.");
+			/* MDH@31JAN2025: can't check anymore, because no access to the owner through _owners field
+			if(_alloc->owner.disowned!=_owner->disowned)
+				q2outputMessage(M_BUG_PREFIX,"\tUnsynced ownership flags.");
 			if(_owner->disowned!=0){
 				*_owner=owner;
+			*/
 				// printf("\tOwnership of %s:%u(%s%u%s%s)"
 				//	 ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 				// );
-				_alloc->owner=*_owner; // TODO we might have to comment this out in due course
+				_alloc->owner=owner; /// MDH@31JAN2025: replacing _alloc->owner=*_owner; // TODO we might have to comment this out in due course
 				// printf(" taken by %s:%u(%s%u%s%s).\n"
 				//	 ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 				//	 );
+			/*
 			}else
 			if(_owner->id==0)
 				q2outputMessage(M_BUG_PREFIX,"\tOwner %s:%u(%s%u%s%s) cannot take over ownership of a memory allocation: it is not owned anymore."
@@ -1681,6 +1848,7 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 					,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
 					,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 					);
+			*/
 			// printf("%s","Y");
 		}else
 			q2outputMessage(M_BUG_PREFIX,"\tCan't set the ownership of the memory allocation owned by %s:%u(%s%u%s%s) to invalid owner %s:%u(%s%u%s%s)."
@@ -1712,6 +1880,7 @@ void* Msubowned(void* ptr,uint8_t level){
 	//replacing: OUTPUT_INFO("Incrementing subownership of %p by %i.\n",_alloc,level);
 	// OUTPUT_INFO("Subowning %p:\n",ptr);
 	if(allocationIndex>=0&&allocationIndex<allocations.l){
+		/*
 		Mallocationowner* _owner=&(allocations._owners[allocationIndex]->owner);
 		OUTPUT_INFO("\tAllocation #%i=%s:%u(%s%u%s%s).\n",allocationIndex
 			,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]);
@@ -1724,6 +1893,7 @@ void* Msubowned(void* ptr,uint8_t level){
 		}else
 			q2outputMessage(M_BUG_PREFIX,"\tCan't subown a disowned or unowned memory allocation %s:%u(%s%u%s%s)."
 				,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]);
+		*/
 	}else
 		q2outputMessage(M_BUG_PREFIX,"\tFailed to subown memory allocation %s:%u(%s%u%s%s): it is not registered (index: %llu)."
 				,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
@@ -1784,7 +1954,7 @@ void Mvfree(){
  * @param report when true, diagnostic messages are output
  */
 void Mfree(void const * const ptr,long long count,signed char allocationType,bool report/*,Mallocationowner owner*/){
-	if(!ptr||allocationType==0||count<=0)return;
+	if(NULL==ptr||allocationType==0||count<=0)return;
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
 	int32_t allocationIndex=_alloc->allocationIndex; // MDH@13NOV2020: best to get the allocation index asap
 	if(report)
@@ -1800,11 +1970,14 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 			,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 		);
 	if(allocationIndex>=0&&allocationIndex<allocations.l){
+		freeAllocationIndex(_alloc); // MDH@31JAN2025: free the allocation index BEFORE calling free(_alloc)!!
 		// MDH@14JAN2023: since the allocations now store the pointer (i.e. _alloc), which is to be NULLed on freeing
 		//				we cannot check it anymore, but we can check whether it matches _alloc!!!!
 		// replacing: if(allocations._owners[allocationIndex]->owner.freed!=0)
+		/* MDH@31JAN2025: can't check as _owners not being used anymore, replaced by allocationNodesRoot
 		if(allocations._owners[allocationIndex]!=_alloc)
 			q2outputMessage(M_BUG_PREFIX,"\tFreed before!");
+		*/
 	}else{
 		q2outputMessage(M_BUG_PREFIX,"\tInvalid allocation index %i.",allocationIndex);
 		if(allocationIndex>=0)allocationIndex=INT32_MIN; // MDH@17JAN2023: makes testing a little easier
@@ -1846,7 +2019,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 	}
 	// if(_alloc->allocationIndex<=0)q2outputMessage(M_BUG_PREFIX,"No allocation index registered for allocation of type '%c'.\n",allocationType);
 #endif
-	if(!allocations._owners)q2outputMessage(M_ERROR_PREFIX,"Allocation owners not recorded!\n");
+	/// MDH@31JAN2025: if(!allocations._owners)q2outputMessage(M_ERROR_PREFIX,"Allocation owners not recorded!\n");
 	if(allocations.l==0)q2outputMessage(M_WARNING_PREFIX,"Nothing allocated to free.\n");
 #ifndef __PRODUCTION__
 	// MDH@04JUN2020: we can check ownership here BUT when a subowned allocation is freed by the superowner, which might have changed ownership the subowned allocation can still be freed as long as the levels match
@@ -1902,6 +2075,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 	// we may safely assume that _alloc was freed but its good that to set the freed flag so we know that the pointer was freed actually but still know the type
 	// technically it might also be a good idea to have an additional flag that we can use to 
 	if(allocationIndex>=0){
+		/* MDH@31JAN2025 replacing: _owners not used anymore like this!!!
 		// MDH@14JAN2023: can't do the following anymore since _alloc is already freed, technically we could set the freed flag though!!!!
 		if(allocations._owners[allocationIndex]!=_alloc)
 			q2outputMessage(M_BUG_PREFIX,"Allocation #'%lld' pointer '%p' does not match the freed memory pointer '%p'.",allocationIndex,allocations._owners[allocationIndex],_alloc);
@@ -1909,6 +2083,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,boo
 			allocations._owners[allocationIndex]=NULL;
 			allocations.nulled++;
 		}
+		*/
 		// replacing:	allocations._owners[allocationIndex]->owner.freed=1; // MDH@13APR2020: can't use ' ' as that's used for a command
 	}
 	if(report)
@@ -1963,6 +2138,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 			// MDH@20APR2020 ASSERT: freed>0 as freed!=occupied
 			allocationIndex=_alloc->allocationIndex;
 			if(allocationIndex>=0&&allocationIndex<allocations.l){
+				/* MDH@31JAN2025: not using _owners anymore!!!
 				if(allocations._owners[allocationIndex]!=_alloc){
 					q2outputMessage(M_BUG_PREFIX,"Registered allocation pointer '%p' does not match the reallocated pointer '%p'!",allocations._owners[allocationIndex],ptr);
 					dump(ptr,freed,size);
@@ -1972,6 +2148,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 							,allocations._owners[allocationIndex]->allocationType,allocations._owners[allocationIndex]->allocationType,allocationIndex,_alloc->allocationType,_alloc->allocationType);
 					dump(ptr,freed,size);
 				}
+				*/
 				/* MDH@18JAN2023: with size_t>0 will never happen
 				// MDH@22APR2020 BUG FIX: do NOT clear the remembered allocation type unless the memory is freed!!!!
 				if(occupied==0) // MDH@22APR2020 ADDITION
@@ -1990,7 +2167,10 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 			if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
 				// MDH@18JAN2023: we have to rethink the following: registerReallocation() isn't crucial to the operation so if it fails we can still continue
 				//				it's essential to replace the registered allocation pointer (which should equal ptr with newptr)
+				/* MDH@31JAN2025 REMOVING TODO should we find a way to replace the allocation history pointer??????
+				                 because by commenting this out the pointers will be different after a realloc!!!! 
 				allocations._owners[allocationIndex]=newptr;
+				*/
 				// safer to do the following immediately
 				newptr=((char*)newptr)+sizeof(Malloc);
 				unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false);
