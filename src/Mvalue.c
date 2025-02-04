@@ -8243,13 +8243,16 @@ Mvalue* Mallocationhistorycounts(){Mallocationowner owner=getOwner(__LINE__);
 	unsigned long long allocationHistoryCounts[257];
 	obtainAllocationHistoryCounts(allocationHistoryCounts);
 	char countindexString[20];
-	unsigned long long count;
+	unsigned long long count,totalcount;
 	for(int countIndex=0;countIndex<257;countIndex++){
 		count=allocationHistoryCounts[countIndex];
 		if(!count)continue;
+		totalcount+=(count*countIndex);
 		snprintf(countindexString,20,"%d",countIndex);
 		if(appendedToMap(_allocationHistoryCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
 			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history count #%d.",countIndex);
 	}
+	if(appendedToMap(_allocationHistoryCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
+		q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history totalcount #%zzu.",totalcount);
 	return _getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner));
 }

@@ -83,7 +83,8 @@ typedef struct allocationnodes_t{
 	// instead of updating field firstnonfullnodeindex when it no longer can have more children
 	// we can mark it as full, allowing us to increment firstnonfullmodeindex on the next allocation!!
 	unsigned currentNodeIndexIsValid:1; // whether or not the first non full node index is full
-	unsigned notEmpty:1; // whether or not empty
+	/* there's an easier way to determine whether notEmpty is true or not
+	unsigned notEmpty:1; // whether or not empty*/
 }allocationnodes_t;
 /**
  * @brief defines the final node containing the Malloc* pointers associated with the allocation index
@@ -94,7 +95,7 @@ typedef struct allocationpointers_t{
 	unsigned NULLs:ALLOCATION_NODE_INDEX_BITS; // the number of NULL (and therefore available) elements 
 	unsigned notFulls:ALLOCATION_NODE_INDEX_BITS; // unused but always zero to indicate that there are no not fulls!!!
 	unsigned firstnullpointerindex:ALLOCATION_NODE_INDEX_BITS;
-	unsigned notEmpty:1;
+	//unsigned notEmpty:1;
 }allocationpointers_t;
 /**
  * @brief the root node of the allocations history
@@ -165,10 +166,13 @@ static bool updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
 			///output("CREATING NEW ALLOCATION NODE AT INDEX %d",allocationnodes->currentNodeIndex);
 			nextallocationnodes=unmanaged_calloc(1,sizeof(allocationnodes_t));
 			if(nextallocationnodes!=NULL){
-				allocationnodes->nodes[allocationnodes->currentNodeIndex]=nextallocationnodes;
-				allocationnodes->NULLs--; // one less NULL nodes entry (will go from 0->255 on initialization)
-				allocationnodes->notFulls++; // one more notFulls (adding this one)
-				allocationnodes->currentNodeIndexIsValid=1;
+				if(NULL==allocationnodes->nodes[allocationnodes->currentNodeIndex]){
+					allocationnodes->nodes[allocationnodes->currentNodeIndex]=nextallocationnodes;
+					allocationnodes->NULLs--; // one less NULL nodes entry (will go from 0->255 on initialization)
+					allocationnodes->notFulls++; // one more notFulls (adding this one)
+					allocationnodes->currentNodeIndexIsValid=1;
+				}else
+					q2outputError("Allocation history node already occupied");
 			}else
 				q2outputError("Failed to create a new allocation history node");
 		}
@@ -277,13 +281,11 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 	for(int i=0;i<=255;i++)if(allocationpointers->pointers[i]==NULL)count2++;
 	output("<Number of deteted NULLs in pointers node: %d>",count2);
   */
- 	/*
-	if(allocationpointers->notEmpty&&!allocationpointers->NULLs){
+	if(!allocationpointers->NULLs&&allocationpointers->pointers[0]!=NULL){
 		output("%s%sNo NULLs left in allocation history pointers record!\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 		///if(!count2)
 		return 6;
 	}
-	*/
 	// find the first NULL pointer element
 	int count=ALLOCATION_NODES_SIZE;
 	while(allocationpointers->pointers[allocationpointers->firstnullpointerindex]!=NULL){
@@ -292,17 +294,17 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 		if(allocationpointers->firstnullallocationindex==255)
 			allocationpointers->firstnullallocationindex=0;
 		else*/
-			allocationpointers->firstnullpointerindex++;
+			allocationpointers->firstnullpointerindex--; // going back is more likely to find a NULL element
 		///output(":%llu",allocationpointers->firstnullpointerindex);
 		if(!--count){
-			output("%s%sNo available allocation pointer elements found.\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
+			q2outputMessage(M_BUG_PREFIX,"No available allocation pointer elements found.");
 			return 7;
 		}
-		
 	}
+	assert(NULL==allocationpointers->pointers[allocationpointers->firstnullpointerindex]); // DEBUGGING
 	///outputChar('N');
 	allocationpointers->pointers[allocationpointers->firstnullpointerindex]=_alloc;
-	allocationpointers->notEmpty=1; // definitely not empty now!!!
+	///allocationpointers->notEmpty=1; // definitely not empty now!!!
 	newAllocationIndex<<=8;newAllocationIndex+=allocationpointers->firstnullpointerindex;
 	// replacing: newAllocationIndex.indices[ALLOCATION_INDEX_BYTES-1]=allocationpointers->firstnullpointerindex;
 	_alloc->allocationIndex=newAllocationIndex; // replacing: (newAllocationIndex<<8)+allocationpointers->firstnullpointerindex;
@@ -314,10 +316,10 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 	// we might be full now!!!!
 	if(!allocationpointers->NULLs){ // no more NULL pointers
 		// it's sufficient to mark the current nodes pointer as full
-		while(level>0){
+		while(--level>=0){
 			///outputChar('P');
-			levelallocationnodes=allocationnodes[--level];
-			levelallocationnodes->currentNodeIndexIsValid=0;
+			levelallocationnodes=allocationnodes[level];
+			levelallocationnodes->currentNodeIndexIsValid=0; // no longer valid because pointing to a full node!!
 			// decrement the notFulls
 			levelallocationnodes->notFulls--;
 			// if not full yet, we're done, otherwise we have to do the same to previous allocation tree nodes
@@ -541,6 +543,12 @@ static void obtainAllocationIndices(allocationindex_t allocationIndex,uint8_t in
 		///outputChar('g');
 	}
 }
+/**
+ * @brief returns the Malloc pointer stored at \p allocationIndex in the allocation history
+ * 
+ * @param allocationIndex 
+ * @return Malloc* the Malloc pointer stored at \p allocationIndex in the allocation history
+ */
 static Malloc* getAllocationAtIndex(allocationindex_t allocationIndex){
 	// TODO return the pointer stored at allocationIndex
 	if(allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return NULL;
@@ -576,8 +584,8 @@ unsigned long long getAllocationsFreed(){
 	return allocationsFreed;
 }
 void obtainAllocationHistoryCounts(unsigned long long counts[257]){
-	for(int i=256;i>=0;i--)counts[i]=0;
-	// replacing: memset(counts,0,sizeof(unsigned long long)*257);
+	memset(counts,0,257*sizeof(unsigned long long));
+	// replacing: for(int i=256;i>=0;i--)counts[i]=0;
 	if(NULL==_allocationnodesRoot)return;
 	if(allocations.l==0)return;
 	allocationindex_t lastAllocationIndex=allocations.l-1;
@@ -602,7 +610,12 @@ void obtainAllocationHistoryCounts(unsigned long long counts[257]){
 		}
 		// distinguish empty from not being empty because when empty there are no pointers set, otherwise all are set
 		// when NULLs field equals 0
-		if(allocationnodes!=NULL)counts[256-allocationnodes->NULLs]++;
+		if(allocationnodes!=NULL){
+			if(allocationnodes->NULLs||allocationnodes->nodes[0]!=NULL) // either not empty or full
+				counts[256-allocationnodes->NULLs]++;
+			else // empty
+				counts[0]++;
+		}
 		// decrement indices
 		level=ALLOCATION_INDEX_BYTES-1;
 		while(--level>=0){
