@@ -8238,7 +8238,7 @@ Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
 }
 
 Mvalue* Mallocationhistorycounts(){Mallocationowner owner=getOwner(__LINE__);
-	Mmap* _allocationHistoryCountsMap=owned_map(_getMap("allocationhistorycounts"),owner);
+	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationhistorycount"),owner);
 	if(NULL==_allocationHistoryCountsMap)return NULL;
 	unsigned long long allocationHistoryCounts[257];
 	obtainAllocationHistoryCounts(allocationHistoryCounts);
