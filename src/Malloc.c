@@ -394,7 +394,24 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
  * @param allocationIndex 
  * @return uint8_t zero on success, nonzero on failure
  */
-static uint8_t replaceAllocationAtIndex(allocationindex_t allocationIndex,Malloc const * const _newalloc){
+static uint8_t replaceAllocationAtIndex(Malloc const * const _alloc,Malloc const * const _newalloc){
+	if(NULL==_alloc)return 1;
+	allocationindex_t allocationIndex=_alloc->allocationIndex;
+	if(allocationIndex!=UNAVAILABLE_ALLOCATION_INDEX){
+		// extract all the bytes stored in ascending order: (0,1,2,3)
+		uint8_t indices[ALLOCATION_INDEX_BYTES];
+		int level=ALLOCATION_INDEX_BYTES;
+		while(--level>=0){indices[level]=(allocationIndex&0xFF);allocationIndex>>=8;}
+		allocationnodes_t* allocationnodes=_allocationnodesRoot;
+		level=0;
+		while(level<ALLOCATION_INDEX_BYTES-1)
+			allocationnodes=allocationnodes->nodes[indices[level++]];
+		Malloc* ptr=((allocationpointers_t*)allocationnodes)->pointers[indices[ALLOCATION_INDEX_BYTES-1]];
+		if(ptr!=_alloc){
+			output("%s%Unmatched allocation history pointer!\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
+		}
+		((allocationpointers_t*)allocationnodes)->pointers[indices[ALLOCATION_INDEX_BYTES-1]]=_newalloc;
+	}
 	return 0;
 }
 static uint8_t freeAllocationIndex(Malloc* const _alloc){
@@ -2244,13 +2261,13 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 			OUTPUT_INFO("Number of dynamically reallocated bytes: %zd.\n",occupied+sizeof(Malloc));
 			OUTPUT_INFO("Variable-size allocation of type '%c'(=%i) resized from %zd to %zd!\n",allocationType,allocationType,freed,occupied);
 			// newptr is allowed to be NULL if occupied equals 
-			if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
+			if(newptr!=NULL){ // success (newptr will be NULL when occupied==0, but that also indicates success)
 				// MDH@18JAN2023: we have to rethink the following: registerReallocation() isn't crucial to the operation so if it fails we can still continue
 				//				it's essential to replace the registered allocation pointer (which should equal ptr with newptr)
-				/* MDH@31JAN2025 REMOVING TODO should we find a way to replace the allocation history pointer??????
-				                 because by commenting this out the pointers will be different after a realloc!!!! 
-				allocations._owners[allocationIndex]=newptr;
-				*/
+				// MDH@31JAN2025 REMOVING TODO should we find a way to replace the allocation history pointer??????
+				//                 because by commenting this out the pointers will be different after a realloc!!!! 
+				replaceAllocationAtIndex(_alloc,newptr);
+				// replacing: allocations._owners[allocationIndex]=newptr;
 				// safer to do the following immediately
 				newptr=((char*)newptr)+sizeof(Malloc);
 				unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false);
