@@ -583,8 +583,9 @@ unsigned long long getAllocationsRemembered(){
 unsigned long long getAllocationsFreed(){
 	return allocationsFreed;
 }
-void obtainAllocationHistoryCounts(unsigned long long counts[257]){
-	memset(counts,0,257*sizeof(unsigned long long));
+void obtainAllocationStats(unsigned long long occupationcounts[257],unsigned long long valuetypecounts[256]){
+	memset(occupationcounts,0,257*sizeof(unsigned long long));
+	memset(valuetypecounts,0,256*sizeof(unsigned long long));
 	// replacing: for(int i=256;i>=0;i--)counts[i]=0;
 	if(NULL==_allocationnodesRoot)return;
 	if(allocations.l==0)return;
@@ -612,9 +613,14 @@ void obtainAllocationHistoryCounts(unsigned long long counts[257]){
 		// when NULLs field equals 0
 		if(allocationnodes!=NULL){
 			if(allocationnodes->NULLs||allocationnodes->nodes[0]!=NULL) // either not empty or full
-				counts[256-allocationnodes->NULLs]++;
+				occupationcounts[256-allocationnodes->NULLs]++;
 			else // empty
-				counts[0]++;
+				occupationcounts[0]++;
+			// now determine the value type of the pointers
+			Malloc** ptr=(Malloc**)((allocationpointers_t*)allocationnodes)->pointers; // NOTE those should match
+			for(int index=255;index>=0;index--,ptr++)
+				if(*ptr!=NULL)
+					valuetypecounts[128+(*ptr)->allocationType]++;
 		}
 		// decrement indices
 		level=ALLOCATION_INDEX_BYTES-1;

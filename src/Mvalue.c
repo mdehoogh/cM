@@ -8237,22 +8237,51 @@ Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
 	return messageCountsValue;
 }
 
-Mvalue* Mallocationhistorycounts(){Mallocationowner owner=getOwner(__LINE__);
-	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationhistorycount"),owner);
-	if(NULL==_allocationHistoryCountsMap)return NULL;
-	unsigned long long allocationHistoryCounts[257];
-	obtainAllocationHistoryCounts(allocationHistoryCounts);
+Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _allocationStatsMap=owned_map(__map("allocationStats"),owner);
+	if(NULL==_allocationStatsMap)return NULL;
+	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
+	obtainAllocationStats(allocationHistoryCounts,valueTypeCounts);
 	char countindexString[20];
 	unsigned long long count,totalcount;
-	for(int countIndex=0;countIndex<257;countIndex++){
-		count=allocationHistoryCounts[countIndex];
-		if(!count)continue;
-		totalcount+=(count*countIndex);
-		snprintf(countindexString,20,"%d",countIndex);
-		if(appendedToMap(_allocationHistoryCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
-			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history count #%d.",countIndex);
+	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationHisttoryCounts"),owner);
+	if(_allocationHistoryCountsMap!=NULL){
+		for(int countIndex=0;countIndex<257;countIndex++){
+			count=allocationHistoryCounts[countIndex];
+			if(!count)continue;
+			totalcount+=(count*countIndex);
+			snprintf(countindexString,20,"%d",countIndex);
+			if(appendedToMap(_allocationHistoryCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
+				q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history count #%d.",countIndex);
+		}
+		if(appendedToMap(_allocationHistoryCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history totalcount #%zzu.",totalcount);
+		if(appendedToMap(_allocationStatsMap,owner,"historycounts",_getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner)))!=M_TRUE){
+			free_map(_allocationHistoryCountsMap);
+			q2outputError("Failed to append allocation history counts to the allocation stats.");
+		}
 	}
-	if(appendedToMap(_allocationHistoryCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
-		q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history totalcount #%zzu.",totalcount);
-	return _getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner));
+	Mmap* _valueTypeCountsMap=owned_map(__map("valueTypeCounts"),owner);
+	if(_valueTypeCountsMap!=NULL){
+		totalcount=0;
+		for(int countIndex=0;countIndex<256;countIndex++){
+			count=valueTypeCounts[countIndex];
+			if(!count)continue;
+			totalcount+=count;
+			if(countIndex<128)
+				snprintf(countindexString,20,"-%c",-(countIndex-128));
+			else
+				snprintf(countindexString,20,"%c",countIndex-128);
+			if(appendedToMap(_valueTypeCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
+				q2outputMessage(M_ERROR_PREFIX,"Failed to append value type count #%d.",countIndex);
+		}
+		if(appendedToMap(_valueTypeCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append value type totalcount #%zzu.",totalcount);
+		if(appendedToMap(_allocationStatsMap,owner,"valuetypecounts",_getValueOfMap(disowned_map(_valueTypeCountsMap,owner)))!=M_TRUE){
+			free_map(_valueTypeCountsMap);
+			q2outputError("Failed to append value type counts to the allocation stats.");
+		}
+	}
+
+	return _getValueOfMap(disowned_map(_allocationStatsMap,owner));
 }

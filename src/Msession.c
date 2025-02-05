@@ -18,6 +18,8 @@
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_SESSION,id};}
 
 extern long long M_LL_INVALID;
+extern char* M_ERROR_PREFIX;
+extern char* M_MESSAGE_PREFIX;
 
 static struct termios orig_termios;
 
@@ -32,7 +34,7 @@ static int16_t rawmode=-1;
  */
 void disableRawmode(){
 	if(rawmode<0)return;
-	outputLine("Disabling character input mode.");
+	output("\nDisabling character input mode.\n");
 	rawmode=-1;
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
 }
@@ -88,13 +90,14 @@ void endOfUserInput(){Mallocationowner owner=getOwner(__LINE__);
 		strcat(outputFilename,_outputFilenamePrefix);
 		strcat(outputFilename,string_remainder(_timestampedOutputFilename,string_length(_timestampedOutputFilename)-outputFilenameSuffixLength));
 		if(rename(outputFilename,string(_timestampedOutputFilename))==-1)
-			output("\nERROR: Failed to timestamp output file '%s'.",outputFilename);
+			output("\n%s%sFailed to timestamp output file '%s'.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,outputFilename);
 		else
-			output("\nOutput file '%s' renamed to '%s'.",outputFilename,string(_timestampedOutputFilename));
+			output("\nOutput file '%s' renamed to '%s'.\n",outputFilename,string(_timestampedOutputFilename));
 		free(_outputFilenamePrefix); // ESSENTIAL
 	}
-	output("\n\n%s\n\n","Thanks for using M.");
+	//////outputChar('\n');
 	disableRawmode();
+	output("\n%s\n","Thanks for using M.");
 }
 
 // MDH@30JUN2020: let's allow a timeout (number of tenths of seconds to block for input every time)

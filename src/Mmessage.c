@@ -988,7 +988,7 @@ size_t q2collect(char const * const fmt,...){
 		}else
 			output("%s%sNo format in queued output.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
 	}else{ // directly pass along to output
-		output("%sNo output collector!\n",M_WARNING_PREFIX);
+		output("%s%sNo output collector!\n",M_WARNING_PREFIX,M_MESSAGE_PREFIX);
 	  va_list args;
   	va_start(args,fmt);
 		vprintf(fmt,args);

@@ -105,7 +105,7 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 #ifndef __PRODUCTION__
 unsigned long long getAllocationsRemembered();
 unsigned long long getAllocationsFreed();
-void obtainAllocationHistoryCounts(unsigned long long counts[257]);
+void obtainAllocationStats(unsigned long long occupations[257],unsigned long long valuetypecounts[256]);
 
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
 bool Misowned(void* ptr);

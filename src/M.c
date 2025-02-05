@@ -7232,9 +7232,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	while(1){ // command loop
 
 		if(inputMode==IM_COMMAND)
-			if(blockCommandLevel==0)
+			if(blockCommandLevel==0){
+				showSeparatorLine();
 				outputTotalMemoryUsage(); // TODO have to think about this though
-
+			}
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
 		promptForUserInput();
 
@@ -8498,8 +8499,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			}else // Return key in control mode, always to return to command input!!
 				switchToCommandMode();
 		}
+		/*
 		if(inputMode!=IM_COMMAND||blockCommandLevel==0)
 			showSeparatorLine();
+		*/
 		if(!allocationMarkAdded())
 			q2outputError("Failed to add a new memory allocation mark");
 	}

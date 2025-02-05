@@ -658,4 +658,4 @@ Mvalue* Maddmessage(Mvalue const * const messageValue);
 Mvalue* Mmessagecounts();
 
 // MDH@03FEB2025: allow retrieving allocation history occupation frequencies
-Mvalue* Mallocationhistorycounts();
+Mvalue* Mallocationstats();
