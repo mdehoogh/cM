@@ -8241,7 +8241,22 @@ Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _allocationStatsMap=owned_map(__map("allocationStats"),owner);
 	if(NULL==_allocationStatsMap)return NULL;
 	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
-	obtainAllocationStats(allocationHistoryCounts,valueTypeCounts);
+	unsigned long long offered,refused,consumed;
+	obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,&offered,&refused,&consumed);
+	Mmap* _allocationHistoryCacheMap=owned_map(__map("allocationHistoryCache"),owner);
+	if(_allocationHistoryCacheMap!=NULL){
+		if(appendedToMap(_allocationHistoryCacheMap,owner,"offered",_getIntegerValue(offered))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache offered count %llu.",offered);
+		if(appendedToMap(_allocationHistoryCacheMap,owner,"refused",_getIntegerValue(refused))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache refused count %llu.",refused);
+		if(appendedToMap(_allocationHistoryCacheMap,owner,"consumed",_getIntegerValue(consumed))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache consumed count %llu.",consumed);
+		if(appendedToMap(_allocationStatsMap,owner,"freed allocation id cache",_getValueOfMap(disowned_map(_allocationHistoryCacheMap,owner)))!=M_TRUE){
+			free_map(_allocationHistoryCacheMap);
+			q2outputError("Failed to append allocation history freed index cache info to the allocation stats.");
+		}
+	}else
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history cache info map.");
 	char countindexString[20];
 	unsigned long long count,totalcount;
 	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationHisttoryCounts"),owner);
@@ -8260,7 +8275,8 @@ Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
 			free_map(_allocationHistoryCountsMap);
 			q2outputError("Failed to append allocation history counts to the allocation stats.");
 		}
-	}
+	}else
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history counts map.");
 	Mmap* _valueTypeCountsMap=owned_map(__map("valueTypeCounts"),owner);
 	if(_valueTypeCountsMap!=NULL){
 		totalcount=0;
@@ -8281,7 +8297,8 @@ Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
 			free_map(_valueTypeCountsMap);
 			q2outputError("Failed to append value type counts to the allocation stats.");
 		}
-	}
+	}else
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history value type info map.");
 
 	return _getValueOfMap(disowned_map(_allocationStatsMap,owner));
 }
