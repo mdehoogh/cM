@@ -8237,12 +8237,71 @@ Mvalue* Mmessagecounts(){Mallocationowner owner=getOwner(__LINE__);
 	return messageCountsValue;
 }
 
+// determining the sizes of the different types
+size_t getMcharsSize(Mchars const * const _mchars){return(_mchars!=NULL?sizeof(unsigned char)*(1+strlen(_mchars->chars)):0);}
+size_t getmpd_tSize(mpd_t const * const _mpd){return(_mpd!=NULL?sizeof(mpd_t)+(_mpd->data!=NULL?sizeof(mpd_uint_t)*_mpd->alloc:0):0);}
+size_t getmp_intSize(mp_int const * const _mp_int){return(_mp_int!=NULL?sizeof(_mp_int)+(_mp_int->dp!=NULL?sizeof(mp_digit)*_mp_int->alloc:0):0);}
+size_t getMintegerSize(Minteger const * const _integer){return(_integer!=NULL?sizeof(Minteger):0);}
+size_t getMbigintegerSize(Mbiginteger const * const _biginteger){
+	return(_biginteger!=NULL?sizeof(Mbiginteger)+getmp_intSize(_biginteger->_bi):0);
+}
+size_t getMvalueSize(Mvalue const * const _value){
+	size_t result=0;
+	if(_value!=NULL){
+		result+=sizeof(Mvalue);
+		// next to add the size of whatever's being pointed to
+		switch(_value->type){
+			case VT_ARRAY:
+				{
+					Marray* array=_value->value._array;
+					if(array!=NULL){
+						result+=sizeof(Marray);
+						result+=getMcharsSize(array->_creator);
+						if(array->values!=NULL){
+							unsigned long long numberOfElements=array->numberOfElements;
+							do{
+								result+=getMvalueSize(array->values[--numberOfElements]);
+							}while(numberOfElements);
+						}
+					}
+					break;
+				}
+			case VT_BIGINTEGER:;
+			case VT_BYTES:;
+			case VT_DECIMAL:;
+			case VT_ENVIRONMENT:;
+			case VT_FILE:;
+			case VT_FLOAT:;
+			case VT_FUNCTION:;
+			case VT_INTEGER:;
+			case VT_LIST:;
+			case VT_MAP:;
+			case VT_RATIONAL:;
+			case VT_REFERENCE:;
+			case VT_TEXT:;
+			case VT_TIME:;
+			case VT_TOKEN:;
+			case VT_UNDEFINED:;
+		}
+	}
+	return 0;
+}
+size_t getValueSize(int8_t type,void* value){
+	if(value!=NULL)
+	switch(type){
+		case 'V':return getMvalueSize((Mvalue*)value);
+
+	}
+	return 0;
+}
+
 Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _allocationStatsMap=owned_map(__map("allocationStats"),owner);
 	if(NULL==_allocationStatsMap)return NULL;
 	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
 	unsigned long long offered,refused,consumed;
-	obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,&offered,&refused,&consumed);
+	Mallocationsize* allocationTypeSizes[256]; // the histogram of size counts for each of the data types
+	obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSize,&offered,&refused,&consumed);
 	Mmap* _allocationHistoryCacheMap=owned_map(__map("allocationHistoryCache"),owner);
 	if(_allocationHistoryCacheMap!=NULL){
 		if(appendedToMap(_allocationHistoryCacheMap,owner,"offered",_getIntegerValue(offered))!=M_TRUE)

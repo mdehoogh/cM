@@ -14601,7 +14601,7 @@ bool settingApplied(char settingCharacter){
  * @return true on success
  * @return false on failure
  */
-bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
+bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
 
 	//reportNumberOfAllocations("shellInitialized 1");
 

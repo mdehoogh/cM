@@ -643,13 +643,15 @@ unsigned long long getAllocationsRemembered(){
 unsigned long long getAllocationsFreed(){
 	return allocationsFreed;
 }
-void obtainAllocationStats(unsigned long long occupationcounts[257],unsigned long long valuetypecounts[256],unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed){
+void obtainAllocationStats(unsigned long long occupationcounts[257],unsigned long long valuetypecounts[256],
+	Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,
+	unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed){
 	*offered=allocationindexcache.offered;
 	*refused=allocationindexcache.refused;
 	*consumed=allocationindexcache.consumed;
 	memset(occupationcounts,0,257*sizeof(unsigned long long));
 	memset(valuetypecounts,0,256*sizeof(unsigned long long));
-	// replacing: for(int i=256;i>=0;i--)counts[i]=0;
+	if(getValueSizeFunction!=NULL)for(int i=256;i>=0;i--)valuetypesizes[i]=NULL;
 	if(NULL==_allocationnodesRoot)return;
 	if(allocations.l==0)return;
 	allocationindex_t lastAllocationIndex=allocations.l-1;

@@ -137,7 +137,7 @@ bool shellInitialized(
 				InputResponseFunction _inputErrorFunction,
 				OutputTokenFunction _outputTokenFunction,
 				ReoutputTokenFunction _reoutputTokenFunction,
-				UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,
+				UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,
 				OutputCommandInfoFunction _outputCommandInfoFunction
 			);
 
