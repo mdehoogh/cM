@@ -27,7 +27,7 @@ extern int daylight;
  * @brief stores the timezone names
  * 
  */
-char** Mtimezonenames=NULL;Mallocationowner owner_timezonenames=(Mallocationowner){MI_TIME,__LINE__,1}; // the locally remembered timezones which ends with a NULL timezone!!!
+char** Mtimezonenames=NULL;Mallocationowner owner_timezonenames=(Mallocationowner){MI_TIME,-__LINE__,1}; // the locally remembered timezones which ends with a NULL timezone!!!
 /**
  * @brief returns the index of the timezone with name \p tzn
  * 

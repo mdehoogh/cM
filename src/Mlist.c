@@ -143,7 +143,7 @@ Mvalue* Mempty(Mvalue* value){
 	long long result=M_LL_INVALID;
 	if(value)
 	switch(value->type){
-		case VT_ARRAY:result=(value->value._array==NULL||value->value._array->numberOfElements==0);break;
+		case VT_ARRAY:result=(value->value._array==NULL||value->value._array->elements==NULL||value->value._array->elements->count==0);break;
 		case VT_MAP:result=(value->value._map!=NULL&&value->value._map->_first!=NULL?M_FALSE:M_TRUE);break;
 		case VT_LIST:result=(value->value._list&&value->value._list->_first?M_FALSE:M_TRUE);break;
 		default:break;
@@ -344,20 +344,20 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
 					}else // MDH@20MAR2023: are we creating an array or a list???????
 					if(listIndexValue->type==VT_ARRAY){
 						Marray* indexArray=listIndexValue->value._array;
-						if(indexArray!=NULL){
+						if(indexArray!=NULL&&indexArray->elements!=NULL){
 							Mlist* _removedElementsList=owned_list(_getListOfType(list->valuetype),owner); // get a list of the same type as the list from which elements are removed!!!
-							if(_removedElementsList!=NULL&&indexArray->numberOfElements>0){
+							if(_removedElementsList!=NULL&&indexArray->elements->count>0){
 								unsigned long long arrayIndex=0;
 								Mvalue* removedFromListValue;
-								while(arrayIndex<indexArray->numberOfElements){
-									long long listIndex=getValueInteger(indexArray->values[arrayIndex]);
+								while(arrayIndex<indexArray->elements->count){
+									long long listIndex=getValueInteger(indexArray->elements->values[arrayIndex]);
 									if(listIndex!=M_LL_INVALID){
 										removedFromListValue=removedFromList(list,Msubowner(getValueOwner(),1),listIndex);
 										if(removedFromListValue!=NULL&&appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID)<=0)
 											q2outputError("Failed to append a removed list element");
 									}else{
 										q2outputmessageprefix(M_ERROR_PREFIX);
-										q2outputValue("'",indexArray->values[arrayIndex],"' cannot be used as index integer in removing list elements.\n");
+										q2outputValue("'",indexArray->elements->values[arrayIndex],"' cannot be used as index integer in removing list elements.\n");
 									}
 									arrayIndex++;
 								}
@@ -427,7 +427,7 @@ Mvalue* Mfirst(Mvalue* listValue){ // return the first value
 			if(listValue->value._list!=NULL&&listValue->value._list->_first!=NULL)return listValue->value._list->_first->_value;
 		}else
 		if(listValue->type==VT_ARRAY){	
-			if(listValue->value._array!=NULL&&listValue->value._array->numberOfElements>0)return listValue->value._array->values[0];
+			if(listValue->value._array!=NULL&&listValue->value._array->elements!=NULL&&listValue->value._array->elements->count>0)return listValue->value._array->elements->values[0];
 		}
 	}
 	return NULL;
@@ -444,8 +444,8 @@ Mvalue* Mlast(Mvalue* listValue){ // return the last value
 		if(listValue->type==VT_LIST){
 			if(listValue->value._list!=NULL&&listValue->value._list->_last!=NULL)return listValue->value._list->_last->_value;
 		}else
-		if(listValue->type==VT_ARRAY){	
-			if(listValue->value._array!=NULL&&listValue->value._array->numberOfElements>0)return listValue->value._array->values[listValue->value._array->numberOfElements-1];
+		if(listValue->type==VT_ARRAY){
+			if(listValue->value._array!=NULL&&listValue->value._array->elements!=NULL&&listValue->value._array->elements->count>0)return listValue->value._array->elements->values[listValue->value._array->elements->count-1];
 		}
 	}
 	return NULL;

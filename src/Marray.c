@@ -53,9 +53,9 @@ Miterator getArrayiterator(Marray* array){
 	Miterator arrayiterator={arrayNext,arrayNextIndex,1};
 	if(array!=NULL){
 		arrayiterator.valuetype=array->valuetype;
-		if(array->numberOfElements){
-			arrayiterator.lastindex=array->numberOfElements;
-			arrayiterator.valueholder=(void**)array->values; // NOTE leading in determining whether end of sequence was reached (instead of index)
+		if(array->elements!=NULL){
+			arrayiterator.lastindex=array->elements->count;
+			arrayiterator.valueholder=(void**)array->elements->values; // NOTE leading in determining whether end of sequence was reached (instead of index)
 		}
 	}
 	return arrayiterator;
@@ -88,8 +88,8 @@ Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner o
 					Mstring* _name=owned_string(_getString("'"),owner);
 					if(_name!=NULL){
 						if(string_append(_name,mapelement->_variable->_name->chars)){
-							assignValue(&_result->values[arrayindex++],_getTextValue(string(_name)));
-							assignValue(&_result->values[arrayindex++],mapelement->_variable->_value);
+							assignValue(&_result->elements->values[arrayindex++],_getTextValue(string(_name)));
+							assignValue(&_result->elements->values[arrayindex++],mapelement->_variable->_value);
 						}
 						FREE_STRING(_name,owner);
 					}
@@ -101,12 +101,13 @@ Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner o
 		if(length_value->type==VT_ARRAY){
 			// MDH@09APR2023: we should actually use the positive integers in the array to initialize the array
 			Marray* _array=length_value->value._array;
-			unsigned long long numberOfDimensions=_array->numberOfElements;
+			Marrayelements* arrayElements=(_array!=NULL?_array->elements:NULL);
+			unsigned long long numberOfDimensions=(arrayElements!=NULL?arrayElements->count:0);
 			// creating the dimensions backwards
 			Marray*_result=NULL;
 			Mvalue* fillValue=fill_value; // the fill value of the array at the given dimension
 			while(numberOfDimensions>0){
-				long long arrayLength=getValueInteger(_array->values[--numberOfDimensions]);
+				long long arrayLength=getValueInteger(arrayElements->values[--numberOfDimensions]);
 				if(arrayLength>0){
 					if(amVerbose()){
 						q2output("Filling %lld elements of array",arrayLength);
@@ -186,9 +187,9 @@ Mvalue* Mcreatearray(Mvalue* length_value,Mvalue* fill_value){Mallocationowner o
 Mvalue* Mfillarray(Mvalue* array_value,Mvalue* value){
 	Marray* array=(array_value&&array_value->type==VT_ARRAY?array_value->value._array:NULL);
 	if(array!=NULL){
-		unsigned long long l=array->numberOfElements;
+		unsigned long long l=(array->elements!=NULL?array->elements->count:0);
 		// we use assignValue here we get a copy of maps and lists (and arrays for that matter)
-		while(l>0)assignValue(&array->values[--l],value);
+		while(l>0)assignValue(&array->elements->values[--l],value);
 	}
 	return array_value;
 }

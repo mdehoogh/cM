@@ -1312,11 +1312,12 @@ Mvalue* Mcreate(Mvalue* newVariablesValue){Mallocationowner owner=getOwner(__LIN
 				case VT_ARRAY:
 					{
 						Marray* array=newVariablesValue->value._array;
-						if(array!=NULL){
+						Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+						if(arrayElements!=NULL){
 							Mstring* valueText=NULL;
-							long long numberOfElements=array->numberOfElements;
+							long long numberOfElements=arrayElements->count;
 							while(--numberOfElements>=0){
-								valueText=owned_string(_getValueText(array->values[numberOfElements],true,true),owner);
+								valueText=owned_string(_getValueText(arrayElements->values[numberOfElements],true,true),owner);
 								if(valueText!=NULL){
 									if(addVariable(environment,getValueDataOwner(),string(valueText),VT_UNDEFINED,false))
 										result+=1;
@@ -4229,11 +4230,12 @@ Mvalue* Ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			if(value!=NULL){
 				if(value->type==VT_ARRAY){
 					Marray* array=value->value._array;
-					if(array!=NULL){
+					Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+					if(arrayElements!=NULL){
 						_list->valuetype=array->valuetype;
-						unsigned long long arraylength=array->numberOfElements;
+						unsigned long long arraylength=arrayElements->count;
 						if(arraylength>0){
-							Mvalue** valueholder=array->values;
+							Mvalue** valueholder=arrayElements->values;
 							do{
 								if(appendedToList(_list,owner,*valueholder,M_LL_INVALID)<=0){
 									q2outputmessageprefix(M_ERROR_PREFIX);
@@ -4319,11 +4321,12 @@ Mvalue* Mm(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			}else
 			if(value->type==VT_ARRAY){
 				Marray* array=value->value._array;
-				if(array!=NULL){
+				Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+				if(arrayElements!=NULL){
 					_map->valuetype=array->valuetype; // MDH@28MAR2023
-					unsigned long long arraylength=array->numberOfElements;
+					unsigned long long arraylength=arrayElements->count;
 					if(arraylength>0){
-						Mvalue** valueholder=array->values;
+						Mvalue** valueholder=arrayElements->values;
 						unsigned long long arrayindex=0;
 						while(arrayindex<arraylength){
 							char* _key=OWNED(_getIntegerCharacters(++arrayindex),owner);
@@ -4368,11 +4371,11 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				if(_array!=NULL){
 					_array->valuetype=list->valuetype;
 					if(listlength>0){
-						Mvalue** valueholder=_array->values;
+						Mvalue** valueholder=_array->elements->values;
 						Mlistelement* listelement=value->value._list->_first;
 						unsigned long long arrayindex=0;
 						while(listelement!=NULL){
-							assignValue(&_array->values[listelement->index-1],listelement->_value);
+							assignValue(&_array->elements->values[listelement->index-1],listelement->_value);
 							// MDH@10APR2023: if(++arrayindex==listlength)break; // done if we reached the end of the array
 							listelement=listelement->_next;
 							// MDH@10APR2023: valueholder++;
@@ -4389,12 +4392,13 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			if(map){
 				unsigned long long maplength=map->numberOfElements;
 				Marray* _array=owned_array(_getArray("Ma",maplength<<1,NULL),owner);
-				if(_array){
+				Marrayelements* arrayElements=(_array!=NULL?_array->elements:NULL);
+				if(arrayElements!=NULL){
 					_array->valuetype=map->valuetype; // MDH@28MAR2023
 					if(maplength>0){ // something to copy over
 						Mmapelement* mapelement=map->_first;
 						Mvariable* mapvariable;
-						Mvalue** valueholder=_array->values;
+						Mvalue** valueholder=arrayElements->values;
 						while(mapelement!=NULL){
 							mapvariable=mapelement->_variable;
 							if(mapvariable!=NULL){
@@ -4421,7 +4425,7 @@ Mvalue* Ma(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		}else{ // a single value, to be wrapped in an array
 			Marray* _array=owned_array(_getArray("Ma",1,NULL),owner);
 			if(_array!=NULL){
-				assignValue(_array->values,value); // pretty simple!
+				assignValue(_array->elements->values,value); // pretty simple!
 				return _getValueOfArray(disowned_array(_array,owner));
 			}
 			q2outputError("Failed to create the array to wrap the value in");
@@ -4851,12 +4855,13 @@ Mvalue* Msum(Mvalue* value){
 		if(value->type==VT_ARRAY){
 			_sumValue=NULL;
 			Marray* array=value->value._array;
-			if(array!=NULL&&array->numberOfElements>0){
+			Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+			if(arrayElements!=NULL&&arrayElements->count>0){
 				register unsigned long long arrayindex=1;
 				// TODO how about skipping all NULL values??????
-				assignValue(&_sumValue,array->values[0]);
-				while(arrayindex<array->numberOfElements)
-					assignValue(&_sumValue,Madd(_sumValue,array->values[arrayindex++]));
+				assignValue(&_sumValue,arrayElements->values[0]);
+				while(arrayindex<arrayElements->count)
+					assignValue(&_sumValue,Madd(_sumValue,arrayElements->values[arrayindex++]));
 				// outputValue("Sum: ",_sumValue,".\n");
 			}
 		}else // if not something that can be summed, returning the original value
@@ -4898,20 +4903,23 @@ Mvalue* _functionAppliedToArray(Marray* _array,OneArgumentFunction function,bool
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Marray* _result=NULL;
-	if(function!=NULL&&_array!=NULL){ // we need both a function and a list
-		_result=owned_array(_getArray("_functionAppliedToArray",_array->numberOfElements,NULL),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
-		if(_result!=NULL){
-			if(maintainsValuetype)_result->valuetype=_array->valuetype;
-			// using pointer arithmetic is the way to go
-			long long arrayindex=_array->numberOfElements;
-			if(arrayindex>0){
-				Mvalue** _resultelementValueholder=_result->values+arrayindex;
-				Mvalue** _arrayelementValueholder=_array->values+arrayindex; // the value to which the function is to be applied
-				do{
-					_resultelementValueholder--;
-					_arrayelementValueholder--;
-					assignValue(_resultelementValueholder,function(*_arrayelementValueholder));
-				}while(--arrayindex>0);
+	if(function!=NULL){
+		Marrayelements* arrayElements=(_array!=NULL?_array->elements:NULL);
+		if(arrayElements!=NULL){ // we need both a function, an array and array elements
+			_result=owned_array(_getArray("_functionAppliedToArray",arrayElements->count,NULL),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
+			if(_result!=NULL){
+				if(maintainsValuetype)_result->valuetype=_array->valuetype;
+				// using pointer arithmetic is the way to go
+				long long arrayindex=arrayElements->count;
+				if(arrayindex>0){
+					Mvalue** _resultelementValueholder=_result->elements->values+arrayindex;
+					Mvalue** _arrayelementValueholder=_array->elements->values+arrayindex; // the value to which the function is to be applied
+					do{
+						_resultelementValueholder--;
+						_arrayelementValueholder--;
+						assignValue(_resultelementValueholder,function(*_arrayelementValueholder));
+					}while(--arrayindex>0);
+				}
 			}
 		}
 	}
@@ -6077,7 +6085,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																					}else
 																						newValueholder=NULL;
 																				}else{ // indexing an array
-																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
+																					Marrayelements* valueholderArrayelements=valueholderArray->elements;
+																					newValueholder=(valueholderArrayelements!=NULL&&listIndex>0&&listIndex<=valueholderArrayelements->count?&(valueholderArrayelements->values[listIndex-1]):NULL);
 																					if(report)
 																						if(newValueholder!=NULL)
 																							output("New value holder reference value #%llu in array.\n",listIndex);
@@ -6466,6 +6475,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																// we either have a list or an array (bit of a nuisance to have to do it this way?????)
 																Mlist* valueholderList=((*valueholder)->type==VT_LIST?(*valueholder)->value._list:NULL);
 																Marray* valueholderArray=((*valueholder)->type==VT_ARRAY?(*valueholder)->value._array:NULL);
+																if(valueholderArray!=NULL&&NULL==valueholderArray->elements)valueholderArray=NULL; // safeguarding against empty array!!
 																if((valueholderList!=NULL&&valueholderList->unlockCode==0)||(valueholderArray!=NULL&&valueholderArray->unlockCode==0)){
 																	Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
 																	if(report)
@@ -6502,7 +6512,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																							q2outputMessage(M_ERROR_PREFIX,"Failed to add list element at index '%lld'.\n",listIndex);
 																					}
 																				}else{ // MDH@23NOV2020: an array (and we're NOT going to create an element that's not there like we do with a list!!!!)
-																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->numberOfElements?&(valueholderArray->values[listIndex-1]):NULL);
+																					newValueholder=(listIndex>0&&listIndex<=valueholderArray->elements->count?&(valueholderArray->elements->values[listIndex-1]):NULL);
 																					if(report)
 																						if(newValueholder!=NULL)
 																							q2outputMessage(NULL,"New value holder reference value #%llu in array.\n",listIndex);
@@ -6515,6 +6525,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																			if(NULL==newValueholder||NULL==(*newValueholder))break;
 																			valueholderList=((*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
 																			valueholderArray=((*newValueholder)->type==VT_ARRAY?(*newValueholder)->value._array:NULL);
+																			if(valueholderArray!=NULL&&NULL==valueholderArray->elements)valueholderArray=NULL;
 																			// output("%c\n",'E'); // DEBUG
 																		}
 																		// output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
@@ -9967,7 +9978,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 						_scalarRangeArray=owned_array(_getArray("_getScalarRangeArray",arraylength,NULL),owner);
 						if(_scalarRangeArray!=NULL){
 							if(arraylength>0){
-								Mvalue** valueholder=_scalarRangeArray->values;
+								Mvalue** valueholder=_scalarRangeArray->elements->values; // NOTE _getArray() will ascertain that elements will not be NULL!
 								while(integerrangeValue){
 									assignValue(valueholder,integerrangeValue);
 									if(--arraylength==0)break; // fail-safe to ascertain NOT to right beyond the end of the array
@@ -11226,8 +11237,8 @@ Mvalue* Mcorr(Mvalue* _sequence1Value,Mvalue* _sequence2Value){
 		// the sequences need to have the same number of elements
 		if((_sequence1Value->type==VT_LIST||_sequence1Value->type==VT_ARRAY)
 			&&(_sequence2Value->type==VT_LIST||_sequence2Value->type==VT_ARRAY)){
-			unsigned long long numberOfElements1=(_sequence1Value->type==VT_LIST?_sequence1Value->value._list->numberOfElements:_sequence1Value->value._array->numberOfElements);
-			unsigned long long numberOfElements2=(_sequence2Value->type==VT_LIST?_sequence2Value->value._list->numberOfElements:_sequence2Value->value._array->numberOfElements);
+			unsigned long long numberOfElements1=(_sequence1Value->type==VT_LIST?_sequence1Value->value._list->numberOfElements:_sequence1Value->value._array->elements->count);
+			unsigned long long numberOfElements2=(_sequence2Value->type==VT_LIST?_sequence2Value->value._list->numberOfElements:_sequence2Value->value._array->elements->count);
 			if(numberOfElements1==numberOfElements2){
 				Miterator iterator1=(_sequence1Value->type==VT_LIST?getListiterator(_sequence1Value->value._list):getArrayiterator(_sequence1Value->value._array));
 				Miterator iterator2=(_sequence2Value->type==VT_LIST?getListiterator(_sequence2Value->value._list):getArrayiterator(_sequence2Value->value._array));
@@ -11760,8 +11771,8 @@ static int alargerthan(const void* aValue,const void* bValue){
  * @return long long M_TRUE on success, M_FALSE or M_LL_INVALID on failure
  */
 static long long acsort(Marray* _array){
-	if(NULL==_array)return M_LL_INVALID;
-	qsort(_array->values,_array->numberOfElements,sizeof(Mvalue*),alargerthan);
+	if(NULL==_array||NULL==_array->elements)return M_LL_INVALID;
+	qsort(_array->elements->values,_array->elements->count,sizeof(Mvalue*),alargerthan);
 	return M_TRUE;
 }
 /**
@@ -11824,11 +11835,12 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	long long result=M_LL_INVALID;
 	sortstatistics.pointertests++;
-	if(_array!=NULL){
+	Marrayelements* arrayElements=(_array!=NULL?_array->elements:NULL);
+	if(arrayElements!=NULL){
 		result=M_TRUE;
 		clock_t sortstart=clock();
 		sortstatistics.fieldreferences++;
-		unsigned long long arraylength=_array->numberOfElements;
+		unsigned long long arraylength=arrayElements->count;
 		if(arraylength>1){ // things to compare
 			if(report)
 				q2outputMessage(NULL,"Sorting an array of %zd elements with quicksort.\n",arraylength);
@@ -11845,7 +11857,7 @@ static long long aquicksort(Marray* _array){Mallocationowner owner=getOwner(__LI
 				// so that the smallest value of top will be 0
 				unsigned long long top=2;
 				long long lmin1,l,h,pmin1,p,pplus1;
-				Mvalue** values=_array->values;
+				Mvalue** values=arrayElements->values;
 				sortstatistics.fieldreferences++;
 				// as long as there are two elements on the stack
 				while(top>1){ // two or more elements on the stack
@@ -12016,7 +12028,8 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 				Mlistelement** stack=MALLOC(sizeof(Mlistelement*),maxtop=initialmaxtop,-'l',owner);
 				if(stack!=NULL){
 					sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*maxtop);
-					if(report)q2outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
+					if(report)
+						q2outputMessage(NULL,"Initial quicksort stack size: %llu.\n",maxtop);
 					result=2; // the current amount of stack elements used
 					stack[0]=NULL; // i.e. the first lmin1
 					stack[1]=_list->_last;
@@ -12040,7 +12053,8 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 							sortstatistics.fieldtests+=2;
 							if(pmin1->index>l->index){
 								if(top>=maxtop){
-									if(report)q2outputMessage(NULL,"Expanding the stack.\n");
+									if(report)
+										q2outputMessage(NULL,"Expanding the stack.\n");
 									stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
 									if(NULL==stack){
 										q2outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
@@ -12048,7 +12062,8 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 									}
 									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);
 									maxtop+=initialmaxtop;
-									if(report)q2outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+									if(report)
+										q2outputMessage(NULL,"Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 								}
 								stack[top++]=lmin1;
 								stack[top++]=pmin1;
@@ -12070,7 +12085,7 @@ static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE
 										q2outputMessage(M_ERROR_PREFIX,"Not enough memory for a stack of %llu list elements in quicksort.\n",maxtop+initialmaxtop);
 										break;
 									}
-									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);									
+									sortstatistics.memoryallocation+=(sizeof(Mlistelement*)*initialmaxtop);
 									maxtop+=initialmaxtop;
 									if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
 								}
@@ -12723,12 +12738,12 @@ typedef bool (*ArrayMergeFunction)(Mvalue** const values,unsigned long long l,un
 static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunction){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=M_LL_INVALID;
-	if(_array!=NULL){
+	if(_array!=NULL&&_array->elements!=NULL&&_array->elements->values!=NULL){
 		result=M_TRUE;
 		clock_t sortstart=clock();
-		unsigned long long arraylength=_array->numberOfElements;
+		unsigned long long arraylength=_array->elements->count;
 		if(arraylength>1){ // at least two elements
-			Mvalue** values=_array->values; // address of the first Mvalue pointer
+			Mvalue** values=_array->elements->values; // address of the first Mvalue pointer
 			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
 			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;sortstatistics.pointertests++; // the test below
 			Mvalue** current=values; // initialize current to the address of first Mvalue pointer
@@ -12841,7 +12856,7 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 						{_array->numberOfElements=arrayindex+1;outputArray("The array after merging the final down run: '",_array,"'.\n");}
 						*/
 					}
-					_array->numberOfElements=++arraylength; // in case we changed it (for display purposes)
+					_array->elements->count=++arraylength; // in case we changed it (for display purposes)
 				}
 			}
 		}
@@ -12850,8 +12865,8 @@ static long long aharmonicasort(Marray* _array,ArrayMergeFunction arrayMergeFunc
 			if(report)
 			{
 				outputArray("The sorted array: '",_array,"'.\n");
-				q2outputValue("First: '",*_array->values,"'.\n");
-				q2outputValue("Last: '",*(_array->values+_array->numberOfElements-1),"'.\n");
+				q2outputValue("First: '",*_array->elements->values,"'.\n");
+				q2outputValue("Last: '",*(_array->elements->values+_array->elements->count-1),"'.\n");
 			}
 			q2output("Duration of array sorting by harmonicasort: %.3f ms.\n",duration/M_CLOCKS_PER_MS);
 		}
@@ -13851,15 +13866,15 @@ static long long atimsort(Marray* const _array,ArrayMergeFunction arrayMergeFunc
 	bool report=amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_SHELL);
 	bool result=M_LL_INVALID;
 	sortstatistics.pointertests++;
-	if(_array!=NULL){
+	if(_array!=NULL&&_array->elements!=NULL&&_array->elements->values!=NULL){
 		result=M_TRUE;
 		clock_t sortstart=clock(); // force to double
 		sortstatistics.fieldreferences++;
-		unsigned long long arraylength=_array->numberOfElements;
+		unsigned long long arraylength=_array->elements->count;
 		if(arraylength>1){
 			double sortstart=clock();
 			sortstatistics.pointerassignments++;sortstatistics.fieldreferences++;
-			Mvalue** values=_array->values;
+			Mvalue** values=_array->elements->values;
 			// sort the (fixed-size) runs with insertion sort
 			// NOTE ainsertionsort expects indices one up the actual index
 			for(unsigned long long runfirst=0;runfirst<arraylength;runfirst+=M_RUN_LENGTH)
@@ -14487,11 +14502,12 @@ Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__)
 		}else
 		if(_listValue->type==VT_ARRAY){
 			Marray* array=_listValue->value._array;
-			unsigned long long arraylength=array->numberOfElements;
+			Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+			unsigned long long arraylength=(arrayElements!=NULL?arrayElements->count:0);
 			if(arraylength>0){
 				Mlist* _runsList=owned_list(__list("Mrunpoints"),owner);
 				if(_runsList!=NULL){
-					Mvalue** valueholder=array->values; // the pointer to the first Mvalue*
+					Mvalue** valueholder=array->elements->values; // the pointer to the first Mvalue*
 					Mvalue* value=*valueholder; // the first value pointed to
 					// the first and last list element will always be in the list
 					if(appendedToList(_runsList,owner,value,1)>0){ // the first value 

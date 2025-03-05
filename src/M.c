@@ -2743,9 +2743,9 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 					written+=outputChar('[');
 					Marray* _array=_value->value._array;
 					if(_array!=NULL){
-						unsigned long long arraylength=_array->numberOfElements;
+						unsigned long long arraylength=(_array->elements!=NULL?_array->elements->count:0);
 						if(arraylength>0){
-							Mvalue** values=_array->values;
+							Mvalue** values=_array->elements->values;
 							long long numberOfElementsNotWritten=arraylength;
 							numberOfElementsNotWritten-=(M_ARRAY_ELEMENTS_AT_START+M_ARRAY_ELEMENTS_AT_END);
 							unsigned long long arrayindex=0; // the expected array index
@@ -5797,11 +5797,12 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
 						}else
 						if(pythonCommandValue->type==VT_ARRAY){
 							// write every array element as a python script line
-							Mvalue** arrayValues=pythonCommandValue->value._array->values;
+							Marrayelements* arrayElements=(pythonCommandValue->value._array!=NULL?pythonCommandValue->value._array->elements:NULL);
+							Mvalue** arrayValues=(arrayElements!=NULL?arrayElements->values:NULL);
 							size_t arrayElementIndex=0;
 							Mvalue* arrayElementValue;
 							pythonScriptLinesWritten=true;
-							while(arrayElementIndex<pythonCommandValue->value._array->numberOfElements){
+							while(arrayElementIndex<arrayElements->count){
 								arrayElementValue=arrayValues[arrayElementIndex];
 								if(arrayElementValue!=NULL&&arrayElementValue->type==VT_TEXT){
 									Mstring* _pythonCommandText=owned_string(_getStringOfText(arrayElementValue->value._text,true),owner);

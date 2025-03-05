@@ -114,23 +114,23 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
  * @return Mlist* returns the wrapped M list containing the result of applying \p binaryoperator to M list \p _list and M array \p _array
  */
 Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
-	if(NULL==_array||_array->numberOfElements==0)return _list;
+	if(NULL==_array||NULL==_array->elements||_array->elements->count==0)return _list;
 	Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_array->valuetype):VT_UNDEFINED),owner); // TODO if the types are the same use that?
 	if(_result!=NULL){
 		// elements with the same index are to be added and stored under that index
 		Mlistelement* _listelement=_list->_first;
 		unsigned long long arrayindex=0;
-		while(_listelement!=NULL||arrayindex<_array->numberOfElements){
-			if(_listelement!=NULL&&arrayindex<_array->numberOfElements){
+		while(_listelement!=NULL||arrayindex<_array->elements->count){
+			if(_listelement!=NULL&&arrayindex<_array->elements->count){
 				if(_listelement->index==arrayindex+1){
-					if(appendedToList(_result,owner,binaryoperator(_listelement->_value,_array->values[arrayindex]),arrayindex+1)<=0)break;
+					if(appendedToList(_result,owner,binaryoperator(_listelement->_value,_array->elements->values[arrayindex]),arrayindex+1)<=0)break;
 					_listelement=_listelement->_next;arrayindex++;
 				}else
 				if(_listelement->index<=arrayindex){
 					if(appendedToList(_result,owner,binaryoperator(_listelement->_value,NULL),_listelement->index)<=0)break;
 					_listelement=_listelement->_next;
 				}else{
-					if(appendedToList(_result,owner,binaryoperator(NULL,_array->values[arrayindex]),arrayindex+1)<=0)break;
+					if(appendedToList(_result,owner,binaryoperator(NULL,_array->elements->values[arrayindex]),arrayindex+1)<=0)break;
 					arrayindex++;
 				}
 			}else
@@ -138,7 +138,7 @@ Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction bi
 				if(appendedToList(_result,owner,binaryoperator(_listelement->_value,NULL),_listelement->index)<=0)break;
 				_listelement=_listelement->_next;
 			}else{
-				if(appendedToList(_result,owner,binaryoperator(NULL,_array->values[arrayindex]),arrayindex+1)<=0)break;
+				if(appendedToList(_result,owner,binaryoperator(NULL,_array->elements->values[arrayindex]),arrayindex+1)<=0)break;
 				arrayindex++;
 			}
 		}
@@ -157,7 +157,7 @@ Mlist* _appliedToListAndArray(Mlist* _list,Marray* _array,TwoArgumentFunction bi
 Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_list||_list->numberOfElements==0)return _array;
 	// ASSERT the list is not empty
-	unsigned long long arraylength=(_array!=NULL?_array->numberOfElements:0);
+	unsigned long long arraylength=(_array!=NULL&&_array->elements!=NULL?_array->elements->count:0);
 	// the number of elements in the array is the maximum of the number of elements in the array or the index of the list
 	Marray* _result=owned_array(_getArray("appliedToArrayAndList",MAX(arraylength,_list->_last->index),NULL),owner);
 	if(_result!=NULL){
@@ -168,22 +168,22 @@ Marray* _appliedToArrayAndList(Marray* _array,Mlist* _list,TwoArgumentFunction b
 		while(_listelement!=NULL||arrayindex<arraylength){
 			if(_listelement!=NULL&&arrayindex<arraylength){
 				if(_listelement->index==arrayindex+1){
-					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_listelement->_value));
+					assignValue(&_result->elements->values[arrayindex],binaryoperator(_array->elements->values[arrayindex],_listelement->_value));
 					_listelement=_listelement->_next;arrayindex++;
 				}else
 				if(_listelement->index<=arrayindex){
-					assignValue(&_result->values[_listelement->index-1],binaryoperator(NULL,_listelement->_value));
+					assignValue(&_result->elements->values[_listelement->index-1],binaryoperator(NULL,_listelement->_value));
 					_listelement=_listelement->_next;
 				}else{
-					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],NULL));
+					assignValue(&_result->elements->values[arrayindex],binaryoperator(_array->elements->values[arrayindex],NULL));
 					arrayindex++;
 				}
 			}else
 			if(_listelement!=NULL){
-				assignValue(&_result->values[_listelement->index-1],binaryoperator(NULL,_listelement->_value));
+				assignValue(&_result->elements->values[_listelement->index-1],binaryoperator(NULL,_listelement->_value));
 				_listelement=_listelement->_next;
 			}else{
-				assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],NULL));
+				assignValue(&_result->elements->values[arrayindex],binaryoperator(_array->elements->values[arrayindex],NULL));
 				arrayindex++;
 			}
 		}
@@ -291,14 +291,18 @@ Marray* _appliedToArrayElements(Marray* _array,OneArgumentFunction oneArgumentFu
  */
 Marray* _appliedToArrays(Marray* _array1,Marray* _array2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@30MAR2023: it's debatable whether we want a elementwise binary operator application or every element with every other element
-	if(NULL==_array1)return _array2;if(NULL==_array2)return _array1;
-	Marray* _result=owned_array(_getArray("_appliedToArrays",MAX(_array1->numberOfElements,_array2->numberOfElements),NULL),owner); // TODO if the types are the same use that?
+	if(NULL==_array1||NULL==_array1->elements||NULL==_array1->elements->values)return _array2;
+	if(NULL==_array2||NULL==_array2->elements||NULL==_array2->elements->values)return _array1;
+	Marray* _result=owned_array(_getArray("_appliedToArrays",MAX(_array1->elements->count,_array2->elements->count),NULL),owner); // TODO if the types are the same use that?
 	if(_result!=NULL){
 		if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array1->valuetype,_array2->valuetype);
 		unsigned long long arrayindex=0;
-		while(arrayindex<_result->numberOfElements){
+		while(arrayindex<_result->elements->count){
 			// leaving it up to the binary operator what will be the result of applying it with one of the arguments equal to NULL
-			assignValue(&_result->values[arrayindex],binaryoperator((arrayindex<_array1->numberOfElements?_array1->values[arrayindex]:NULL),(arrayindex<_array2->numberOfElements?_array2->values[arrayindex]:NULL)));
+			assignValue(&_result->elements->values[arrayindex],
+				binaryoperator(
+					(arrayindex<_array1->elements->count?_array1->elements->values[arrayindex]:NULL),
+					(arrayindex<_array2->elements->count?_array2->elements->values[arrayindex]:NULL)));
 			arrayindex++;
 		}
 	}
@@ -320,12 +324,12 @@ Mvalue* _appliedToArray(Marray* _array,Mvalue* _value,TwoArgumentFunction binary
 	if(_value!=NULL){
 		if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
 			// should create an array of the same length
-			Marray* _result=owned_array(_getArray("_appliedToArray",_array->numberOfElements,NULL),owner);
+			Marray* _result=(_array!=NULL&&_array->elements!=NULL?owned_array(_getArray("_appliedToArray",_array->elements->count,NULL),owner):NULL);
 			if(_result!=NULL){
 				if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
 				unsigned long long arrayindex=0;
-				while(arrayindex<_array->numberOfElements){
-					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
+				while(arrayindex<_array->elements->count){
+					assignValue(&_result->elements->values[arrayindex],binaryoperator(_array->elements->values[arrayindex],_value));
 					arrayindex++;
 				}
 				resultValue=_getValueOfArray(disowned_array(_result,owner));
@@ -353,12 +357,12 @@ Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binar
 	if(_value!=NULL){
 		if(_value->type!=VT_ARRAY&&_value->type!=VT_LIST){
 			// should create an array of the same length
-			Marray* _result=owned_array(_getArray("_appliedToArray2",_array->numberOfElements,NULL),owner);
+			Marray* _result=(_array!=NULL&&_array->elements!=NULL?owned_array(_getArray("_appliedToArray2",_array->elements->count,NULL),owner):NULL);
 			if(_result!=NULL){
 				if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
 				unsigned long long arrayindex=0;
-				while(arrayindex<_array->numberOfElements){
-					assignValue(&_result->values[arrayindex],binaryoperator(_array->values[arrayindex],_value));
+				while(arrayindex<_array->elements->count){
+					assignValue(&_result->elements->values[arrayindex],binaryoperator(_array->elements->values[arrayindex],_value));
 					arrayindex++;
 				}
 			}

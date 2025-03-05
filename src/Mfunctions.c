@@ -723,7 +723,8 @@ Mvalue* Mlen(Mvalue* _value){
 	if(_value!=NULL){
 		switch(_value->type){
 			case VT_ARRAY:
-				result=_value->value._array->numberOfElements;
+			{
+				result=(_value->value._array->elements!=NULL?_value->value._array->elements->count:0);
 				/* MDH@08APR2023: an array can now be defined with multiple dimensions
 				if(_value->value._array->numberOfDimensionsLeft){
 					Marray* _dimensions=_getArray("len",numberOfDimensionsLeft+1,NULL);
@@ -734,6 +735,7 @@ Mvalue* Mlen(Mvalue* _value){
 				}
 				*/
 				break;
+			}
 			case VT_LIST:result=_value->value._list->numberOfElements;break; //(_value->value._list->_last?_value->value._list->_last->index:0);break;
 			case VT_MAP:result=_value->value._map->numberOfElements;break;
 			case VT_TEXT:result=strlen(_value->value._text->_c);break;
@@ -761,9 +763,10 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 				case VT_ARRAY:
 					{
 						Marray* array=_value->value._array;
+						Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
 						// TODO if this is a multidimensional array what should we do?????? should newlength_value have the same number of dimension lengths??????
-						if(array->numberOfElements>0){ // this is not a dimensioned array
-							unsigned long long length=array->numberOfElements;
+						if(arrayElements!=NULL&&arrayElements->count>0){ // this is not a dimensioned array
+							unsigned long long length=arrayElements->count;
 							if(length!=newlength){
 								unsigned long long l=MAX(length,newlength); // guaranteed to be positive, will equal length if newlength equals 0!!!
 								// we can't cut off values until we managed to get new memory
@@ -775,20 +778,24 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 											l--;
 											// all values ABOVE newlength will not be used anymore
 											// all values below length will still be used
-											if(l>=newlength)assignValue(&array->values[l],NULL);else if(l<length)newvalues[l]=array->values[l];
+											if(l>=newlength)
+												assignValue(&arrayElements->values[l],NULL);
+											else 
+											if(l<length)
+												newvalues[l]=arrayElements->values[l];
 										}while(l>0);
 										// NULL any value reference in the current array's values NOT included in the new values
-										FREE_DISOWNED(array->values,length,-'a',Msubowner(getValueOwner(),1)); // get rid of the current values
-										array->values=newvalues; // make values point to the new values
-										array->numberOfElements=newlength; // remember the new length
+										FREE_DISOWNED(arrayElements->values,length,-'a',Msubowner(getValueOwner(),1)); // get rid of the current values
+										arrayElements->values=newvalues; // make values point to the new values
+										arrayElements->count=newlength; // remember the new length
 										result-=length; // the change in number of elements is the result of the function
 									}
 								}else{ // deleting all values, so no need to try to allocate sufficient memory
 									result-=length;
-									while(l>0)assignValue(&array->values[--l],NULL); // getting rid of all value pointers (in effect decrementing the counts of all the values!!!!)
-									FREE(array->values,length,-'a'); // get rid of the current values							
-									array->numberOfElements=0;
-									array->values=NULL;
+									while(l>0)assignValue(&arrayElements->values[--l],NULL); // getting rid of all value pointers (in effect decrementing the counts of all the values!!!!)
+									FREE(arrayElements->values,length,-'a'); // get rid of the current values							
+									arrayElements->count=0;
+									arrayElements->values=NULL;
 								}
 							}else // no need to change
 								result=0;
@@ -880,10 +887,11 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 				Marray* textArray=textsValue->value._array;
 				if(textArray!=NULL){
 					// TODO how to return the texts of a dimensioned array????
-					if(textArray->numberOfElements>0){
-						*textcount=textArray->numberOfElements;
+					Marrayelements* textArrayElements=textArray->elements;
+					if(textArrayElements->count>0){
+						*textcount=textArrayElements->count;
 						if(*textcount>0){
-							Mvalue** textValues=textArray->values;
+							Mvalue** textValues=textArrayElements->values;
 							if(textValues!=NULL){
 								_texts=MALLOC(sizeof(char*),*textcount,'c',owner);
 								if(_texts!=NULL){
@@ -1143,7 +1151,7 @@ Mvalue* Msplit(Mvalue* _textValue,Mvalue* _separatorValue,Mvalue* _itemwrapperVa
 				// move the values in the split text list over to splitTextArray
 				unsigned long long splittextindex=0;
 				Mlistelement* splitTextsListelement=_splitTextsList->_first;
-				Mvalue** splitTextsArrayelement=_splitTextsArray->values;
+				Mvalue** splitTextsArrayelement=_splitTextsArray->elements->values;
 				while(splitTextsListelement!=NULL){
 					if(++splittextindex>_splitTextsList->numberOfElements)break; // the number of elements in the split texts list is too small (and therefore incorrect!!!)
 					assignValue(splitTextsArrayelement,splitTextsListelement->_value);
@@ -1304,10 +1312,11 @@ Mvalue* Moutputlines(Mvalue* _value){
 		if(_value->type==VT_ARRAY){
 			written=0;
 			Marray* array=_value->value._array;
-			if(array!=NULL){
+			Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+			if(arrayElements!=NULL){
 				size_t elementIndex=0;
-				while(elementIndex++<array->numberOfElements){
-					written+=Moutput(array->values[elementIndex])->value._integer->ll;
+				while(elementIndex++<array->elements->count){
+					written+=Moutput(array->elements->values[elementIndex])->value._integer->ll;
 					written+=newline();
 				}
 			}
@@ -1456,7 +1465,7 @@ Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
 	if(count>0){
 		Marray* _randarray=owned_array(_getArray("Mrands",count,NULL),owner);
 		if(_randarray!=NULL){
-			Mvalue** valueholder=_randarray->values;
+			Mvalue** valueholder=_randarray->elements->values;
 			while(--count>=0){assignValue(valueholder,Mrand());valueholder++;}
 			return _getValueOfArray(disowned_array(_randarray,owner));
 		}
@@ -1481,9 +1490,9 @@ Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue){Mallocationowner owner=
 	if(count>0){
 		long long upper=getValueInteger(_upperValue);
 		if(upper>0&&upper<=RAND_MAX){
-			Marray* _randarray=owned_array(_getArray("Mrands",count,NULL),owner);
+			Marray* _randarray=owned_array(_getArray("Mrands",count,NULL),owner); // guarantees elements field and elements->values to be non-NULL
 			if(_randarray!=NULL){
-				Mvalue** valueholder=_randarray->values;
+				Mvalue** valueholder=_randarray->elements->values;
 				while(--count>=0){
 					long long r=randominteger(upper);
 					assignValue(valueholder,(r>=0?_getIntegerValue(r):NULL));

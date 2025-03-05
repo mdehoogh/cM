@@ -111,13 +111,17 @@ typedef struct Mlist{
 }Mlist;
 
 // MDH@04NOV2020: similar definitions for Marray
+typedef struct Marrayelements{
+	unsigned long long count;
+	Mvalue** values;
+}Marrayelements;
 typedef struct Marray{
 	Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
 	long long unlockCode; // MDH@17AUG2023: replaces immutable flag
-	unsigned long long numberOfElements; // the number of values field "values" holds
+	///unsigned long long numberOfElements; // the number of values field "values" holds
 	long long numberOfDimensionsLeft; // MDH@08APR2023: the number of dimensions left (only for multidimensional arrays, so we can tell from the top-level array how many dimensions it has)
 	Mvaluetype valuetype; // we can force an array to have elements of the same type
-	Mvalue** values; // I suppose we need to have a pointer to an array of Mvalue pointers, alternatively if the number of elements is fixed, we could point to the Mvalue structures themselves?????
+	Marrayelements* elements; // I suppose we need to have a pointer to an array of Mvalue pointers, alternatively if the number of elements is fixed, we could point to the Mvalue structures themselves?????
 	bool weak:1;
 	// replacing: bool immutable:1;
 }Marray;

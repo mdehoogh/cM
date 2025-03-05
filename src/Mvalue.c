@@ -1142,11 +1142,13 @@ Mvalue* getFirstScalarValue(Mvalue* value){
 		}
 		// MDH@15MAR2023: an array is also a composite non-scalar structure
 		if(value->type==VT_ARRAY){
-			Mvalue** values=(value->value._array!=NULL?value->value._array->values:NULL);
+			Marray* array=value->value._array;
+			Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+			Mvalue** values=(arrayElements!=NULL?arrayElements->values:NULL); // NOTE
 			if(values!=NULL){
 				unsigned long long l=0;
-				while(l<value->value._array->numberOfElements){
-					Mvalue* firstScalarValue=getFirstScalarValue(value->value._array->values[l]);
+				while(l<arrayElements->count){
+					Mvalue* firstScalarValue=getFirstScalarValue(arrayElements->values[l]);
 					if(firstScalarValue!=NULL)return firstScalarValue;
 					l++;
 				}
@@ -1927,7 +1929,10 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
  */
 Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
 	if(NULL==_array)return NULL;
-	if(_array->values!=NULL)OWNED(_array->values,Msubowner(owner_array,1));
+	if(_array->elements!=NULL){
+		OWNED(_array->elements,Msubowner(owner_array,1));
+		if(_array->elements->values!=NULL)OWNED(_array->elements->values,Msubowner(owner_array,2));
+	}
 	return OWNED(_array,owner_array);
 }
 /**
@@ -1939,7 +1944,10 @@ Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
  */
 Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
 	if(NULL==_array)return NULL;
-	if(_array->values!=NULL)DISOWNED(_array->values,owner_array);
+	if(_array->elements!=NULL){
+		if(_array->elements->values!=NULL)DISOWNED(_array->elements->values,owner_array);
+		DISOWNED(_array->elements,owner_array);
+	}
 	return DISOWNED(_array,owner_array);
 }
 #endif
@@ -1965,21 +1973,29 @@ Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
 Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const * fillValue){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _array=owned_array(__array(source),owner);
 	if(NULL==_array)return NULL;
-	if(numberOfElements){ // _array->values should be initialized to accomodate the given number of values
+	if(numberOfElements>0){ // _array->values should be initialized to accomodate the given number of values
 		// I need to allocated enough room for numberOfElements Mvalue*
-		_array->values=CALLOC(sizeof(Mvalue*),numberOfElements,-'a',Msubowner(owner,1));
-		if(_array->values!=NULL){
-			_array->numberOfElements=numberOfElements;
-			if(fillValue!=NULL){
-				///outputValue("Fill value: ",fillValue,".\n");
-				while(numberOfElements>0)assignValue(&_array->values[--numberOfElements],fillValue); // assign the fillValue to each element in the array
-				_array->valuetype=fillValue->type; // the type of fillValue becomes the value type of the array
-				if(fillValue->type==VT_ARRAY)
-					_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
-				///output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
+		_array->elements=CALLOC(sizeof(Marrayelements),1,'a',Msubowner(owner,1)); // NOTE fixed sized allocations use positive type indicators
+		if(_array->elements!=NULL){
+			_array->elements->values=CALLOC(sizeof(Mvalue*),numberOfElements,-'a',Msubowner(owner,1));
+			if(_array->elements->values!=NULL){
+				_array->elements->count=numberOfElements;
+				if(fillValue!=NULL){
+					///outputValue("Fill value: ",fillValue,".\n");
+					while(numberOfElements>0)assignValue(&_array->elements->values[--numberOfElements],fillValue); // assign the fillValue to each element in the array
+					_array->valuetype=fillValue->type; // the type of fillValue becomes the value type of the array
+					if(fillValue->type==VT_ARRAY)
+						_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
+					///output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
+				}
+			}else{ // failed to ascertain that field values is non-NULL!!
+				FREE_ARRAY(_array,owner);
+				q2outputError("Failed to allocate memory for storing the array elements");
 			}
-		}else
+		}else{ // failed to allocate memory for elements field
+			FREE_ARRAY(_array,owner);
 			q2outputError("Failed to allocate memory for storing the array elements");
+		}
 	}
 	return DISOWNED_ARRAY(_array,owner);
 }
@@ -1996,13 +2012,24 @@ void free_values(Mvalue** values,unsigned long long numberOfValues){
 	FREE(values,numberOfValues,-'a');
 }
 /**
+ * @brief frees M array element \p arrayelement
+ * 
+ * @param arrayelements 
+ */
+static void free_arrayelements(Marrayelements* arrayelements){
+	if(arrayelements!=NULL){
+		free_values(arrayelements->values,arrayelements->count);
+		FREE_1(arrayelements,'a');
+	}
+}
+/**
  * @brief frees M array \p _array
  * @param _array
  */
 void free_array(Marray* _array/*,Mallocationowner owner*/){
 	if(NULL==_array)return;
 	// if we have values, we should disconnect them from their values (see free_values)
-	if(_array->values!=NULL)free_values(_array->values,_array->numberOfElements);
+	free_arrayelements(_array->elements);
 	FREE_1(_array,'A');
 }
 
@@ -2037,13 +2064,13 @@ Mvalue* _getValueOfArray(Marray* _array/*,Mallocationowner owner_list*/){//Mallo
  * @return Marray* a new M array copy from M array \p array
  */
 Marray* _getArrayCopy(Marray const * const array){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
-	if(array!=NULL){
-		register unsigned long long arrayindex=array->numberOfElements; // MDH@24NOV2020: HOORAY my first time use of 'register'
+	if(array!=NULL&&array->elements!=NULL){
+		register unsigned long long arrayindex=array->elements->count; // MDH@24NOV2020: HOORAY my first time use of 'register'
 		Marray* _array=owned_array(_getArray("_getArrayCopy",arrayindex,NULL),owner);
 		if(_array!=NULL){
 			_array->numberOfDimensionsLeft=array->numberOfDimensionsLeft; // MDH@02MAY2023: let's copy this new field as well
 			if(arrayindex>0){
-				Mvalue **newvalueholder=_array->values+arrayindex,**valueholder=array->values+arrayindex;
+				Mvalue **newvalueholder=_array->elements->values+arrayindex,**valueholder=array->elements->values+arrayindex;
 				do assignValue(--newvalueholder,*(--valueholder));while(--arrayindex>0);
 			}
 			return disowned_array(_array,owner);
@@ -2067,7 +2094,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 	Mstring* result=owned_string(__string(),owner);
 	if(result!=NULL){
 		Mstring* p=result;
-		unsigned long long l=(_array?_array->numberOfElements:0);
+		unsigned long long l=(_array!=NULL?(_array->elements!=NULL?_array->elements->count:0):0);
 		if(report)
 		{p=string_append_char(p,'a');p=string_append_char(p,'(');p=appendll(p,l);p=string_append_char(p,')');}
 		p=string_append_char(p,'['); // switch to using p in appends
@@ -2094,7 +2121,7 @@ Mstring* _getArrayText(Marray const * const _array,long long showAtStart,long lo
 						p=string_append_char(p,':');
 					}
 					// replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
-					Mstring* _arrayelementValueText=owned_string(_getValueText(_array->values[arrayelementindex],false,showAll),owner); // to be freed asap
+					Mstring* _arrayelementValueText=owned_string(_getValueText(_array->elements->values[arrayelementindex],false,showAll),owner); // to be freed asap
 					if(_arrayelementValueText!=NULL){
 						p=string_append(p,string(_arrayelementValueText));
 						FREE_STRING(_arrayelementValueText,owner); // release AFTER copying over
@@ -4043,14 +4070,16 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowne
 Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mvaluetype array_valuetype){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _result=NULL;
 	if(_array!=NULL){
-		unsigned long long l=_array->numberOfElements;
+		unsigned long long l=(_array->elements!=NULL?_array->elements->count:0);
 		if(l>0){
-			_result=owned_array(_getArray("appliedToArray",_array->numberOfElements,NULL),owner);
+			Marrayelements* arrayElements=_array->elements;
+			_result=owned_array(_getArray("appliedToArray",arrayElements->count,NULL),owner);
 			if(_result==NULL)return NULL;
 			_result->valuetype=array_valuetype; // MDH@04AUG2023
+			Marrayelements* resultElements=_result->elements;
 			do{
 				l--;
-				assignValue(&_result->values[l],oneArgumentFunction(_array->values[l]));
+				assignValue(&resultElements->values[l],oneArgumentFunction(arrayElements->values[l]));
 			}while(l>0);
 		}
 	}
@@ -4066,20 +4095,21 @@ Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mv
  * @return Marray* returns the array of applying the function in \p functionunion to each element of \p _array as first argument, and \p additionalArguments as additional arguments
  */
 Marray* applyFunctionToArray(Marray const * const _array,Mfunctionunion functionunion,size_t numberOfAdditionalArguments,Mvalue** additionalArguments){Mallocationowner owner=getOwner(__LINE__);
-	unsigned long long l=(_array!=NULL?_array->numberOfElements:0);
+	unsigned long long l=(_array!=NULL?(_array->elements!=NULL?_array->elements->count:0):0);
 	Marray* _result=(l>0?owned_array(_getArray("applyFunctionToArray",l,NULL),owner):NULL);
 	if(NULL==_result)return NULL;
+	Marrayelements *arrayElements=_array->elements,*resultElements=_result->elements;
 	do{
 		l--;
 		Mvalue* functionValue=NULL;
 		switch(numberOfAdditionalArguments){
-			case 0:functionValue=functionunion.oneArgumentFunction(_array->values[l]);break;
-			case 1:functionValue=functionunion.twoArgumentFunction(_array->values[l],additionalArguments[0]);break;
-			case 2:functionValue=functionunion.threeArgumentFunction(_array->values[l],additionalArguments[0],additionalArguments[1]);break;
-			case 3:functionValue=functionunion.fourArgumentFunction(_array->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2]);break;
-			case 4:functionValue=functionunion.fiveArgumentFunction(_array->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2],additionalArguments[3]);break;
+			case 0:functionValue=functionunion.oneArgumentFunction(arrayElements->values[l]);break;
+			case 1:functionValue=functionunion.twoArgumentFunction(arrayElements->values[l],additionalArguments[0]);break;
+			case 2:functionValue=functionunion.threeArgumentFunction(arrayElements->values[l],additionalArguments[0],additionalArguments[1]);break;
+			case 3:functionValue=functionunion.fourArgumentFunction(arrayElements->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2]);break;
+			case 4:functionValue=functionunion.fiveArgumentFunction(arrayElements->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2],additionalArguments[3]);break;
 		}
-		assignValue(&_result->values[l],functionValue);
+		assignValue(&resultElements->values[l],functionValue);
 	}while(l>0);
 	return disowned_array(_result,owner);
 }
@@ -7145,8 +7175,8 @@ long long fWriteValue(FILE* const file,Mvalue* valueToWrite,bool openedInBinaryM
 				result=0;
 				Marray* array=valueToWrite->value._array;
 				if(array!=NULL){
-					Mvalue** values=array->values;
-					long long numberOfWrites=array->numberOfElements;
+					Mvalue** values=(array->elements!=NULL?array->elements->values:NULL);
+					long long numberOfWrites=(values!=NULL?array->elements->count:0);
 					///////output("Number of array elements to write: %llu.\n",numberOfWrites);
 					while(numberOfWrites>0){
 						if(*values!=NULL)
@@ -7464,8 +7494,9 @@ Mvalue* Mfwritelines(Mvalue const * const fileValue,Mvalue const * const linesTo
 				}else
 				if(linesToWriteValue->type==VT_ARRAY){
 					Marray* arrayToWrite=linesToWriteValue->value._array;
-					Mvalue** values=(arrayToWrite!=NULL?arrayToWrite->values:NULL);
-					result=(values!=NULL?arrayToWrite->numberOfElements:-1);
+					Marrayelements* arrayToWriteElements=(arrayToWrite!=NULL?arrayToWrite->elements:NULL);
+					Mvalue** values=(arrayToWriteElements!=NULL?arrayToWriteElements->values:NULL);
+					result=(values!=NULL?arrayToWriteElements->count:-1);
 					if(result>0){
 						q2output("Number of lines to write: %lld.\n",result);
 						while(result>0){
@@ -7887,16 +7918,17 @@ static MessageCounts* _getValueMessageCounts(Mvalue const * const messageTypeVal
 		///output("Constructing the filter message counts.\n");
 		if(messageTypeValue->type==VT_ARRAY){
 			Marray* array=messageTypeValue->value._array;
-			size_t numberOfArrayElements=(array!=NULL?array->numberOfElements:0);
-			if(numberOfArrayElements){
-				output("Retrieving %zu message types from array.\n",numberOfArrayElements);
+			Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
+			unsigned long long numberOfArrayElements=(arrayElements!=NULL?arrayElements->count:0);
+			if(numberOfArrayElements>0){
+				output("Retrieving %llu message types from array.\n",numberOfArrayElements);
 				// accept only text elements
 				_messageCounts->messagecounts=unmanaged_calloc(numberOfArrayElements,sizeof(MessageCount));
 				if(_messageCounts->messagecounts!=NULL){
 					Mvalue* arrayElementValue;
-					size_t messageCountIndex=0;
-					for(size_t arrayElementIndex=0;arrayElementIndex<numberOfArrayElements;arrayElementIndex++){
-						arrayElementValue=array->values[arrayElementIndex];
+					unsigned long long messageCountIndex=0;
+					for(unsigned long long arrayElementIndex=0;arrayElementIndex<numberOfArrayElements;arrayElementIndex++){
+						arrayElementValue=arrayElements->values[arrayElementIndex];
 						if(arrayElementValue!=NULL&&arrayElementValue->type==VT_TEXT)
 							_messageCounts->messagecounts[messageCountIndex++]=(MessageCount){0,strdup(arrayElementValue->value._text->_c)};
 					}
@@ -8027,8 +8059,8 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 			Mvalue* noTextValue=_getTextValue("");
 			// we can have _getTable() create the table we need passing it the list of column names
 			Marray* messageTableColumnNameArray=owned_array(_getArray("Mmessages",4,noTextValue),owner);
-			if(messageTableColumnNameArray!=NULL){
-				Mvalue** messageTableColumnNameArrayelement=messageTableColumnNameArray->values;
+			if(messageTableColumnNameArray!=NULL&&messageTableColumnNameArray->elements!=NULL){
+				Mvalue** messageTableColumnNameArrayelement=messageTableColumnNameArray->elements->values;
 				assignValue(messageTableColumnNameArrayelement,_getTextValue("'#"));
 				assignValue(++messageTableColumnNameArrayelement,_getTextValue("'Id"));
 				assignValue(++messageTableColumnNameArrayelement,_getTextValue("'Type"));
@@ -8046,7 +8078,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						if(NULL==messageArray)continue; // TODO should we break here???
 						long long messageIndex=message->index;
 						char *messageId=message->id,*messageText=message->msg;
-						Mvalue** messageArrayelement=messageArray->values;
+						Mvalue** messageArrayelement=messageArray->elements->values;
 						assignValue(messageArrayelement,_getIntegerValue(messageIndex));
 						assignValue(++messageArrayelement,_getValueOfText(_getSingleQuotedText(messageId)));
 						assignValue(++messageArrayelement,_getValueOfText(_getSingleQuotedText(messageType)));
@@ -8064,7 +8096,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 		if(returnType=='a'){
 			// instead of an array we could return a list as well, or as a map (with the id used as key)
 			messagesArray=owned_array(_getArray("Mmessages",_messages->count,NULL),owner);
-			if(messagesArray!=NULL){
+			if(messagesArray!=NULL&&messagesArray->elements!=NULL){
 				size_t messageIndex=_messages->count;
 				while(messageIndex>0){
 					Message* message=_messages->messages[--messageIndex];
@@ -8081,7 +8113,7 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 						///////string_append(msgText,": ");
 					}
 					string_append(msgText,message->msg);
-					assignValue(messagesArray->values+messageIndex,_getStringTextValue(msgText));
+					assignValue(messagesArray->elements->values+messageIndex,_getStringTextValue(msgText));
 					FREE_STRING(msgText,owner);
 				}
 			}
@@ -8246,9 +8278,9 @@ size_t getMbigintegerSize(Mbiginteger const * const _biginteger){
 	return(_biginteger!=NULL?sizeof(Mbiginteger)+getmp_intSize(_biginteger->_bi):0);
 }
 size_t getMvalueSize(Mvalue const * const _value){
-	size_t result=0;
-	if(_value!=NULL){
-		result+=sizeof(Mvalue);
+	size_t result=(_value!=NULL?sizeof(Mvalue):0);
+	/*
+	if(result){
 		// next to add the size of whatever's being pointed to
 		switch(_value->type){
 			case VT_ARRAY:
@@ -8284,15 +8316,102 @@ size_t getMvalueSize(Mvalue const * const _value){
 			case VT_UNDEFINED:;
 		}
 	}
-	return 0;
+	*/
+	return result;
 }
 size_t getValueSize(int8_t type,void* value){
+	size_t result=0;
 	if(value!=NULL)
 	switch(type){
-		case 'V':return getMvalueSize((Mvalue*)value);
+		case 'V':
+		{
+			result=getMvalueSize((Mvalue*)value);
+			break;
+		}
+		case 'D':
+		{
+			result=sizeof(Mdecimal);
+			break;
+		}
+		case 'I':
+		{
+			result+=sizeof(Minteger);
+			break;
+		}
+		case 'B':
+		{
+			result+=sizeof(Mbiginteger);
+			break;
+		}
+		case 'R':
+		{
+			result+=sizeof(Mrational);
+			break;
+		}
+		case 'Q':
+		{
+			result+=sizeof(Mreference);
+			break;
+		}
+		case 'L':
+		{
+			result+=sizeof(Mlist);
+			break;
+		}
+		case 'M':
+		{
+			result+=sizeof(Mmap);
+			break;
+		}
+		case 'A':
+		{
+			result+=sizeof(Marray);
+			break;
+		}
+		case 'F':
+		{
+			result+=sizeof(Mfloat);
+			break;
+		}
+		case 'f':
+		{
+			result+=sizeof(Mfile);
+			break;
+		}
+		case 'S':
+		{
+			result=sizeof(Mstring);
+			break;
+		}
+		case 's': // Mchars
+		{
+			result+=sizeof(Mchars); // TODO is this correct?????
+			break;
+		}
+		case -'l': // Mlistelement
+		{
+			result+=sizeof(Mlistelement);
+			break;
+		}
+		case -'"': // result of _strdup()
+		{
+			result+=sizeof(char)*(1+strlen((char*)value));
+			break;
+		}
+		case -'t': // Mtimezones which is a NULL terminated list of pointers
+		{
+			char** timezonenames=(char**)value;
+			while(*timezonenames){result+=sizeof(char*)+strlen(*timezonenames);timezonenames++;}
+			result+=sizeof(char*);
+			break;
+		}
+		case -'C': // Mregisteredcommands, problem is knowing how many there are!!
+		{
 
+			break;
+		}
 	}
-	return 0;
+	return result;
 }
 
 Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);

@@ -57,7 +57,7 @@ typedef struct{
 //                NOTE that unowning a disowned pointer is typically prohibited because ownership should always be passed when disowned
 typedef struct{
     uint16_t module:8; // the owner id (typically a function or a module itself)
-    uint16_t id:16;
+    int16_t id:16; // MDH@21FEB2025: changed from uint16_t to int16_t to allow for negative ids to indicate global variables
     uint8_t global:1; // MDH@04JUN2020: can now be negative (to indicate module global owners that are allowed to persist)
     uint8_t level:5; // the subpointer level (by putting this first we can quickly create a dummy allocation owner at some nonzero level so the pointer won't be freed when we do not want to)
     uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)

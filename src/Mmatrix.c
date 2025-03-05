@@ -122,14 +122,14 @@ long long isAMatrix(Marray* array){
 		if(array->numberOfDimensionsLeft==1)return M_TRUE;
 		////output("Number of dimensions left: %lld.\n",array->numberOfDimensionsLeft);
 		// iterate over the values in the array and check that each is an array with the same number of elements
-		long long numberOfRows=array->numberOfElements;
+		long long numberOfRows=(array->elements!=NULL?array->elements->count:0);
 		if(numberOfRows>0){
-			Mvalue* firstElement=array->values[0];
+			Mvalue* firstElement=(array->elements->values!=NULL?array->elements->values[0]:NULL);
 			if(firstElement!=NULL&&firstElement->type==VT_ARRAY){
-				long long numberOfColumns=firstElement->value._array->numberOfElements;
+				long long numberOfColumns=firstElement->value._array->elements->count;
 				while(--numberOfRows>0){
-					Mvalue* elementValue=array->values[numberOfRows];
-					if(elementValue->type!=VT_ARRAY||elementValue->value._array->numberOfElements!=numberOfColumns)
+					Mvalue* elementValue=array->elements->values[numberOfRows];
+					if(elementValue->type!=VT_ARRAY||elementValue->value._array->elements->count!=numberOfColumns)
 						return M_FALSE;
 				}
 				return M_TRUE;
@@ -147,7 +147,7 @@ long long isAMatrix(Marray* array){
  * @return long long the number of rows in matrix \p array
  */
 long long getNumberOfMatrixRows(Marray* array){
-	return(isAMatrix(array)==M_TRUE?array->numberOfElements:M_LL_INVALID);
+	return(isAMatrix(array)==M_TRUE?array->elements->count:M_LL_INVALID);
 }
 /**
  * @brief returns the number of columns of matrix \p array
@@ -156,7 +156,7 @@ long long getNumberOfMatrixRows(Marray* array){
  * @return long long the number of columns of matrix \p array
  */
 long long getNumberOfMatrixColumns(Marray* array){
-	return(isAMatrix(array)==M_TRUE?array->values[0]->value._array->numberOfElements:M_LL_INVALID);
+	return(isAMatrix(array)==M_TRUE?array->elements->values[0]->value._array->elements->count:M_LL_INVALID);
 }
 
 static bool allValuesAreNumeric(Mvalue** values,unsigned long long numberOfValues){
@@ -185,22 +185,22 @@ long long isANumericMatrix(Marray* array,bool update){
 				// it requires two dimensions and all cells should be integer!!!
 				// this means that all values in the array must be arrays themselves
 				// and have the same number of elements to start with
-				Mvalue* firstArrayValue=array->values[0];
+				Mvalue* firstArrayValue=array->elements->values[0];
 				if(firstArrayValue!=NULL&&firstArrayValue->type==VT_ARRAY){
 					// check all the array values for being numeric
-					unsigned long long numberOfValues=firstArrayValue->value._array->numberOfElements;
+					unsigned long long numberOfValues=firstArrayValue->value._array->elements->count;
 					if(isANumericValuetype(firstArrayValue->value._array->valuetype)==M_TRUE||
-							allValuesAreNumeric(firstArrayValue->value._array->values,numberOfValues)){
+							allValuesAreNumeric(firstArrayValue->value._array->elements->values,numberOfValues)){
 						// the first value is an array with numberOfValues numeric values
 						// and so should all the other values as well
-						unsigned long long elementIndex=array->numberOfElements;
+						unsigned long long elementIndex=array->elements->count;
 						while(--elementIndex>0){
-							Mvalue* value=array->values[elementIndex];
+							Mvalue* value=array->elements->values[elementIndex];
 							if(value==NULL||
 									value->type!=VT_ARRAY||
-									value->value._array->numberOfElements!=numberOfValues||
+									value->value._array->elements->count!=numberOfValues||
 									(isANumericValuetype(value->value._array->valuetype)!=M_TRUE&&
-										!allValuesAreNumeric(value->value._array->values,numberOfValues)))
+										!allValuesAreNumeric(value->value._array->elements->values,numberOfValues)))
 								break;
 						}	
 						// if not broken out of the loop due to not matching array element
@@ -245,7 +245,7 @@ long long isANumericMatrix(Marray* array){
  * @return Mvaluetype the value type of elements of matrix \p array
  */
 static Mvaluetype getMatrixElementValuetype(Marray* array){
-	return(array->values[0]->value._array->values[0]->type);
+	return(array->elements->values[0]->value._array->elements->values[0]->type);
 }
 
 /**
@@ -269,7 +269,7 @@ static Marray* matrixcopy(Marray* array){
 static Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner owner=getOwner(__LINE__);
 	//// assert(isANumericMatrix(array1)==M_TRUE&&isANumericMatrix(array2)==M_TRUE);
 	long long array1cols=getNumberOfMatrixColumns(array1),array2rows=getNumberOfMatrixRows(array2);
-	if(array1cols==array2rows){
+	if(array1cols>0&&array1cols==array2rows){
 		// MDH@01MAY2023: there's no need to determine the productValuetype per se but we use it to get the highest accuracy zero to start with
 		// we need to multiply rows of array1 with columns of array2
 		// it's easy to iterate the rows of array1
@@ -284,29 +284,29 @@ static Marray* matrixproduct(Marray* array1,Marray* array2){Mallocationowner own
 				_matrixproductRowValue->value._array->valuetype=productValuetype;
 				q2outputBug("_getArray() does not assign the right element value type!");
 			}
-			Marray* _matrixproduct=owned_array(_getArray(NULL,array1rows,_matrixproductRowValue),owner);
-			if(_matrixproduct!=NULL){
-				_matrixproduct->numberOfDimensionsLeft=1; // so it's considered a matrix!!!!
+			Marray* _matrixproductArray=owned_array(_getArray(NULL,array1rows,_matrixproductRowValue),owner);
+			if(_matrixproductArray!=NULL){
+				_matrixproductArray->numberOfDimensionsLeft=1; // so it's considered a matrix!!!!
 				// iterate over the rows of array1
 				for(long long rowIndex=0;rowIndex<array1rows;rowIndex++){
-					Mvalue** productRowArrayValues=_matrixproduct->values[rowIndex]->value._array->values; // the product array to fill
-					Mvalue** rowArrayValues=array1->values[rowIndex]->value._array->values;
+					Mvalue** productRowArrayValues=_matrixproductArray->elements->values[rowIndex]->value._array->elements->values; // the product array to fill
+					Mvalue** rowArrayValues=array1->elements->values[rowIndex]->value._array->elements->values;
 					for(long long colIndex=0;colIndex<array2columns;colIndex++){
 						Mvalue* sumproductValue=productRowArrayValues[colIndex]; // which will be zero!!!
 						for(long long elementIndex=0;elementIndex<array1cols;elementIndex++){
 							q2output("Adding the product of ");
 							q2outputValue(NULL,rowArrayValues[elementIndex],NULL);
 							q2output(" and ");
-							q2outputValue(NULL,array2->values[elementIndex]->value._array->values[colIndex],NULL);
+							q2outputValue(NULL,array2->elements->values[elementIndex]->value._array->elements->values[colIndex],NULL);
 							q2outputValue(" to ",sumproductValue,".\n");
-							sumproductValue=Madd(sumproductValue,Mmultiply(rowArrayValues[elementIndex],array2->values[elementIndex]->value._array->values[colIndex]));
+							sumproductValue=Madd(sumproductValue,Mmultiply(rowArrayValues[elementIndex],array2->elements->values[elementIndex]->value._array->elements->values[colIndex]));
 						}
 						q2output("Product value at cell (%lld,%lld)",rowIndex,colIndex);
 						q2outputValue(": ",sumproductValue,".\n");
 						assignValue(&productRowArrayValues[colIndex],sumproductValue);
 					}
 				}
-				return disowned_array(_matrixproduct,owner);
+				return disowned_array(_matrixproductArray,owner);
 			}
 		}
 		q2outputError("Failed to create the product matrix");
@@ -331,8 +331,8 @@ Marray* diagonalmatrix(Mvalue** diagonalValues,long long numberOfValues){Malloca
 		Marray* _rows=OWNED_ARRAY(_getArray(NULL,numberOfValues,_getValueOfArray(DISOWNED_ARRAY(_row,owner))),owner);
 		// fill the diagonal of _rows
 		for(long long rowIndex=0;rowIndex<numberOfValues;rowIndex++){
-			Marray* row=_rows->values[rowIndex]->value._array;
-			assignValue(&row->values[rowIndex],diagonalValues[rowIndex]);
+			Marray* row=_rows->elements->values[rowIndex]->value._array;
+			assignValue(&row->elements->values[rowIndex],diagonalValues[rowIndex]);
 		}
 		return DISOWNED_ARRAY(_rows,owner);
 	}
@@ -375,7 +375,7 @@ Mvalue* getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(
 static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LINE__);
 	///////assert(isANumericMatrix(array)==M_TRUE);
 	long long numberOfArrayRows=getNumberOfMatrixRows(array);
-	if(numberOfArrayRows==getNumberOfMatrixColumns(array)){
+	if(numberOfArrayRows>0&&numberOfArrayRows==getNumberOfMatrixColumns(array)){
 		Marray* _arrayCopy=OWNED_ARRAY(_getArrayCopy(array),owner); // TODO DONE needs to be owned at some point 
 		if(_arrayCopy!=NULL){
 			Marray* unityMatrix=NULL;
@@ -384,17 +384,17 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
 			Marray* diagonalOfOnes=OWNED_ARRAY(_getArray(NULL,numberOfArrayRows,oneOfTypeValue),owner);
 			if(diagonalOfOnes!=NULL){
 				// TODO perhaps diagonalOfOnes needs to be freed anyway!!!!
-				unityMatrix=OWNED_ARRAY(diagonalmatrix(diagonalOfOnes->values,numberOfArrayRows),owner);
+				unityMatrix=OWNED_ARRAY(diagonalmatrix(diagonalOfOnes->elements->values,numberOfArrayRows),owner);
 				if(unityMatrix!=NULL){
 					// ok, ready to iterate over the columns of the 
-					Mvalue** arrayRows=_arrayCopy->values;
-					Mvalue** unityMatrixRows=unityMatrix->values;
+					Mvalue** arrayRows=_arrayCopy->elements->values;
+					Mvalue** unityMatrixRows=unityMatrix->elements->values;
 					long long colIndex;
 					// source: geeksforgeeks.org
 					// 1. interchange the row of matrix
 					for(long long rowIndex=numberOfArrayRows-1;rowIndex>0;rowIndex--){
 						// can't compare using < because we have to compare the values bro'
-						if(smallerthan(arrayRows[rowIndex-1]->value._array->values[0],arrayRows[rowIndex]->value._array->values[0])==M_TRUE){
+						if(smallerthan(arrayRows[rowIndex-1]->value._array->elements->values[0],arrayRows[rowIndex]->value._array->elements->values[0])==M_TRUE){
 							Mvalue* tempRow=arrayRows[rowIndex];
 							arrayRows[rowIndex]=arrayRows[rowIndex-1];
 							arrayRows[rowIndex-1]=tempRow;
@@ -413,24 +413,24 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
 							output("\tRow=%lld.\n",rowIndex);
 							if(colIndex!=rowIndex){
 								Mvalue* tempValue=Mdivide(
-													arrayRows[rowIndex]->value._array->values[colIndex],
-													arrayRows[colIndex]->value._array->values[colIndex]);
+													arrayRows[rowIndex]->value._array->elements->values[colIndex],
+													arrayRows[colIndex]->value._array->elements->values[colIndex]);
 								outputValue("\t\tTemp value: ",tempValue,"\n");
 								for(long long elementIndex=0;elementIndex<numberOfArrayRows;elementIndex++){
 									assignValue(
-										&arrayRows[rowIndex]->value._array->values[elementIndex],
+										&arrayRows[rowIndex]->value._array->elements->values[elementIndex],
 										Msubtract(
-											arrayRows[rowIndex]->value._array->values[elementIndex],
-											Mmultiply(arrayRows[colIndex]->value._array->values[elementIndex],tempValue)
+											arrayRows[rowIndex]->value._array->elements->values[elementIndex],
+											Mmultiply(arrayRows[colIndex]->value._array->elements->values[elementIndex],tempValue)
 										)
 									);
 									// also for the unity matrix
 									outputValue("\t\tTemp value: ",tempValue,"\n");
 									assignValue(
-										&unityMatrixRows[rowIndex]->value._array->values[elementIndex],
+										&unityMatrixRows[rowIndex]->value._array->elements->values[elementIndex],
 										Msubtract(
-											unityMatrixRows[rowIndex]->value._array->values[elementIndex],
-											Mmultiply(unityMatrixRows[colIndex]->value._array->values[elementIndex],tempValue)
+											unityMatrixRows[rowIndex]->value._array->elements->values[elementIndex],
+											Mmultiply(unityMatrixRows[colIndex]->value._array->elements->values[elementIndex],tempValue)
 										)
 									);
 									outputValue("\t\tTemp value: ",tempValue,"\n");
@@ -448,21 +448,21 @@ static Marray* matrixinverse(Marray* array){Mallocationowner owner=getOwner(__LI
 					output("Normalization.\n");
 					for(long long rowIndex=0;rowIndex<numberOfArrayRows;rowIndex++){
 						output("\tRow=%lld.\n",rowIndex);
-						Mvalue* tempValue=arrayRows[rowIndex]->value._array->values[rowIndex];
+						Mvalue* tempValue=arrayRows[rowIndex]->value._array->elements->values[rowIndex];
 						if(tempValue==NULL){FREE_ARRAY(unityMatrix,owner);unityMatrix=NULL;break;}
 						outputValue("\t\tDivider:",tempValue,"\n");
 						for(long long colIndex=0;colIndex<numberOfArrayRows;colIndex++){
 							assignValue(
-								&arrayRows[rowIndex]->value._array->values[colIndex],
+								&arrayRows[rowIndex]->value._array->elements->values[colIndex],
 								Mdivide(
-									arrayRows[rowIndex]->value._array->values[colIndex],
+									arrayRows[rowIndex]->value._array->elements->values[colIndex],
 									tempValue
 								)
 							);
 							assignValue(
-								&unityMatrixRows[rowIndex]->value._array->values[colIndex],
+								&unityMatrixRows[rowIndex]->value._array->elements->values[colIndex],
 								Mdivide(
-									unityMatrixRows[rowIndex]->value._array->values[colIndex],
+									unityMatrixRows[rowIndex]->value._array->elements->values[colIndex],
 									tempValue
 								)
 							);
@@ -853,7 +853,7 @@ Mvalue* Mmatrixinverse(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__)
 Mvalue* Mmatrixdiagonal(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==_value)return NULL;
 	if(_value->type==VT_ARRAY){
-		Marray* _diagonalmatrix=OWNED_ARRAY(diagonalmatrix(_value->value._array->values,_value->value._array->numberOfElements),owner);
+		Marray* _diagonalmatrix=OWNED_ARRAY(diagonalmatrix(_value->value._array->elements->values,_value->value._array->elements->count),owner);
 		return _getValueOfArray(DISOWNED_ARRAY(_diagonalmatrix,owner));
 	}
 	q2outputError("Argument to the diagonal matrix function not an array");
@@ -882,11 +882,11 @@ Mvalue* Mmatrixtranspose(Mvalue* _value){Mallocationowner owner=getOwner(__LINE_
 				_array->numberOfDimensionsLeft=array->numberOfDimensionsLeft; // TODO should we do this?????
 				// transpose _array
 				// NOTE we're simply exchanging the pointers (and not using assignValue!!!)
-				Mvalue** arrayRows=array->values; // the original 'matrix'
+				Mvalue** arrayRows=array->elements->values; // the original 'matrix'
 				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++){
-					Mvalue** arrayRowValues=arrayRows[rowIndex]->value._array->values; // the values in the row #rowIndex
+					Mvalue** arrayRowValues=arrayRows[rowIndex]->value._array->elements->values; // the values in the row #rowIndex
 					for(long long colIndex=0;colIndex<numberOfColumns;colIndex++)
-						assignValue(&_array->values[colIndex]->value._array->values[rowIndex],
+						assignValue(&_array->elements->values[colIndex]->value._array->elements->values[rowIndex],
 													arrayRowValues[colIndex]);
 				}
 				return _getValueOfArray(DISOWNED_ARRAY(_array,owner));
@@ -912,11 +912,11 @@ Mvalue* Mmatrixtrace(Mvalue* _value){
 		Marray* array=_value->value._array;
 		if(isANumericMatrix(array,false)){ // NOT forcing marking a numeric matrix as such
 			long long numberOfRows=getNumberOfMatrixRows(array);
-			if(numberOfRows==getNumberOfMatrixColumns(array)){
-				Mvalue** arrayRows=array->values;
+			if(numberOfRows>0&&numberOfRows==getNumberOfMatrixColumns(array)){
+				Mvalue** arrayRows=array->elements->values;
 				Mvalue* traceValue=getValueZeroOfType(getMatrixElementValuetype(array));
 				while(--numberOfRows>=0)
-					assignValue(&traceValue,Madd(traceValue,arrayRows[numberOfRows]->value._array->values[numberOfRows]));
+					assignValue(&traceValue,Madd(traceValue,arrayRows[numberOfRows]->value._array->elements->values[numberOfRows]));
 				return traceValue;
 			}else
 				q2outputError("Argument to the transpose function not a square matrix");
@@ -943,7 +943,7 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 		if(isANumericMatrix(array,true)){
 			long long numberOfRows=getNumberOfMatrixRows(array);
 			if(numberOfRows==getNumberOfMatrixColumns(array)){
-				Mvalue** arrayRows=array->values;
+				Mvalue** arrayRows=array->elements->values;
 				Mvalue* determinantValue=NULL;
 				// we can use the first column and therefore exclude rows
 				// we know how many to exclude in total that is one less than the total number of rows
@@ -953,10 +953,10 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 				Mvalue* *cumproduct=(Mvalue**)CALLOC(sizeof(Mvalue*),numberOfRows,'X',owner);
 				if(c!=NULL&&permutation!=NULL&&cumproduct!=NULL){
 					// initialize the cumulative product to the cumulative product of the diagonal elements
-					assignValue(cumproduct,arrayRows[0]->value._array->values[0]);
+					assignValue(cumproduct,arrayRows[0]->value._array->elements->values[0]);
 					for(long long rowIndex=1;rowIndex<numberOfRows;rowIndex++)
 						assignValue(cumproduct+rowIndex,
-							Mmultiply(cumproduct[rowIndex-1],arrayRows[rowIndex]->value._array->values[rowIndex]));
+							Mmultiply(cumproduct[rowIndex-1],arrayRows[rowIndex]->value._array->elements->values[rowIndex]));
 					assignValue(&determinantValue,cumproduct[numberOfRows-1]);
 					/////////q2outputValue("Initial value determinant: ",determinantValue,"\n");
 					if(determinantValue!=NULL){
@@ -986,12 +986,12 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 								if(swapi>i)swapi=i;
 								// update all cumulative products starting at swapi
 								if(swapi==0){
-									assignValue(cumproduct,arrayRows[permutation[swapi]]->value._array->values[0]);
+									assignValue(cumproduct,arrayRows[permutation[swapi]]->value._array->elements->values[0]);
 									swapi++;
 								}
 								for(;swapi<numberOfRows;swapi++)
 									assignValue(cumproduct+swapi,
-										Mmultiply(cumproduct[swapi-1],arrayRows[permutation[swapi]]->value._array->values[swapi]));
+										Mmultiply(cumproduct[swapi-1],arrayRows[permutation[swapi]]->value._array->elements->values[swapi]));
 								//q2outputValue("Cum product: ",cumproduct[numberOfRows-1],"\n");
 								// increment the determinant with the new cumulative product
 								if(neg){ // toggle to false
@@ -1038,12 +1038,13 @@ Mvalue* Mmatrixdeterminant(Mvalue* _value){Mallocationowner owner=getOwner(__LIN
 				}
 				if(amVerbose())
 					q2outputValue("Determinant: ",determinantValue,"\n");
-				FREE_DISOWNED(permutation,numberOfRows,-'x',owner);
-				FREE_DISOWNED(c,numberOfRows,-'x',owner);
+				if(permutation!=NULL)FREE_DISOWNED(permutation,numberOfRows,-'x',owner);
+				if(c!=NULL)FREE_DISOWNED(c,numberOfRows,-'x',owner);
 				// MDH@06MAY2023: we can't just release the Mvalue pointers without getting rid of the values
 				//                NOTE I should've stored these Mvalues in an array wrapped Mvalue
-				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++)assignValue(cumproduct+rowIndex,NULL);
-				FREE_DISOWNED(cumproduct,numberOfRows,'X',owner);
+				for(long long rowIndex=0;rowIndex<numberOfRows;rowIndex++)
+					assignValue(cumproduct+rowIndex,NULL);
+				if(cumproduct!=NULL)FREE_DISOWNED(cumproduct,numberOfRows,'X',owner);
 				return determinantValue;
 			}else
 				q2outputError("Argument to the transpose function not a square matrix");

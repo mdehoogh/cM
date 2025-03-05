@@ -349,9 +349,10 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 					}else
 					if(tablerowValue->type==VT_ARRAY){
 						Marray* tablerowValueArray=tablerowValue->value._array;
-						if(tablerowValueArray!=NULL&&tablerowValueArray->numberOfElements>0){
+						Marrayelements* tablerowValueArrayElements=(tablerowValueArray!=NULL?tablerowValueArray->elements:NULL);
+						if(tablerowValueArrayElements!=NULL&&tablerowValueArrayElements->count>0){
 							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
-							maximumNumberOfColumns=tablerowValueArray->numberOfElements;
+							maximumNumberOfColumns=tablerowValueArrayElements->count;
 							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
 							_columnLengths=unmanaged_calloc(maximumNumberOfColumns,sizeof(size_t));
 							/*
@@ -400,10 +401,12 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 									}
 								}else{
 									Marray* tablerowValueArray=tablerowValue->value._array;
+									Marrayelements* tablerowValueArrayElements=(tablerowValueArray!=NULL?tablerowValueArray->elements:NULL);
 									///output("Number of column elements: %zu.\n",tablerowValueArray->numberOfElements);
+									if(tablerowValueArrayElements!=NULL&&tablerowValueArrayElements->values!=NULL)
 									for(int columnIndex=0;columnIndex<maximumNumberOfColumns;columnIndex++){
-										Mstring* _cellText=(columnIndex<tablerowValueArray->numberOfElements
-																				?owned_string(_getValueText(tablerowValueArray->values[columnIndex],true,true),owner)
+										Mstring* _cellText=(columnIndex<tablerowValueArrayElements->count
+																				?owned_string(_getValueText(tablerowValueArrayElements->values[columnIndex],true,true),owner)
 																				:NULL);
 										if(_cellText!=NULL){
 											cellTextLength=string_length(_cellText);
@@ -757,11 +760,12 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 			}else
 			if(value->type==VT_ARRAY){ // a list or an array
 				Marray* array=value->value._array;
+				Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
 				value=NULL;
-				if(array!=NULL){
+				if(arrayElements!=NULL){
 					long long index=atoll(propertySeparator);
 					if(report)logToOutputFile("Looking for element '%s' in '%s'.\n",propertySeparator,name);
-					if(index>0&&index<=array->numberOfElements)value=array->values[index-1];
+					if(index>0&&index<=arrayElements->count)value=arrayElements->values[index-1];
 				}
 			}else
 			if(value->type==VT_LIST){
@@ -1033,8 +1037,8 @@ Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 							long long index=atoll(name);
 							/////////output("%i",index);
 							if(variableArray!=NULL){
-								if(index>0&&index<=variableArray->numberOfElements)
-									variableValue=variableArray->values[index-1];
+								if(index>0&&index<=variableArray->elements->count)
+									variableValue=variableArray->elements->values[index-1];
 								variableArray=NULL;
 							}else{ // ASSERT it must be a list
 								if(variableList->_first!=NULL&&index>=variableList->_first->index){
@@ -1059,6 +1063,7 @@ Mstring* _getCompletion(char * name,bool functionidentifiersaswell){
 						}else
 						if(variableValue->type==VT_ARRAY){
 							variableArray=variableValue->value._array;
+							if(variableArray!=NULL&&(NULL==variableArray->elements||NULL==variableArray->elements->values))variableArray=NULL; // prevent empty array
 							/////outputArray("ARRAY(",variableArray,")");
 						}
 						// ascertain to point to the next property to find
@@ -1934,11 +1939,11 @@ static bool allArrayElementsAreOfType(Marray* array,Mvaluetype valuetype){
 	// ASSERT list must NOT be NULL
 	if(array!=NULL)
 	if(valuetype!=VT_UNDEFINED){ // a specific type requested
-		size_t l=array->numberOfElements;
+		size_t l=(array->elements!=NULL?array->elements->count:0);
 		while(l>0){
 			--l;
 			// allowing list element with value NULL or value type VT_UNDEFINED no matter what
-			if(array->values[l]!=NULL)if(array->values[l]->type!=VT_UNDEFINED&&array->values[l]->type!=valuetype)return false;
+			if(array->elements->values[l]!=NULL)if(array->elements->values[l]->type!=VT_UNDEFINED&&array->elements->values[l]->type!=valuetype)return false;
 		}
 	}
 	return true;
