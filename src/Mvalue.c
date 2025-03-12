@@ -8319,6 +8319,13 @@ size_t getMvalueSize(Mvalue const * const _value){
 	*/
 	return result;
 }
+/**
+ * @brief returns the number of bytes occupied by value \p value of type \p type
+ * 
+ * @param type 
+ * @param value 
+ * @return size_t the number of bytes occupied by value \p value of type \p type 
+ */
 size_t getValueSize(int8_t type,void* value){
 	size_t result=0;
 	if(value!=NULL)
@@ -8335,47 +8342,58 @@ size_t getValueSize(int8_t type,void* value){
 		}
 		case 'I':
 		{
-			result+=sizeof(Minteger);
+			result=sizeof(Minteger);
 			break;
 		}
 		case 'B':
 		{
-			result+=sizeof(Mbiginteger);
+			result=sizeof(Mbiginteger);
 			break;
 		}
 		case 'R':
 		{
-			result+=sizeof(Mrational);
+			result=sizeof(Mrational);
 			break;
 		}
 		case 'Q':
 		{
-			result+=sizeof(Mreference);
+			result=sizeof(Mreference);
 			break;
 		}
 		case 'L':
 		{
-			result+=sizeof(Mlist);
+			result=sizeof(Mlist);
 			break;
 		}
 		case 'M':
 		{
-			result+=sizeof(Mmap);
+			result=sizeof(Mmap);
 			break;
 		}
 		case 'A':
 		{
-			result+=sizeof(Marray);
+			result=sizeof(Marray);
+			break;
+		}
+		case 'a':
+		{
+			result=sizeof(Marrayelements);
+			break;
+		}
+		case -'a':
+		{
+			Marrayelements* arrayelements=(Marrayelements*)value;
+			result=sizeof(Mvalue*)*arrayelements->count+sizeof(unsigned long long);
 			break;
 		}
 		case 'F':
 		{
-			result+=sizeof(Mfloat);
+			result=sizeof(Mfloat);
 			break;
 		}
 		case 'f':
 		{
-			result+=sizeof(Mfile);
+			result=sizeof(Mfile);
 			break;
 		}
 		case 'S':
@@ -8385,17 +8403,18 @@ size_t getValueSize(int8_t type,void* value){
 		}
 		case 's': // Mchars
 		{
-			result+=sizeof(Mchars); // TODO is this correct?????
+			result=sizeof(Mchars); // TODO is this correct?????
 			break;
 		}
 		case -'l': // Mlistelement
 		{
-			result+=sizeof(Mlistelement);
+			result=sizeof(Mlistelement);
 			break;
 		}
+		case -'\'':
 		case -'"': // result of _strdup()
 		{
-			result+=sizeof(char)*(1+strlen((char*)value));
+			result=sizeof(char)*(1+strlen((char*)value));
 			break;
 		}
 		case -'t': // Mtimezones which is a NULL terminated list of pointers
@@ -8413,9 +8432,13 @@ size_t getValueSize(int8_t type,void* value){
 	}
 	return result;
 }
-
-Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
-	Mmap* _allocationStatsMap=owned_map(__map("allocationStats"),owner);
+/**
+ * @brief returns dynamic memory allocation statistics
+ * 
+ * @return Mvalue* 
+ */
+Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _allocationStatsMap=owned_map(__map("memstats"),owner);
 	if(NULL==_allocationStatsMap)return NULL;
 	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
 	unsigned long long offered,refused,consumed;
@@ -8436,7 +8459,7 @@ Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
 	}else
 		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history cache info map.");
 	char countindexString[20];
-	unsigned long long count,totalcount;
+	unsigned long long count,totalcount,bytes,totalbytes;
 	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationHisttoryCounts"),owner);
 	if(_allocationHistoryCountsMap!=NULL){
 		for(int countIndex=0;countIndex<257;countIndex++){
@@ -8458,19 +8481,33 @@ Mvalue* Mallocationstats(){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _valueTypeCountsMap=owned_map(__map("valueTypeCounts"),owner);
 	if(_valueTypeCountsMap!=NULL){
 		totalcount=0;
+		totalbytes=0;
 		for(int countIndex=0;countIndex<256;countIndex++){
 			count=valueTypeCounts[countIndex];
 			if(!count)continue;
 			totalcount+=count;
+			bytes=(allocationTypeSizes[countIndex]!=NULL?allocationTypeSizes[countIndex][0].class:0);
+			if(bytes)totalbytes+=bytes;
 			if(countIndex<128)
 				snprintf(countindexString,20,"-%c",-(countIndex-128));
 			else
 				snprintf(countindexString,20,"%c",countIndex-128);
-			if(appendedToMap(_valueTypeCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
-				q2outputMessage(M_ERROR_PREFIX,"Failed to append value type count #%d.",countIndex);
+			// wrap count and bytes in a two-element value array
+			Marray* _array=owned_array(_getArray("Mmemstats",2,NULL),owner);
+			if(_array!=NULL){
+				assignValue(&_array->elements->values[0],_getIntegerValue(count));
+				assignValue(&_array->elements->values[1],_getIntegerValue(bytes));
+				if(appendedToMap(_valueTypeCountsMap,owner,countindexString,_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
+					q2outputMessage(M_ERROR_PREFIX,"Failed to append value type count #%d.",countIndex);
+			}
 		}
-		if(appendedToMap(_valueTypeCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
-			q2outputMessage(M_ERROR_PREFIX,"Failed to append value type totalcount #%zzu.",totalcount);
+		Marray* _array=owned_array(_getArray("Mmemstats",2,NULL),owner);
+		if(_array!=NULL){
+			assignValue(&_array->elements->values[0],_getIntegerValue(totalcount));
+			assignValue(&_array->elements->values[1],_getIntegerValue(totalbytes));
+			if(appendedToMap(_valueTypeCountsMap,owner,"",_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
+				q2outputMessage(M_ERROR_PREFIX,"Failed to append value type totalcount #%zzu.",totalcount);
+		}
 		if(appendedToMap(_allocationStatsMap,owner,"valuetypecounts",_getValueOfMap(disowned_map(_valueTypeCountsMap,owner)))!=M_TRUE){
 			free_map(_valueTypeCountsMap);
 			q2outputError("Failed to append value type counts to the allocation stats.");

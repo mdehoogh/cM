@@ -683,9 +683,35 @@ void obtainAllocationStats(unsigned long long occupationcounts[257],unsigned lon
 				occupationcounts[0]++;
 			// now determine the value type of the pointers
 			Malloc** ptr=(Malloc**)((allocationpointers_t*)allocationnodes)->pointers; // NOTE those should match
-			for(int index=255;index>=0;index--,ptr++)
-				if(*ptr!=NULL)
-					valuetypecounts[128+(*ptr)->allocationType]++;
+			signed char type;
+			unsigned long long category,categoryCount;
+			size_t valueTypeSize;
+			for(int index=255;index>=0;index--,ptr++){
+				if(*ptr!=NULL){
+					type=(*ptr)->allocationType;
+					valuetypecounts[128+type]++;
+					if(getValueSizeFunction!=NULL){
+						char* cptr=(char*)*ptr;
+						valueTypeSize=getValueSizeFunction(type,cptr+sizeof(Malloc));
+						if(NULL==valuetypesizes[type]){
+							valuetypesizes[type]=unmanaged_calloc(1,sizeof(Mallocationsize));
+							if(valuetypesizes[type]==NULL)continue;
+						}
+						categoryCount=valuetypesizes[type][0].count+1;
+						category=categoryCount;
+						while(--category>0&&valuetypesizes[type][category].class!=valueTypeSize)
+						;
+						if(category==0){
+							unmanaged_realloc(valuetypesizes[type],categoryCount*sizeof(Mallocationsize),(categoryCount+1)*sizeof(Mallocationsize));
+							category=categoryCount;
+							valuetypesizes[type][0].count=category;
+							valuetypesizes[type][category].class=valueTypeSize;
+						}
+						valuetypesizes[type][category].count++;
+						valuetypesizes[type][0].class+=valueTypeSize;
+					}
+				}
+			}
 		}
 		// decrement indices
 		level=ALLOCATION_INDEX_BYTES-1;
