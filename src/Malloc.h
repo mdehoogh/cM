@@ -107,7 +107,7 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 #ifndef __PRODUCTION__
 unsigned long long getAllocationsRemembered();
 unsigned long long getAllocationsFreed();
-void obtainAllocationStats(unsigned long long occupations[257],unsigned long long valuetypecounts[256],
+unsigned long long obtainAllocationStats(unsigned long long occupations[257],unsigned long long valuetypecounts[256],
 	Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,
 	unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed);
 

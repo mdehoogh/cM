@@ -318,6 +318,7 @@ Mvalue* getFirstScalarValue(Mvalue* value);
 
 Mmapelement* getMapelement(Mmap const * const map,char const * const attributeName); // MDH@22OCT2020: useful not only in appendedByMap() but also in _getFunctionArgumentMap()
 long long appendedToMap(Mmap * const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue);
+long long prependedToMap(Mmap * const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue);
 long long removedFromMap(Mmap * const _map,Mallocationowner owner_map,char const * const attributeName);
 
 long double getValueLongDouble(Mvalue const * const _value);

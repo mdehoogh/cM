@@ -2538,7 +2538,9 @@ Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
 Mmapelement* getMapelement(Mmap const * const map,char const * const attributeName){
 	Mmapelement* mapelement=(map!=NULL&&attributeName!=NULL?map->_first:NULL); // if both map and attribute name are defined, initialize map element to the first map element
 	// as long as the map element is defined, and either it does not hold a variable or the variable's name does not match the given attribute name, select the next map element
-	while(mapelement!=NULL&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,attributeName)))mapelement=mapelement->_next;
+	while(mapelement!=NULL
+		&&(NULL==mapelement->_variable||strcmp(mapelement->_variable->_name->chars,attributeName)))
+		mapelement=mapelement->_next;
 	return mapelement;
 }
 // MDH@24MAY2019: if already in the map should replace the current value
@@ -2580,6 +2582,73 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
 							_mapelement->_variable=_variable; // pass ownership of _variable to the mapelement at the second sublevel in the map
 							if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
 							_map->_last=SUBOWNED(OWNED(DISOWNED(_mapelement,owner),owner_map),1);
+							_map->numberOfElements++;
+							// result=M_TRUE; // success
+						}else{ // we have a map element BUT no variable, so no go
+							FREE_MAPELEMENT(_mapelement,false,owner);_mapelement=NULL;
+							q2outputError("Failed to create a new attribute");
+						}
+					}else
+						q2outputError("Failed to create new map element");
+				}
+				if(_mapelement!=NULL){
+					if(_map->weak)
+						_mapelement->_variable->_value=_attributeValue;
+					else // MDH@02NOB2019: if the map is weak assign directly!!
+						assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
+					result=M_TRUE;
+				}
+			}else{
+				q2outputmessageprefix(M_ERROR_PREFIX);q2outputValue("Unable to add '",_attributeValue,"' to a map: it is of the wrong type.\n");
+			}
+		}else 
+			q2outputError("Unable to change the map: it is immutable");
+	}else
+		q2outputError("No map or atribute name specified");
+	if(report)q2output("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
+	return result;
+}/* VALIDATED */
+/**
+ * @brief prepends a new attribute with name \p attributeName and value \p _attributeValue to M map \p _map owned by \p owner_map
+ * 
+ * @param _map 
+ * @param owner_map 
+ * @param attributeName 
+ * @param _attributeValue 
+ * @return long long M_TRUE on success, M_FALSE on failure, M_LL_INVALID on invalid input 
+ */
+long long prependedToMap(Mmap* const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=(amVerboseDebugging()||(M_MODULE_DEBUGGING&MM_VALUE));
+	long long result=(_map!=NULL&&attributeName!=NULL?M_FALSE:M_LL_INVALID);
+	if(result!=M_LL_INVALID){
+		if(!_map->unlockCode){ // the map is mutable
+			// MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
+			if(NULL==_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
+				if(report)
+				{q2output("Setting the value of attribute '%s'",attributeName);q2outputValue(" to '",_attributeValue,"'.\n");}
+				// MDH@22OCT2020: get the map element associated with the given attribute name (without creating it)
+				Mmapelement* _mapelement=getMapelement(_map,attributeName);
+				/* replacing:
+				Mmapelement* _mapelement=_map->_first;
+				while(_mapelement&&(!_mapelement->_variable||strcmp(_mapelement->_variable->_name->chars,attributeName)))_mapelement=_mapelement->_next;
+				*/
+				if(NULL==_mapelement){ // not found
+					if(report)q2outputInfo("Attribute not found");
+					_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
+					if(_mapelement!=NULL){
+						// MDH@09JUN2020: we can immediately set the owner of _variable to be in the map because if we succeed in creating it that's where it will go
+						// MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
+						// MDH@25MAY2020: we're disowning _variable because we 
+						Mvariable* _variable=_getVariableWithName(attributeName,VT_UNDEFINED,false,Msubowner(owner_map,2)); // TODO why would this 'variable' be mutable, and allowing all values????
+						if(_variable!=NULL){ // the variable was created so attach in map
+							if(report)q2outputInfo("Map element created");
+							 // pass ownership of _mapelement to _map at the first sublevel
+							_mapelement->_variable=_variable; // pass ownership of _variable to the mapelement at the second sublevel in the map
+							
+							//**** THESE TWO LINES SHOULD BE THE ONLY TWO LINES THAT DIFFER FROM appendedToMap()!!
+							if(NULL==_map->_first)_map->_last=_mapelement;else _mapelement->_next=_map->_first;
+							_map->_first=SUBOWNED(OWNED(DISOWNED(_mapelement,owner),owner_map),1);
+							
 							_map->numberOfElements++;
 							// result=M_TRUE; // success
 						}else{ // we have a map element BUT no variable, so no go
@@ -8383,6 +8452,7 @@ size_t getValueSize(int8_t type,void* value){
 		case -'a':
 		{
 			Marrayelements* arrayelements=(Marrayelements*)value;
+			////output("Number of array elements: %llu.\n",arrayelements->count);
 			result=sizeof(Mvalue*)*arrayelements->count+sizeof(unsigned long long);
 			break;
 		}
@@ -8443,7 +8513,9 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
 	unsigned long long offered,refused,consumed;
 	Mallocationsize* allocationTypeSizes[256]; // the histogram of size counts for each of the data types
-	obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSize,&offered,&refused,&consumed);
+	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSize,&offered,&refused,&consumed);
+	if(memoryErrors)
+		q2outputMessage(M_ERROR_PREFIX,"Number of out of memory errors obtaining memory statistics: %llu.",memoryErrors);
 	Mmap* _allocationHistoryCacheMap=owned_map(__map("allocationHistoryCache"),owner);
 	if(_allocationHistoryCacheMap!=NULL){
 		if(appendedToMap(_allocationHistoryCacheMap,owner,"offered",_getIntegerValue(offered))!=M_TRUE)
@@ -8470,7 +8542,7 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 			if(appendedToMap(_allocationHistoryCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
 				q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history count #%d.",countIndex);
 		}
-		if(appendedToMap(_allocationHistoryCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
+		if(prependedToMap(_allocationHistoryCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
 			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history totalcount #%zzu.",totalcount);
 		if(appendedToMap(_allocationStatsMap,owner,"historycounts",_getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner)))!=M_TRUE){
 			free_map(_allocationHistoryCountsMap);
@@ -8478,14 +8550,43 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 		}
 	}else
 		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history counts map.");
-	Mmap* _valueTypeCountsMap=owned_map(__map("valueTypeCounts"),owner);
-	if(_valueTypeCountsMap!=NULL){
+	// I suppose it's probably best to show the histograms for each type
+	Mmap* _valueTypeHistogramsMap=owned_map(__map("valueTypeHistograms"),owner);
+	if(_valueTypeHistogramsMap!=NULL){
 		totalcount=0;
 		totalbytes=0;
+		Mallocationsize* typeSizes; 
 		for(int countIndex=0;countIndex<256;countIndex++){
-			count=valueTypeCounts[countIndex];
-			if(!count)continue;
-			totalcount+=count;
+			// if no allocation type sizes available for this type, skip it
+			typeSizes=allocationTypeSizes[countIndex];
+			if(NULL==typeSizes)continue;
+			count=typeSizes[0].count; // the 'total count' across all histogram categories (=classes)
+			if(count>0){
+				totalcount+=count; // to ascertain the total count will be correct!!!!
+				// we can now create a map to be added
+				Mmap* _typeSizesMap=owned_map(__map("typeSizes"),owner);
+				if(NULL==_typeSizesMap)continue;
+				size_t categoryCount=typeSizes[0].class;
+				for(size_t categoryIndex=1;categoryIndex<=categoryCount;categoryIndex++){
+					snprintf(countindexString,20,"%d",typeSizes[categoryIndex].class);
+					if(appendedToMap(_typeSizesMap,owner,countindexString,_getIntegerValue(typeSizes[categoryIndex].count))!=M_TRUE)
+						q2outputMessage(M_ERROR_PREFIX,"Failed to register the number of allocations of type #%d of size '%s'.",countIndex,countindexString);		
+				}
+				// prepend the total number of bytes
+				if(prependedToMap(_typeSizesMap,owner,"",_getIntegerValue(typeSizes[0].count))!=M_TRUE)
+					q2outputMessage(M_ERROR_PREFIX,"Failed to register the total number of allocated bytes '%llu'.",typeSizes[0].count);
+				if(countIndex<128)
+					snprintf(countindexString,20,"-%c",-(countIndex-128));
+				else
+					snprintf(countindexString,20,"%c",countIndex-128);
+				if(appendedToMap(_valueTypeHistogramsMap,owner,countindexString,_getValueOfMap(disowned_map(_typeSizesMap,owner)))!=M_TRUE){
+					free_map(_typeSizesMap);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to register the memory allocation information of '%s'.",countindexString);
+				}
+			}
+			// essential to free typeSizes
+			unmanaged_free(typeSizes,sizeof(Mallocationsize)*(typeSizes[0].class+1));
+			/* replacing showing the counts/bytes only
 			bytes=(allocationTypeSizes[countIndex]!=NULL?allocationTypeSizes[countIndex][0].class:0);
 			if(bytes)totalbytes+=bytes;
 			if(countIndex<128)
@@ -8500,16 +8601,17 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 				if(appendedToMap(_valueTypeCountsMap,owner,countindexString,_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
 					q2outputMessage(M_ERROR_PREFIX,"Failed to append value type count #%d.",countIndex);
 			}
+			*/
 		}
 		Marray* _array=owned_array(_getArray("Mmemstats",2,NULL),owner);
 		if(_array!=NULL){
 			assignValue(&_array->elements->values[0],_getIntegerValue(totalcount));
 			assignValue(&_array->elements->values[1],_getIntegerValue(totalbytes));
-			if(appendedToMap(_valueTypeCountsMap,owner,"",_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
+			if(prependedToMap(_valueTypeHistogramsMap,owner,"",_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
 				q2outputMessage(M_ERROR_PREFIX,"Failed to append value type totalcount #%zzu.",totalcount);
 		}
-		if(appendedToMap(_allocationStatsMap,owner,"valuetypecounts",_getValueOfMap(disowned_map(_valueTypeCountsMap,owner)))!=M_TRUE){
-			free_map(_valueTypeCountsMap);
+		if(appendedToMap(_allocationStatsMap,owner,"valuetypehistograms",_getValueOfMap(disowned_map(_valueTypeHistogramsMap,owner)))!=M_TRUE){
+			free_map(_valueTypeHistogramsMap);
 			q2outputError("Failed to append value type counts to the allocation stats.");
 		}
 	}else

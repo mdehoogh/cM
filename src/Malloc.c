@@ -643,17 +643,31 @@ unsigned long long getAllocationsRemembered(){
 unsigned long long getAllocationsFreed(){
 	return allocationsFreed;
 }
-void obtainAllocationStats(unsigned long long occupationcounts[257],unsigned long long valuetypecounts[256],
-	Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,
-	unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed){
+/**
+ * @brief returns dynamic memory allocation statistics through its parameters
+ * 
+ * @param occupationcounts 
+ * @param valuetypecounts 
+ * @param result 
+ * @param getValueSizeFunction 
+ * @param offered 
+ * @param refused 
+ * @param consumed 
+ * @return unsigned long long the number of errors that occurred
+ */
+unsigned long long obtainAllocationStats(
+		unsigned long long occupationcounts[257],unsigned long long valuetypecounts[256],
+		Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,
+		unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed){
 	*offered=allocationindexcache.offered;
 	*refused=allocationindexcache.refused;
 	*consumed=allocationindexcache.consumed;
 	memset(occupationcounts,0,257*sizeof(unsigned long long));
 	memset(valuetypecounts,0,256*sizeof(unsigned long long));
-	if(getValueSizeFunction!=NULL)for(int i=256;i>=0;i--)valuetypesizes[i]=NULL;
-	if(NULL==_allocationnodesRoot)return;
-	if(allocations.l==0)return;
+	if(getValueSizeFunction!=NULL)for(int i=255;i>=0;i--)valuetypesizes[i]=NULL;
+	if(NULL==_allocationnodesRoot)return 0;
+	if(allocations.l==0)return 0;
+	unsigned long long result=0;
 	allocationindex_t lastAllocationIndex=allocations.l-1;
 	// I need to iterate over all allocation nodes, we can do that by iterating over
 	// all indices, we know we're done once all indices are negative
@@ -668,6 +682,7 @@ void obtainAllocationStats(unsigned long long occupationcounts[257],unsigned lon
 	// as long as the first index is non-negative
 	allocationnodes_t* allocationnodes;
 	do{
+		///outputChar('A');
 		// determine allocationpointers based on the current indices
 		allocationnodes=_allocationnodesRoot;
 		for(level=0;level<ALLOCATION_INDEX_BYTES-1;level++){
@@ -677,51 +692,92 @@ void obtainAllocationStats(unsigned long long occupationcounts[257],unsigned lon
 		// distinguish empty from not being empty because when empty there are no pointers set, otherwise all are set
 		// when NULLs field equals 0
 		if(allocationnodes!=NULL){
+			///outputChar('(');
 			if(allocationnodes->NULLs||allocationnodes->nodes[0]!=NULL) // either not empty or full
 				occupationcounts[256-allocationnodes->NULLs]++;
 			else // empty
 				occupationcounts[0]++;
+			///outputChar('a');
 			// now determine the value type of the pointers
 			Malloc** ptr=(Malloc**)((allocationpointers_t*)allocationnodes)->pointers; // NOTE those should match
 			signed char type;
+			unsigned char typeIndex;
 			unsigned long long category,categoryCount;
 			size_t valueTypeSize;
+			Mallocationsize* typesizes;
+			///outputChar('b');
 			for(int index=255;index>=0;index--,ptr++){
+				///output("[%d",index);
 				if(*ptr!=NULL){
+					///outputChar(':');
 					type=(*ptr)->allocationType;
-					valuetypecounts[128+type]++;
+					typeIndex=128+type;
+					///output("%d",typeIndex);
+					valuetypecounts[typeIndex]++;
+					///outputChar('c');
 					if(getValueSizeFunction!=NULL){
 						char* cptr=(char*)*ptr;
-						valueTypeSize=getValueSizeFunction(type,cptr+sizeof(Malloc));
-						if(NULL==valuetypesizes[type]){
-							valuetypesizes[type]=unmanaged_calloc(1,sizeof(Mallocationsize));
-							if(valuetypesizes[type]==NULL)continue;
+						valueTypeSize=getValueSizeFunction(type,(void*)(cptr+sizeof(Malloc)));
+						///output("{%zu}",valueTypeSize);
+						if(!valueTypeSize)continue;
+						if(NULL==valuetypesizes[typeIndex]){
+							///outputChar('e');
+							void* rptr=unmanaged_calloc(2,sizeof(Mallocationsize));
+							///outputChar('f');
+							if(NULL==rptr){result++;continue;}
+							///output("=%p",rptr);
+							///outputChar('g');
+							valuetypesizes[typeIndex]=rptr;
+							categoryCount=1;
+							valuetypesizes[typeIndex][0].class=1;
+							///outputChar('h');
+							category=1;
+						}else{
+							///outputChar('i');
+							typesizes=valuetypesizes[typeIndex];
+							///outputChar('j');
+							if(typesizes!=NULL){
+								///output("{%zu:%llu}",typesizes->class,typesizes->count);
+								///output("?%llu}",categoryCount);
+								category=typesizes[0].class;
+								while(category>0&&typesizes[category].class!=valueTypeSize)category--;
+								///outputChar('k');
+								if(!category){ // the category does not yet exist!!
+									categoryCount=typesizes[0].class+1;
+									void* rptr=unmanaged_realloc(valuetypesizes[typeIndex],categoryCount*sizeof(Mallocationsize),(categoryCount+1)*sizeof(Mallocationsize));
+									if(NULL==rptr){result++;continue;}
+									valuetypesizes[typeIndex][0].class=categoryCount; // update the total category count
+									category=categoryCount;
+									valuetypesizes[typeIndex]=rptr;
+									valuetypesizes[typeIndex][category].count=0; // initialize
+									/////////valuetypesizes[typeIndex][0].count=category;
+									valuetypesizes[typeIndex][category].class=valueTypeSize;
+								}
+							}///else outputChar('!');
 						}
-						categoryCount=valuetypesizes[type][0].count+1;
-						category=categoryCount;
-						while(--category>0&&valuetypesizes[type][category].class!=valueTypeSize)
-						;
-						if(category==0){
-							unmanaged_realloc(valuetypesizes[type],categoryCount*sizeof(Mallocationsize),(categoryCount+1)*sizeof(Mallocationsize));
-							category=categoryCount;
-							valuetypesizes[type][0].count=category;
-							valuetypesizes[type][category].class=valueTypeSize;
-						}
-						valuetypesizes[type][category].count++;
-						valuetypesizes[type][0].class+=valueTypeSize;
+						///outputChar('d');
+						valuetypesizes[typeIndex][category].count++; // increment the category count
+						valuetypesizes[typeIndex][0].count+=valueTypeSize; // update the total count
 					}
 				}
+				///outputChar(']');
 			}
+			///outputChar(')');
 		}
+		///outputChar('C');
 		// decrement indices
 		level=ALLOCATION_INDEX_BYTES-1;
 		while(--level>=0){
 			if(indices[level]>0){indices[level]--;break;}
 			// indices[level] must be zero
-			if(level==0)return; // if this is the top-level we've traversed the entire tree
+			if(level==0)return result; // if this is the top-level we've traversed the entire tree
 			indices[level]=255;
 		}
+		///outputChar('D');
 	}while(1);
+	///outputChar('E');
+	///output("%llu",result);
+	return result;
 }
 
 // MDH@20JAN2025: END new allocations functionality (first in v0.1.10)
