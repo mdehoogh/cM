@@ -113,7 +113,7 @@ typedef struct Mlist{
 // MDH@04NOV2020: similar definitions for Marray
 typedef struct Marrayelements{
 	unsigned long long count;
-	Mvalue** values;
+	Mvalue* values[1]; // just a place holder, you're supposed to allocated as much memory to store count Mvalues
 }Marrayelements;
 typedef struct Marray{
 	Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;

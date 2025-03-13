@@ -765,41 +765,72 @@ Mvalue* Msetlen(Mvalue* _value,Mvalue* newlength_value){Mallocationowner owner=g
 						Marray* array=_value->value._array;
 						Marrayelements* arrayElements=(array!=NULL?array->elements:NULL);
 						// TODO if this is a multidimensional array what should we do?????? should newlength_value have the same number of dimension lengths??????
-						if(arrayElements!=NULL&&arrayElements->count>0){ // this is not a dimensioned array
-							unsigned long long length=arrayElements->count;
-							if(length!=newlength){
-								unsigned long long l=MAX(length,newlength); // guaranteed to be positive, will equal length if newlength equals 0!!!
-								// we can't cut off values until we managed to get new memory
-								result=newlength;
+						long long valueIndex;
+						unsigned long long length=(arrayElements!=NULL?arrayElements->count:0);
+						if(length!=newlength){
+							if(newlength<length){ // decreasing length
+								// NULL all values we will be loosing (through assignment here as these are actual values!!!)
+								valueIndex=length;
+								while(--valueIndex>=newlength)
+									assignValue(&(array->elements->values[valueIndex]),NULL);
 								if(newlength>0){
-									Mvalue** newvalues=CALLOC(sizeof(Mvalue*),newlength,-'a',owner);
-									if(newvalues!=NULL){
-										do{
-											l--;
-											// all values ABOVE newlength will not be used anymore
-											// all values below length will still be used
-											if(l>=newlength)
-												assignValue(&arrayElements->values[l],NULL);
-											else 
-											if(l<length)
-												newvalues[l]=arrayElements->values[l];
-										}while(l>0);
-										// NULL any value reference in the current array's values NOT included in the new values
-										FREE_DISOWNED(arrayElements->values,length,-'a',Msubowner(getValueOwner(),1)); // get rid of the current values
-										arrayElements->values=newvalues; // make values point to the new values
-										arrayElements->count=newlength; // remember the new length
-										result-=length; // the change in number of elements is the result of the function
+									Marrayelements* newarrayelements=
+										REALLOC(array->elements,sizeof(Marrayelements)+(length-1)*sizeof(Mvalue*),sizeof(Marrayelements)+(newlength-1)*sizeof(Mvalue*),1,-'a');
+									if(newarrayelements!=NULL){
+										array->elements=newarrayelements;
+										array->elements->count=newlength;
+										result=newlength;
 									}
-								}else{ // deleting all values, so no need to try to allocate sufficient memory
-									result-=length;
-									while(l>0)assignValue(&arrayElements->values[--l],NULL); // getting rid of all value pointers (in effect decrementing the counts of all the values!!!!)
-									FREE(arrayElements->values,length,-'a'); // get rid of the current values							
-									arrayElements->count=0;
-									arrayElements->values=NULL;
+								}else{ // removing all array elements
+									FREE(array->elements,sizeof(Marrayelements)+(length-1)*sizeof(Mvalue*),-'a');
+									array->elements=NULL;
 								}
-							}else // no need to change
-								result=0;
-						}
+							}else{ // increasing the length
+								Marrayelements* newarrayelements=
+									REALLOC(array->elements,sizeof(Marrayelements)+(length-1)*sizeof(Mvalue*),sizeof(Marrayelements)+(newlength-1)*sizeof(Mvalue*),1,-'a');
+								if(newarrayelements!=NULL){
+									array->elements=newarrayelements;
+									array->elements->count=newlength;
+									// NULL all values added (no assignment!!!)
+									valueIndex=length;
+									while(valueIndex<newlength)
+									{array->elements->values[valueIndex]=NULL;valueIndex++;}
+									result=newlength;
+								}
+							}
+							/* replacing:
+							unsigned long long l=MAX(length,newlength); // guaranteed to be positive, will equal length if newlength equals 0!!!
+							// we can't cut off values until we managed to get new memory
+							result=newlength;
+							if(newlength>0){
+								Mvalue** newvalues=CALLOC(sizeof(Mvalue*),newlength,-'a',owner);
+								if(newvalues!=NULL){
+									do{
+										l--;
+										// all values ABOVE newlength will not be used anymore
+										// all values below length will still be used
+										if(l>=newlength)
+											assignValue(&arrayElements->values[l],NULL);
+										else 
+										if(l<length)
+											newvalues[l]=arrayElements->values[l];
+									}while(l>0);
+									// NULL any value reference in the current array's values NOT included in the new values
+									FREE_DISOWNED(arrayElements->values,length,-'a',Msubowner(getValueOwner(),1)); // get rid of the current values
+									///arrayElements->values=newvalues; // make values point to the new values
+									arrayElements->count=newlength; // remember the new length
+									result-=length; // the change in number of elements is the result of the function
+								}
+							}else{ // deleting all values, so no need to try to allocate sufficient memory
+								result-=length;
+								while(l>0)assignValue(&arrayElements->values[--l],NULL); // getting rid of all value pointers (in effect decrementing the counts of all the values!!!!)
+								FREE(arrayElements->values,length,-'a'); // get rid of the current values							
+								arrayElements->count=0;
+								///arrayElements->values=NULL;
+							}
+							*/
+						}else // no need to change
+							result=0;
 					};
 					break;
 				case VT_LIST:

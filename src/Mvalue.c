@@ -1931,7 +1931,7 @@ Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
 	if(NULL==_array)return NULL;
 	if(_array->elements!=NULL){
 		OWNED(_array->elements,Msubowner(owner_array,1));
-		if(_array->elements->values!=NULL)OWNED(_array->elements->values,Msubowner(owner_array,2));
+		////if(_array->elements->values!=NULL)OWNED(_array->elements->values,Msubowner(owner_array,2));
 	}
 	return OWNED(_array,owner_array);
 }
@@ -1945,7 +1945,7 @@ Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
 Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
 	if(NULL==_array)return NULL;
 	if(_array->elements!=NULL){
-		if(_array->elements->values!=NULL)DISOWNED(_array->elements->values,owner_array);
+		/////if(_array->elements->values!=NULL)DISOWNED(_array->elements->values,owner_array);
 		DISOWNED(_array->elements,owner_array);
 	}
 	return DISOWNED(_array,owner_array);
@@ -1973,12 +1973,14 @@ Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
 Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const * fillValue){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _array=owned_array(__array(source),owner);
 	if(NULL==_array)return NULL;
+	output("Creating an array with %llu elements.\n",numberOfElements);
 	if(numberOfElements>0){ // _array->values should be initialized to accomodate the given number of values
 		// I need to allocated enough room for numberOfElements Mvalue*
-		_array->elements=CALLOC(sizeof(Marrayelements),1,'a',Msubowner(owner,1)); // NOTE fixed sized allocations use positive type indicators
+		_array->elements=CALLOC(1,sizeof(Marrayelements)+(numberOfElements-1)*sizeof(Mvalue*),-'a',Msubowner(owner,1)); // NOTE fixed sized allocations use positive type indicators
 		if(_array->elements!=NULL){
+			/*
 			_array->elements->values=CALLOC(sizeof(Mvalue*),numberOfElements,-'a',Msubowner(owner,1));
-			if(_array->elements->values!=NULL){
+			if(_array->elements->values!=NULL){*/
 				_array->elements->count=numberOfElements;
 				if(fillValue!=NULL){
 					///outputValue("Fill value: ",fillValue,".\n");
@@ -1988,15 +1990,18 @@ Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const 
 						_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
 					///output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
 				}
-			}else{ // failed to ascertain that field values is non-NULL!!
+				output("Number of array elements in %p: %llu.\n",_array->elements,_array->elements->count);
+			/*}else{ // failed to ascertain that field values is non-NULL!!
 				FREE_ARRAY(_array,owner);
 				q2outputError("Failed to allocate memory for storing the array elements");
-			}
+			}*/
 		}else{ // failed to allocate memory for elements field
 			FREE_ARRAY(_array,owner);
 			q2outputError("Failed to allocate memory for storing the array elements");
+			return NULL;
 		}
-	}
+	}else // just in case
+		_array->elements=NULL;
 	return DISOWNED_ARRAY(_array,owner);
 }
 /**
@@ -2009,7 +2014,7 @@ void free_values(Mvalue** values,unsigned long long numberOfValues){
 	if(NULL==values)return;
 	// disconnect every stored value
 	unsigned long long l=0;while(l<numberOfValues)assignValue(&values[l++],NULL);
-	FREE(values,numberOfValues,-'a');
+	///FREE(values,numberOfValues,-'a');
 }
 /**
  * @brief frees M array element \p arrayelement
@@ -2019,7 +2024,7 @@ void free_values(Mvalue** values,unsigned long long numberOfValues){
 static void free_arrayelements(Marrayelements* arrayelements){
 	if(arrayelements!=NULL){
 		free_values(arrayelements->values,arrayelements->count);
-		FREE_1(arrayelements,'a');
+		FREE(arrayelements,sizeof(Marrayelements)+(arrayelements->count-1)*sizeof(Mvalue*),-'a'); // replacing: FREE_1(arrayelements,-'a');
 	}
 }
 /**
