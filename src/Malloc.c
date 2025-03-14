@@ -484,7 +484,7 @@ static uint8_t replaceAllocationAtIndex(Malloc const * const _alloc,Malloc const
 			allocationnodes=allocationnodes->nodes[indices[level++]];
 		Malloc* ptr=((allocationpointers_t*)allocationnodes)->pointers[indices[ALLOCATION_INDEX_BYTES-1]];
 		if(ptr!=_alloc){
-			output("%s%Unmatched allocation history pointer!\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
+			output("%s%sUnmatched allocation history pointer!\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
 		}
 		((allocationpointers_t*)allocationnodes)->pointers[indices[ALLOCATION_INDEX_BYTES-1]]=_newalloc;
 	}
@@ -646,19 +646,22 @@ unsigned long long getAllocationsFreed(){
 /**
  * @brief returns dynamic memory allocation statistics through its parameters
  * 
- * @param occupationcounts 
- * @param valuetypecounts 
- * @param result 
- * @param getValueSizeFunction 
- * @param offered 
- * @param refused 
- * @param consumed 
+ * @param occupationcounts the histogram of the number of entries occupied in the blocks holding all allocated pointers on return
+ * @param valuetypecounts the number of allocated managed memory blocks per value type on return
+ * @param valuetypesizes the histograms of the sizes of the managed dynamic memory blocks per value type on return
+ * @param result the number of errors
+ * @param getValueSizeFunction the function to use when determining the size of a block of managed allocated memory
+ * @param offered the number of offered dynamic memory allocation ids on return
+ * @param refused the number of refused dynamic memory allocation ids on return
+ * @param consumed the number of consumed dynamic memory allocation ids on return
+ * @param unmanaged the number of unmanaged dynamic memory bytes on return
  * @return unsigned long long the number of errors that occurred
  */
 unsigned long long obtainAllocationStats(
 		unsigned long long occupationcounts[257],unsigned long long valuetypecounts[256],
 		Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,
-		unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed){
+		unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed,unsigned long long* unmanaged){
+	*unmanaged=getNumberOfUnmanagedBytes();
 	*offered=allocationindexcache.offered;
 	*refused=allocationindexcache.refused;
 	*consumed=allocationindexcache.consumed;

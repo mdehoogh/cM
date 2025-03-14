@@ -1973,7 +1973,7 @@ Marray* __array(char* source){Mallocationowner owner=getOwner(__LINE__);
 Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const * fillValue){Mallocationowner owner=getOwner(__LINE__);
 	Marray* _array=owned_array(__array(source),owner);
 	if(NULL==_array)return NULL;
-	output("Creating an array with %llu elements.\n",numberOfElements);
+	///output("Creating an array with %llu elements.\n",numberOfElements);
 	if(numberOfElements>0){ // _array->values should be initialized to accomodate the given number of values
 		// I need to allocated enough room for numberOfElements Mvalue*
 		_array->elements=CALLOC(1,sizeof(Marrayelements)+(numberOfElements-1)*sizeof(Mvalue*),-'a',Msubowner(owner,1)); // NOTE fixed sized allocations use positive type indicators
@@ -1990,7 +1990,7 @@ Marray* _getArray(char* source,unsigned long long numberOfElements,Mvalue const 
 						_array->numberOfDimensionsLeft=fillValue->value._array->numberOfDimensionsLeft+1;
 					///output("Number of dimensions left: %i.\n",_array->numberOfDimensionsLeft);
 				}
-				output("Number of array elements in %p: %llu.\n",_array->elements,_array->elements->count);
+				///output("Number of array elements in %p: %llu.\n",_array->elements,_array->elements->count);
 			/*}else{ // failed to ascertain that field values is non-NULL!!
 				FREE_ARRAY(_array,owner);
 				q2outputError("Failed to allocate memory for storing the array elements");
@@ -8451,7 +8451,6 @@ size_t getValueSize(int8_t type,void* value){
 		}
 		case 'a':
 		{
-			result=sizeof(Marrayelements);
 			break;
 		}
 		case -'a':
@@ -8516,11 +8515,13 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _allocationStatsMap=owned_map(__map("memstats"),owner);
 	if(NULL==_allocationStatsMap)return NULL;
 	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
-	unsigned long long offered,refused,consumed;
+	unsigned long long offered,refused,consumed,unmanaged;
 	Mallocationsize* allocationTypeSizes[256]; // the histogram of size counts for each of the data types
-	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSize,&offered,&refused,&consumed);
+	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSize,&offered,&refused,&consumed,&unmanaged);
 	if(memoryErrors)
 		q2outputMessage(M_ERROR_PREFIX,"Number of out of memory errors obtaining memory statistics: %llu.",memoryErrors);
+	if(appendedToMap(_allocationStatsMap,owner,"unmanaged",_getIntegerValue(unmanaged))!=M_TRUE)
+		q2outputMessage(M_ERROR_PREFIX,"Failed to report the amount of unmanaged dynamic memory");
 	Mmap* _allocationHistoryCacheMap=owned_map(__map("allocationHistoryCache"),owner);
 	if(_allocationHistoryCacheMap!=NULL){
 		if(appendedToMap(_allocationHistoryCacheMap,owner,"offered",_getIntegerValue(offered))!=M_TRUE)
@@ -8537,8 +8538,9 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history cache info map.");
 	char countindexString[20];
 	unsigned long long count,totalcount,bytes,totalbytes;
-	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationHisttoryCounts"),owner);
+	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationHistoryCounts"),owner);
 	if(_allocationHistoryCountsMap!=NULL){
+		totalcount=0;
 		for(int countIndex=0;countIndex<257;countIndex++){
 			count=allocationHistoryCounts[countIndex];
 			if(!count)continue;
@@ -8549,7 +8551,7 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 		}
 		if(prependedToMap(_allocationHistoryCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
 			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history totalcount #%zzu.",totalcount);
-		if(appendedToMap(_allocationStatsMap,owner,"historycounts",_getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner)))!=M_TRUE){
+		if(appendedToMap(_allocationStatsMap,owner,"allocationhistorycounts",_getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner)))!=M_TRUE){
 			free_map(_allocationHistoryCountsMap);
 			q2outputError("Failed to append allocation history counts to the allocation stats.");
 		}

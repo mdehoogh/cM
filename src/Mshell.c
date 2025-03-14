@@ -9978,8 +9978,7 @@ static Marray* _getScalarRangeArray(Mvalue* firstRangeValue,Mvalue* lastRangeVal
 						///output("Creating array with %llu elements.\n",arraylength);
 						_scalarRangeArray=owned_array(_getArray("_getScalarRangeArray",arraylength,NULL),owner);
 						if(_scalarRangeArray!=NULL){
-							if(_scalarRangeArray->elements!=NULL)
-								output("Array with %llu elements %p created.\n",_scalarRangeArray->elements->count,_scalarRangeArray->elements);
+							///if(_scalarRangeArray->elements!=NULL)output("Array with %llu elements %p created.\n",_scalarRangeArray->elements->count,_scalarRangeArray->elements);
 							if(arraylength>0){
 								Mvalue** valueholder=_scalarRangeArray->elements->values; // NOTE _getArray() will ascertain that elements will not be NULL!
 								while(integerrangeValue){
