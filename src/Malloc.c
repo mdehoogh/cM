@@ -142,7 +142,8 @@ static bool cacheAllocationIndex(allocationindex_t allocationIndex){
 }
 static allocationindex_t getCachedAllocationIndex(){
 	// if the cache is empty, can't return a freed allocation index
-	if(allocationindexcache.notEmpty==0)return UNAVAILABLE_ALLOCATION_INDEX;
+	////if(allocationindexcache.notEmpty==0)
+	return UNAVAILABLE_ALLOCATION_INDEX;
 	allocationindexcache.consumed++; // another one consumed
 	allocationindex_t cachedAllocationIndex=allocationindexcache.freedindices[++allocationindexcache.tail];
 	// if the head and the tail are now equal, the cache is now empty
@@ -156,7 +157,7 @@ static allocationindex_t getCachedAllocationIndex(){
  */
 static void allocationsInitialized(){
 	if(NULL==_allocationnodesRoot){
-		_allocationnodesRoot=calloc(1,sizeof(allocationnodes_t));
+		_allocationnodesRoot=unmanaged_calloc(1,sizeof(allocationnodes_t));
 		// the problem here is that _allocationnodesRoot->NULLs and _allocationnodesRoot->notfulls
 		// will both be 0 at this moment, and thus _allocationnodesRoot->first is NULL and unoccupied
 	}
@@ -255,24 +256,30 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 	allocationnodes_t *levelallocationnodes,*nextlevelallocationnodes;
 	allocationnodes_t *allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot}; // pointer to the first allocation node	
 	allocationpointers_t* allocationpointers;
-	int level=0,levelIndex;
-	allocationindex_t newAllocationIndex,cachedAllocationIndex=getCachedAllocationIndex();
-	if(cachedAllocationIndex!=UNAVAILABLE_ALLOCATION_INDEX){ // an available allocation index retrieved from the cache
+	int level,levelIndex;
+	// initialize newAllocationIndex to the cached allocation index
+	allocationindex_t newAllocationIndex=getCachedAllocationIndex();
+	// when available use it
+	if(newAllocationIndex!=UNAVAILABLE_ALLOCATION_INDEX){ // an available allocation index retrieved from the cache
 		// I have to set the allocationnodes elements at index 1 through ALLOCATION_INDEX_BYTES-1
 		uint8_t indices[ALLOCATION_INDEX_BYTES];
-		obtainAllocationIndices(newAllocationIndex=cachedAllocationIndex,indices);
-		// use the indices
+		obtainAllocationIndices(newAllocationIndex,indices);
+		// use the indices to set the allocation nodes
+		level=0;
 		while(level<ALLOCATION_INDEX_BYTES-1){
 			levelIndex=indices[level]; // the right-most byte indicates the node to use
 			levelallocationnodes=allocationnodes[level];
 			allocationnodes[++level]=levelallocationnodes->nodes[levelIndex];
 		}
 		allocationpointers=(allocationpointers_t*)allocationnodes[level];
-		allocationpointers->firstnullpointerindex=cachedAllocationIndex;
+		// MDH@17MAR2025 BUG FIX: the following would be erroneous because we need to use indices[level] not cachedAllocationIndex!!!
+		//                        this might be the reason that the pointer is written at the wrong place!!!
+		allocationpointers->firstnullpointerindex=indices[level]; // BUG FIX replacing: cachedAllocationIndex;
 	}else{ // can't find one in the cache, so we have to find one to use
-		newAllocationIndex=0; ///{.index=0}; // to hold the allocation index
 		///output("+++++++++");
 		// 1. determine all remaining pointers to allocation nodes
+		newAllocationIndex=0; ///{.index=0}; // to hold the allocation index
+		level=0;
 		while(level<ALLOCATION_INDEX_BYTES-1){
 			///output(">LEVEL %d:",level);
 			///outputChar(level+48);
@@ -373,10 +380,11 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 			}
 		}
 		// NOTE: we're doing this ahead of time, assuming to succeed in using newAllocationIndex!!!!
-		newAllocationIndex<<=8;newAllocationIndex+=allocationpointers->firstnullpointerindex;
+		newAllocationIndex<<=8;
+		newAllocationIndex+=allocationpointers->firstnullpointerindex;
 	}
 	// MDH@07FEB2025: we should now know which pointer to set
-	assert(NULL==allocationpointers->pointers[allocationpointers->firstnullpointerindex]); // DEBUGGING
+	assert(allocationpointers->firstnullpointerindex<=255&&NULL==allocationpointers->pointers[allocationpointers->firstnullpointerindex]); // DEBUGGING
 	///outputChar('N');
 	allocationpointers->pointers[allocationpointers->firstnullpointerindex]=_alloc;
 	///allocationpointers->notEmpty=1; // definitely not empty now!!!
@@ -470,22 +478,22 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
  * @param allocationIndex 
  * @return uint8_t zero on success, nonzero on failure
  */
-static uint8_t replaceAllocationAtIndex(Malloc const * const _alloc,Malloc const * const _newalloc){
+static uint8_t replaceAllocationAtIndex(Malloc const * const _alloc,allocationindex_t allocationIndex,Malloc const * const _newalloc){
 	if(NULL==_alloc)return 1;
-	allocationindex_t allocationIndex=_alloc->allocationIndex;
 	if(allocationIndex!=UNAVAILABLE_ALLOCATION_INDEX){
 		// extract all the bytes stored in ascending order: (0,1,2,3)
 		uint8_t indices[ALLOCATION_INDEX_BYTES];
+		obtainAllocationIndices(allocationIndex,indices);
+		/* replacing (what would effectively change allocationIndex which would using it in q2outputMessage() below incorrect)
 		int level=ALLOCATION_INDEX_BYTES;
 		while(--level>=0){indices[level]=(allocationIndex&0xFF);allocationIndex>>=8;}
+		*/
 		allocationnodes_t* allocationnodes=_allocationnodesRoot;
-		level=0;
-		while(level<ALLOCATION_INDEX_BYTES-1)
-			allocationnodes=allocationnodes->nodes[indices[level++]];
-		Malloc* ptr=((allocationpointers_t*)allocationnodes)->pointers[indices[ALLOCATION_INDEX_BYTES-1]];
-		if(ptr!=_alloc){
-			output("%s%sUnmatched allocation history pointer!\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
-		}
+		int level=0;
+		while(level<ALLOCATION_INDEX_BYTES-1)allocationnodes=allocationnodes->nodes[indices[level++]];
+		Malloc* ptr=((allocationpointers_t*)allocationnodes)->pointers[indices[level]];
+		if(ptr!=_alloc)
+			q2outputMessage(M_BUG_PREFIX,"Unmatched allocation history pointer with id %lu!",allocationIndex);
 		((allocationpointers_t*)allocationnodes)->pointers[indices[ALLOCATION_INDEX_BYTES-1]]=_newalloc;
 	}
 	return 0;
@@ -658,18 +666,30 @@ unsigned long long getAllocationsFreed(){
  * @return unsigned long long the number of errors that occurred
  */
 unsigned long long obtainAllocationStats(
-		unsigned long long occupationcounts[257],unsigned long long valuetypecounts[256],
-		Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,
-		unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed,unsigned long long* unmanaged){
-	*unmanaged=getNumberOfUnmanagedBytes();
+		unsigned long long occupationcounts[257],
+		unsigned long long valuetypecounts[256],
+		Mallocationsize* valuetypesizes[256],
+		GetValueSizeFunction getValueSizeFunction,
+		unsigned long long *offered,
+		unsigned long long *refused,
+		unsigned long long *consumed,
+		unsigned long long *unmanaged){
+	// MDH@17MAR2025: let's report any local allocation as well!!!!
+	///outputChar('1');
+	*unmanaged=getNumberOfUnmanagedBytes(false);
 	*offered=allocationindexcache.offered;
 	*refused=allocationindexcache.refused;
 	*consumed=allocationindexcache.consumed;
+	///outputChar('2');
 	memset(occupationcounts,0,257*sizeof(unsigned long long));
+	///outputChar('3');
 	memset(valuetypecounts,0,256*sizeof(unsigned long long));
+	///outputChar('4');
 	if(getValueSizeFunction!=NULL)for(int i=255;i>=0;i--)valuetypesizes[i]=NULL;
 	if(NULL==_allocationnodesRoot)return 0;
 	if(allocations.l==0)return 0;
+	/////return 0;
+	///outputChar('5');
 	unsigned long long result=0;
 	allocationindex_t lastAllocationIndex=allocations.l-1;
 	// I need to iterate over all allocation nodes, we can do that by iterating over
@@ -680,6 +700,7 @@ unsigned long long obtainAllocationStats(
 		indices[level]=(lastAllocationIndex&0xFF);
 		lastAllocationIndex>>=8;
 	}
+	///outputChar('6');
 	indices[0]=lastAllocationIndex;
 	///////indices[0]=lastAllocationIndex;
 	// as long as the first index is non-negative
@@ -723,7 +744,8 @@ unsigned long long obtainAllocationStats(
 						valueTypeSize=getValueSizeFunction(type,(void*)(cptr+sizeof(Malloc)));
 						///output("{%zu}",valueTypeSize);
 						if(!valueTypeSize)continue;
-						if(NULL==valuetypesizes[typeIndex]){
+						typesizes=valuetypesizes[typeIndex];
+						if(NULL==typesizes){
 							///outputChar('e');
 							void* rptr=unmanaged_calloc(2,sizeof(Mallocationsize));
 							///outputChar('f');
@@ -733,34 +755,38 @@ unsigned long long obtainAllocationStats(
 							valuetypesizes[typeIndex]=rptr;
 							categoryCount=1;
 							valuetypesizes[typeIndex][0].class=1;
+							valuetypesizes[typeIndex][0].count=valueTypeSize;
 							///outputChar('h');
 							category=1;
+							valuetypesizes[typeIndex][1].class=valueTypeSize;
+							valuetypesizes[typeIndex][1].count=1;
 						}else{
 							///outputChar('i');
-							typesizes=valuetypesizes[typeIndex];
-							///outputChar('j');
-							if(typesizes!=NULL){
-								///output("{%zu:%llu}",typesizes->class,typesizes->count);
-								///output("?%llu}",categoryCount);
-								category=typesizes[0].class;
-								while(category>0&&typesizes[category].class!=valueTypeSize)category--;
-								///outputChar('k');
-								if(!category){ // the category does not yet exist!!
-									categoryCount=typesizes[0].class+1;
-									void* rptr=unmanaged_realloc(valuetypesizes[typeIndex],categoryCount*sizeof(Mallocationsize),(categoryCount+1)*sizeof(Mallocationsize));
-									if(NULL==rptr){result++;continue;}
-									valuetypesizes[typeIndex][0].class=categoryCount; // update the total category count
-									category=categoryCount;
-									valuetypesizes[typeIndex]=rptr;
-									valuetypesizes[typeIndex][category].count=0; // initialize
-									/////////valuetypesizes[typeIndex][0].count=category;
-									valuetypesizes[typeIndex][category].class=valueTypeSize;
-								}
-							}///else outputChar('!');
+							///output("{%zu:%llu}",typesizes->class,typesizes->count);
+							///output("?%llu}",categoryCount);
+							category=typesizes[0].class;
+							while(category>0&&typesizes[category].class!=valueTypeSize)category--;
+							///outputChar('k');
+							if(!category){ // the category does not yet exist!!
+								///outputChar('l');
+								categoryCount=typesizes[0].class+1;
+								void* rptr=unmanaged_realloc(valuetypesizes[typeIndex],categoryCount*sizeof(Mallocationsize),(categoryCount+1)*sizeof(Mallocationsize));
+								///outputChar('m');
+								if(NULL==rptr){result++;continue;}
+								///outputChar('n');
+								valuetypesizes[typeIndex]=rptr; // NOTE you have to do this first before setting updating the class!!!
+								valuetypesizes[typeIndex][0].class=categoryCount; // update the total category count
+								///outputChar('o');
+								category=categoryCount;
+								valuetypesizes[typeIndex][category].count=1; // initialize
+								/////////valuetypesizes[typeIndex][0].count=category;
+								valuetypesizes[typeIndex][category].class=valueTypeSize;
+								///outputChar('p');
+							}else // an existing category!!
+								valuetypesizes[typeIndex][category].count++; // increment the category count
+							valuetypesizes[typeIndex][0].count+=valueTypeSize; // update the total count
 						}
 						///outputChar('d');
-						valuetypesizes[typeIndex][category].count++; // increment the category count
-						valuetypesizes[typeIndex][0].count+=valueTypeSize; // update the total count
 					}
 				}
 				///outputChar(']');
@@ -2391,7 +2417,6 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 			/// newptr=((char*)newptr)-sizeof(Malloc);
 			size_t freed=size*from_count,occupied=size*to_count;
 			Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@18JAN2023replacing: (Malloc*)allocptr; // pointer to Malloc allocation registration appendix
-			long long allocationIndex=-1;
 #ifndef __PRODUCTION__
 			// MDH@05JUN2020 realloc takes care of this: Malloc newAllocation=*_alloc; // MDH@05JUN2020: copy the entire record over
 			// we need to get the allocation type and index out BEFORE memory is reallocated!!!!!
@@ -2402,7 +2427,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 					dump(ptr,freed,size);
 			}
 			// MDH@20APR2020 ASSERT: freed>0 as freed!=occupied
-			allocationIndex=_alloc->allocationIndex;
+			allocationindex_t allocationIndex=_alloc->allocationIndex;
 			if(allocationIndex>=0&&allocationIndex<allocations.l){
 				/* MDH@31JAN2025: not using _owners anymore!!!
 				if(allocations._owners[allocationIndex]!=_alloc){
@@ -2435,7 +2460,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 				//				it's essential to replace the registered allocation pointer (which should equal ptr with newptr)
 				// MDH@31JAN2025 REMOVING TODO should we find a way to replace the allocation history pointer??????
 				//                 because by commenting this out the pointers will be different after a realloc!!!! 
-				replaceAllocationAtIndex(_alloc,newptr);
+				replaceAllocationAtIndex(_alloc,allocationIndex,newptr);
 				// replacing: allocations._owners[allocationIndex]=newptr;
 				// safer to do the following immediately
 				newptr=((char*)newptr)+sizeof(Malloc);

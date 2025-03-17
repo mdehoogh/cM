@@ -7226,8 +7226,11 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		}
 	}
 
+	q2output("Registering the number of unmanaged dynamic memory bytes allocated (now %llu) reset to zero.\n",getNumberOfUnmanagedBytes(true));
+
 	if(amVerbose())
 		reportAllocations("Initial allocations:\n","\t");
+
 
 	// the main user input loop
 	while(1){ // command loop

@@ -13,7 +13,7 @@ void* unmanaged_malloc(size_t size);
 void* unmanaged_calloc(size_t count,size_t size);
 void* unmanaged_realloc(void* ptr,size_t oldsize,size_t newsize);
 void unmanaged_free(void* ptr,size_t size);
-unsigned long long getNumberOfUnmanagedBytes();
+unsigned long long getNumberOfUnmanagedBytes(bool reset);
 
 /* possibly move to a separate module in the future
 // support for multiple message streams stored in a double-linked message stream list (_messageStreamStack)

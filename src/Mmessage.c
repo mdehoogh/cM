@@ -22,25 +22,31 @@ static unsigned long long unmanaged_bytes=0;
 void* unmanaged_malloc(size_t size){
 	void* ptr=malloc(size);
 	if(ptr!=NULL)unmanaged_bytes+=size;
+	////output("(M%zu)",size);
 	return ptr;
 }
 void* unmanaged_calloc(size_t count,size_t size){
 	void* ptr=calloc(count,size);
 	if(ptr!=NULL)unmanaged_bytes+=(count*size);
+	///output("(C%zu*%zu)",count,size);
 	return ptr;
 }
 void* unmanaged_realloc(void* ptr,size_t oldsize,size_t newsize){
 	void* newptr=(ptr!=NULL?realloc(ptr,newsize):NULL);
 	if(newptr!=NULL){unmanaged_bytes-=oldsize;unmanaged_bytes+=newsize;}
+	///output("(R%zu->%zu)",oldsize,newsize);
 	return newptr;
 }
 void unmanaged_free(void* ptr,size_t size){
 	if(NULL==ptr)return;
 	free(ptr);
+	///output("(F%zu)",size);
 	unmanaged_bytes-=size;
 }
-unsigned long long getNumberOfUnmanagedBytes(){
-	return unmanaged_bytes;
+unsigned long long getNumberOfUnmanagedBytes(bool reset){
+	unsigned long long result=unmanaged_bytes;
+	if(reset)unmanaged_bytes=0;
+	return result;
 }
 // MDH@29JAN2025 END
 

@@ -8512,7 +8512,7 @@ size_t getValueSize(int8_t type,void* value){
  * @return Mvalue* 
  */
 Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
-	Mmap* _allocationStatsMap=owned_map(__map("memstats"),owner);
+	Mmap* _allocationStatsMap=owned_map(__map(__FUNCTION__),owner);
 	if(NULL==_allocationStatsMap)return NULL;
 	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
 	unsigned long long offered,refused,consumed,unmanaged;
@@ -8520,8 +8520,8 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSize,&offered,&refused,&consumed,&unmanaged);
 	if(memoryErrors)
 		q2outputMessage(M_ERROR_PREFIX,"Number of out of memory errors obtaining memory statistics: %llu.",memoryErrors);
-	if(appendedToMap(_allocationStatsMap,owner,"unmanaged",_getIntegerValue(unmanaged))!=M_TRUE)
-		q2outputMessage(M_ERROR_PREFIX,"Failed to report the amount of unmanaged dynamic memory");
+		if(appendedToMap(_allocationStatsMap,owner,"unmanaged",_getIntegerValue(unmanaged))!=M_TRUE)
+		q2outputError("Failed to report the amount of unmanaged dynamic memory");
 	Mmap* _allocationHistoryCacheMap=owned_map(__map("allocationHistoryCache"),owner);
 	if(_allocationHistoryCacheMap!=NULL){
 		if(appendedToMap(_allocationHistoryCacheMap,owner,"offered",_getIntegerValue(offered))!=M_TRUE)
@@ -8530,12 +8530,12 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache refused count %llu.",refused);
 		if(appendedToMap(_allocationHistoryCacheMap,owner,"consumed",_getIntegerValue(consumed))!=M_TRUE)
 			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache consumed count %llu.",consumed);
-		if(appendedToMap(_allocationStatsMap,owner,"freed allocation id cache",_getValueOfMap(disowned_map(_allocationHistoryCacheMap,owner)))!=M_TRUE){
+		if(appendedToMap(_allocationStatsMap,owner,"allocation id cache",_getValueOfMap(disowned_map(_allocationHistoryCacheMap,owner)))!=M_TRUE){
 			free_map(_allocationHistoryCacheMap);
 			q2outputError("Failed to append allocation history freed index cache info to the allocation stats.");
 		}
 	}else
-		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history cache info map.");
+		q2outputError("Failed to create the allocation history cache info map.");
 	char countindexString[20];
 	unsigned long long count,totalcount,bytes,totalbytes;
 	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationHistoryCounts"),owner);
