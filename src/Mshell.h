@@ -139,7 +139,8 @@ bool shellInitialized(
 				ReoutputTokenFunction _reoutputTokenFunction,
 				UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,
 				OutputCommandInfoFunction _outputCommandInfoFunction,
-				GetValueSizeFunction _getValueSizeFunction
+				GetValueSizeFunction _getValueSizeFunction,
+				GetAllocCountFunction _getAllocCountFunction
 			);
 
 // MDH@18MAR2024: block stuff

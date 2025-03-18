@@ -671,13 +671,18 @@ unsigned long long obtainAllocationStats(
 		unsigned long long valuetypecounts[256],
 		Mallocationsize* valuetypesizes[256],
 		GetValueSizeFunction getValueSizeFunction,
+		GetAllocCountFunction getAllocCountFunction,
 		unsigned long long *offered,
 		unsigned long long *refused,
 		unsigned long long *consumed,
-		unsigned long long *unmanaged){
+		unsigned long long *unmanaged,
+		unsigned long long *allocationCount,
+		unsigned long long *allocationsCounted){
 	// MDH@17MAR2025: let's report any local allocation as well!!!!
 	///outputChar('1');
 	*unmanaged=getNumberOfUnmanagedBytes(false);
+	*allocationsCounted=0;
+	*allocationCount=allocations.l;
 	*offered=allocationindexcache.offered;
 	*refused=allocationindexcache.refused;
 	*consumed=allocationindexcache.consumed;
@@ -706,6 +711,7 @@ unsigned long long obtainAllocationStats(
 	///////indices[0]=lastAllocationIndex;
 	// as long as the first index is non-negative
 	allocationnodes_t* allocationnodes;
+	unsigned long long countedAllocations=0;
 	do{
 		///outputChar('A');
 		// determine allocationpointers based on the current indices
@@ -740,13 +746,15 @@ unsigned long long obtainAllocationStats(
 					///output("%d",typeIndex);
 					valuetypecounts[typeIndex]++;
 					///outputChar('c');
+					countedAllocations+=(getAllocCountFunction!=NULL?getAllocCountFunction(type):1);
+					////output(" %llu",*allocationsCounted);
 					if(getValueSizeFunction!=NULL){
 						char* cptr=(char*)*ptr;
 						valueTypeSize=getValueSizeFunction(type,(void*)(cptr+sizeof(Malloc)));
 						///output("{%zu}",valueTypeSize);
 						/// valueTypeSize should never be 0 if it does report
 						if(!valueTypeSize)
-							q2outputMessage(M_BUG_PREFIX,"Size of type %s'%c' unknown!",(type<0?"-":""),abs(type));
+							q2outputMessage(M_WARNING_PREFIX,"Size of type %s'%c' unknown!",(type<0?"-":""),abs(type));
 						// determine the category (class) equal to valueTypeSize
 						typesizes=valuetypesizes[typeIndex];
 						if(NULL==typesizes){ // we need to create it
@@ -807,7 +815,7 @@ unsigned long long obtainAllocationStats(
 		while(--level>=0){
 			if(indices[level]>0){indices[level]--;break;}
 			// indices[level] must be zero
-			if(level==0)return result; // if this is the top-level we've traversed the entire tree
+			if(level==0){*allocationsCounted=countedAllocations;return result;} // if this is the top-level we've traversed the entire tree
 			indices[level]=255;
 		}
 		///outputChar('D');

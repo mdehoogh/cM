@@ -7004,6 +7004,17 @@ void initializeM(){
 }
 
 /**
+ * @brief returns the number of allocations required for type \p type
+ * 
+ * @param type 
+ * @return unsigned long long the number of allocations required for type \p type
+ */
+unsigned long long getAllocCount(int8_t type){
+	if(type=='S')return 2;
+	if(type==-'s')return 0;
+	return 1;
+}
+/**
 * @brief returns the number of bytes occupied by value \p value of type \p type
 * 
 * @param type 
@@ -7011,9 +7022,9 @@ void initializeM(){
 * @return size_t the number of bytes occupied by value \p value of type \p type 
 */
 size_t getValueSize(int8_t type,void* value){
- size_t result=0;
- if(value!=NULL)
- switch(type){
+	size_t result=0;
+	if(value!=NULL)
+	switch(type){
 	 case 'U': // undefined
 	 case 'X':
 	 {
@@ -7160,9 +7171,13 @@ size_t getValueSize(int8_t type,void* value){
 		 result=sizeof(Mfile);
 		 break;
 	 }
-	 case 'S':
+	 case 'S': // Mstring
 	 {
+		 // because we can't determine the length of Mchars we're going to include it in the length of an Mstring here!!!
+		 // NOTE that with Mstring there are actually two Malloc structures to count!!!
 		 result=sizeof(Mstring);
+		 Mstring* str=(Mstring*)value;
+		 if(str!=NULL&&str->blocks>0)result+=(M_BLOCK_SIZE*str->blocks);
 		 break;
 	 }
 	 case 's': // Mchars
@@ -7303,7 +7318,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
 	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
-	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutoCompletionText,NULL,getValueSize)){ // ascertain to have an shell environment!!!
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutoCompletionText,NULL,getValueSize,getAllocCount)){ // ascertain to have an shell environment!!!
 		q2outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);

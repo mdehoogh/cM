@@ -459,6 +459,7 @@ void setOutputCommandInfoFunction(OutputCommandInfoFunction* _outputCommandInfoF
 static InputCharReadFunction* inputCharReadFunction=NULL;
 
 static GetValueSizeFunction* getValueSizeFunction=NULL;
+static GetAllocCountFunction* getAllocCountFunction=NULL;
 
 /**
  * @brief outputs token \p token
@@ -14605,13 +14606,25 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _allocationStatsMap=owned_map(__map(__FUNCTION__),owner);
 	if(NULL==_allocationStatsMap)return NULL;
 	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
-	unsigned long long offered,refused,consumed,unmanaged;
+	unsigned long long offered,refused,consumed,unmanaged,allocationCount,allocationsCounted;
 	Mallocationsize* allocationTypeSizes[256]; // the histogram of size counts for each of the data types
-	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSizeFunction,&offered,&refused,&consumed,&unmanaged);
+	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSizeFunction,getAllocCountFunction,&offered,&refused,&consumed,&unmanaged,&allocationCount,&allocationsCounted);
+	///output("Allocations counted: %llu.\n",allocationsCounted); // DEBUGGING
 	if(memoryErrors)
 		q2outputMessage(M_ERROR_PREFIX,"Number of out of memory errors obtaining memory statistics: %llu.",memoryErrors);
-		if(appendedToMap(_allocationStatsMap,owner,"unmanaged",_getIntegerValue(unmanaged))!=M_TRUE)
-		q2outputError("Failed to report the amount of unmanaged dynamic memory");
+	if(appendedToMap(_allocationStatsMap,owner,"unmanaged",_getIntegerValue(unmanaged))!=M_TRUE)
+		q2outputError("Failed to report the allocated number of unmanaged dynamic memory bytes");
+
+	Mmap* _allocationsMap=owned_map(__map("allocations"),owner);
+	if(_allocationsMap!=NULL){
+		if(appendedToMap(_allocationsMap,owner,"count",_getIntegerValue(allocationCount))!=M_TRUE)
+			q2outputError("Failed to report the managed allocation count");
+		if(appendedToMap(_allocationsMap,owner,"counted",_getIntegerValue(allocationsCounted))!=M_TRUE)
+			q2outputError("Failed to report the number of counted allocations");
+		if(appendedToMap(_allocationStatsMap,owner,"allocations",_getValueOfMap(disowned_map(_allocationsMap,owner)))!=M_TRUE)
+		q2outputError("Failed to report the managed allocation counts");
+	}
+
 	Mmap* _allocationHistoryCacheMap=owned_map(__map("allocationHistoryCache"),owner);
 	if(_allocationHistoryCacheMap!=NULL){
 		if(appendedToMap(_allocationHistoryCacheMap,owner,"offered",_getIntegerValue(offered))!=M_TRUE)
@@ -14748,7 +14761,17 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
  * @return true on success
  * @return false on failure
  */
-bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction,GetValueSizeFunction _getValueSizeFunction){Mallocationowner owner=getOwner(__LINE__);
+bool shellInitialized(char const * const settingCharacters,char const * const locale,
+	unsigned long long moduleDebugging,
+	InputCharReadFunction _inputCharReadFunction,
+	InputResponseFunction _inputInfoFunction,
+	InputResponseFunction _inputErrorFunction,
+	OutputTokenFunction _outputTokenFunction,
+	ReoutputTokenFunction _reoutputTokenFunction,
+	UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,
+	OutputCommandInfoFunction _outputCommandInfoFunction,
+	GetValueSizeFunction _getValueSizeFunction,
+	GetAllocCountFunction _getAllocCountFunction){Mallocationowner owner=getOwner(__LINE__);
 
 	//reportNumberOfAllocations("shellInitialized 1");
 
@@ -14786,6 +14809,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(NULL==_updateLastTokenAutocompletionTextFunction)q2outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
 	if(NULL==_outputCommandInfoFunction)q2outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
 	if(NULL==_getValueSizeFunction)q2outputWarning("No get value size function.");else getValueSizeFunction=_getValueSizeFunction;
+	if(NULL==_getAllocCountFunction)q2outputWarning("No get alloc count function.");else getAllocCountFunction=_getAllocCountFunction;
 
 	//reportNumberOfAllocations("shellInitialized 5");
 
@@ -14797,6 +14821,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(NULL==updateLastTokenAutocompletionTextFunction)q2outputWarning("No update last token auto completion text function!");else q2outputInfo("Update last token auto completion text function set!");
 	if(NULL==outputCommandInfoFunction)q2outputWarning("No output command info function!");else q2outputInfo("Output command info function set!");
 	if(NULL==getValueSizeFunction)q2outputWarning("No get value size function!");else q2outputInfo("Get value size function set!");
+	if(NULL==getAllocCountFunction)q2outputWarning("No get alloc count function!");else q2outputInfo("Get alloc count function set!");
 
 	///q2outputWarning("Dit is een test");
 	//reportNumberOfAllocations("shellInitialized 6");

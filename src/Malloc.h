@@ -18,6 +18,7 @@ typedef struct{
 }Mallocationsize;
 
 typedef size_t GetValueSizeFunction(int8_t type,void* value);
+typedef unsigned long long GetAllocCountFunction(int8_t type);
 
 /*
 // when dealing with a variable size allocation type, we're storing 
@@ -108,8 +109,10 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 unsigned long long getAllocationsRemembered();
 unsigned long long getAllocationsFreed();
 unsigned long long obtainAllocationStats(unsigned long long occupations[257],unsigned long long valuetypecounts[256],
-	Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,
-	unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed,unsigned long long* allocated_unmanaged);
+	Mallocationsize* valuetypesizes[256],GetValueSizeFunction getValueSizeFunction,GetAllocCountFunction getAllocCountFunction,
+	unsigned long long *offered,unsigned long long *refused,unsigned long long* consumed,unsigned long long* allocated_unmanaged,
+	unsigned long long *allocationCount,
+	unsigned long long *allocationsCounted);
 
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
 bool Misowned(void* ptr);
