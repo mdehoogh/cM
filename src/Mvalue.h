@@ -661,6 +661,3 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 Mvalue* Mremovemessages(Mvalue const * const messageTypeValue);
 Mvalue* Maddmessage(Mvalue const * const messageValue);
 Mvalue* Mmessagecounts();
-
-// MDH@03FEB2025: allow retrieving allocation history occupation frequencies
-Mvalue* Mmemstats();

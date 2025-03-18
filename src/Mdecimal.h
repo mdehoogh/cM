@@ -32,6 +32,15 @@ typedef struct Mdecimalcontext{
     Msincoselement* _firstCordicelement; // for storing the CORDIC sine/cosines
 }Mdecimalcontext;
 
+/**
+ * @brief a single decimal context node
+ * 
+ */
+typedef struct MdecimalcontextElement{
+	Mdecimalcontext* _decimalcontext;
+	struct MdecimalcontextElement* _next;
+}MdecimalcontextElement;
+
 // MDH@29AUG2019: create a decimal context with __decimalcontext passing in the required precision
 Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision
 

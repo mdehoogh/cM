@@ -175,14 +175,7 @@ void free_decimalcontext(Mdecimalcontext* _decimalcontext/*,Mallocationowner own
 
 // if we want to keep a list of all decimal contexts, we need to be able to iterate over all decimal contexts to see if it is already there
 // create a single Mdecimalcontextelement
-/**
- * @brief a single decimal context node
- * 
- */
-typedef struct MdecimalcontextElement{
-	Mdecimalcontext* _decimalcontext;
-	struct MdecimalcontextElement* _next;
-}MdecimalcontextElement;
+
 /**
  * @brief returns \p decimalcontextElement owned by \p owner_decimalcontextElement
  * 

@@ -138,7 +138,8 @@ bool shellInitialized(
 				OutputTokenFunction _outputTokenFunction,
 				ReoutputTokenFunction _reoutputTokenFunction,
 				UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,
-				OutputCommandInfoFunction _outputCommandInfoFunction
+				OutputCommandInfoFunction _outputCommandInfoFunction,
+				GetValueSizeFunction _getValueSizeFunction
 			);
 
 // MDH@18MAR2024: block stuff
@@ -164,3 +165,14 @@ Mstring* _getBlockName();
 bool addBlockCommand(Mcommand const * const command);
 bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken,Mallocationowner ownerToken);
 Mblock* endBlock();
+
+/**
+ * @brief for storing formula elements
+ * 
+ */
+typedef struct Mformulaelement{
+	Mvaluereference* _operand; // an operand to apply the binary operator to
+	Mstring* _operator; // a (shortcut) binary operator 
+	struct Mformulaelement* _next;
+	struct Mformulaelement* _prev; // MDH@21MAY2019: unfortunately needed for moving back!!
+}Mformulaelement;

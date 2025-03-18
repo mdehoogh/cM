@@ -458,6 +458,8 @@ void setOutputCommandInfoFunction(OutputCommandInfoFunction* _outputCommandInfoF
  */
 static InputCharReadFunction* inputCharReadFunction=NULL;
 
+static GetValueSizeFunction* getValueSizeFunction=NULL;
+
 /**
  * @brief outputs token \p token
  * 
@@ -10342,16 +10344,7 @@ char getOperatorPrecedence(Mstring* operator){
 	}
 	return 0;
 }
-/**
- * @brief for storing formula elements
- * 
- */
-typedef struct Mformulaelement{
-	Mvaluereference* _operand; // an operand to apply the binary operator to
-	Mstring* _operator; // a (shortcut) binary operator 
-	struct Mformulaelement* _next;
-	struct Mformulaelement* _prev; // MDH@21MAY2019: unfortunately needed for moving back!!
-}Mformulaelement;
+
 /**
  * @brief returns a new formula element
  * 
@@ -14601,6 +14594,129 @@ bool settingApplied(char settingCharacter){
 	return false;
 }
 
+// MDH@03FEB2025: allow retrieving allocation history occupation frequencies
+
+/**
+ * @brief returns dynamic memory allocation statistics
+ * 
+ * @return Mvalue* 
+ */
+Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _allocationStatsMap=owned_map(__map(__FUNCTION__),owner);
+	if(NULL==_allocationStatsMap)return NULL;
+	unsigned long long allocationHistoryCounts[257],valueTypeCounts[256];
+	unsigned long long offered,refused,consumed,unmanaged;
+	Mallocationsize* allocationTypeSizes[256]; // the histogram of size counts for each of the data types
+	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSizeFunction,&offered,&refused,&consumed,&unmanaged);
+	if(memoryErrors)
+		q2outputMessage(M_ERROR_PREFIX,"Number of out of memory errors obtaining memory statistics: %llu.",memoryErrors);
+		if(appendedToMap(_allocationStatsMap,owner,"unmanaged",_getIntegerValue(unmanaged))!=M_TRUE)
+		q2outputError("Failed to report the amount of unmanaged dynamic memory");
+	Mmap* _allocationHistoryCacheMap=owned_map(__map("allocationHistoryCache"),owner);
+	if(_allocationHistoryCacheMap!=NULL){
+		if(appendedToMap(_allocationHistoryCacheMap,owner,"offered",_getIntegerValue(offered))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache offered count %llu.",offered);
+		if(appendedToMap(_allocationHistoryCacheMap,owner,"refused",_getIntegerValue(refused))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache refused count %llu.",refused);
+		if(appendedToMap(_allocationHistoryCacheMap,owner,"consumed",_getIntegerValue(consumed))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history freed index cache consumed count %llu.",consumed);
+		if(appendedToMap(_allocationStatsMap,owner,"allocation id cache",_getValueOfMap(disowned_map(_allocationHistoryCacheMap,owner)))!=M_TRUE){
+			free_map(_allocationHistoryCacheMap);
+			q2outputError("Failed to append allocation history freed index cache info to the allocation stats.");
+		}
+	}else
+		q2outputError("Failed to create the allocation history cache info map.");
+	char countindexString[20];
+	unsigned long long count,totalcount,bytes,totalbytes;
+	Mmap* _allocationHistoryCountsMap=owned_map(__map("allocationHistoryCounts"),owner);
+	if(_allocationHistoryCountsMap!=NULL){
+		totalcount=0;
+		for(int countIndex=0;countIndex<257;countIndex++){
+			count=allocationHistoryCounts[countIndex];
+			if(!count)continue;
+			totalcount+=(count*countIndex);
+			snprintf(countindexString,20,"%d",countIndex);
+			if(appendedToMap(_allocationHistoryCountsMap,owner,countindexString,_getIntegerValue(count))!=M_TRUE)
+				q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history count #%d.",countIndex);
+		}
+		if(prependedToMap(_allocationHistoryCountsMap,owner,"",_getIntegerValue(totalcount))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to append allocation history totalcount #%zzu.",totalcount);
+		if(appendedToMap(_allocationStatsMap,owner,"allocationhistorycounts",_getValueOfMap(disowned_map(_allocationHistoryCountsMap,owner)))!=M_TRUE){
+			free_map(_allocationHistoryCountsMap);
+			q2outputError("Failed to append allocation history counts to the allocation stats.");
+		}
+	}else
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history counts map.");
+	// I suppose it's probably best to show the histograms for each type
+	Mmap* _valueTypeHistogramsMap=owned_map(__map("valueTypeHistograms"),owner);
+	if(_valueTypeHistogramsMap!=NULL){
+		totalcount=0;
+		totalbytes=0;
+		Mallocationsize* typeSizes; 
+		for(int countIndex=0;countIndex<256;countIndex++){
+			// if no allocation type sizes available for this type, skip it
+			typeSizes=allocationTypeSizes[countIndex];
+			if(NULL==typeSizes)continue;
+			count=typeSizes[0].count; // the 'total count' across all histogram categories (=classes)
+			if(count>0){
+				totalcount+=count; // to ascertain the total count will be correct!!!!
+				// we can now create a map to be added
+				Mmap* _typeSizesMap=owned_map(__map("typeSizes"),owner);
+				if(NULL==_typeSizesMap)continue;
+				size_t categoryCount=typeSizes[0].class;
+				for(size_t categoryIndex=1;categoryIndex<=categoryCount;categoryIndex++){
+					snprintf(countindexString,20,"%d",typeSizes[categoryIndex].class);
+					if(appendedToMap(_typeSizesMap,owner,countindexString,_getIntegerValue(typeSizes[categoryIndex].count))!=M_TRUE)
+						q2outputMessage(M_ERROR_PREFIX,"Failed to register the number of allocations of type #%d of size '%s'.",countIndex,countindexString);		
+				}
+				// prepend the total number of bytes
+				if(prependedToMap(_typeSizesMap,owner,"",_getIntegerValue(typeSizes[0].count))!=M_TRUE)
+					q2outputMessage(M_ERROR_PREFIX,"Failed to register the total number of allocated bytes '%llu'.",typeSizes[0].count);
+				if(countIndex<128)
+					snprintf(countindexString,20,"-%c",-(countIndex-128));
+				else
+					snprintf(countindexString,20,"%c",countIndex-128);
+				if(appendedToMap(_valueTypeHistogramsMap,owner,countindexString,_getValueOfMap(disowned_map(_typeSizesMap,owner)))!=M_TRUE){
+					free_map(_typeSizesMap);
+					q2outputMessage(M_ERROR_PREFIX,"Failed to register the memory allocation information of '%s'.",countindexString);
+				}
+			}
+			// essential to free typeSizes
+			unmanaged_free(typeSizes,sizeof(Mallocationsize)*(typeSizes[0].class+1));
+			/* replacing showing the counts/bytes only
+			bytes=(allocationTypeSizes[countIndex]!=NULL?allocationTypeSizes[countIndex][0].class:0);
+			if(bytes)totalbytes+=bytes;
+			if(countIndex<128)
+				snprintf(countindexString,20,"-%c",-(countIndex-128));
+			else
+				snprintf(countindexString,20,"%c",countIndex-128);
+			// wrap count and bytes in a two-element value array
+			Marray* _array=owned_array(_getArray("Mmemstats",2,NULL),owner);
+			if(_array!=NULL){
+				assignValue(&_array->elements->values[0],_getIntegerValue(count));
+				assignValue(&_array->elements->values[1],_getIntegerValue(bytes));
+				if(appendedToMap(_valueTypeCountsMap,owner,countindexString,_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
+					q2outputMessage(M_ERROR_PREFIX,"Failed to append value type count #%d.",countIndex);
+			}
+			*/
+		}
+		Marray* _array=owned_array(_getArray("Mmemstats",2,NULL),owner);
+		if(_array!=NULL){
+			assignValue(&_array->elements->values[0],_getIntegerValue(totalcount));
+			assignValue(&_array->elements->values[1],_getIntegerValue(totalbytes));
+			if(prependedToMap(_valueTypeHistogramsMap,owner,"",_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
+				q2outputMessage(M_ERROR_PREFIX,"Failed to append value type totalcount #%zzu.",totalcount);
+		}
+		if(appendedToMap(_allocationStatsMap,owner,"valuetypehistograms",_getValueOfMap(disowned_map(_valueTypeHistogramsMap,owner)))!=M_TRUE){
+			free_map(_valueTypeHistogramsMap);
+			q2outputError("Failed to append value type counts to the allocation stats.");
+		}
+	}else
+		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history value type info map.");
+
+	return _getValueOfMap(disowned_map(_allocationStatsMap,owner));
+}
+
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
 // MDH@07DEC2020: added argument locale for setting the locale
 /**
@@ -14616,10 +14732,11 @@ bool settingApplied(char settingCharacter){
  * @param _reoutputTokenFunction 
  * @param _updateLastTokenAutocompletionTextFunction 
  * @param _outputCommandInfoFunction 
+ * @param _getValueSizeFunction
  * @return true on success
  * @return false on failure
  */
-bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
+bool shellInitialized(char const * const settingCharacters,char const * const locale,unsigned long long moduleDebugging,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction,GetValueSizeFunction _getValueSizeFunction){Mallocationowner owner=getOwner(__LINE__);
 
 	//reportNumberOfAllocations("shellInitialized 1");
 
@@ -14656,6 +14773,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(NULL==_reoutputTokenFunction)q2outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
 	if(NULL==_updateLastTokenAutocompletionTextFunction)q2outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
 	if(NULL==_outputCommandInfoFunction)q2outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
+	if(NULL==_getValueSizeFunction)q2outputWarning("No get value size function.");else getValueSizeFunction=_getValueSizeFunction;
 
 	//reportNumberOfAllocations("shellInitialized 5");
 
@@ -14666,6 +14784,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 	if(NULL==reoutputTokenFunction)q2outputWarning("No reoutput token function!");else q2outputInfo("Reoutput token function set!");
 	if(NULL==updateLastTokenAutocompletionTextFunction)q2outputWarning("No update last token auto completion text function!");else q2outputInfo("Update last token auto completion text function set!");
 	if(NULL==outputCommandInfoFunction)q2outputWarning("No output command info function!");else q2outputInfo("Output command info function set!");
+	if(NULL==getValueSizeFunction)q2outputWarning("No get value size function!");else q2outputInfo("Get value size function set!");
 
 	///q2outputWarning("Dit is een test");
 	//reportNumberOfAllocations("shellInitialized 6");

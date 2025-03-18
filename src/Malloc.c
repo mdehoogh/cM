@@ -142,12 +142,13 @@ static bool cacheAllocationIndex(allocationindex_t allocationIndex){
 }
 static allocationindex_t getCachedAllocationIndex(){
 	// if the cache is empty, can't return a freed allocation index
-	////if(allocationindexcache.notEmpty==0)
-	return UNAVAILABLE_ALLOCATION_INDEX;
-	allocationindexcache.consumed++; // another one consumed
-	allocationindex_t cachedAllocationIndex=allocationindexcache.freedindices[++allocationindexcache.tail];
-	// if the head and the tail are now equal, the cache is now empty
-	if(allocationindexcache.tail==allocationindexcache.head)allocationindexcache.notEmpty=0;
+	allocationindex_t cachedAllocationIndex=UNAVAILABLE_ALLOCATION_INDEX;
+	if(allocationindexcache.notEmpty){
+		allocationindexcache.consumed++; // another one consumed
+		cachedAllocationIndex=allocationindexcache.freedindices[++allocationindexcache.tail];
+		// if the head and the tail are now equal, the cache is now empty
+		if(allocationindexcache.tail==allocationindexcache.head)allocationindexcache.notEmpty=0;
+	}
 	return cachedAllocationIndex;
 }
 
@@ -743,23 +744,28 @@ unsigned long long obtainAllocationStats(
 						char* cptr=(char*)*ptr;
 						valueTypeSize=getValueSizeFunction(type,(void*)(cptr+sizeof(Malloc)));
 						///output("{%zu}",valueTypeSize);
-						if(!valueTypeSize)continue;
+						/// valueTypeSize should never be 0 if it does report
+						if(!valueTypeSize)
+							q2outputMessage(M_BUG_PREFIX,"Size of type %s'%c' unknown!",(type<0?"-":""),abs(type));
+						// determine the category (class) equal to valueTypeSize
 						typesizes=valuetypesizes[typeIndex];
-						if(NULL==typesizes){
+						if(NULL==typesizes){ // we need to create it
 							///outputChar('e');
-							void* rptr=unmanaged_calloc(2,sizeof(Mallocationsize));
+							typesizes=(Mallocationsize*)unmanaged_calloc(2,sizeof(Mallocationsize));
 							///outputChar('f');
-							if(NULL==rptr){result++;continue;}
+							if(NULL==typesizes){result++;continue;}
 							///output("=%p",rptr);
 							///outputChar('g');
-							valuetypesizes[typeIndex]=rptr;
-							categoryCount=1;
-							valuetypesizes[typeIndex][0].class=1;
-							valuetypesizes[typeIndex][0].count=valueTypeSize;
+							valuetypesizes[typeIndex]=typesizes;
+							// no need to compute categoryCount here! removing: categoryCount=1;
+							typesizes[0].class=1;
+							////typesizes[0].count=valueTypeSize;
 							///outputChar('h');
 							category=1;
-							valuetypesizes[typeIndex][1].class=valueTypeSize;
-							valuetypesizes[typeIndex][1].count=1;
+							/* incremented afterwards
+							typesizes[1].class=valueTypeSize;
+							typesizes[1].count=1;
+							*/
 						}else{
 							///outputChar('i');
 							///output("{%zu:%llu}",typesizes->class,typesizes->count);
@@ -770,22 +776,24 @@ unsigned long long obtainAllocationStats(
 							if(!category){ // the category does not yet exist!!
 								///outputChar('l');
 								categoryCount=typesizes[0].class+1;
-								void* rptr=unmanaged_realloc(valuetypesizes[typeIndex],categoryCount*sizeof(Mallocationsize),(categoryCount+1)*sizeof(Mallocationsize));
+								typesizes=(Mallocationsize*)unmanaged_realloc(typesizes,categoryCount*sizeof(Mallocationsize),(categoryCount+1)*sizeof(Mallocationsize));
 								///outputChar('m');
-								if(NULL==rptr){result++;continue;}
+								if(NULL==typesizes){result++;continue;}
 								///outputChar('n');
-								valuetypesizes[typeIndex]=rptr; // NOTE you have to do this first before setting updating the class!!!
-								valuetypesizes[typeIndex][0].class=categoryCount; // update the total category count
+								valuetypesizes[typeIndex]=typesizes; // NOTE you have to do this first before setting updating the class!!!
+								typesizes[0].class=categoryCount; // update the total category count
 								///outputChar('o');
 								category=categoryCount;
-								valuetypesizes[typeIndex][category].count=1; // initialize
-								/////////valuetypesizes[typeIndex][0].count=category;
-								valuetypesizes[typeIndex][category].class=valueTypeSize;
+								// initialize the new category
+								typesizes[category].class=valueTypeSize;
+								typesizes[category].count=0;
 								///outputChar('p');
-							}else // an existing category!!
-								valuetypesizes[typeIndex][category].count++; // increment the category count
-							valuetypesizes[typeIndex][0].count+=valueTypeSize; // update the total count
+							}
 						}
+						// update the frequency count of category
+						typesizes[category].count++;
+						// increment the total bytes count with valueTypeSize
+						typesizes[0].count+=valueTypeSize;
 						///outputChar('d');
 					}
 				}

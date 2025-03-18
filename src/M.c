@@ -7004,6 +7004,195 @@ void initializeM(){
 }
 
 /**
+* @brief returns the number of bytes occupied by value \p value of type \p type
+* 
+* @param type 
+* @param value 
+* @return size_t the number of bytes occupied by value \p value of type \p type 
+*/
+size_t getValueSize(int8_t type,void* value){
+ size_t result=0;
+ if(value!=NULL)
+ switch(type){
+	 case 'U': // undefined
+	 case 'X':
+	 {
+		 result=sizeof(Mvalue);
+		 break;
+	 }
+	 case 'W':
+	 {
+		 result=sizeof(Mfunctionmap);
+		 break;
+	 }
+	 case '+':
+	 {
+		 result=sizeof(Mfunctionmapelement);
+		 break;
+	 }
+	 case 'O':
+	 {
+		 result=sizeof(Mtoken);
+		 break;
+	 }
+	 case 'K':
+	 {
+		 result=sizeof(Mcommand);
+		 break;
+	 }
+	 case '7':
+	 {
+		 result=sizeof(Mtokenautocompletiontext);
+		 break;
+	 }
+	 case '5':
+	 {
+		 result=sizeof(Mvaluereference);
+		 break;
+	 }
+	 case '4':
+	 {
+		 result=sizeof(Mformulaelement);
+		 break;
+	 }
+	 case '=':
+	 {
+		 result=sizeof(Mfunction);
+		 break;
+	 }
+	 case 'C':
+	 {
+		 result=sizeof(Mdecimalcontext);
+		 break;
+	 }
+	 case 'E':
+	 {
+		 result=sizeof(Menvironment);
+	 }
+	 case 'e':
+	 {
+		 result=sizeof(MdecimalcontextElement);
+		 break;
+	 }
+	 case 'c':
+	 {
+		 result=sizeof(char*);
+		 break;
+	 }
+	 case 'V':
+	 {
+		 result=sizeof(Mvariable);
+		 break;
+	 }
+	 case 'D':
+	 {
+		 result=sizeof(Mdecimal);
+		 break;
+	 }
+	 case 'I':
+	 {
+		 result=sizeof(Minteger);
+		 break;
+	 }
+	 case 'B':
+	 {
+		 result=sizeof(Mbiginteger);
+		 break;
+	 }
+	 case 'R':
+	 {
+		 result=sizeof(Mrational);
+		 break;
+	 }
+	 case 'Q':
+	 {
+		 result=sizeof(Mreference);
+		 break;
+	 }
+	 case 'L':
+	 {
+		 result=sizeof(Mlist);
+		 break;
+	 }
+	 case 'l':
+	 {
+		 result=sizeof(Mlistelement);
+		 break;
+	 }
+	 case 'M':
+	 {
+		 result=sizeof(Mmap);
+		 break;
+	 }
+	 case 'm':
+	 {
+		 result=sizeof(Mmapelement);
+		 break;
+	 }
+	 case 'A':
+	 {
+		 result=sizeof(Marray);
+		 break;
+	 }
+	 case 'a':
+	 {
+		 break;
+	 }
+	 case -'a':
+	 {
+		 Marrayelements* arrayelements=(Marrayelements*)value;
+		 ////output("Number of array elements: %llu.\n",arrayelements->count);
+		 result=sizeof(Mvalue*)*arrayelements->count+sizeof(unsigned long long);
+		 break;
+	 }
+	 case 'F':
+	 {
+		 result=sizeof(Mfloat);
+		 break;
+	 }
+	 case 'f':
+	 {
+		 result=sizeof(Mfile);
+		 break;
+	 }
+	 case 'S':
+	 {
+		 result=sizeof(Mstring);
+		 break;
+	 }
+	 case 's': // Mchars
+	 {
+		 result=sizeof(Mchars); // TODO is this correct?????
+		 break;
+	 }
+	 case -'l': // Mlistelement
+	 {
+		 result=sizeof(Mlistelement);
+		 break;
+	 }
+	 case -'\'':
+	 case -'"': // result of _strdup()
+	 {
+		 result=sizeof(char)*(1+strlen((char*)value));
+		 break;
+	 }
+	 case -'t': // Mtimezones which is a NULL terminated list of pointers
+	 {
+		 char** timezonenames=(char**)value;
+		 while(*timezonenames){result+=sizeof(char*)+strlen(*timezonenames);timezonenames++;}
+		 result+=sizeof(char*);
+		 break;
+	 }
+	 case -'C': // Mregisteredcommands, problem is knowing how many there are!!
+	 {
+
+		 break;
+	 }
+ }
+ return result;
+}
+
+/**
  * @brief main entry point of M
  * 
  * @param argc 
@@ -7109,7 +7298,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
 	// MDH@07DEC2020: try to switch to the local locale (passing empty string as locale)
-	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutoCompletionText,NULL)){ // ascertain to have an shell environment!!!
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),"",Debugging,inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutoCompletionText,NULL,getValueSize)){ // ascertain to have an shell environment!!!
 		q2outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);
