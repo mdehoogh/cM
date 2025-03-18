@@ -412,14 +412,6 @@ Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){Mallocationowner owne
 
 // CONVERSION FROM OTHER M TYPES
 // MDH@24JUN2019: used an Mlist before to store the remainders, but because Mlist uses Mvalue instances, which we do not have access to here anymore (we have to create our own list for storing the remainders)
-/**
- * @brief a big integer list element
- * 
- */
-typedef struct MbigintegerListelement{
-	Mbiginteger* _biginteger;
-	struct MbigintegerListelement* _next;
-}MbigintegerListelement;
 
 // MDH@20MAY2020: you can't free what isn't yours to start with, we can make it easy by allowing passing in the owner id of the big integer list element
 /**

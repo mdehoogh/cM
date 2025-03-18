@@ -762,8 +762,8 @@ unsigned long long obtainAllocationStats(
 							////typesizes[0].count=valueTypeSize;
 							///outputChar('h');
 							category=1;
-							/* incremented afterwards
 							typesizes[1].class=valueTypeSize;
+							/* incremented afterwards
 							typesizes[1].count=1;
 							*/
 						}else{

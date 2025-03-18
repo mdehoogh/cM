@@ -14648,8 +14648,9 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 	}else
 		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history counts map.");
 	// I suppose it's probably best to show the histograms for each type
+	Mmap* _valueTypeBytesMap=owned_map(__map("valueTypeBytes"),owner);
 	Mmap* _valueTypeHistogramsMap=owned_map(__map("valueTypeHistograms"),owner);
-	if(_valueTypeHistogramsMap!=NULL){
+	if(_valueTypeBytesMap!=NULL||_valueTypeHistogramsMap!=NULL){
 		totalcount=0;
 		totalbytes=0;
 		Mallocationsize* typeSizes; 
@@ -14669,14 +14670,15 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 					if(appendedToMap(_typeSizesMap,owner,countindexString,_getIntegerValue(typeSizes[categoryIndex].count))!=M_TRUE)
 						q2outputMessage(M_ERROR_PREFIX,"Failed to register the number of allocations of type #%d of size '%s'.",countIndex,countindexString);		
 				}
-				// prepend the total number of bytes
-				if(prependedToMap(_typeSizesMap,owner,"",_getIntegerValue(typeSizes[0].count))!=M_TRUE)
-					q2outputMessage(M_ERROR_PREFIX,"Failed to register the total number of allocated bytes '%llu'.",typeSizes[0].count);
+				totalbytes+=typeSizes[0].count; // keep track of the total number of bytes
+				// append the total number of bytes to _valueTypeBytesMap
 				if(countIndex<128)
 					snprintf(countindexString,20,"-%c",-(countIndex-128));
 				else
 					snprintf(countindexString,20,"%c",countIndex-128);
-				if(appendedToMap(_valueTypeHistogramsMap,owner,countindexString,_getValueOfMap(disowned_map(_typeSizesMap,owner)))!=M_TRUE){
+				if(_valueTypeBytesMap!=NULL&&appendedToMap(_valueTypeBytesMap,owner,countindexString,_getIntegerValue(typeSizes[0].count))!=M_TRUE)
+					q2outputMessage(M_ERROR_PREFIX,"Failed to register the total number of allocated bytes '%llu'.",typeSizes[0].count);
+				if(_valueTypeHistogramsMap!=NULL&&appendedToMap(_valueTypeHistogramsMap,owner,countindexString,_getValueOfMap(disowned_map(_typeSizesMap,owner)))!=M_TRUE){
 					free_map(_typeSizesMap);
 					q2outputMessage(M_ERROR_PREFIX,"Failed to register the memory allocation information of '%s'.",countindexString);
 				}
@@ -14700,6 +14702,9 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 			}
 			*/
 		}
+		if(_valueTypeBytesMap!=NULL&&prependedToMap(_valueTypeBytesMap,owner,"",_getIntegerValue(totalbytes))!=M_TRUE)
+			q2outputMessage(M_ERROR_PREFIX,"Failed to register the total number of allocated bytes '%llu'.",totalbytes);
+		/*
 		Marray* _array=owned_array(_getArray("Mmemstats",2,NULL),owner);
 		if(_array!=NULL){
 			assignValue(&_array->elements->values[0],_getIntegerValue(totalcount));
@@ -14707,9 +14712,16 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 			if(prependedToMap(_valueTypeHistogramsMap,owner,"",_getValueOfArray(disowned_array(_array,owner)))!=M_TRUE)
 				q2outputMessage(M_ERROR_PREFIX,"Failed to append value type totalcount #%zzu.",totalcount);
 		}
-		if(appendedToMap(_allocationStatsMap,owner,"valuetypehistograms",_getValueOfMap(disowned_map(_valueTypeHistogramsMap,owner)))!=M_TRUE){
+		*/
+		if(_valueTypeBytesMap!=NULL&&			
+			appendedToMap(_allocationStatsMap,owner,"bytes",_getValueOfMap(disowned_map(_valueTypeBytesMap,owner)))!=M_TRUE){
+			free_map(_valueTypeBytesMap);
+			q2outputError("Failed to append the number of bytes map to the memory allocation stats.");
+		}
+		if(_valueTypeHistogramsMap!=NULL&&
+			appendedToMap(_allocationStatsMap,owner,"blocks",_getValueOfMap(disowned_map(_valueTypeHistogramsMap,owner)))!=M_TRUE){
 			free_map(_valueTypeHistogramsMap);
-			q2outputError("Failed to append value type counts to the allocation stats.");
+			q2outputError("Failed to append value type block frequency counts map to the allocation stats.");
 		}
 	}else
 		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history value type info map.");

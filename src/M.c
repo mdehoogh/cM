@@ -7055,6 +7055,11 @@ size_t getValueSize(int8_t type,void* value){
 		 result=sizeof(Mformulaelement);
 		 break;
 	 }
+	 case 'b':
+	 {
+		result=sizeof(MbigintegerListelement);
+		break;
+	 }
 	 case '=':
 	 {
 		 result=sizeof(Mfunction);

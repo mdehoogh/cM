@@ -110,3 +110,12 @@ Mdecimal* _getJSONDecimal(Mstring const * const _decimalJSON);
 void outputDecimalStatus(uint32_t status);
 
 Mdecimal* _getDecimalSqrt(Mdecimal const * const _decimal);
+
+/**
+ * @brief a big integer list element
+ * 
+ */
+typedef struct MbigintegerListelement{
+	Mbiginteger* _biginteger;
+	struct MbigintegerListelement* _next;
+}MbigintegerListelement;
