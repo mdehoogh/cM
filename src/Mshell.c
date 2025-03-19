@@ -14617,10 +14617,12 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 
 	Mmap* _allocationsMap=owned_map(__map("allocations"),owner);
 	if(_allocationsMap!=NULL){
-		if(appendedToMap(_allocationsMap,owner,"count",_getIntegerValue(allocationCount))!=M_TRUE)
-			q2outputError("Failed to report the managed allocation count");
-		if(appendedToMap(_allocationsMap,owner,"counted",_getIntegerValue(allocationsCounted))!=M_TRUE)
-			q2outputError("Failed to report the number of counted allocations");
+		if(appendedToMap(_allocationsMap,owner,"max id",_getIntegerValue(allocationCount))!=M_TRUE)
+			q2outputError("Failed to report the maximum allocation id");
+		if(appendedToMap(_allocationsMap,owner,"active",_getIntegerValue(allocationsCounted))!=M_TRUE)
+			q2outputError("Failed to report the number of active allocations");
+		if(appendedToMap(_allocationsMap,owner,"bytes",_getIntegerValue(allocationsCounted*getAllocationRecordSize()))!=M_TRUE)
+			q2outputError("Failed to report the number of active allocations");
 		if(appendedToMap(_allocationStatsMap,owner,"allocations",_getValueOfMap(disowned_map(_allocationsMap,owner)))!=M_TRUE)
 		q2outputError("Failed to report the managed allocation counts");
 	}

@@ -17,8 +17,10 @@ typedef struct{
     unsigned long long count; // how many we have of this 'size'
 }Mallocationsize;
 
+size_t getAllocationRecordSize();
+
 typedef size_t GetValueSizeFunction(int8_t type,void* value);
-typedef unsigned long long GetAllocCountFunction(int8_t type);
+typedef unsigned long long GetAllocCountFunction(int8_t type,void* value);
 
 /*
 // when dealing with a variable size allocation type, we're storing 

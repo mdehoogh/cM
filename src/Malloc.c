@@ -40,6 +40,7 @@ typedef struct Malloc{
 	Mallocationowner owner; // MDH@19MAY2020: storing the owner id as well
 	signed char allocationType;
 }Malloc;
+size_t getAllocationRecordSize(){return sizeof(Malloc);}
 /**
  * @brief temporary type definition of a allocation type and owner 
  * 
@@ -676,13 +677,13 @@ unsigned long long obtainAllocationStats(
 		unsigned long long *refused,
 		unsigned long long *consumed,
 		unsigned long long *unmanaged,
-		unsigned long long *allocationCount,
+		unsigned long long *allocationMaxId,
 		unsigned long long *allocationsCounted){
 	// MDH@17MAR2025: let's report any local allocation as well!!!!
 	///outputChar('1');
 	*unmanaged=getNumberOfUnmanagedBytes(false);
 	*allocationsCounted=0;
-	*allocationCount=allocations.l;
+	*allocationMaxId=allocations.l-1;
 	*offered=allocationindexcache.offered;
 	*refused=allocationindexcache.refused;
 	*consumed=allocationindexcache.consumed;
@@ -713,6 +714,7 @@ unsigned long long obtainAllocationStats(
 	allocationnodes_t* allocationnodes;
 	unsigned long long countedAllocations=0;
 	do{
+		///output("(%d,%d,%d)",indices[0],indices[1],indices[2]);
 		///outputChar('A');
 		// determine allocationpointers based on the current indices
 		allocationnodes=_allocationnodesRoot;
@@ -724,10 +726,9 @@ unsigned long long obtainAllocationStats(
 		// when NULLs field equals 0
 		if(allocationnodes!=NULL){
 			///outputChar('(');
-			if(allocationnodes->NULLs||allocationnodes->nodes[0]!=NULL) // either not empty or full
-				occupationcounts[256-allocationnodes->NULLs]++;
-			else // empty
-				occupationcounts[0]++;
+			int occupied=(allocationnodes->NULLs||allocationnodes->nodes[0]!=NULL?256-allocationnodes->NULLs:0);
+			///output("[%d]",occupied);
+			occupationcounts[occupied]++;
 			///outputChar('a');
 			// now determine the value type of the pointers
 			Malloc** ptr=(Malloc**)((allocationpointers_t*)allocationnodes)->pointers; // NOTE those should match
@@ -738,23 +739,23 @@ unsigned long long obtainAllocationStats(
 			Mallocationsize* typesizes;
 			///outputChar('b');
 			for(int index=255;index>=0;index--,ptr++){
-				///output("[%d",index);
+				///output("%d",index);
 				if(*ptr!=NULL){
+					occupied--;
 					///outputChar(':');
 					type=(*ptr)->allocationType;
 					typeIndex=128+type;
 					///output("%d",typeIndex);
 					valuetypecounts[typeIndex]++;
 					///outputChar('c');
-					countedAllocations+=(getAllocCountFunction!=NULL?getAllocCountFunction(type):1);
+					char* cptr=(char*)*ptr;
+					countedAllocations+=(getAllocCountFunction!=NULL?getAllocCountFunction(type,(void*)(cptr+sizeof(Malloc))):1);
 					////output(" %llu",*allocationsCounted);
 					if(getValueSizeFunction!=NULL){
-						char* cptr=(char*)*ptr;
 						valueTypeSize=getValueSizeFunction(type,(void*)(cptr+sizeof(Malloc)));
 						///output("{%zu}",valueTypeSize);
 						/// valueTypeSize should never be 0 if it does report
-						if(!valueTypeSize)
-							q2outputMessage(M_WARNING_PREFIX,"Size of type %s'%c' unknown!",(type<0?"-":""),abs(type));
+						////if(!valueTypeSize)q2outputMessage(M_WARNING_PREFIX,"Size of type %s'%c' unknown!",(type<0?"-":""),abs(type));
 						// determine the category (class) equal to valueTypeSize
 						typesizes=valuetypesizes[typeIndex];
 						if(NULL==typesizes){ // we need to create it
@@ -804,9 +805,12 @@ unsigned long long obtainAllocationStats(
 						typesizes[0].count+=valueTypeSize;
 						///outputChar('d');
 					}
-				}
+					///outputChar('+');
+				}///else outputChar('-');
 				///outputChar(']');
 			}
+			if(occupied>0)
+				q2outputMessage(M_BUG_PREFIX,"%d allocation pointers less found than expected.",occupied);
 			///outputChar(')');
 		}
 		///outputChar('C');
@@ -815,11 +819,17 @@ unsigned long long obtainAllocationStats(
 		while(--level>=0){
 			if(indices[level]>0){indices[level]--;break;}
 			// indices[level] must be zero
-			if(level==0){*allocationsCounted=countedAllocations;return result;} // if this is the top-level we've traversed the entire tree
+			if(level==0){
+				*allocationsCounted=countedAllocations;
+				///output("%llu\n",countedAllocations);
+				return result;
+			} // if this is the top-level we've traversed the entire tree
 			indices[level]=255;
 		}
+		///output("%llu\n",countedAllocations);
 		///outputChar('D');
 	}while(1);
+	///output("%llu\n",countedAllocations);
 	///outputChar('E');
 	///output("%llu",result);
 	return result;

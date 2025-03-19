@@ -7009,9 +7009,9 @@ void initializeM(){
  * @param type 
  * @return unsigned long long the number of allocations required for type \p type
  */
-unsigned long long getAllocCount(int8_t type){
-	if(type=='S')return 2;
+unsigned long long getAllocCount(int8_t type,void* value){
 	if(type==-'s')return 0;
+	if(type=='S'&&((Mstring*)value)->_chars!=NULL)return 2;
 	return 1;
 }
 /**
