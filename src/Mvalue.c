@@ -3221,6 +3221,26 @@ size_t q2outputValue(char const * const prefix,Mvalue const * const value, char 
 }
 
 /**
+ * @brief outputs value reference \p valuereference with prefix \p prefix and postfix \p suffix
+ * 
+ * @param prefix 
+ * @param valuereference 
+ * @param suffix 
+ * @return size_t the number of characters output
+ */
+size_t outputValueReference(char const * const prefix,Mvaluereference* valuereference,char const * const suffix){
+	size_t result=0;
+	if(prefix!=NULL)result+=output("%s",prefix);
+	if(valuereference!=NULL){
+		if(valuereference->_name!=NULL)result+=output("%s",valuereference->_name->chars);
+		if(valuereference->_itemid!=NULL)result+=outputValueReference(".",valuereference->_itemid,NULL);
+		if(valuereference->_value!=NULL)result+=outputValue("=",valuereference->_value,NULL);
+	}
+	if(suffix!=NULL)result+=output("%s",suffix);
+	return result;
+}
+
+/**
  * @brief returns the integer stored in M value \p _value
  * @details returns M_LL_INVALID if \p _value cannot be converted to an integer
  * @param _value 

@@ -6872,7 +6872,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		expressionToken=nextEnvironmentExpressionToken();
 	}
 	if(amVerboseDebugging())
-		{if(unaryOperators)output("Unary operators: '%s'.\n",string(unaryOperators));else output("No unary operators!\n");}
+	{if(unaryOperators!=NULL)output("Unary operators: '%s'.\n",string(unaryOperators));else output("No unary operators!\n");}
 	// ASSERT unary operators extracted
 
 	if(expressionToken!=NULL){
@@ -7367,7 +7367,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 
 		// apply the unary operators (backwards)
 		// MDH@17NOV2019: why is the unary operator applied to the _value instead of what _valueReference references?????
-		size_t l=(unaryOperators?string_length(unaryOperators):0);
+		size_t l=(unaryOperators!=NULL?string_length(unaryOperators):0);
 		if(l>0){
 			Mvalue* referencedValue;
 			char unaryOperator;
@@ -7409,7 +7409,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		}else
 		if(amVerboseDebugging())
 			q2outputInfo("No unary operators to apply!");
-		
+
+		if(unaryOperators!=NULL)FREE_STRING(unaryOperators,owner); // MDH@22MAR2025: thanks to mmstats() reporting discovered memory leak
+
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=nextEnvironmentExpressionToken();
 

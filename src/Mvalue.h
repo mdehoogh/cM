@@ -58,7 +58,7 @@ Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Malloc
 #else
 #define FREE_VALUEREFERENCE(_valuereference,owner_valuereference) free_valuereference(_valuereference)
 #endif
-
+size_t outputValueReference(char const * const prefix,Mvaluereference* valuereference,char const * const suffix);
 
 // a variable is a named value of a certain value type
 typedef struct Mvariable{

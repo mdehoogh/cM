@@ -653,6 +653,17 @@ unsigned long long getAllocationsRemembered(){
 unsigned long long getAllocationsFreed(){
 	return allocationsFreed;
 }
+
+/**
+ * @brief the (module local) names of the modules in the same order as the abbreviations stored in MODULES
+ * 
+ */
+static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue",
+	"Msystem","Mtime","Miterator","Marray","Mlist","Moperations","Mmatrix","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
+	/**
+	 * @brief the (module local) text representation of the sign of the type field in the owner structure
+	 * 
+	 */	
 /**
  * @brief returns dynamic memory allocation statistics through its parameters
  * 
@@ -748,11 +759,17 @@ unsigned long long obtainAllocationStats(
 					///output("%d",typeIndex);
 					valuetypecounts[typeIndex]++;
 					///outputChar('c');
-					char* cptr=(char*)*ptr;
-					countedAllocations+=(getAllocCountFunction!=NULL?getAllocCountFunction(type,(void*)(cptr+sizeof(Malloc))):1);
+					void* contentsptr=((char*)*ptr)+sizeof(Malloc);
+					// report any active local allocation
+					Mallocationowner owner=(*ptr)->owner;
+					if(owner.global==0){
+						q2outputMessage(M_WARNING_PREFIX,"Active local allocation of type %s'%c' at %s:%d",(type<0?"-":""),(type<0?-type:type),MODULE_NAMES[owner.module],owner.id);
+						//if(type=='S')output("\tcontents: '%s'.\n",string((Mstring*)(cptr+sizeof(Malloc))));
+					}
+					countedAllocations+=(getAllocCountFunction!=NULL?getAllocCountFunction(type,contentsptr,owner.global==0):1);
 					////output(" %llu",*allocationsCounted);
 					if(getValueSizeFunction!=NULL){
-						valueTypeSize=getValueSizeFunction(type,(void*)(cptr+sizeof(Malloc)));
+						valueTypeSize=getValueSizeFunction(type,contentsptr,getAllocCountFunction==NULL&&owner.global==0);
 						///output("{%zu}",valueTypeSize);
 						/// valueTypeSize should never be 0 if it does report
 						////if(!valueTypeSize)q2outputMessage(M_WARNING_PREFIX,"Size of type %s'%c' unknown!",(type<0?"-":""),abs(type));
@@ -853,16 +870,6 @@ typedef struct{
 
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_ALLOC,id};}
 
-/**
- * @brief the (module local) names of the modules in the same order as the abbreviations stored in MODULES
- * 
- */
-static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue",
-"Msystem","Mtime","Miterator","Marray","Mlist","Moperations","Mmatrix","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
-/**
- * @brief the (module local) text representation of the sign of the type field in the owner structure
- * 
- */
 static char const * const DISOWNED_FLAG_TEXTS[]={"","-"};
 /**
  * @brief the (module local) text representation of the global flag in the owner structure

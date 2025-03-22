@@ -7003,13 +7003,46 @@ void initializeM(){
 	// should do whatever needs doing, before the REPL is started in main()
 }
 
+static void showContents(int8_t type,void* value){
+	///if(type!='S'||type!='V'||type!=-'\''||type!='M')return;
+	output("\tContents: ");
+	// TODO allow displaying other contents as well!!
+	switch(type){
+		case 'S':{output("'%s'",string((Mstring*)value));break;}
+		case 'V':{outputValue("'",(Mvalue*)value,"'");break;}
+		case -'\'':{output("'%s'",(char*)value);break;}
+		case 'M':{outputMap(NULL,(Mmap*)value,NULL);break;}
+		case 'm':
+		{
+			output("%s",((Mmapelement*)value)->_variable->_name->chars);
+			outputValue(":",((Mmapelement*)value)->_variable->_value,NULL);
+			break;
+		}
+		case '4':
+		{
+			Mstring* operator=((Mformulaelement*)value)->_operator;
+			if(operator!=NULL)output("%s",string(operator));else output(".");
+			outputValueReference("(",((Mformulaelement*)value)->_operand,")");
+			break;
+		}
+		case '5':
+		{
+			outputValueReference("(",(Mvaluereference*)value,")");
+			break;
+		}
+		default:
+			outputChar('?');
+	}
+	output("\n");
+}
 /**
  * @brief returns the number of allocations required for type \p type
  * 
  * @param type 
  * @return unsigned long long the number of allocations required for type \p type
  */
-unsigned long long getAllocCount(int8_t type,void* value){
+unsigned long long getAllocCount(int8_t type,void* value,bool showValue){
+	if(showValue)showContents(type,value);
 	if(type==-'s')return 0;
 	if(type=='S'&&((Mstring*)value)->_chars!=NULL)return 2;
 	return 1;
@@ -7021,7 +7054,8 @@ unsigned long long getAllocCount(int8_t type,void* value){
 * @param value 
 * @return size_t the number of bytes occupied by value \p value of type \p type 
 */
-size_t getValueSize(int8_t type,void* value){
+size_t getValueSize(int8_t type,void* value,bool showValue){
+	if(showValue)showContents(type,value);
 	size_t result=0;
 	if(value!=NULL)
 	switch(type){
