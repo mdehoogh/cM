@@ -52,10 +52,11 @@ typedef Malloc *Mallocationtypeowner; // a bit weird though to have to do it thi
  */
 struct{
 	size_t nulled; // MDH@17JAN2023: keep track of the number of NULLed pointers as well as the amount removed so far (that end up at the end of l allocated pointers)
-	size_t l; // the number of allocation types stored
+	size_t l; // MDH@23MAR2025: now the max allocation id
+	size_t ownercount; // the number of local owners registered
 	size_t size; // the total number of available allocation pointers
 	Mallocationtypeowner* _owners; // the allocation Malloc pointers // replacing: type owners
-}allocations={0,0,0,NULL};
+}allocations={0,0,0,0,NULL};
 
 /**
  * @brief the total number of child nodes
@@ -103,10 +104,20 @@ typedef struct allocationpointers_t{
  * 
  */
 allocationnodes_t* _allocationnodesRoot=NULL; // the global variable storing the allocations
-unsigned long long allocationsSet=0,allocationsFreed=0;
 /**
- * @brief all 31 bits set means that we haven't been able to store the allocation pointer at some valid index
- * @details if we didn't manage to find a spot to register the Malloc pointer at we return UNAVAILABLE_ALLOCATION_INDEX
+ * @brief the total number of managed allocations set
+ * 
+ */
+unsigned long long allocationsSet=0;
+/**
+ * @brief the total number of managed allocations freed
+ * 
+ */
+unsigned long long allocationsFreed=0;
+/**
+ * @brief all 32 bits not set means that we haven't been able to store the allocation pointer at some valid index
+ * @details if we didn't manage to find a place to store the Malloc pointer at we return UNAVAILABLE_ALLOCATION_INDEX
+ *          this means that the first managed allocation (to receive 0 as allocationIndex) can never be freed, so should be part of initializating M
  * 
  */
 static const allocationindex_t UNAVAILABLE_ALLOCATION_INDEX=0; // replacing: {.index=0};
@@ -126,14 +137,15 @@ static struct{
 }allocationindexcache={};
 /**
  * @brief tries to store the freed allocation index \p allocationIndex in allocationindexcache 
- * 
+ * @details allocationindexcache.freedindices is used as a cyclic buffer with allocation indices added at the head and removed from the tail (for reuse)
+ *          when allocationindexcache.head equals allocationindexcache.tail and allocation.notEmpty equals 1 the cyclic buffer is full!!!
  * @param allocationIndex 
  */
 static bool cacheAllocationIndex(allocationindex_t allocationIndex){
 	assert(allocationIndex!=UNAVAILABLE_ALLOCATION_INDEX);
 	allocationindexcache.offered++; // another allocation index offered
 	// if the cache is full we have to refuse
-	if(allocationindexcache.notEmpty!=0&&allocationindexcache.head==allocationindexcache.tail){ // cache is full
+	if(allocationindexcache.head==allocationindexcache.tail&&allocationindexcache.notEmpty!=0){ // cache is full
 		allocationindexcache.refused++;
 		return false;
 	}
@@ -141,14 +153,20 @@ static bool cacheAllocationIndex(allocationindex_t allocationIndex){
 	allocationindexcache.notEmpty=1; // for sure no longer empty
 	return true;
 }
+/**
+ * @brief returns the first queued allocation index from the buffer of freed allocation indexes on success, or UNAVAILABLE_ALLOCATION_INDEX on failure
+ * 
+ * @return allocationindex_t the first queued allocation index removed from the cyclic buffer stored in allocationindexcache.freedindices if any, or UNAVAILABLE_ALLOCATION_INDEX on failure
+ */
 static allocationindex_t getCachedAllocationIndex(){
 	// if the cache is empty, can't return a freed allocation index
 	allocationindex_t cachedAllocationIndex=UNAVAILABLE_ALLOCATION_INDEX;
-	if(allocationindexcache.notEmpty){
+	if(allocationindexcache.notEmpty!=0){
 		allocationindexcache.consumed++; // another one consumed
 		cachedAllocationIndex=allocationindexcache.freedindices[++allocationindexcache.tail];
 		// if the head and the tail are now equal, the cache is now empty
-		if(allocationindexcache.tail==allocationindexcache.head)allocationindexcache.notEmpty=0;
+		if(allocationindexcache.tail==allocationindexcache.head)
+			allocationindexcache.notEmpty=0;
 	}
 	return cachedAllocationIndex;
 }
@@ -223,10 +241,10 @@ static bool updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
 	return result;
 }
 /**
- * @brief updates \p indices to contain the byte elements of allocationIndex
+ * @brief updates \p indices to contain the constituent integer parts of \p allocationIndex
  * 
- * @param allocationIndex 
- * @param indices 
+ * @param allocationIndex the unique integer id of an allocation
+ * @param indices contains the constituent integer parts of \p allocationIndex on return
  */
 static void obtainAllocationIndices(allocationindex_t allocationIndex,uint8_t indices[ALLOCATION_INDEX_BYTES]){
 	int level=ALLOCATION_INDEX_BYTES;
@@ -239,10 +257,18 @@ static void obtainAllocationIndices(allocationindex_t allocationIndex,uint8_t in
 	}
 }
 /**
- * @brief sets the allocation index of _allocation
- * 
- * @param _allocation 
- * @return uint32_t 
+ * @brief sets the allocation index of \p _alloc to a unique allocation (integer) id
+ * @details returns:
+ *          0: success
+ *          1: \p _alloc equals NULL
+ *          2: unable to store allocation indices (allocation index management uninitialized)
+ *          3: failed to update the current nodes index storing an allocation pointer
+ *          4: N/A
+ *          5: full application pointer array
+ *          6: no available places left in allocation pointers array (bug)
+ *          7: no available allocation pointer elements found (bug)
+ * @param _alloc
+ * @return uint8_t the error code, 0 on success, 1 when \p _alloc is NULL, 2 when there are no allocation nodes available for storing the allocation pointers,
  */
 static uint8_t setAllocationIndex(Malloc* const _alloc){
 	if(NULL==_alloc)return 1;
@@ -362,7 +388,7 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 		output("<Number of deteted NULLs in pointers node: %d>",count2);
  	 */
 		if(!allocationpointers->NULLs&&allocationpointers->pointers[0]!=NULL){
-			output("%s%sNo NULLs left in allocation history pointers record!\n",M_BUG_PREFIX,M_MESSAGE_PREFIX);
+			q2outputBug("No NULLs left in allocation history pointers record!");
 			///if(!count2)
 			return 6;
 		}
@@ -377,7 +403,7 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 				allocationpointers->firstnullpointerindex--; // going back is more likely to find a NULL element
 			///output(":%llu",allocationpointers->firstnullpointerindex);
 			if(!--count){
-				q2outputMessage(M_BUG_PREFIX,"No available allocation pointer elements found.");
+				q2outputBug("No available allocation pointer elements found.");
 				return 7;
 			}
 		}
@@ -475,10 +501,11 @@ static uint8_t setAllocationIndex(Malloc* const _alloc){
 }
 /**
  * @brief replaces the allocation with index \p allocationIndex by \p _newalloc
- * 
- * @param _newalloc 
- * @param allocationIndex 
- * @return uint8_t zero on success, nonzero on failure
+ * @details if the allocation pointer stored at location \p allocationIndex does not match \p _alloc a bug is reported
+ * @param _alloc the original allocation pointer
+ * @param _newalloc the allocation pointer to replace \p _alloc
+ * @param allocationIndex the unique allocation id of \p _alloc
+ * @return uint8_t 0 on success, 1 when \p _alloc equals NULL
  */
 static uint8_t replaceAllocationAtIndex(Malloc const * const _alloc,allocationindex_t allocationIndex,Malloc const * const _newalloc){
 	if(NULL==_alloc)return 1;
@@ -500,6 +527,56 @@ static uint8_t replaceAllocationAtIndex(Malloc const * const _alloc,allocationin
 	}
 	return 0;
 }
+
+/**
+ * @brief the (module local) names of the modules in the same order as the abbreviations stored in MODULES
+ * 
+ */
+static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue",
+	"Msystem","Mtime","Miterator","Marray","Mlist","Moperations","Mmatrix","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
+
+/**
+ * @brief unregisters local allocation \p alloc
+ * 
+ * @param alloc 
+ * @return true on success
+ * @return false on failure
+ */
+static bool unregisterLocalAllocation(Malloc* const alloc){
+	// only when it's actually a local and registered allocation pointer should be we look for it and remove it
+	if(alloc!=NULL){ // defined
+		if(!alloc->owner.global){ // and considered local
+			// locate it
+			long long allocationIndex=allocations.ownercount;
+			while(--allocationIndex>=0&&allocations._owners[allocationIndex]!=alloc)
+				;
+			if(allocationIndex>=0){ // found
+				allocations._owners[allocationIndex]=NULL;
+				// normalize allocations.ownercount so that the last registered local allocation pointer is not NULL!!!
+				if(allocationIndex+1==allocations.ownercount){
+					while(--allocationIndex>=0&&NULL==allocations._owners[allocationIndex])
+						;
+					allocations.ownercount=allocationIndex+1;
+					q2output("Local allocation pointer counter lowered to %zu.\n",allocations.ownercount);
+				}
+				q2output("Local allocation pointer owned by %s:%d with id %llu unregistered!\n",MODULE_NAMES[alloc->owner.module],alloc->owner.id,alloc->allocationIndex); // DEBUGGING
+				return true;
+			}
+			q2output("%s","Assumed registered local allocation not found!\n"); // DEBUGGING
+			// allocation pointer not registered!!
+			if(alloc->owner.id>0)
+				q2outputMessage(M_BUG_PREFIX,"Failed to locate and unregister local allocation with id %llu owned by %s:%d",alloc->allocationIndex,MODULE_NAMES[alloc->owner.module],alloc->owner.id);
+		}else
+			q2outputBug("Allocation pointer to unregister as local allocation pointer not local!");
+	}
+	return false;
+}
+/**
+ * @brief removes the unique integer allocation id stored in field allocationIndex in the allocation record pointed to by \p _alloc
+ * 
+ * @param _alloc 
+ * @return uint8_t 0 on success, 1 when \p _alloc equals NULL, 2 when the allocation index storage was not initialized, 3 when the allocation index equals UNAIVALABLE_ALLOCATION_INDEX
+ */
 static uint8_t freeAllocationIndex(Malloc* const _alloc){
 	///outputChar('a');
 	if(NULL==_alloc)return 1;
@@ -512,6 +589,8 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 	///outputChar('e');output(" ALLOCATION INDEX: %d ",allocationIndex);
 	// extract indices!!!
 	allocationindex_t indices[ALLOCATION_INDEX_BYTES];
+	obtainAllocationIndices(allocationIndex,indices);
+	/* replacing:
 	int level=ALLOCATION_INDEX_BYTES;
 	while(--level>0){
 		///outputChar(level+48);
@@ -521,12 +600,13 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 		///outputChar('g');
 	}
 	indices[0]=allocationIndex;
+	*/
 	///output("INDICES:(");for(int i=0;i<ALLOCATION_INDEX_BYTES;i++)output(" %d:%d",i,indices[i]);outputChar(')'); // DEBUGGING
 	// determine allocationnodes pointers
 	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot};
 	///outputChar('h');
 	allocationnodes_t* levelallocationnode;
-	//////level=0;
+	int level=0;
 	while(level<ALLOCATION_INDEX_BYTES-1){
 		///outputChar('i');outputChar(level+48);output(":%d",indices[level]);
 		levelallocationnode=allocationnodes[level]->nodes[indices[level]];
@@ -556,7 +636,7 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 		*/
 		///output("%d",allocationpointers->NULLs);
 	}else
-		output("***** BUG BUG BUG BUG BUG NOTHING TO NULL AT INDEX %d *****",indices[level]);
+		q2outputMessage(M_BUG_PREFIX,"Nothing to NULL at allocation pointer array at index %d.",indices[level]);
 	///outputChar('n');
 	// as long as the level nodes are considered full we have to unfull them
 	while(full){
@@ -572,6 +652,29 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 		///outputChar('r');
 		if(!level)break;
 		///outputChar('s');
+	}
+	// MDH@23MAR2025: if a local owner we have to remove it from the list of local owners
+	//                and assuming we're dealing with locally created variables that are freed in reverse order (LIFO) it's best to search for the allocation pointer starting at the end
+	if(!_alloc->owner.global&&_alloc->owner.id>0){ // should be a registered local allocation
+		unregisterLocalAllocation(_alloc);
+		/* replacing code with the same functionality:
+		long long allocationIndex=allocations.ownercount;
+		while(--allocationIndex>=0&&allocations._owners[allocationIndex]!=_alloc)
+			;
+		if(allocationIndex>=0){ // found
+			allocations._owners[allocationIndex]=NULL;
+			// normalize _owners so that the last one is not NULL
+			// if we NULLed the last one currently in use there may be more NULLed in front of this last one
+			if(allocationIndex+1==allocations.ownercount){
+				while(--allocationIndex>=0&&NULL==allocations._owners[allocationIndex])
+					;
+				allocations.ownercount=allocationIndex+1;	
+			}
+		}else{
+			_alloc->owner.id=-_alloc->owner.id; // reverse the id so we won't try to look for it again
+			q2outputMessage(M_BUG_PREFIX,"Local owner %s:%llu of allocation #zu to be unregistered not found!",MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,_alloc->allocationIndex);
+		}
+		*/
 	}
 	////output("\n\t-[%llu]",allocationIndex);
 	/*
@@ -618,52 +721,47 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
  * 
  * @param allocationIndex 
  * @return Malloc* the Malloc pointer stored at \p allocationIndex in the allocation history
- */
+ ///
 static Malloc* getAllocationAtIndex(allocationindex_t allocationIndex){
 	// TODO return the pointer stored at allocationIndex
 	if(allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return NULL;
 	///outputChar('e');
 	// extract indices!!!
 	uint8_t indices[ALLOCATION_INDEX_BYTES];
-	int level=ALLOCATION_INDEX_BYTES;
-	while(--level>=0){
-		///outputChar(level+48);
-		indices[level]=(allocationIndex&0xFF);
-		///outputChar('f');
-		allocationIndex>>=8;
-		///outputChar('g');
-	}
+	obtainAllocationIndices(allocationIndex,indices);
 	// determine allocationnodes pointers
 	///outputChar('h');
 	allocationnodes_t* levelallocationnode=_allocationnodesRoot;
-	for(level=0;level<ALLOCATION_INDEX_BYTES-1;level++){
-		///outputChar(level+48);
-		levelallocationnode=levelallocationnode->nodes[indices[level]];
+	for(int level=0;level<ALLOCATION_INDEX_BYTES-1;level++){
 		if(NULL==levelallocationnode){
 			output("%s%sUndefied allocation history node at level %d.\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX,level);
 			return NULL;
 		}
+		///outputChar(level+48);
+		levelallocationnode=levelallocationnode->nodes[indices[level]];
 		///outputChar('i');
 	}
 	return (Malloc*)levelallocationnode->nodes[indices[level]];
 }
+*/
+
+/**
+ * @brief returns the number of allocations still active
+ * 
+ * @return unsigned long long the number of allocations still active
+ */
 unsigned long long getAllocationsRemembered(){
 	return allocationsSet-allocationsFreed;
 }
+/**
+ * @brief returns the number of freed allocations
+ * 
+ * @return unsigned long long the number of freed allocations
+ */
 unsigned long long getAllocationsFreed(){
 	return allocationsFreed;
 }
 
-/**
- * @brief the (module local) names of the modules in the same order as the abbreviations stored in MODULES
- * 
- */
-static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars","Mstring","Mjson","Msettings","Mtoken","Mmemory","Mexecution","Mbiginteger","Mrational","Mdecimal","Mvalue",
-	"Msystem","Mtime","Miterator","Marray","Mlist","Moperations","Mmatrix","Mlocale","Mfunctions","Menvironment","Mshell","Mcolors","Msession","M"};
-	/**
-	 * @brief the (module local) text representation of the sign of the type field in the owner structure
-	 * 
-	 */	
 /**
  * @brief returns dynamic memory allocation statistics through its parameters
  * 
@@ -705,7 +803,7 @@ unsigned long long obtainAllocationStats(
 	///outputChar('4');
 	if(getValueSizeFunction!=NULL)for(int i=255;i>=0;i--)valuetypesizes[i]=NULL;
 	if(NULL==_allocationnodesRoot)return 0;
-	if(allocations.l==0)return 0;
+	if(allocations.l==0)return 0; // no active allocations
 	/////return 0;
 	///outputChar('5');
 	unsigned long long result=0;
@@ -1075,7 +1173,7 @@ static bool updateAllocationTypeMarks(){
 static long long getAllocationTypeIndex(signed char allocationType){
 	long long allocationTypeIndex=numberOfAllocationTypes;
 	while(--allocationTypeIndex>=0&&_allocationTypes[allocationTypeIndex].type!=allocationType)
-	;
+		;
 	if(allocationTypeIndex>=0)
 		OUTPUT_INFO("Index of allocation type '%c'(=%i): %lld.\n",allocationType,allocationType,allocationTypeIndex);
 	return allocationTypeIndex;
@@ -1096,7 +1194,7 @@ long long getNumberOfAllocationTypes(){return (_allocationTypes/* MDH@14APR2020:
  * @return long long the new allocation type index
  */
 static long long getNewAllocationTypeIndex(signed char allocationType,size_t size,long long count/*,bool fixedsize*/){
-	if(_allocationTypes){
+	if(_allocationTypes!=NULL){
 			long long newAllocationTypeIndex=getAllocationTypeIndex(allocationType);
 			if(newAllocationTypeIndex<0){ // doesn't exist yet
 					bool fixedsize=(allocationType>0);
@@ -1154,6 +1252,48 @@ static long long getNewAllocationTypeIndex(signed char allocationType,size_t siz
 	return -1;
 }
 
+/**
+ * @brief registers the local allocation \p alloc
+ * 
+ * @param alloc 
+ * @return true on success
+ * @return false on failure
+ */
+static bool registerLocalAllocation(Malloc* const alloc){
+	if(alloc!=NULL){
+		if(!alloc->owner.global){
+			if(allocations.ownercount>=allocations.size){ // MDH@18JAN2023 replacing: !(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
+				OUTPUT_INFO("%s","Expanding allocations.");
+				Malloc* *newAllocationOwners=(Malloc**)(allocations.size?unmanaged_realloc(allocations._owners,allocations.size*sizeof(Malloc*),(allocations.size+16)*sizeof(Malloc*)):unmanaged_malloc(16*sizeof(Malloc*)));
+				if(newAllocationOwners!=NULL){
+					allocations._owners=newAllocationOwners;
+					allocations.size+=16;
+				}else{
+					// not enough memory: negate the owner id to indicate we failed to actually store it in the list of 'owners'
+					alloc->owner.id=-abs(alloc->owner.id);
+					q2outputError("Failed to expand the local allocation history to accomodate another local dynamic memory pointer.");
+					return false;
+				}
+			}
+			// MDH@14JAN2023 now passed in: Mallocationownertype allocationowner={owner,type};
+			assert(allocations.ownercount<allocations.size);
+			// there's room
+			allocations._owners[allocations.ownercount++]=alloc;
+			OUTPUT_INFO("Allocation of type '%c' (=%i) owned by %s:%u(%s%u%s%s) remembered at position %llu.\n"
+					,alloc->allocationType,alloc->allocationType
+					,MODULE_NAMES[alloc->owner.module]
+					,alloc->owner.id
+					,GLOBAL_FLAG_TEXTS[alloc->owner.global]
+					,alloc->owner.level,DISOWNED_FLAG_TEXTS[alloc->owner.disowned]
+					,FREED_FLAG_TEXTS[alloc->owner.freed]
+					,allocations.ownercount);
+			return true;
+		}
+		q2outputBug("Global allocation pointer offered to register as local allocation pointer!");
+	}
+	return false;
+}
+
 // MDH@09APR2020: distinguish between adding an allocation (local) and adding an allocationtype (global)
 // MDH@21APR2020: addAllocation() doesn't use size so we remove it from the parameter list
 // MDH@14JAN2023: there's NO need to actually store owner twice since we want to be able to check for memory leaks
@@ -1169,6 +1309,11 @@ static long long addAllocation(Mallocationtypeowner allocationowner/*,signed cha
 	assert(allocationowner!=NULL);
 	// MDH@22JAN2025
 	setAllocationIndex(allocationowner);
+	// MDH@23MAR2025: when a local owner add it to _owners
+	if(!allocationowner->owner.global){ // a local owner and therefore to be registered as a local owner
+		registerLocalAllocation(allocationowner);
+		/// q2outputError("Failed to register a new local allocation.");
+	}
 	return allocationowner->allocationIndex;
 	/* replacing:
 	// if(count<=0)return -2; // invalid input
@@ -1207,8 +1352,8 @@ static long long addAllocation(Mallocationtypeowner allocationowner/*,signed cha
  */
 static void incrementAllocationTypeOccupied(long long allocationTypeIndex,unsigned long long increment){
 	if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
-	if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
-	if(allocationTypeIndex>=numberOfAllocationMarkTypes){q2outputMessage(M_WARNING_PREFIX,"Type #%lld not markable.");return;}
+	if(NULL==_allocationMarks||numberOfAllocationMarks==0)return; // too bad
+	if(allocationTypeIndex>=numberOfAllocationMarkTypes){q2outputMessage(M_WARNING_PREFIX,"Type #%lld not markable.",allocationTypeIndex);return;}
 	unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
 	// output("Allocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationMarks[allocationTypeMarkIndex].occupied);
 	_allocationMarks[allocationTypeMarkIndex].occupied+=increment;
@@ -1223,15 +1368,15 @@ static void incrementAllocationTypeOccupied(long long allocationTypeIndex,unsign
  */
 static void incrementAllocationTypeFreed(long long allocationTypeIndex,unsigned long long increment){
 	if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
-	if(!_allocationMarks||numberOfAllocationMarks==0)return; // too bad
-	if(allocationTypeIndex>=numberOfAllocationMarkTypes){q2outputMessage(M_WARNING_PREFIX,"Type #%lld not markable.");return;}
+	if(NULL==_allocationMarks||numberOfAllocationMarks==0)return; // too bad
+	if(allocationTypeIndex>=numberOfAllocationMarkTypes){q2outputMessage(M_WARNING_PREFIX,"Type #%lld not markable.",allocationTypeIndex);return;}
 	unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
 	// output("Deallocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationMarks[allocationTypeMarkIndex].freed);
 	_allocationMarks[allocationTypeMarkIndex].freed+=increment;
 	// output(" to %llu.\n",_allocationMarks[allocationTypeMarkIndex].freed);
 	// MDH@14MAY2020: if occupied is below freed something terribly wrong
 	if(_allocationMarks[allocationTypeMarkIndex].occupied<_allocationMarks[allocationTypeMarkIndex].freed)
-			q2outputMessage(M_BUG_PREFIX,"More memory freed than allocated for allocation type '%c'.",_allocationTypes[allocationTypeIndex].type);
+		q2outputMessage(M_BUG_PREFIX,"More memory freed than allocated for allocation type '%c'.",_allocationTypes[allocationTypeIndex].type);
 	// replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
 }
 
@@ -1271,14 +1416,14 @@ if(type!=0&&size>0&&count>0){
 								histogram=unmanaged_malloc(sizeof(Mallocationsize));
 						if(NULL==histogram)return -1;
 						if(histogram!=NULL){
-								_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
-								category=numberOfHistogramCategories; // MDH@04MAY2020: the negative value of the count represents the number of histogram categories
-								_allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
-								histogram[category].count=0; // will be incremented below!!!!
-								histogram[category].class=count;
-								OUTPUT_INFO("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",-_allocationTypes[allocationTypeIndex].count,count,type);
+							_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
+							category=numberOfHistogramCategories; // MDH@04MAY2020: the negative value of the count represents the number of histogram categories
+							_allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
+							histogram[category].count=0; // will be incremented below!!!!
+							histogram[category].class=count;
+							OUTPUT_INFO("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",-_allocationTypes[allocationTypeIndex].count,count,type);
 						}else
-								allocationIndex=-1;
+							allocationIndex=-1;
 				}
 				if(category>=0){
 					histogram[category].count++;
@@ -1299,8 +1444,8 @@ if(type!=0&&size>0&&count>0){
 				allocationIndex=-1;
 			}
 		}else{
-				q2outputMessage(M_ERROR_PREFIX,"Failed to register allocation of type '%c' and size %zd (error code: %lld).\n",type,size,allocationTypeIndex);
-				allocationIndex=-1;
+			q2outputMessage(M_ERROR_PREFIX,"Failed to register allocation of type '%c' and size %zd (error code: %lld).\n",type,size,allocationTypeIndex);
+			allocationIndex=-1;
 		}
 	}
 	return allocationIndex;
@@ -1464,15 +1609,15 @@ long long* _getAllocationCounts(){
 static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner owner,size_t size,long long count){
 	// ASSERT all arguments supposedly valid i.e. ptr!=NULL, size>0
 	// MDH@13APR2020: all Mmalloc calls represent fixed size allocations
-	if(ptr==NULL||type==0||size==0||count<=0)return false;
+	if(NULL==ptr||type==0||size==0||count<=0)return false;
 		// MDH@14JAN2023: replacing the following block with equivalent code passing ptr as well to registerAllocation
 		//				exchanging the order so the contents of pointer is already set however we could have all this done
 		//				in registerAllocation instead, I suppose, but for now we don't
 	Mallocationtypeowner _alloc=(Mallocationtypeowner)ptr/*((char*)ptr+size)*/;
 	_alloc->allocationType=type; // register the type
 	_alloc->owner=owner;
-	_alloc->allocationIndex=registerAllocation(_alloc/*,type,owner*/,size,count);
-	return(_alloc->allocationIndex>=0);
+	// NOTE registerAllocation will set _alloc->allocationIndex itself, so we only need to return false
+	return(registerAllocation(_alloc,size,count)>=0);
 	/* replacing:
 	// MDH@26MAY2020: now we should also accomodate for variable size allocations in which case we call registerReallocation with -1 for the allocationIndex (as this is a new allocation), see Mvalloc for a rewrite of Mrealloc with from_count=0 and to_count=1 with the required functionality)
 	long long allocationIndex=registerAllocation(type,owner,size,count); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
@@ -1766,9 +1911,8 @@ bool resetAllocationManagement(){
 	*/
 	////////OUTPUT_INFO("Allocation type counts reset.\n");
 	// free(_allocationMarks);numberOfAllocationMarks=0;free(_allocationMarkTimestamps);
-	output("Resetting dynamic memory allocation management.\n");
+	q2outputMessage(M_INFO_PREFIX,"Resetting dynamic memory allocation management.");
 	return allocationRecordingInitialized();
-
 }
 
 static size_t oldNumberOfAllocationTypeMarks=0;
@@ -2009,7 +2153,7 @@ void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owne
 		ptr=malloc(size*count);
 #endif
 	}
-	if(!ptr)return NULL;
+	if(NULL==ptr)return NULL;
 #ifndef __PRODUCTION__
 	if(!attachAllocationInfo(ptr,type,owner,size,count))
 		q2outputMessage(M_BUG_PREFIX,"Failed to register %lld %s-sized allocation%s of type '%c'.\n",count,(type>0?"fixed":"variable"),abs(type),(count>1?"s":""));
@@ -2039,7 +2183,7 @@ void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owne
 		ptr=calloc(count,size);
 #endif
 	}
-	if(!ptr)return NULL;
+	if(NULL==ptr)return NULL;
 #ifndef __PRODUCTION__
 	if(!attachAllocationInfo(ptr,type,owner,size,count))
 		q2outputMessage(M_BUG_PREFIX,"Failed to register %lld %s-size allocation%s of type '%c'.",count,(type>0?"fixed":"variable"),abs(type),(count>1?"s":""));
@@ -2057,7 +2201,11 @@ void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owne
  * @return true when currently owned
  * @return false when not currently owned
  */
-bool Misowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));return(!_alloc->owner.freed&&!_alloc->owner.disowned);}
+bool Misowned(void* ptr){
+	if(NULL==ptr)return false;
+	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));
+	return(!_alloc->owner.freed&&!_alloc->owner.disowned);
+}
 
 /**
  * @brief determines whether allocation element pointed to by \p ptr is currently disowned
@@ -2066,7 +2214,11 @@ bool Misowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char*)p
  * @return true when currently disowned
  * @return false when not currently disowned
  */
-bool Misdisowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));return(!_alloc->owner.freed&&_alloc->owner.disowned);}
+bool Misdisowned(void* ptr){
+	if(NULL==ptr)return false;
+	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));
+	return(!_alloc->owner.freed&&_alloc->owner.disowned);
+}
 
 // MDH@18MAY2020: passing along ownership is done through macros DISOWNED and OWNED 
 //				unfortunately we need to know the size so we can find the allocation id
@@ -2079,7 +2231,7 @@ bool Misdisowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char
  * @result void* ptr when disowning it succeeded, NULL otherwise
  */
 void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
-	if(!ptr)return NULL;
+	if(NULL==ptr)return NULL;
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/*+size*/);
 	OUTPUT_INFO("%p: %s:%u(%s%u%s%s) requesting to disown the memory allocation owned by %s:%u(%s%u%s%s).\n",_alloc
 		,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
@@ -2147,6 +2299,20 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			);
 		*/
 		if(owner.disowned==0&&owner.id>0&&owner.freed==0){
+			// MDH@23MAR2025: if ownership changes from local to global or from global to local we need to deregister or register in allocations._owners respectively
+			if(_alloc->owner.global){ // currently global
+				if(!owner.global){ // global to local
+					q2output("Global to local transition!\n");
+					if(!registerLocalAllocation(_alloc))
+						q2outputError("Failed to register a local allocation on transitioning from global to local.");
+				}
+			}else{ // currently local
+				if(owner.global){ // local to global
+					q2output("Local to global transition!\n");
+					if(!unregisterLocalAllocation(_alloc))
+						q2outputError("Failed to unregister a local allocation on transitioning from local to global.");
+				}
+			}
 			// pass ownership to owner if ptr is currently disowned
 			// printf("%s","X");
 			/* MDH@31JAN2025: can't check anymore, because no access to the owner through _owners field
@@ -2158,7 +2324,9 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 				// printf("\tOwnership of %s:%u(%s%u%s%s)"
 				//	 ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 				// );
+				q2output("Allocation with owner %s:%d now to be owned by %s:%d...",MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,MODULE_NAMES[owner.module],owner.id); // DEBUGGING
 				_alloc->owner=owner; /// MDH@31JAN2025: replacing _alloc->owner=*_owner; // TODO we might have to comment this out in due course
+				q2output("done.\n");
 				// printf(" taken by %s:%u(%s%u%s%s).\n"
 				//	 ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 				//	 );
@@ -2205,6 +2373,7 @@ void* Msubowned(void* ptr,uint8_t level){
 	//replacing: OUTPUT_INFO("Incrementing subownership of %p by %i.\n",_alloc,level);
 	// OUTPUT_INFO("Subowning %p:\n",ptr);
 	if(allocationIndex>=0&&allocationIndex<allocations.l){
+		_alloc->owner.level+=level; // MDH@22MAR2025: increments the owner's level by \p level
 		/*
 		Mallocationowner* _owner=&(allocations._owners[allocationIndex]->owner);
 		OUTPUT_INFO("\tAllocation #%i=%s:%u(%s%u%s%s).\n",allocationIndex

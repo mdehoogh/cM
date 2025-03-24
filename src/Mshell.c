@@ -15002,15 +15002,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to create E");
 				return NULL;
 			}
+			q2output("E value created!\n");
 			if(!addVariable(_Menvironment,owner,"E",VT_FLOAT,true)){
 				q2outputError("Failed to add E");
 				return NULL;
 			}
+			q2output("E variable registered!\n"); // DEBUGGING
 			if(!setValue(_Menvironment,"E",E_value)){
 				//////free_value(E_value);
 				q2outputError("Failed to initialize E");
 				return NULL;
 			}
+			q2output("E variable initialized to the E value!\n"); // DEBUGGING
 
 			Mvalue* PHI_value=_getFloatValue(M_LD_PHI);
 			if(NULL==PHI_value){
@@ -15018,42 +15021,48 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to create PHI");
 				return NULL;
 			}
+			q2output("PHI value created!\n"); // DEBUGGING
 			if(!addVariable(_Menvironment,owner,"PHI",VT_FLOAT,true)){
 				q2outputError("Failed to add PHI");
 				return NULL;
 			}
+			q2output("PHI variable registered!\n"); // DEBUGGING
 			if(!setValue(_Menvironment,"PHI",PHI_value)){
 				//////free_value(E_value);
 				q2outputError("Failed to initialize PHI");
 				return NULL;
 			}
-
+			q2output("PHI variable initialized to the PHI value!\n"); // DEBUGGING
 			//reportNumberOfAllocations("shellInitialized 14");
 		
 
 			// MDH@05DEC2020: obtain the current LC_ALL locale, and save it to the LOCALE variable
 			// MDH@07DEC2020: we're going to use a map to store both the current locale setting (in property '') as well as all the fields
-			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
-			if(NULL==localesettingsValue)q2outputWarning("Failed to obtain the current locale settings value");
 			// the locale settings variable will be created as immutable, so once set it cannot be changed itself (although the map can be!!!)
 			if(!addVariable(_Menvironment,owner,M_LOCALE_SETTINGS_VARIABLE_NAME,VT_MAP,true)){
 				q2outputMessage(M_ERROR_PREFIX,"Failed to register '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
+			q2output("Locale settings variable added!\n"); // DEBUGGING
+			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
+			if(NULL==localesettingsValue)
+				q2outputWarning("Failed to obtain the current locale settings value");
+			else
+				q2output("Local settings value initialized.\n");
 			if(!setValue(_Menvironment,M_LOCALE_SETTINGS_VARIABLE_NAME,localesettingsValue)){
 				//////free_value(E_value);
 				q2outputMessage(M_ERROR_PREFIX,"Failed to initialize '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
-
+			q2output("Locale settings variable initialized to local settings value!\n"); // DEBUGGING
 			//reportNumberOfAllocations("shellInitialized 15");
-
 
 			// MDH@30SEP2020: let's add a CWD variable to contain the current working directory (if any) to makes things a little easier
 			if(!addVariable(_Menvironment,owner,"CWD",VT_TEXT,true)){
 				q2outputError("Failed to add CWD");
 				return NULL;
 			}
+			q2output("CWD variable added!\n"); // DEBUGGING
 			char cwd[PATH_MAX];
 			Mstring* cwd_str=owned_string(_getString("'"),owner);
 			char* _cwd=getcwd(cwd,sizeof(cwd));output("Current working directory: '%s'.\n",_cwd);
@@ -15066,7 +15075,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to initialize CWD");
 				return NULL;
 			}
-
+			q2output("CWD variable initialized!\n"); // DEBUGGING
 			//reportNumberOfAllocations("shellInitialized 16");
 
 

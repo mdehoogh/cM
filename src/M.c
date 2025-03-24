@@ -248,9 +248,10 @@ static void outputCommandInfo(Mcommand* command){
  * @brief writes the current time stamp to file \p _file
  * @param _file
  */
-void writeTimestamp(FILE* _file){if(!_file)return;Mallocationowner owner=getOwner(__LINE__);
+void writeTimestamp(FILE* _file){if(NULL==_file)return;Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _timestamp=owned_string(_getTimestamp(NULL),owner);
 	if(NULL==_timestamp)return;
+	output("Session timestamp: %s.\n",string(_timestamp));
 	fprintf(_file,"%s\t",string(_timestamp));
 	FREE_STRING(_timestamp,owner);
 	/* replacing:
@@ -432,7 +433,11 @@ enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
  * @brief the prompt info for each possible input mode
  * 
  */
-char* promptinfo[]={"Command mode: clear the command with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Use history command|Verbose|Wrap - Options: Beep|Reset|eXit|Functions|History|Shell.","Shell mode: enter a system command to execute."};
+char* promptinfo[]={
+	"Command mode: clear the command with Ctrl-C.",
+	"Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Use history command|Verbose|Wrap - Options: Beep|Reset|eXit|Functions|History|Shell.",
+	"Shell mode: enter a system command to execute."
+};
 /**
 call prompt() when ready to receive a new command
  */
@@ -3405,7 +3410,8 @@ void setInputMode(enum INPUTMODE_ENUM newInputMode){
  */
 char switchToControlMode(char* message){
 	if(inputMode!=IM_CONTROL){
-		if(inputMode==IM_COMMAND)clearCommand();
+		if(inputMode==IM_COMMAND)
+			clearCommand();
 		// MDH@03APR2024: if there's a message let's beep!!!
 		if(message!=NULL){
 			q2outputError(message);
@@ -3418,7 +3424,8 @@ char switchToControlMode(char* message){
 		} // MDH@01OCT2019: message will typically be an error so
 		resetOutputColor();
 		setInputMode(IM_CONTROL);
-		if(amVerbose())outputValues(); // MDH@25NOV2019: it's convenient to also output the values when verbose
+		if(amVerbose())
+			outputValues(); // MDH@25NOV2019: it's convenient to also output the values when verbose
 		outputVariables(); // immediately show the list of available variables (so we can then use v for verbose flag, AND s is available for Shell again!!!!)
 	}
 	///////////outputFlags(); // show the user the current flags!!
@@ -7765,9 +7772,6 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 
 			// from now on no continue's anymore, because at the end of the loop we want to check for inputCharType equaling o
 			if(inputMode==IM_COMMAND){
-#ifdef __DEBUG__
-				outputChar(inputCharType);
-#endif
 				// MDH@03SEP2019: any input character that somehow changes the command needs to ascertain that no previous command is being used (i.e. when commandIndex is not zero)
 				//////////outputStatus(inputChar,inputCharType);
 				// MDH@27OCT2020: Ctrl-G maps to inserting 'get()' as we expect people to use it a lot

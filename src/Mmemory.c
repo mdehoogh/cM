@@ -43,7 +43,7 @@ char* _strdup(char const * const _c){Mallocationowner owner=getOwner(__LINE__);
  * @return long \p invalid on failure, or the represented long integer on success
  */
 long long _strtoll(char* _c,long long invalid){
-	size_t l=(_c?strlen(_c):0);
+	size_t l=(_c!=NULL?strlen(_c):0);
 	if(!l)return invalid;
 	char* eptr;
 	long long ll=strtoll(_c,&eptr,0); // assume decimal (TODO allow other representations as well)

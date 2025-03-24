@@ -29,11 +29,13 @@ static Mmap* _localesettingsMap=NULL;Mallocationowner owner_localesettingsmap=(M
  */
 bool updateLocalesettingsMap(){
 	char* _locale=setlocale(LC_ALL,NULL);
-	if(_localesettingsMap){
+	if(_locale!=NULL)q2output("Active locale: %s.\n",_locale); // DEBUGGING
+	if(_localesettingsMap!=NULL){
 		if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"",_getValueOfText(_getSingleQuotedText(_locale)))>0){
+			q2output("Locale name added to locale settings map.\n"); // DEBUGGING
 			// now we should append the locale settings
 			struct lconv* localeSettings=localeconv();
-			if(localeSettings){
+			if(localeSettings!=NULL){
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"decimal_point",_getValueOfText(_getSingleQuotedText(localeSettings->decimal_point)))<=0)
 					q2outputError("Failed to store the decimal_point locale setting");
 				if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"thousands_sep",_getValueOfText(_getSingleQuotedText(localeSettings->thousands_sep)))<=0)
@@ -72,6 +74,7 @@ bool updateLocalesettingsMap(){
 					q2outputError("Failed to store the n_sign_posn locale setting");
 				return true;
 			}
+			q2outputError("No locale settings found!");
 		}
 	}
 	return false;
@@ -89,8 +92,11 @@ Mmap* getLocalesettingsMap(){///////////Mallocationowner owner=getOwner(__LINE__
 	if(NULL==_localesettingsMap)
 		_localesettingsMap=owned_map(__map("getLocaleSettingsMap()"),owner_localesettingsmap);
 	if(_localesettingsMap!=NULL){
+		q2output("Locale settings map created!\n"); // DEBUGGING
 		if(!updateLocalesettingsMap())
 			q2outputError("Failed to register the current locale settings");
+		else
+			q2output("Locale settings map updated!\n"); // DEBUGGING
 	}else
 		q2outputError("Failed to create the map for storing the locale settings");
 	// NOTE not returning the map disowned, so this module will keep ownership of the map

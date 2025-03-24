@@ -943,9 +943,9 @@ Mstring* _getQuotedTextString(char const * const text,char quote){Mallocationown
  * @return Mtext* the M string pointer with \t text enquoted
  */
 Mtext* _getSingleQuotedText(char const * const text){Mallocationowner owner=getOwner(__LINE__);
-	if(!text)return NULL;
+	if(NULL==text)return NULL;
 	Mstring* _singleQuotedTextString=owned_string(_getQuotedTextString(text,'\''),owner);
-	if(!_singleQuotedTextString)return NULL;
+	if(NULL==_singleQuotedTextString)return NULL;
 	Mtext* _singleQuotedText=owned_text(_getText(string(_singleQuotedTextString)),owner);
 	FREE_STRING(_singleQuotedTextString,owner);
 	return disowned_text(_singleQuotedText,owner);
