@@ -913,7 +913,7 @@ static char** _getTexts(Mvalue* textsValue,unsigned long long * textcount){Mallo
 	if(textcount!=NULL){
 		*textcount=0;
 		if(textsValue!=NULL){
-			q2outputValue("Extracting text(s) from '",textsValue,"'.\n"); // DEBUGGING
+			//D q2outputValue("Extracting text(s) from '",textsValue,"'.\n"); // DEBUGGING
 			if(textsValue->type==VT_ARRAY){
 				Marray* textArray=textsValue->value._array;
 				if(textArray!=NULL){
@@ -1006,7 +1006,7 @@ static void freetexts(char** const texts,unsigned long long textcount,Mallocatio
 	if(NULL==texts)return;
 	for(register unsigned long long textindex=0;textindex<textcount;textindex++)
 	if(texts[textindex]!=NULL){
-		output("Freeing text '%s'.\n",texts[textindex]); // DEBUGGING
+		//D output("Freeing text '%s'.\n",texts[textindex]); // DEBUGGING
 		FREE_DISOWNED(texts[textindex],strlen(texts[textindex])+1,-'"',owner); // the reverse of the allocation by _strdup()
 	}
 	FREE_DISOWNED(texts,textcount,'c',owner);

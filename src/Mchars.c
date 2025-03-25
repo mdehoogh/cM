@@ -81,6 +81,8 @@ void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,siz
 	// typically the caller would need to tell us the current number of characters stored in _chars
 	// ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
 	if(NULL==_chars){q2outputWarning("No Mchars to free");return;}
+	//D output("Freeing chars '%s'.\n",_chars->chars);
+	// TODO count in the call to FREE should actually equal size*count theoretically but apparently there's also an error in allocating the chars (and the registered size!!!)
 	FREE(_chars,count,(type>0?-type:type)/*,owner_chars*/); // obtain ownership and free
 }
 

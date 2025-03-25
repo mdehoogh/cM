@@ -29,10 +29,10 @@ static Mmap* _localesettingsMap=NULL;Mallocationowner owner_localesettingsmap=(M
  */
 bool updateLocalesettingsMap(){
 	char* _locale=setlocale(LC_ALL,NULL);
-	if(_locale!=NULL)q2output("Active locale: %s.\n",_locale); // DEBUGGING
 	if(_localesettingsMap!=NULL){
+		if(_locale!=NULL)q2output("Active locale: %s.\n",_locale);else q2outputError("No active locale!");
 		if(appendedToMap(_localesettingsMap,owner_localesettingsmap,"",_getValueOfText(_getSingleQuotedText(_locale)))>0){
-			q2output("Locale name added to locale settings map.\n"); // DEBUGGING
+			//D q2output("Locale name added to locale settings map.\n"); // DEBUGGING
 			// now we should append the locale settings
 			struct lconv* localeSettings=localeconv();
 			if(localeSettings!=NULL){
@@ -75,7 +75,8 @@ bool updateLocalesettingsMap(){
 				return true;
 			}
 			q2outputError("No locale settings found!");
-		}
+		}else
+			q2outputError("Failed to add the locale name to the locale settings map!");
 	}
 	return false;
 }
@@ -92,11 +93,10 @@ Mmap* getLocalesettingsMap(){///////////Mallocationowner owner=getOwner(__LINE__
 	if(NULL==_localesettingsMap)
 		_localesettingsMap=owned_map(__map("getLocaleSettingsMap()"),owner_localesettingsmap);
 	if(_localesettingsMap!=NULL){
-		q2output("Locale settings map created!\n"); // DEBUGGING
+		//D q2output("Locale settings map created!\n"); // DEBUGGING
 		if(!updateLocalesettingsMap())
 			q2outputError("Failed to register the current locale settings");
-		else
-			q2output("Locale settings map updated!\n"); // DEBUGGING
+		//D else q2output("Locale settings map updated!\n"); // DEBUGGING
 	}else
 		q2outputError("Failed to create the map for storing the locale settings");
 	// NOTE not returning the map disowned, so this module will keep ownership of the map
@@ -212,6 +212,7 @@ static Mstring* _getIntegerTextLocale(char const * const integerText){Mallocatio
 		if(groupsize<=sepinsertpos-sign)break;
 		sepinsertpos-=groupsize;
 		if(NULL==string_insert_char(_integerTextString,sepinsertpos,sep))break;
+		output("->'%s'",string(_integerTextString));
 	}
 	return disowned_string(_integerTextString,owner);
 }
@@ -228,9 +229,11 @@ size_t outputBigintegerLocale(Mbiginteger const * const biginteger){Mallocationo
 		Mstring* _bigintegerTextLocale=owned_string(_getIntegerTextLocale(string(_bigintegerText)),owner);
 		if(_bigintegerTextLocale!=NULL){ // we've got it
 			written=output("%s",string(_bigintegerTextLocale));
+			output("Freeing big integer text locale '%s'.\n",string(_bigintegerTextLocale)); // DEBUGGING
 			FREE_STRING(_bigintegerTextLocale,owner);
 		}else
 			written=output("%s",string(_bigintegerText));
+		//D output("Freeing big integer text!\n"); // DEBUGGING
 		FREE_STRING(_bigintegerText,owner);
 	}
 	return written;

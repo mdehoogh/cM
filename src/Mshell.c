@@ -6158,7 +6158,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										break;
 									}
 								}
-								outputList("Referenced list: ",_resultList,".\n"); // DEBUGGING
+								//D outputList("Referenced list: ",_resultList,".\n"); // DEBUGGING
 								referencedValue=_getValueOfList(disowned_list(_resultList,owner)); // the result
 							}else
 								referencedValue=*_valueholders[0];
@@ -14611,7 +14611,7 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 	unsigned long long offered,refused,consumed,unmanaged,allocationCount,allocationsCounted;
 	Mallocationsize* allocationTypeSizes[256]; // the histogram of size counts for each of the data types
 	unsigned long long memoryErrors=obtainAllocationStats(allocationHistoryCounts,valueTypeCounts,allocationTypeSizes,getValueSizeFunction,getAllocCountFunction,&offered,&refused,&consumed,&unmanaged,&allocationCount,&allocationsCounted);
-	///output("Allocations counted: %llu.\n",allocationsCounted); // DEBUGGING
+	//D output("Allocations counted: %llu.\n",allocationsCounted); // DEBUGGING
 	if(memoryErrors)
 		q2outputMessage(M_ERROR_PREFIX,"Number of out of memory errors obtaining memory statistics: %llu.",memoryErrors);
 	if(appendedToMap(_allocationStatsMap,owner,"unmanaged",_getIntegerValue(unmanaged))!=M_TRUE)
@@ -14744,6 +14744,93 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 		q2outputMessage(M_ERROR_PREFIX,"Failed to create the allocation history value type info map.");
 
 	return _getValueOfMap(disowned_map(_allocationStatsMap,owner));
+}
+
+// MDH@24MAR2025: a bit of fun with a Quara question
+/**
+ * @brief computes the probability of 3x3 matrices with integer values between minValue and maxValue inclusive being invertible
+ * 
+ * @param minValue the smallest integer value
+ * @param maxValue the largest integer value
+ * @return Mvalue* the probability of being invertible
+ */
+Mvalue* Mintegerinvertibleprobability(Mvalue* minValue,Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
+	long long min=(minValue!=NULL?getValueInteger(minValue):M_LL_INVALID);
+	long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
+	if(min!=M_LL_INVALID&&max!=M_LL_INVALID&&min<=max){
+		// now we're going to compute the total number of non-invertible matrices
+		Mbiginteger *zerodeterminantcount=owned_biginteger(_getBiginteger(0),owner),
+								*totalcount=owned_biginteger(_getBiginteger(0),owner);
+		if(zerodeterminantcount!=NULL&&totalcount!=NULL){
+			mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
+			long long a,b,c,d,e,f,g,h,i,count,billioncount=0;
+			// the different parts may be computed as soon as they are computable
+			// let's assume using long instead of long long suffices!!!
+			long ce,bd,cd,G,H,I,gpart,ghpart,ghipart; // these are the submatrix determinants we're going to compute 
+			for(a=min;a<=max;a++){
+				for(b=min;b<=max;b++){
+					for(c=min;c<=max;c++){
+						cd=c*min; // initial value of cd=c*d
+						bd=b*min;
+						for(d=min;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
+							ce=c*min;
+							I=a*min-bd; // initial value of I=a*e-b*d
+							for(e=min;e<=max;e++,ae+=a,ce+=c,I+=a){
+								H=cd-a*min; // initial value of H=c*d-a*f
+								G=b*min-ce; // initial value of G=b*f-c*e
+								for(f=min;f<=max;f++,G+=b,H-=a){
+									gpart=G*min; // the initial value of gpart=G*g
+									for(g=min;g<=max;g++,gpart+=G){
+										ghpart=gpart+H*min; // the initial value of ghpart=gpart+H*h
+										for(h=min;h<=max;h++,ghpart+=H){
+											ghipart=ghpart+I*min; // the initial value of ghipart=ghpart+I*i
+											for(i=min;i<=max;i++,ghipart+=I){
+												if(ghipart==0)mp_incr(zdc);
+												mp_incr(tc);
+												if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			/* replacing:
+			long long ei,fh,di,fg,dh,eg,apart,bpart,cpart;
+			count=1000000000;
+			for(a=min;a<=max;a++){
+				for(b=min;b<=max;b++){
+					for(c=min;c<=max;c++){
+						for(d=min;d<=max;d++){
+							for(e=min;e<=max;e++){
+								for(f=min;f<=max;f++){
+									for(g=min,eg=e*min,fg=f*min;g<=max;g++,eg+=e,fg+=f){
+										for(h=min,dh=d*min,fh=f*min;h<=max;h++,fh+=f,dh+=d){
+											for(i=min,ei=e*min,di=d*min;i<=max;i++,ei+=e,di+=d){
+												apart=(a!=0?a*(ei-fh):0);
+												bpart=(b!=0?b*(fg-di):0);
+												cpart=(c!=0?c*(dh-eg):0);
+												if(apart+bpart+cpart==0)mp_incr(zdc);
+												mp_incr(tc);
+												if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			*/
+			return _getValueOfRational(_getRational(disowned_biginteger(zerodeterminantcount,owner),disowned_biginteger(totalcount,owner),0,false));
+		}
+		FREE_BIGINTEGER(zerodeterminantcount,owner);
+		FREE_BIGINTEGER(totalcount,owner);
+	}
+	return NULL;
 }
 
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
@@ -15002,18 +15089,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to create E");
 				return NULL;
 			}
-			q2output("E value created!\n");
+			//D q2output("E value created!\n");
 			if(!addVariable(_Menvironment,owner,"E",VT_FLOAT,true)){
 				q2outputError("Failed to add E");
 				return NULL;
 			}
-			q2output("E variable registered!\n"); // DEBUGGING
+			//D q2output("E variable registered!\n"); // DEBUGGING
 			if(!setValue(_Menvironment,"E",E_value)){
 				//////free_value(E_value);
 				q2outputError("Failed to initialize E");
 				return NULL;
 			}
-			q2output("E variable initialized to the E value!\n"); // DEBUGGING
+			//D q2output("E variable initialized to the E value!\n"); // DEBUGGING
 
 			Mvalue* PHI_value=_getFloatValue(M_LD_PHI);
 			if(NULL==PHI_value){
@@ -15021,18 +15108,18 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to create PHI");
 				return NULL;
 			}
-			q2output("PHI value created!\n"); // DEBUGGING
+			//D q2output("PHI value created!\n"); // DEBUGGING
 			if(!addVariable(_Menvironment,owner,"PHI",VT_FLOAT,true)){
 				q2outputError("Failed to add PHI");
 				return NULL;
 			}
-			q2output("PHI variable registered!\n"); // DEBUGGING
+			//D q2output("PHI variable registered!\n"); // DEBUGGING
 			if(!setValue(_Menvironment,"PHI",PHI_value)){
 				//////free_value(E_value);
 				q2outputError("Failed to initialize PHI");
 				return NULL;
 			}
-			q2output("PHI variable initialized to the PHI value!\n"); // DEBUGGING
+			//D q2output("PHI variable initialized to the PHI value!\n"); // DEBUGGING
 			//reportNumberOfAllocations("shellInitialized 14");
 		
 
@@ -15043,7 +15130,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputMessage(M_ERROR_PREFIX,"Failed to register '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
-			q2output("Locale settings variable added!\n"); // DEBUGGING
+			//D q2output("Locale settings variable added!\n"); // DEBUGGING
 			Mvalue* localesettingsValue=_getValueOfMap(getLocalesettingsMap());
 			if(NULL==localesettingsValue)
 				q2outputWarning("Failed to obtain the current locale settings value");
@@ -15054,7 +15141,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputMessage(M_ERROR_PREFIX,"Failed to initialize '%s'.\n",M_LOCALE_SETTINGS_VARIABLE_NAME);
 				return NULL;
 			}
-			q2output("Locale settings variable initialized to local settings value!\n"); // DEBUGGING
+			//D q2output("Locale settings variable initialized to local settings value!\n"); // DEBUGGING
 			//reportNumberOfAllocations("shellInitialized 15");
 
 			// MDH@30SEP2020: let's add a CWD variable to contain the current working directory (if any) to makes things a little easier
@@ -15062,7 +15149,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to add CWD");
 				return NULL;
 			}
-			q2output("CWD variable added!\n"); // DEBUGGING
+			//D q2output("CWD variable added!\n"); // DEBUGGING
 			char cwd[PATH_MAX];
 			Mstring* cwd_str=owned_string(_getString("'"),owner);
 			char* _cwd=getcwd(cwd,sizeof(cwd));output("Current working directory: '%s'.\n",_cwd);
@@ -15075,7 +15162,7 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to initialize CWD");
 				return NULL;
 			}
-			q2output("CWD variable initialized!\n"); // DEBUGGING
+			//D q2output("CWD variable initialized!\n"); // DEBUGGING
 			//reportNumberOfAllocations("shellInitialized 16");
 
 
@@ -15494,6 +15581,9 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to register the outputtable and tablelines function");
 				return NULL;
 			}
+
+			if(!registerFunction(_Menvironment,owner,"integerinvertibleprobability",Mintegerinvertibleprobability,2,(char*[]){"min integer","max integer"},NULL))
+				q2outputError("Failed to register the integerinvertibleprobability() function");
 
 		}
 	}

@@ -944,10 +944,14 @@ Mstring* _getQuotedTextString(char const * const text,char quote){Mallocationown
  */
 Mtext* _getSingleQuotedText(char const * const text){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==text)return NULL;
+	//D output("Determining the single quoted text of '%s'.\n",text); // DEBUGGING
 	Mstring* _singleQuotedTextString=owned_string(_getQuotedTextString(text,'\''),owner);
 	if(NULL==_singleQuotedTextString)return NULL;
+	//D output("Single quoted text string: '%s'.\n",string(_singleQuotedTextString));
 	Mtext* _singleQuotedText=owned_text(_getText(string(_singleQuotedTextString)),owner);
+	//D q2output("\tFreeing single quoted text string..."); // DEBUGGING
 	FREE_STRING(_singleQuotedTextString,owner);
+	//D output("done.\n"); // DEBUGGING
 	return disowned_text(_singleQuotedText,owner);
 } /* VALIDATED */
 /**

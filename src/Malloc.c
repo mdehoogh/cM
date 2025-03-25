@@ -194,7 +194,7 @@ static bool updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
 	allocationnodes_t* nextallocationnodes;
 	// it's preferable to use a non-full non-NULL entry if there is one
 	if(allocationnodes->notFulls){ // this will never be the case on initialization!!!
-		///output("NEW NOT FULL ALLOCATION INDEX AFTER %d",allocationnodes->currentNodeIndex); // DEBUGGING
+		//D output("NEW NOT FULL ALLOCATION INDEX AFTER %d",allocationnodes->currentNodeIndex); // DEBUGGING
 		// let's go back because the not fulls are more likely to be behind the current node index!!!
 		// the main problem here is that nextallocationnodes could well be the one containing the allocation pointers
 		// which DOES NOT have a notFulls but only a NULLs, we can solve this by adding a notFulls to allocationpointers_t
@@ -203,7 +203,7 @@ static bool updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
 			nextallocationnodes=allocationnodes->nodes[--allocationnodes->currentNodeIndex];
 			// as long as this is a full node we have to keep looking
 		}while(NULL==nextallocationnodes||(!nextallocationnodes->notFulls&&!nextallocationnodes->NULLs));
-		///output(":%d WITH NOT FULLS %d and NOT NULLS %d",allocationnodes->currentNodeIndex,nextallocationnodes->notFulls,nextallocationnodes->NULLs); // DEBUGGING
+		//D output(":%d WITH NOT FULLS %d and NOT NULLS %d",allocationnodes->currentNodeIndex,nextallocationnodes->notFulls,nextallocationnodes->NULLs); // DEBUGGING
 		// we've updated ->currentNodeIndex to point to a non full node
 		allocationnodes->currentNodeIndexIsValid=1; // since it doesn't point to a full nodes block
 	}else{
@@ -215,7 +215,7 @@ static bool updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
 		nextallocationnodes=allocationnodes->nodes[allocationnodes->currentNodeIndex];
 		// when not NULL (and thus full), and there are still NULLs find a NULL
 		if(nextallocationnodes!=NULL&&allocationnodes->NULLs){ // there are no usable nodes anymore, so we should choose the first NULL node
-			///output("NEXT NULL OF %d NULLS AFTER %d",allocationnodes->NULLs,allocationnodes->currentNodeIndex); // DEBUGGING
+			//D output("NEXT NULL OF %d NULLS AFTER %d",allocationnodes->NULLs,allocationnodes->currentNodeIndex); // DEBUGGING
 			do{
 				nextallocationnodes=allocationnodes->nodes[++allocationnodes->currentNodeIndex];
 			}while(nextallocationnodes!=NULL);
@@ -248,13 +248,18 @@ static bool updateCurrentNodeIndex(allocationnodes_t* const allocationnodes){
  */
 static void obtainAllocationIndices(allocationindex_t allocationIndex,uint8_t indices[ALLOCATION_INDEX_BYTES]){
 	int level=ALLOCATION_INDEX_BYTES;
-	while(--level>=0){
+	while(--level>0){
 		///outputChar(level+48);
 		indices[level]=(allocationIndex&0xFF);
 		///outputChar('f');
 		allocationIndex>>=8;
+		if(0==allocationIndex){ // all remaining indices will and must be set to zero
+			while(--level>=0)indices[level]=0;
+			return;
+		}
 		///outputChar('g');
 	}
+	indices[0]=allocationIndex;
 }
 /**
  * @brief sets the allocation index of \p _alloc to a unique allocation (integer) id
@@ -546,6 +551,7 @@ static bool unregisterLocalAllocation(Malloc* const alloc){
 	// only when it's actually a local and registered allocation pointer should be we look for it and remove it
 	if(alloc!=NULL){ // defined
 		if(!alloc->owner.global){ // and considered local
+			//D output("Unregister local allocation pointer with id %llu.\n",alloc->allocationIndex); // DEBUGGING
 			// locate it
 			long long allocationIndex=allocations.ownercount;
 			while(--allocationIndex>=0&&allocations._owners[allocationIndex]!=alloc)
@@ -557,12 +563,12 @@ static bool unregisterLocalAllocation(Malloc* const alloc){
 					while(--allocationIndex>=0&&NULL==allocations._owners[allocationIndex])
 						;
 					allocations.ownercount=allocationIndex+1;
-					q2output("Local allocation pointer counter lowered to %zu.\n",allocations.ownercount);
+					//D q2output("Local allocation pointer counter lowered to %zu.\n",allocations.ownercount);
 				}
-				q2output("Local allocation pointer owned by %s:%d with id %llu unregistered!\n",MODULE_NAMES[alloc->owner.module],alloc->owner.id,alloc->allocationIndex); // DEBUGGING
+				//D q2output("Local allocation pointer owned by %s:%d with id %llu unregistered!\n",MODULE_NAMES[alloc->owner.module],alloc->owner.id,alloc->allocationIndex); // DEBUGGING
 				return true;
 			}
-			q2output("%s","Assumed registered local allocation not found!\n"); // DEBUGGING
+			//D q2output("%s","Assumed registered local allocation not found!\n"); // DEBUGGING
 			// allocation pointer not registered!!
 			if(alloc->owner.id>0)
 				q2outputMessage(M_BUG_PREFIX,"Failed to locate and unregister local allocation with id %llu owned by %s:%d",alloc->allocationIndex,MODULE_NAMES[alloc->owner.module],alloc->owner.id);
@@ -580,16 +586,18 @@ static bool unregisterLocalAllocation(Malloc* const alloc){
 static uint8_t freeAllocationIndex(Malloc* const _alloc){
 	///outputChar('a');
 	if(NULL==_alloc)return 1;
-	///output("-[%lld]",_alloc->allocationIndex);outputChar('b');
+	//outputChar('b');
 	if(NULL==_allocationnodesRoot)return 2;
 	///outputChar('c');
 	allocationindex_t allocationIndex=_alloc->allocationIndex;
 	///outputChar('d');
 	if(allocationIndex==UNAVAILABLE_ALLOCATION_INDEX)return 3;
+	//D output("Freeing allocation pointer with id %lld.\n",allocationIndex); // DEBUGGING
 	///outputChar('e');output(" ALLOCATION INDEX: %d ",allocationIndex);
 	// extract indices!!!
-	allocationindex_t indices[ALLOCATION_INDEX_BYTES];
+	uint8_t indices[ALLOCATION_INDEX_BYTES]; // MDH@24MAR2025 BUG FIX: type should be uint8_t and not allocationindex_t
 	obtainAllocationIndices(allocationIndex,indices);
+	//D output("Allocation indices determined!\n");
 	/* replacing:
 	int level=ALLOCATION_INDEX_BYTES;
 	while(--level>0){
@@ -601,7 +609,7 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 	}
 	indices[0]=allocationIndex;
 	*/
-	///output("INDICES:(");for(int i=0;i<ALLOCATION_INDEX_BYTES;i++)output(" %d:%d",i,indices[i]);outputChar(')'); // DEBUGGING
+	//D output("INDICES:(");for(int i=0;i<ALLOCATION_INDEX_BYTES;i++)output(" %d:%d",i,indices[i]);outputChar(')\n'); // DEBUGGING
 	// determine allocationnodes pointers
 	allocationnodes_t* allocationnodes[ALLOCATION_INDEX_BYTES]={_allocationnodesRoot};
 	///outputChar('h');
@@ -617,6 +625,8 @@ static uint8_t freeAllocationIndex(Malloc* const _alloc){
 	///outputChar(level+48);
 	// the last allocationnodes[ALLOCATION_INDEX_BYTES-1] points to the last
 	allocationpointers_t* allocationpointers=(allocationpointers_t*)allocationnodes[level];
+	//D output(allocationpointers!=NULL?"Allocation pointers found!\n":"Allocation pointers not found!\n"); // DEBUGGING
+	if(NULL==allocationpointers){q2outputBug("No allocation pointers found");return 4;}
 	//////level=ALLOCATION_INDEX_BYTES-1;
 	bool full=(!allocationpointers->NULLs);
 	///outputChar(full?'L':'l');
@@ -2302,13 +2312,13 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			// MDH@23MAR2025: if ownership changes from local to global or from global to local we need to deregister or register in allocations._owners respectively
 			if(_alloc->owner.global){ // currently global
 				if(!owner.global){ // global to local
-					q2output("Global to local transition!\n");
+					//D q2output("Global to local transition!\n");
 					if(!registerLocalAllocation(_alloc))
 						q2outputError("Failed to register a local allocation on transitioning from global to local.");
 				}
 			}else{ // currently local
 				if(owner.global){ // local to global
-					q2output("Local to global transition!\n");
+					//D q2output("Local to global transition!\n");
 					if(!unregisterLocalAllocation(_alloc))
 						q2outputError("Failed to unregister a local allocation on transitioning from local to global.");
 				}
@@ -2324,9 +2334,9 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 				// printf("\tOwnership of %s:%u(%s%u%s%s)"
 				//	 ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 				// );
-				q2output("Allocation with owner %s:%d now to be owned by %s:%d...",MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,MODULE_NAMES[owner.module],owner.id); // DEBUGGING
+				//D q2output("Allocation with owner %s:%d now to be owned by %s:%d...",MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,MODULE_NAMES[owner.module],owner.id); // DEBUGGING
 				_alloc->owner=owner; /// MDH@31JAN2025: replacing _alloc->owner=*_owner; // TODO we might have to comment this out in due course
-				q2output("done.\n");
+				//D q2output("done.\n");
 				// printf(" taken by %s:%u(%s%u%s%s).\n"
 				//	 ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 				//	 );

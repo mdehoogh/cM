@@ -1307,7 +1307,7 @@ Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/){
 // MDH@07DEC2020: why wasn't this defined before??????
 Mvalue* _getValueOfText(Mtext* _text){
 	if(NULL==_text)return NULL;
-	q2output("Wrapping text '%s' in a value.\n",_text->_c); // DEBUGGING
+	//D q2output("Wrapping text '%s' in a value.\n",_text->_c); // DEBUGGING
 	bool disowned_text=Misdisowned(_text); // if _text is currently disowned we're going to free it if we fail to wrap it in a value
 	Mvalue* _value=__value("text");
 	if(_value!=NULL)
