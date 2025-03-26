@@ -14747,17 +14747,19 @@ Mvalue* Mmemstats(){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // MDH@24MAR2025: a bit of fun with a Quara question
+static long gcd(long a, long b){
+	assert(b>=0&&a>=b); // assumes a>b
+	long t;
+	while(b){t=b;b=a%b;a=t;}
+	return a;
+}
 /**
- * @brief computes the probability of 3x3 matrices with integer values between minValue and maxValue inclusive being invertible
+ * @brief 
  * 
- * @param minValue the smallest integer value
- * @param maxValue the largest integer value
- * @return Mvalue* the probability of being invertible
  */
-Mvalue* Mintegerinvertibleprobability(Mvalue* minValue,Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
-	long long min=(minValue!=NULL?getValueInteger(minValue):M_LL_INVALID);
+Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
 	long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
-	if(min!=M_LL_INVALID&&max!=M_LL_INVALID&&min<=max){
+	if(max>=0){
 		// now we're going to compute the total number of non-invertible matrices
 		Mbiginteger *zerodeterminantcount=owned_biginteger(_getBiginteger(0),owner),
 								*totalcount=owned_biginteger(_getBiginteger(0),owner);
@@ -14766,28 +14768,238 @@ Mvalue* Mintegerinvertibleprobability(Mvalue* minValue,Mvalue* maxValue){Malloca
 			long long a,b,c,d,e,f,g,h,i,count,billioncount=0;
 			// the different parts may be computed as soon as they are computable
 			// let's assume using long instead of long long suffices!!!
+			long ae,af,ah,ai,bd,bf,bg,bi,cd,ce,cg,ch,dh,di,eg,ei,fg,fh; // 18 all products
+			long G,H,I,gpart,ghpart,ghipart; // these are the submatrix determinants we're going to compute 
+			long gcdab,maxab,gcdabc,multabc,mult,determinant;
+			long delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i;
+			long flag_a,flag_b,flag_c,flag_d,flag_e,flag_f,flag_g,flag_h,flag_i;
+			// only doing the non-negative parts, in which case we need to count differently
+			for(a=0;a<=max;a++){
+				for(b=0;b<=max;b++){
+					if(a>b){
+						maxab=a;
+						gcdab=gcd(a,b);
+					}else{
+						maxab=b;
+						gcdab=(a==b?a:gcd(b,a));
+					}
+					for(c=0;c<=max;c++){
+						gcdabc=(c>gcdab?gcd(c,gcdab):gcd(gcdab,c));
+						if(gcdabc!=1){outputChar('.');continue;}
+						multabc=max/MAX(c,maxab); // this should be the number of multiples of (a,b,c) we do not need to consider
+						cd=0; // initial value of cd=c*d
+						bd=0;
+						for(d=0;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
+							ae=0;
+							ce=0;
+							I=-bd; // initial value of I=a*e-b*d
+							for(e=0;e<=max;e++,ae+=a,ce+=c,I+=a){
+								H=cd; // initial value of H=c*d-a*f
+								G=-ce; // initial value of G=b*f-c*e
+								af=0;
+								for(f=0;f<=max;f++,af+=a,G+=b,H-=a){
+									gpart=0; // the initial value of gpart=G*g
+									bg=0;cg=0;eg=0;fg=0;
+									for(g=0;g<=max;g++,bg+=b,cg+=c,eg+=e,fg+=f,gpart+=G){
+										ghpart=gpart; // the initial value of ghpart=gpart+H*h
+										ah=0;ch=0;dh=0;fh=0;
+										for(h=0;h<=max;h++,ah+=a,ch+=c,dh+=d,fh+=f,ghpart+=H){
+											ghipart=ghpart; // the initial value of ghipart=ghpart+I*i
+											ai=0;bi=0;di=0;ei=0;
+											for(i=0;i<=max;i++,ai+=a,bi+=b,di+=d,ei+=e,ghipart+=I){
+												delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
+												delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
+												delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
+												determinant=ghipart;
+												for(flag_a=(a?1:0);flag_a>=0;flag_a--){
+													if(flag_a)determinant+=delta_a;
+													for(flag_b=(b?1:0);flag_b>=0;flag_b--){
+														if(flag_b)determinant+=delta_b;
+														for(flag_c=(c?1:0);flag_c>=0;flag_c--){
+															if(flag_c)determinant+=delta_c;
+															for(flag_d=(d?1:0);flag_d>=0;flag_d--){
+																if(flag_d)determinant+=delta_d;
+																for(flag_e=(e?1:0);flag_e>=0;flag_e--){
+																	if(flag_e)determinant+=delta_e;
+																	for(flag_f=(f?1:0);flag_f>=0;flag_f--){
+																		if(flag_f)determinant+=delta_f;
+																		for(flag_g=(g?1:0);flag_g>=0;flag_g--){
+																			if(flag_g)determinant+=delta_g;
+																			for(flag_h=(h?1:0);flag_h>=0;flag_h--){
+																				if(flag_h)determinant+=delta_h;
+																				for(flag_i=(i?1:0);flag_i>=0;flag_i--){
+																					if(flag_i)determinant+=delta_i;
+																					mult=multabc;
+																					while(--mult>=0){
+																						if(0==determinant)mp_incr(zdc);
+																						mp_incr(tc);
+																						if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+																					}
+																				}
+																			}
+																		}
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			return _getValueOfRational(_getRational(disowned_biginteger(zerodeterminantcount,owner),disowned_biginteger(totalcount,owner),0,false));
+		}
+		FREE_BIGINTEGER(zerodeterminantcount,owner);
+		FREE_BIGINTEGER(totalcount,owner);
+	}
+	return NULL;
+}
+/**
+ * @brief computes the probability of 3x3 matrices with integer values between minValue and maxValue inclusive being invertible
+ * 
+ * @param minValue the smallest integer value
+ * @param maxValue the largest integer value
+ * @return Mvalue* the probability of being invertible
+ */
+Mvalue* Mintegernotinvertibleprobability(Mvalue* minValue,Mvalue* maxValue,Mvalue* methodValue){Mallocationowner owner=getOwner(__LINE__);
+	long long min=(minValue!=NULL?getValueInteger(minValue):M_LL_INVALID);
+	long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
+	long long method=(methodValue!=NULL?getValueInteger(methodValue):M_LL_INVALID);
+	if(min!=M_LL_INVALID&&max!=M_LL_INVALID&&min<=max){
+		// use shortcut method
+		if(min+max==0&&method<0)return Msymmetricintegernotinvertibleprobability(maxValue);
+		// now we're going to compute the total number of non-invertible matrices
+		Mbiginteger *zerodeterminantcount=owned_biginteger(_getBiginteger(0),owner),
+								*totalcount=owned_biginteger(_getBiginteger(0),owner);
+		if(zerodeterminantcount!=NULL&&totalcount!=NULL){
+			mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
+			long long a,b,c,d,e,f,g,h,i,count=1000000000,billioncount=0;
+			// the different parts may be computed as soon as they are computable
+			// let's assume using long instead of long long suffices!!!
 			long ce,bd,cd,G,H,I,gpart,ghpart,ghipart; // these are the submatrix determinants we're going to compute 
-			for(a=min;a<=max;a++){
-				for(b=min;b<=max;b++){
-					for(c=min;c<=max;c++){
-						cd=c*min; // initial value of cd=c*d
-						bd=b*min;
-						for(d=min;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
-							ce=c*min;
-							I=a*min-bd; // initial value of I=a*e-b*d
-							for(e=min;e<=max;e++,ae+=a,ce+=c,I+=a){
-								H=cd-a*min; // initial value of H=c*d-a*f
-								G=b*min-ce; // initial value of G=b*f-c*e
-								for(f=min;f<=max;f++,G+=b,H-=a){
-									gpart=G*min; // the initial value of gpart=G*g
-									for(g=min;g<=max;g++,gpart+=G){
-										ghpart=gpart+H*min; // the initial value of ghpart=gpart+H*h
-										for(h=min;h<=max;h++,ghpart+=H){
-											ghipart=ghpart+I*min; // the initial value of ghipart=ghpart+I*i
-											for(i=min;i<=max;i++,ghipart+=I){
-												if(ghipart==0)mp_incr(zdc);
-												mp_incr(tc);
-												if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+			// IMPROVEMENT 2
+			if(method<=0){
+				output("Using the fastest method to compute the number of zero determinant combinations.");
+				long absa,absb,absc,abc,gcdab,maxab,maxabc,gcdabc,multabc,mult; // mult indicates the number of times to switch a b c signs!!!
+				// only doing the non-negative parts, in which case we need to count differently
+				for(a=min;a<=max;a++){
+					absa=labs(a);
+					for(b=min;b<=max;b++){
+						absb=labs(b);
+						if(absa>absb){
+							maxab=absa;
+							gcdab=gcd(absa,absb);
+						}else{
+							maxab=absb;
+							gcdab=(absa==absb?absa:gcd(absb,absa));
+						}
+						for(c=min;c<=max;c++){
+							absc=labs(c);
+							///mult=(a?(b?(c?8:4):(c?4:2)):(b?(c?4:2):(c?2:1)));
+							gcdabc=(absc>gcdab?gcd(absc,gcdab):gcd(gcdab,absc));
+							//D output("a=%ld - b=%ld - c=%ld - gcd=%lu - mult=%lu",a,b,c,gcdabc,multabc);
+							if(gcdabc<=1){
+								maxabc=MAX(absc,maxab);
+								multabc=(maxabc?max/maxabc:1); // this should be the number of multiples of (a,b,c) we do not need to consider
+								cd=c*min; // initial value of cd=c*d
+								bd=b*min;
+								for(d=min;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
+									ce=c*min;
+									I=a*min-bd; // initial value of I=a*e-b*d
+									for(e=min;e<=max;e++,ce+=c,I+=a){
+										H=cd-a*min; // initial value of H=c*d-a*f
+										G=b*min-ce; // initial value of G=b*f-c*e
+										for(f=min;f<=max;f++,G+=b,H-=a){
+											gpart=G*min; // the initial value of gpart=G*g
+											for(g=min;g<=max;g++,gpart+=G){
+												ghpart=gpart+H*min; // the initial value of ghpart=gpart+H*h
+												for(h=min;h<=max;h++,ghpart+=H){
+													ghipart=ghpart+I*min; // the initial value of ghipart=ghpart+I*i
+													for(i=min;i<=max;i++,ghipart+=I){
+														mult=multabc;
+														while(--mult>=0){
+															if(mp_incr(tc)==MP_OKAY){
+																if(ghipart==0)
+																if(mp_incr(zdc)!=MP_OKAY)
+																q2outputError("Failed to increment the zero determinant count!");
+															}else
+																q2outputError("Failed to increment the total count!");
+															//D output("\t%ld",mult);
+															//D outputBiginteger(NULL,zerodeterminantcount,"/");
+															//D outputBiginteger(NULL,totalcount," ");
+															if(--count==0)
+															{output("\n\tBillion combinations processed: %lld.",++billioncount);count=1000000000;}
+														}
+														//D outputChar('\n');
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}else
+			if(method==1){
+				output("Using the second fastest method to compute the number of zero determinant combinations.");
+				for(a=min;a<=max;a++){
+					for(b=min;b<=max;b++){
+						for(c=min;c<=max;c++){
+							cd=c*min; // initial value of cd=c*d
+							bd=b*min;
+							for(d=min;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
+								ce=c*min;
+								I=a*min-bd; // initial value of I=a*e-b*d
+								for(e=min;e<=max;e++,ce+=c,I+=a){
+									H=cd-a*min; // initial value of H=c*d-a*f
+									G=b*min-ce; // initial value of G=b*f-c*e
+									for(f=min;f<=max;f++,G+=b,H-=a){
+										gpart=G*min; // the initial value of gpart=G*g
+										for(g=min;g<=max;g++,gpart+=G){
+											ghpart=gpart+H*min; // the initial value of ghpart=gpart+H*h
+											for(h=min;h<=max;h++,ghpart+=H){
+												ghipart=ghpart+I*min; // the initial value of ghipart=ghpart+I*i
+												for(i=min;i<=max;i++,ghipart+=I){
+													if(ghipart==0)mp_incr(zdc);
+													mp_incr(tc);
+													if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}else{
+				output("Using the slowest method to compute the number of zero determinant combinations.");
+				long long ei,fh,di,fg,dh,eg,apart,bpart,cpart;
+				for(a=min;a<=max;a++){
+					for(b=min;b<=max;b++){
+						for(c=min;c<=max;c++){
+							for(d=min;d<=max;d++){
+								for(e=min;e<=max;e++){
+									for(f=min;f<=max;f++){
+										for(g=min,eg=e*min,fg=f*min;g<=max;g++,eg+=e,fg+=f){
+											for(h=min,dh=d*min,fh=f*min;h<=max;h++,fh+=f,dh+=d){
+												for(i=min,ei=e*min,di=d*min;i<=max;i++,ei+=e,di+=d){
+													apart=(a!=0?a*(ei-fh):0);
+													bpart=(b!=0?b*(fg-di):0);
+													cpart=(c!=0?c*(dh-eg):0);
+													if(apart+bpart+cpart==0)mp_incr(zdc);
+													mp_incr(tc);
+													if(--count==0)
+													{output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+												}
 											}
 										}
 									}
@@ -14797,34 +15009,6 @@ Mvalue* Mintegerinvertibleprobability(Mvalue* minValue,Mvalue* maxValue){Malloca
 					}
 				}
 			}
-			/* replacing:
-			long long ei,fh,di,fg,dh,eg,apart,bpart,cpart;
-			count=1000000000;
-			for(a=min;a<=max;a++){
-				for(b=min;b<=max;b++){
-					for(c=min;c<=max;c++){
-						for(d=min;d<=max;d++){
-							for(e=min;e<=max;e++){
-								for(f=min;f<=max;f++){
-									for(g=min,eg=e*min,fg=f*min;g<=max;g++,eg+=e,fg+=f){
-										for(h=min,dh=d*min,fh=f*min;h<=max;h++,fh+=f,dh+=d){
-											for(i=min,ei=e*min,di=d*min;i<=max;i++,ei+=e,di+=d){
-												apart=(a!=0?a*(ei-fh):0);
-												bpart=(b!=0?b*(fg-di):0);
-												cpart=(c!=0?c*(dh-eg):0);
-												if(apart+bpart+cpart==0)mp_incr(zdc);
-												mp_incr(tc);
-												if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-			*/
 			return _getValueOfRational(_getRational(disowned_biginteger(zerodeterminantcount,owner),disowned_biginteger(totalcount,owner),0,false));
 		}
 		FREE_BIGINTEGER(zerodeterminantcount,owner);
@@ -15582,7 +15766,10 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
-			if(!registerFunction(_Menvironment,owner,"integerinvertibleprobability",Mintegerinvertibleprobability,2,(char*[]){"min integer","max integer"},NULL))
+			if(!registerFunction(_Menvironment,owner,"integernotinvertibleprobability",Mintegernotinvertibleprobability,3,(char*[]){"min integer","max integer","method integer"},NULL))
+				q2outputError("Failed to register the integerinvertibleprobability() function");
+
+			if(!registerFunction(_Menvironment,owner,"symmetricintegernotinvertibleprobability",Msymmetricintegernotinvertibleprobability,1,(char*[]){"max integer"},NULL))
 				q2outputError("Failed to register the integerinvertibleprobability() function");
 
 		}

@@ -551,27 +551,29 @@ static bool unregisterLocalAllocation(Malloc* const alloc){
 	// only when it's actually a local and registered allocation pointer should be we look for it and remove it
 	if(alloc!=NULL){ // defined
 		if(!alloc->owner.global){ // and considered local
-			//D output("Unregister local allocation pointer with id %llu.\n",alloc->allocationIndex); // DEBUGGING
-			// locate it
-			long long allocationIndex=allocations.ownercount;
-			while(--allocationIndex>=0&&allocations._owners[allocationIndex]!=alloc)
-				;
-			if(allocationIndex>=0){ // found
-				allocations._owners[allocationIndex]=NULL;
-				// normalize allocations.ownercount so that the last registered local allocation pointer is not NULL!!!
-				if(allocationIndex+1==allocations.ownercount){
-					while(--allocationIndex>=0&&NULL==allocations._owners[allocationIndex])
-						;
-					allocations.ownercount=allocationIndex+1;
-					//D q2output("Local allocation pointer counter lowered to %zu.\n",allocations.ownercount);
+			if(alloc->owner.id>0){ // and officially registered
+				//D output("Unregister local allocation pointer with id %llu.\n",alloc->allocationIndex); // DEBUGGING
+				// locate it
+				long long ownerIndex=allocations.ownercount;
+				while(--ownerIndex>=0&&allocations._owners[ownerIndex]!=alloc)
+					;
+				if(ownerIndex>=0){ // found
+					allocations._owners[ownerIndex]=NULL;
+					// normalize allocations.ownercount so that the last registered local allocation pointer is not NULL!!!
+					if(ownerIndex+1==allocations.ownercount){
+						while(--ownerIndex>=0&&NULL==allocations._owners[ownerIndex])
+							;
+						allocations.ownercount=ownerIndex+1;
+						//D q2output("Local allocation pointer counter lowered to %zu.\n",allocations.ownercount);
+					}
+					//D output("Local allocation pointer owned by %s:%d with id %llu unregistered (owner count now %zu)!\n",MODULE_NAMES[alloc->owner.module],alloc->owner.id,alloc->allocationIndex,allocations.ownercount); // DEBUGGING
+					return true;
 				}
-				//D q2output("Local allocation pointer owned by %s:%d with id %llu unregistered!\n",MODULE_NAMES[alloc->owner.module],alloc->owner.id,alloc->allocationIndex); // DEBUGGING
-				return true;
-			}
-			//D q2output("%s","Assumed registered local allocation not found!\n"); // DEBUGGING
-			// allocation pointer not registered!!
-			if(alloc->owner.id>0)
+				//D q2output("%s","Assumed registered local allocation not found!\n"); // DEBUGGING
+				// allocation pointer not registered!!
 				q2outputMessage(M_BUG_PREFIX,"Failed to locate and unregister local allocation with id %llu owned by %s:%d",alloc->allocationIndex,MODULE_NAMES[alloc->owner.module],alloc->owner.id);
+			}else
+				q2outputMessage(M_WARNING_PREFIX,"No need to unregister unregistered Local allocation with id %llu owned by %s:%d",alloc->allocationIndex,MODULE_NAMES[alloc->owner.module],alloc->owner.id);
 		}else
 			q2outputBug("Allocation pointer to unregister as local allocation pointer not local!");
 	}
@@ -1275,28 +1277,28 @@ static bool registerLocalAllocation(Malloc* const alloc){
 			if(allocations.ownercount>=allocations.size){ // MDH@18JAN2023 replacing: !(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
 				OUTPUT_INFO("%s","Expanding allocations.");
 				Malloc* *newAllocationOwners=(Malloc**)(allocations.size?unmanaged_realloc(allocations._owners,allocations.size*sizeof(Malloc*),(allocations.size+16)*sizeof(Malloc*)):unmanaged_malloc(16*sizeof(Malloc*)));
-				if(newAllocationOwners!=NULL){
-					allocations._owners=newAllocationOwners;
-					allocations.size+=16;
-				}else{
+				if(NULL==newAllocationOwners){
 					// not enough memory: negate the owner id to indicate we failed to actually store it in the list of 'owners'
 					alloc->owner.id=-abs(alloc->owner.id);
 					q2outputError("Failed to expand the local allocation history to accomodate another local dynamic memory pointer.");
 					return false;
 				}
+				allocations.size+=16;
+				allocations._owners=newAllocationOwners;
 			}
 			// MDH@14JAN2023 now passed in: Mallocationownertype allocationowner={owner,type};
 			assert(allocations.ownercount<allocations.size);
 			// there's room
 			allocations._owners[allocations.ownercount++]=alloc;
-			OUTPUT_INFO("Allocation of type '%c' (=%i) owned by %s:%u(%s%u%s%s) remembered at position %llu.\n"
+			//D output("Local allocation with id %lld owned by %s:%d registered.\n",alloc->allocationIndex,MODULE_NAMES[alloc->owner.module],alloc->owner.id); // DEBUGGING
+			/*D output("Allocation of type '%c' (=%i) owned by %s:%d with id %u remembered at position %zu.\n"
 					,alloc->allocationType,alloc->allocationType
 					,MODULE_NAMES[alloc->owner.module]
 					,alloc->owner.id
-					,GLOBAL_FLAG_TEXTS[alloc->owner.global]
-					,alloc->owner.level,DISOWNED_FLAG_TEXTS[alloc->owner.disowned]
-					,FREED_FLAG_TEXTS[alloc->owner.freed]
-					,allocations.ownercount);
+					//,GLOBAL_FLAG_TEXTS[alloc->owner.global],alloc->owner.level,DISOWNED_FLAG_TEXTS[alloc->owner.disowned]
+					//,FREED_FLAG_TEXTS[alloc->owner.freed]
+					,alloc->allocationIndex
+					,allocations.ownercount);*/
 			return true;
 		}
 		q2outputBug("Global allocation pointer offered to register as local allocation pointer!");
@@ -1319,6 +1321,7 @@ static long long addAllocation(Mallocationtypeowner allocationowner/*,signed cha
 	assert(allocationowner!=NULL);
 	// MDH@22JAN2025
 	setAllocationIndex(allocationowner);
+	//D output("Allocation index: %llu.\n",allocationowner->allocationIndex); // DEBUGGING
 	// MDH@23MAR2025: when a local owner add it to _owners
 	if(!allocationowner->owner.global){ // a local owner and therefore to be registered as a local owner
 		registerLocalAllocation(allocationowner);
@@ -2308,7 +2311,7 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 			);
 		*/
-		if(owner.disowned==0&&owner.id>0&&owner.freed==0){
+		if(0==owner.disowned&&0<owner.id&&0==owner.freed){
 			// MDH@23MAR2025: if ownership changes from local to global or from global to local we need to deregister or register in allocations._owners respectively
 			if(_alloc->owner.global){ // currently global
 				if(!owner.global){ // global to local

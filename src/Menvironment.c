@@ -3755,18 +3755,19 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 					///DEBUGGING output("Argument map constructed!\n");
 					_function->_parameterMap=owned_map(disowned_map(_argumentMap,owner),Msubowner(owner_environment,2));
 				}
-				Mstring* _functionText=owned_string(_getFunctionText(_function,functionName),owner);
+				Mallocationowner ownerf=getOwner(__LINE__);
+				Mstring* _functionText=owned_string(_getFunctionText(_function,functionName),ownerf);
 				if(_functionText!=NULL){
 					q2outputMessage(M_INFO_PREFIX,"'%s' registered.",string(_functionText));
-					FREE_STRING(_functionText,owner);
+					FREE_STRING(_functionText,ownerf);
 				} ///DEBUGGING
 				return true;
 			}
 			q2outputMessage(M_ERROR_PREFIX,"Failed to register internal function '%s'.",functionName);
 		}else
 		if(_argumentMap!=NULL){
-			q2outputMessage(M_ERROR_PREFIX,"Failed to create the argument map of internal function '%s'.",functionName);
 			FREE_MAP(_argumentMap,owner);
+			q2outputMessage(M_ERROR_PREFIX,"Failed to create the argument map of internal function '%s'.",functionName);
 		}
 	}else
 		q2outputMessage(M_BUG_PREFIX,"Too many arguments in internal function '%s' specfied!",functionName);

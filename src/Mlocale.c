@@ -229,7 +229,7 @@ size_t outputBigintegerLocale(Mbiginteger const * const biginteger){Mallocationo
 		Mstring* _bigintegerTextLocale=owned_string(_getIntegerTextLocale(string(_bigintegerText)),owner);
 		if(_bigintegerTextLocale!=NULL){ // we've got it
 			written=output("%s",string(_bigintegerTextLocale));
-			output("Freeing big integer text locale '%s'.\n",string(_bigintegerTextLocale)); // DEBUGGING
+			//D output("Freeing big integer text locale '%s'.\n",string(_bigintegerTextLocale)); // DEBUGGING
 			FREE_STRING(_bigintegerTextLocale,owner);
 		}else
 			written=output("%s",string(_bigintegerText));

@@ -2480,7 +2480,8 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 			}
 			//////inputInfo("Looking for the completion of '%s'.",string(_identifier));
 			// MDH@15SEP2023 TODO when should we look for functions as well, NOT when this is a reference or a property CHECK THIS!!!! 
-			Mstring* _completionText=owned_string(_getCompletion(string(_identifier),_userInputCommand->_lastToken->type!=TT_REFERENCE&&_userInputCommand->_lastToken->type!=TT_PROPERTY),owner);
+			Mallocationowner ownerc=getOwner(__LINE__);
+			Mstring* _completionText=owned_string(_getCompletion(string(_identifier),_userInputCommand->_lastToken->type!=TT_REFERENCE&&_userInputCommand->_lastToken->type!=TT_PROPERTY),ownerc);
 			FREE_STRING(_identifier,owner);
 			// need at least two characters (the type and something text behind it)
 			// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
@@ -2549,7 +2550,7 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 							inputError("There is no existing variable that can be referenced anymore.");
 					}
 				}
-				FREE_STRING(_completionText,owner);
+				FREE_STRING(_completionText,ownerc);
 			}else 
 			if(amVerboseDebugging())
 				inputInfo("No identifier continuation.");
