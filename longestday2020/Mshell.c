@@ -7093,7 +7093,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			// real arithmetic
 			case '+' :result=add(_value1,_value2);break;
 			case '-' :result=subtract(_value1,_value2);break;
-			case '*' :result=(strlen(operator)-1?power(_value1,_value2):multiply(_value1,_value2));break;
+			case '*' :result=(strlen(operator)-1?Mpower(_value1,_value2):multiply(_value1,_value2));break;
 			case 'e' :result=epower(_value1,_value2);break;
 			case '/' :result=(strlen(operator)-1?integerdivide(_value1,_value2):divide(_value1,_value2));break;
 			case '\\':result=integerdivide(_value1,_value2);break;

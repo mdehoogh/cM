@@ -1478,10 +1478,10 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
 				q2outputMessage(M_INFO_PREFIX,"Determining the big integer representation took %lld ms.\n",(clock()-then)/M_CLOCKS_PER_MS);
 		}else
 				q2outputError("No big integer to represent");
-	}else
-		q2outputError("Failed to create a text for storing the representation of a big integer");
-	///outputChar('H');
-	return disowned_string(_mpintText,owner);
+		return disowned_string(_mpintText,owner);
+	}
+	q2outputError("Failed to create a text for storing the representation of a big integer");
+	return NULL;
 }
 /**
  * @brief returns the pointer to a new M string containing the text representation of the M big integer \p _biginteger
@@ -1490,7 +1490,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
  * @return Mstring* the pointer to a new M string containing the text representation of the M big integer \p _biginteger
  */
 Mstring* _getBigintegerText(const Mbiginteger* _biginteger){//Mallocationowner owner=getOwner(__LINE__);
-	return(_biginteger?_getMpintText(MP_INT_POINTER(_biginteger)):__string());
+	return(_biginteger!=NULL?_getMpintText(MP_INT_POINTER(_biginteger)):__string());
 }
 
 Mallocationowner owner_biLLextreme=(Mallocationowner){MI_EXECUTION,__LINE__,1};
