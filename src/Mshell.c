@@ -14782,6 +14782,8 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 			long delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i;
 			long flag_a,flag_b,flag_c,flag_d,flag_e,flag_f,flag_g,flag_h,flag_i;
 			long det_a,det_b,det_c,det_d,det_e,det_f,det_g,det_h;
+			long f_a,f_b,f_c,f_d,f_e,f_f,f_g,f_h,f_i;
+			long checkdet1,checkdet2,checkdet3;
 			// only doing the non-negative parts, in which case we need to count differently
 			for(a=0;a<=max;a++){
 				for(b=0;b<=max;b++){
@@ -14797,8 +14799,8 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 							gcdabc=(c>gcdab?gcd(c,gcdab):gcd(gcdab,c));
 							if(gcdabc!=1){outputChar('.');continue;}
 							multabc=max/MAX(c,maxab); // this should be the number of multiples of (a,b,c) we do not need to consider
-							cd=0; // initial value of cd=c*d
 							bd=0;
+							cd=0; // initial value of cd=c*d
 							for(d=0;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
 								ae=0;
 								ce=0;
@@ -14823,46 +14825,82 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 													determinant=delta_a+delta_b+delta_c;
 													outputChar(':');
 													outputChar(determinant!=ghipart?'X':'O');
-													delta_a+=delta_a;delta_b+=delta_b;delta_c+=delta_c;
+													delta_a*=2;delta_b*=2;delta_c*=2;
 													delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
 													outputChar(determinant!=delta_d+delta_e+delta_f?'X':'O');
-													delta_d+=delta_d;delta_e+=delta_e;delta_f+=delta_f;
+													delta_d*=2;delta_e*=2;delta_f*=2;
 													delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
 													outputChar(determinant!=delta_g+delta_h+delta_i?'X':'O');
-													delta_g+=delta_g;delta_h+=delta_h;delta_i+=delta_i;
+													delta_g*=2;delta_h*=2;delta_i*=2;
+													output(" det=%ld d_a=%ld d_b=%ld d_c=%ld d_d=%ld d_e=%ld d_f=%ld d_g=%ld d_h=%ld d_i=%ld\n",
+																	ghipart,delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i);
 													// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
-													for(flag_a=(a?1:0),det_a=ghipart-(a?delta_a:0);;){
-														for(flag_b=(b?1:0),det_b=det_a-(b?delta_b:0);;){
-															for(flag_c=(c?1:0),det_c=det_b-(c?delta_c:0);;){
-																for(flag_d=(d?1:0),det_d=det_c-(d?delta_d:0);;){
-																	for(flag_e=(e?1:0),det_e=det_d-(e?delta_e:0);;){
-																		for(flag_f=(f?1:0),det_f=det_e-(f?delta_f:0);;){
-																			for(flag_g=(g?1:0),det_g=det_f-(g?delta_g:0);;){
-																				for(flag_h=(h?1:0),det_h=det_g-(h?delta_h:0);;){
-																					for(flag_i=(i?1:0),determinant=det_h-(i?delta_i:0);;){
+													// MISTAKE since we're starting with all negatives instead of all positives
+													//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
+													//         and do all positives first
+													for(flag_a=(a?1:0),det_a=ghipart;;){
+														for(flag_b=(b?1:0),det_b=det_a;;){
+															for(flag_c=(c?1:0),det_c=det_b;;){
+																for(flag_d=(d?1:0),det_d=det_c;;){
+																	for(flag_e=(e?1:0),det_e=det_d;;){
+																		for(flag_f=(f?1:0),det_f=det_e;;){
+																			for(flag_g=(g?1:0),det_g=det_f;;){
+																				for(flag_h=(h?1:0),det_h=det_g;;){
+																					for(flag_i=(i?1:0),determinant=det_h;;){
+																						determinant=ghipart
+																												-(flag_a?0:delta_a)
+																												-(flag_b?0:delta_b)
+																												-(flag_c?0:delta_c)
+																												-(flag_d?0:delta_d)
+																												-(flag_e?0:delta_e)
+																												-(flag_f?0:delta_f)
+																												-(flag_g?0:delta_g)
+																												-(flag_h?0:delta_h)
+																												-(flag_i?0:delta_i);
+																						f_a=(flag_a?a:-a);f_b=(flag_b?b:-b);f_c=(flag_c?c:-c);
+																						f_d=(flag_d?d:-d);f_e=(flag_e?e:-e);f_f=(flag_f?f:-f);
+																						f_g=(flag_g?g:-g);f_h=(flag_h?h:-h);f_i=(flag_i?i:-i);
+																						checkdet1=f_a*(f_e*f_i-f_f*f_h)+f_b*(f_f*f_g-f_d*f_i)+f_c*(f_d*f_h-f_e*f_g);
+																						checkdet2=f_d*(f_c*f_h-f_b*f_i)+f_e*(f_a*f_i-f_c*f_g)+f_f*(f_b*f_g-f_a*f_h);
+																						checkdet3=f_g*(f_b*f_f-f_c*f_e)+f_h*(f_c*f_d-f_a*f_f)+f_i*(f_a*f_e-f_b*f_d);
+																						output("[%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c]->%c%ld=%ld=%ld(%c)=%ld(%c)\n",
+																										f_a,(flag_a?'+':'-'),
+																										f_b,(flag_b?'+':'-'),
+																										f_c,(flag_c?'+':'-'),
+																										f_d,(flag_d?'+':'-'),
+																										f_e,(flag_e?'+':'-'),
+																										f_f,(flag_f?'+':'-'),
+																										f_g,(flag_g?'+':'-'),
+																										f_h,(flag_h?'+':'-'),
+																										f_i,(flag_i?'+':'-'),
+																										(checkdet1!=determinant?'X':'O'),determinant,
+																										checkdet1,
+																										checkdet2,(checkdet1!=checkdet2?'X':'O'),
+																										checkdet3,(checkdet2!=checkdet3?'X':'O'));
+
 																						mult=multabc;
 																						while(--mult>=0){
-																							if(0==determinant)mp_incr(zdc);
+																							if(0==checkdet1)mp_incr(zdc);
 																							mp_incr(tc);
 																							if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
 																						}
-																						if(--flag_i<0)break;determinant=det_h;
+																						if(--flag_i<0)break;determinant-=delta_i;
 																					}
-																					if(--flag_h<0)break;det_h=det_g;
+																					if(--flag_h<0)break;det_h-=delta_h;
 																				}
-																				if(--flag_g<0)break;det_g=det_f;
+																				if(--flag_g<0)break;det_g-=delta_g;
 																			}
-																			if(--flag_f<0)break;det_f=det_e;
+																			if(--flag_f<0)break;det_f-=delta_f;
 																		}
-																		if(--flag_e<0)break;det_e=det_d;
+																		if(--flag_e<0)break;det_e-=delta_e;
 																	}
-																	if(--flag_d<0)break;det_d=det_c;
+																	if(--flag_d<0)break;det_d-=delta_d;
 																}
-																if(--flag_c<0)break;det_c=det_b;
+																if(--flag_c<0)break;det_c-=delta_c;
 															}
-															if(--flag_b<0)break;det_b=det_a;
+															if(--flag_b<0)break;det_b-=delta_b;
 														}
-														if(--flag_a<0)break;det_a=ghipart;
+														if(--flag_a<0)break;det_a-=delta_a;
 													}
 												}
 											}
