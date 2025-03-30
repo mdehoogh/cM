@@ -14771,8 +14771,14 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 		// now we're going to compute the total number of non-invertible matrices
 		Mbiginteger *zerodeterminantcount=owned_biginteger(_getBiginteger(0),owner),
 								*totalcount=owned_biginteger(_getBiginteger(0),owner);
+
+		Mbiginteger *flagzerodeterminantcount=owned_biginteger(_getBiginteger(0),owner),
+								*flagtotalcount=owned_biginteger(_getBiginteger(0),owner),
+								*bigint32=owned_biginteger(_getBiginteger(32),owner);
+
 		if(zerodeterminantcount!=NULL&&totalcount!=NULL){
 			mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
+			mp_int *flagzdc=MP_INT_POINTER(flagzerodeterminantcount),*flagtc=MP_INT_POINTER(flagtotalcount);
 			long long a,b,c,d,e,f,g,h,i,count,billioncount=0;
 			// the different parts may be computed as soon as they are computable
 			// let's assume using long instead of long long suffices!!!
@@ -14784,6 +14790,11 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 			long det_a,det_b,det_c,det_d,det_e,det_f,det_g,det_h;
 			long f_a,f_b,f_c,f_d,f_e,f_f,f_g,f_h,f_i;
 			long checkdet1,checkdet2,checkdet3;
+			long aei,afh,bfg,bdi,cdh,ceg,basedeterminant;
+			long min_aei,min_afh,min_bfg,min_bdi,min_cdh,min_ceg;
+			long sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant,flagdeterminant;
+			long checkdelta_a,checkdelta_b,checkdelta_c,checkdelta_a_error=0,checkdelta_b_error=0,checkdelta_c_error=0;
+			long s1,s2,s3,s4,s5,s6;
 			// only doing the non-negative parts, in which case we need to count differently
 			for(a=0;a<=max;a++){
 				for(b=0;b<=max;b++){
@@ -14805,6 +14816,7 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 								ae=0;
 								ce=0;
 								I=-bd; // initial value of I=a*e-b*d
+								afh=0;cdh=0;
 								for(e=0;e<=max;e++,ae+=a,ce+=c,I+=a){
 									H=cd; // initial value of H=c*d-a*f
 									G=-ce; // initial value of G=b*f-c*e
@@ -14813,15 +14825,22 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 									for(f=0;f<=max;f++,af+=a,bf+=b,G+=b,H-=a){
 										gpart=0; // the initial value of gpart=G*g
 										bg=0;cg=0;eg=0;fg=0;
-										for(g=0;g<=max;g++,bg+=b,cg+=c,eg+=e,fg+=f,gpart+=G){
+										bfg=0;ceg=0;
+										for(g=0;g<=max;g++,bg+=b,cg+=c,eg+=e,fg+=f,bfg+=bf,ceg+=ce,gpart+=G){
 											ghpart=gpart; // the initial value of ghpart=gpart+H*h
 											ah=0;ch=0;dh=0;fh=0;
-											for(h=0;h<=max;h++,ah+=a,ch+=c,dh+=d,fh+=f,ghpart+=H){
+											afh=0;cdh=0;
+											for(h=0;h<=max;h++,ah+=a,ch+=c,dh+=d,fh+=f,afh+=fh,cdh+=cd,ghpart+=H){
 												ghipart=ghpart; // the initial value of ghipart=ghpart+I*i
 												ai=0;bi=0;di=0;ei=0;
-												for(i=0;i<=max;i++,ai+=a,bi+=b,di+=d,ei+=e,ghipart+=I){
+												aei=0;bdi=0;
+												for(i=0;i<=max;i++,ai+=a,bi+=b,di+=d,ei+=e,aei+=ae,bdi+=bd,ghipart+=I){
 													// ghipart is the determinant for nonnegative values of a, b, c, d, e, f, g, h and i
 													delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
+													checkdelta_a=aei-afh;checkdelta_b=bfg-bdi;checkdelta_c=cdh-ceg;
+													if(checkdelta_a!=delta_a){output(" Invalid check delta a");checkdelta_a_error++;}
+													if(checkdelta_b!=delta_b){output(" Invalid check delta b");checkdelta_b_error++;}
+													if(checkdelta_c!=delta_c){output(" Invalid check delta c");checkdelta_c_error++;}
 													determinant=delta_a+delta_b+delta_c;
 													outputChar(':');
 													outputChar(determinant!=ghipart?'X':'O');
@@ -14838,6 +14857,49 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 													// MISTAKE since we're starting with all negatives instead of all positives
 													//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
 													//         and do all positives first
+													// create all minus values we'll be needing
+													// NOTE these 6 three term products will all be positive!!! 
+													basedeterminant=aei-afh+bfg-bdi+cdh-ceg;
+													output("***basedet=%ld*** aei=%ld afh=%ld bfg=%ld bdi=%ld cdh=%ld ceg=%ld\n"
+														,basedeterminant
+														,aei,afh,bfg,bdi,cdh,ceg);
+													min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
+													// initial values of the signs to use
+													/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
+													// we need to toggle the signs twice
+													register uint32_t flags=0x69969669; // that's a funny number!!!
+													/* using the following bits
+													  0=16  1=0  2=0  3=16  
+														4=0  5=16  6=16  7=0  
+														8=0  9=16 10=16 11=0 
+														12=16 13=0 14=0 15=16 
+														16=0 17=16 18=16 19=0 
+														20=16 21=0 22=0 23=16 
+														24=16 25=0 26=0 27=16 
+														28=0 29=16 30=16 31=0
+													*/
+													// let's iterate over all 32 bits in flags consuming flags
+													output("flag determinants:");
+													for(int flagbit=31;flagbit>=0;flagbit--){
+														if(flags&1){ // this combination occurs 16 times
+															// let's construct the determinant
+															flagdeterminant=(flagbit&1?min_aei:aei)+
+																							(flagbit&2?min_afh:afh)+
+																							(flagbit&4?min_bdi:bdi)+
+																							(flagbit&8?min_bfg:bfg)+
+																							(flagbit&16?min_cdh:cdh)+
+																							(flagbit&32?min_ceg:ceg);
+															output(" det#%d=%ld",flagbit,flagdeterminant);
+															mult=multabc;
+															while(--mult>=0){
+																if(0==flagdeterminant)mp_add(flagzdc,MP_INT_POINTER(bigint32),flagzdc);
+																mp_add(flagtc,MP_INT_POINTER(bigint32),flagtc);
+																////if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+															}
+														}
+														flags>>=1; // shift out the bit we consumed
+													}
+													outputChar('\n');
 													for(flag_a=(a?1:0),det_a=ghipart;;){
 														for(flag_b=(b?1:0),det_b=det_a;;){
 															for(flag_c=(c?1:0),det_c=det_b;;){
@@ -14845,8 +14907,21 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 																	for(flag_e=(e?1:0),det_e=det_d;;){
 																		for(flag_f=(f?1:0),det_f=det_e;;){
 																			for(flag_g=(g?1:0),det_g=det_f;;){
+																				sign_bfg=flag_b+flag_f+flag_g;
+																				sign_ceg=flag_c+flag_e+flag_g;
 																				for(flag_h=(h?1:0),det_h=det_g;;){
+																					sign_afh=flag_a+flag_f+flag_h;
+																					sign_cdh=flag_c+flag_d+flag_h;
 																					for(flag_i=(i?1:0),determinant=det_h;;){
+																						sign_aei=flag_a+flag_e+flag_i;
+																						sign_bdi=flag_b+flag_d+flag_i;
+																						signed_determinant=
+																							(sign_aei&1?min_aei:aei)+
+																							(sign_afh&1?afh:min_afh)+
+																							(sign_bfg&1?min_bfg:bfg)+
+																							(sign_bdi&1?bdi:min_bdi)+
+																							(sign_cdh&1?min_cdh:cdh)+
+																							(sign_ceg&1?ceg:min_ceg);
 																						determinant=ghipart
 																												-(flag_a?0:delta_a)
 																												-(flag_b?0:delta_b)
@@ -14857,9 +14932,12 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 																												-(flag_g?0:delta_g)
 																												-(flag_h?0:delta_h)
 																												-(flag_i?0:delta_i);
-																						f_a=(flag_a?a:-a);f_b=(flag_b?b:-b);f_c=(flag_c?c:-c);
-																						f_d=(flag_d?d:-d);f_e=(flag_e?e:-e);f_f=(flag_f?f:-f);
-																						f_g=(flag_g?g:-g);f_h=(flag_h?h:-h);f_i=(flag_i?i:-i);
+																						output(" signs=%ld%ld%ld%ld%ld%ld:%ld;",
+																							sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant);
+																						f_a=(!flag_a?a:-a);f_b=(!flag_b?b:-b);f_c=(!flag_c?c:-c);
+																						f_d=(!flag_d?d:-d);f_e=(!flag_e?e:-e);f_f=(!flag_f?f:-f);
+																						f_g=(!flag_g?g:-g);f_h=(!flag_h?h:-h);f_i=(!flag_i?i:-i);
+																						// apparently checkdet1 through checkdet3 have the wrong sign!!!!!
 																						checkdet1=f_a*(f_e*f_i-f_f*f_h)+f_b*(f_f*f_g-f_d*f_i)+f_c*(f_d*f_h-f_e*f_g);
 																						checkdet2=f_d*(f_c*f_h-f_b*f_i)+f_e*(f_a*f_i-f_c*f_g)+f_f*(f_b*f_g-f_a*f_h);
 																						checkdet3=f_g*(f_b*f_f-f_c*f_e)+f_h*(f_c*f_d-f_a*f_f)+f_i*(f_a*f_e-f_b*f_d);
@@ -14922,6 +15000,14 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 					}
 				}
 			}
+			
+			q2outputBiginteger("The computed total number of flag combinations (",flagzerodeterminantcount,")");
+			q2outputBiginteger("does not match the counted total number of flag combinations (",flagtotalcount,").\n");
+			FREE_BIGINTEGER(flagzerodeterminantcount,owner);
+			FREE_BIGINTEGER(flagtotalcount,owner);
+			FREE_BIGINTEGER(bigint32,owner);
+
+			output("Number of check delta errors: a=%ld b=%ld c=%ld.\n",checkdelta_a_error,checkdelta_b_error,checkdelta_c_error);
 			if(truetotalcount!=NULL){
 				if(mp_cmp(MP_INT_POINTER(truetotalcount),tc)!=MP_EQ){
 					q2outputmessageprefix(M_BUG_PREFIX);
