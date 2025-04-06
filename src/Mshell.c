@@ -14754,7 +14754,7 @@ static long gcd(long a, long b){
 	return a;
 }
 static signed char* _getUniqueTriplets(long max){
-	if(max<=127){
+	if(max>0&&max<=127){
 		//D output("Determining unique triplets with maximum value %ld.\n",max); // DEBUGGING
 		size_t size=16,maxci;
 		signed char* _triplets=malloc(size*sizeof(signed char));
@@ -14762,7 +14762,7 @@ static signed char* _getUniqueTriplets(long max){
 			//D output("Triplets initialized!\n");
 			_triplets[0]=-1;_triplets[1]=-1;_triplets[2]=-1; // mark as not being written yet
 			uint32_t ai=0,bi=1,ci=2; // where to put the a, the b and the c
-			///uint8_t maxab=0,maxabc=0;
+			uint8_t maxab=0,maxabc;
 			long gcdab=0,gcdabc=0;
 			signed char a=0,b=0,c=0;
 			while(1){
@@ -14776,7 +14776,8 @@ static signed char* _getUniqueTriplets(long max){
 					if(_triplets[bi]<0)_triplets[bi]=b;
 					// writing c as well as the number of times (a,b,c) replicates
 					_triplets[ci++]=c;
-					/// triplets[ci++]=(maxabc?max/maxabc:1); ////MAX(c,maxab); // writing the number of replications
+					maxabc=MAX(maxab,c);
+					_triplets[ci++]=(maxabc?max/maxabc:1); ////MAX(c,maxab); // writing the number of replications
 					// am I going to write the number of combinations as well?????
 				}
 				// increment c, and if need be b and a
@@ -14804,10 +14805,10 @@ static signed char* _getUniqueTriplets(long max){
 						b=0;
 					}
 					// update maxab and gcdab
-					if(a>b){/*maxab=a;*/gcdab=gcd(a,b);}else{/*maxab=b;*/gcdab=gcd(b,a);} // replacing: gcdab=(a>b?gcd(a,b):gcd(b,a));
+					if(a>b){maxab=a;gcdab=gcd(a,b);}else{maxab=b;gcdab=gcd(b,a);} // replacing: gcdab=(a>b?gcd(a,b):gcd(b,a));
 					///output(" maxab=%d gcdab=%ld",maxab,gcdab);
 					// ascertain to have enough room for storing all c's and closers
-					maxci=ci+(max+1)+4; // apart from twice the total number of c values, we need one additional entry for at most 3 -1 closers
+					maxci=ci+2*(max+1)+4; // apart from twice the total number of c values, we need one additional entry for at most 3 -1 closers
 					if(maxci>size){
 						//D output(" newsize=%zu\n",maxci);
 						signed char* _newtriplets=realloc(_triplets,maxci*sizeof(signed char));
@@ -14846,8 +14847,21 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 								*totalcount3=(exponent3!=NULL?owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent3),owner):NULL);
 		Mbiginteger *flagzerodeterminantcount=owned_biginteger(_getBiginteger(0),owner)/*,
 								*flagtotalcount=owned_biginteger(_getBiginteger(0),owner)*/;
+		Mbiginteger *billions=owned_biginteger(_getBiginteger(0),owner);
+		Mstring* billionsText=NULL;
+		if(billions!=NULL){
+			mp_digit d;
+			if(mp_div_d(MP_INT_POINTER(truetotalcount),1000000000,MP_INT_POINTER(billions),&d)!=MP_OKAY){
+				q2outputError("Failed to compute the number of billions of combinations to process");
+				FREE_BIGINTEGER(billions,owner);billions=NULL;
+			}else{
+				billionsText=owned_string(_getBigintegerText(billions),owner);
+				outputBiginteger("Number of billions of combinations to process: ",billions,".\n");
+			}
+		}
 		if(truetotalcount!=NULL&&totalcount6!=NULL&&totalcount3!=NULL&&flagzerodeterminantcount!=NULL/*&&flagtotalcount!=NULL*/){
-			q2output("Determining all not invertible 3x3 matrices with maximum value %ld symmetrical.\n",max);
+			q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",-max,max);
+			
 			//D mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
 			mp_int *flagzdc=MP_INT_POINTER(flagzerodeterminantcount)/*,*flagtc=MP_INT_POINTER(flagtotalcount)*/;
 			long long a,b,c,d,e,f,g,h,i;
@@ -14865,8 +14879,7 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 			long long aei,afh,bfg,bdi,cdh,ceg;
 			long long min_aei,min_afh,min_bfg,min_bdi,min_cdh,min_ceg;
 			long long mult,flagdeterminant;
-			long long equalrowcount=0;
-			uint8_t equalrowflags;
+			///long long equalrowcount=0;uint8_t equalrowflags;
 			///long sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant,flagdeterminant;
 			///long checkdelta_a,checkdelta_b,checkdelta_c,checkdelta_a_error=0,checkdelta_b_error=0,checkdelta_c_error=0;
 			///long s1,s2,s3,s4,s5,s6;
@@ -14896,8 +14909,11 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 				///mp_add(flagtc,flagzdc,flagtc); // set flagtc to the same value as flagzdc
 
 				///abctripletindex=2;
-				a=uniqueTriplets[0],b=uniqueTriplets[1],c=uniqueTriplets[2];
-				abctripletptr=&uniqueTriplets[2];
+				a=uniqueTriplets[0];
+				b=uniqueTriplets[1];
+				c=uniqueTriplets[2];
+				////multabc=uniqueTriplets[3];
+				abctripletptr=&uniqueTriplets[3];
 				do{
 					// read the assumed next c
 					c=*(++abctripletptr); //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
@@ -14910,9 +14926,9 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 						}
 						c=*(++abctripletptr); //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
 					}
+					multabc=*(++abctripletptr);
 					//D output(" a=%ld b=%ld c=%ld\n",a,b,c);
-					maxabc=MAX(MAX(a,b),c);
-						multabc=(max/maxabc);
+					// replacing: maxabc=MAX(MAX(a,b),c); multabc=(max/maxabc);
 						///mult=multabc;
 						/*
 						bd=0;cd=0; // initial value of cd=c*d
@@ -14920,7 +14936,7 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 						af=0;bf=0;*/
 						///deftripletindex=2;
 						d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
-						deftripletptr=&uniqueTriplets[2];
+						deftripletptr=&uniqueTriplets[3];
 						do{
 							// read the assumed next f
 							f=*++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
@@ -14937,14 +14953,12 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 							ae=a*e;af=a*f;
 							bd=b*d;bf=b*f;
 							cd=c*d;ce=c*e;
-							maxdef=MAX(MAX(d,e),f);
-							//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
-							//if(maxdef){
-								multdef=max/maxdef;
+							multdef=*++deftripletptr;
+							// replacing: maxdef=MAX(MAX(d,e),f);	multdef=max/maxdef;
 								///mult*=multdef;
 								///ghitripletindex=2;
 								g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
-								ghitripletptr=&uniqueTriplets[2];
+								ghitripletptr=&uniqueTriplets[3];
 								do{
 									// read the assumed next f
 									i=*++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
@@ -14958,10 +14972,8 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 										i=*++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
 									}
 									//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d",a,b,c,d,e,f,g,h,i);
-									maxghi=MAX(MAX(g,h),i);
-									//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
-									//if(maxghi){
-										multghi=max/maxghi;
+									multghi=*++ghitripletptr;
+									// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
 										///mult*=multghi;
 										/// obsolete: bg=b*g;cg=c*g;eg=e*g;fg=f*g;
 										/// obsolete: ah=a*h;ch=c*h;dh=d*h;fh=f*h;
@@ -15052,12 +15064,13 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 										outputBiginteger("/",incflagtc,"\n");
 										*/
 										mult=multabc*multdef*multghi;
-										// if two rows are equal count them
+										/* if two rows are equal count them
 										equalrowflags=(a==d&&b==e&&c==f)+2*(a==g&&b==h&&c==i)+4*(d==g&&e==h&&f==i);
 										if(equalrowflags){
 											equalrowcount+=(mult*totalflagzerodeterminants);
 											output("a=%2d b=%2d c=%2d d=%2d e=%2d f=%2d g=%2d h=%2d i=%2d equalrowflags=%d mult=%lld fzd=%lld equalrowcount=%lld\n",a,b,c,d,e,f,g,h,i,equalrowflags,mult,totalflagzerodeterminants,equalrowcount);
 										}
+										*/
 										//D output(" mult=%ld zdinc=%ld totalinc=%ld",mult,totalflagzerodeterminants,totalflagdeterminants);
 										if(MP_OKAY==mp_add_d(flagzdc,mult*totalflagzerodeterminants,flagzdc)/*&&
 												MP_OKAY==mp_add_d(flagtc,mult*totalflagdeterminants,flagtc)*/){
@@ -15066,7 +15079,12 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 										}else
 											q2outputError("Failed to add the flag (zero) determinant count!");
 										count-=(mult*totalflagdeterminants);
-										if(count<0){output("Billion combinations processed: %lld.\n",++billioncount);count+=1000000000;}
+										if(count<0){
+											output("%lld",++billioncount);
+											if(billionsText!=NULL)output(" out of %s",string(billionsText));
+											output("%s"," billions of combinations processed so far.\n");
+											count+=1000000000;
+										}
 										///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
 										//D outputChar('\n');
 										/*
@@ -15197,7 +15215,7 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 							q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
 					}*/
 				}while(1);
-				output("Equal row count: %lld.\n",equalrowcount);
+				///output("Equal row count: %lld.\n",equalrowcount);
 				/* replacing:
 				while(1){
 					maxabc=MAX(MAX(a,b),c);
@@ -15570,6 +15588,8 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 			FREE_BIGINTEGER(flagzerodeterminantcount,owner);
 			FREE_BIGINTEGER(truetotalcount,owner);
 		}
+		if(billions!=NULL)FREE_BIGINTEGER(billions,owner);
+		if(billionsText!=NULL)FREE_STRING(billionsText,owner);
 		///// OOPS do NOT do this again!!!!! if(base!=NULL)FREE_BIGINTEGER(base,owner);
 		if(exponent9!=NULL)FREE_BIGINTEGER(exponent9,owner);
 		if(exponent6!=NULL)FREE_BIGINTEGER(exponent6,owner);
