@@ -14763,8 +14763,9 @@ static signed char* _getUniqueTriplets(long max){
 			_triplets[0]=-1;_triplets[1]=-1;_triplets[2]=-1; // mark as not being written yet
 			uint32_t ai=0,bi=1,ci=2; // where to put the a, the b and the c
 			uint8_t maxab=0,maxabc;
-			long gcdab=0,gcdabc=0;
-			signed char a=0,b=0,c=0;
+			long gcdab=0,gcdabc;
+			// let's NOT store (0,0,0) but start at (0,0,1)
+			signed char a=0,b=0,c=1;
 			while(1){
 				//D output("a=%d b=%d c=%d",a,b,c);
 				// let's ascertain that we have enouth room to store all the c's we maximally need to add whidh is 2*(max+1)
@@ -14777,7 +14778,7 @@ static signed char* _getUniqueTriplets(long max){
 					// writing c as well as the number of times (a,b,c) replicates
 					_triplets[ci++]=c;
 					maxabc=MAX(maxab,c);
-					_triplets[ci++]=(maxabc?max/maxabc:1); ////MAX(c,maxab); // writing the number of replications
+					_triplets[ci++]=maxabc; ////MAX(c,maxab); // writing the number of replications
 					// am I going to write the number of combinations as well?????
 				}
 				// increment c, and if need be b and a
@@ -14860,7 +14861,7 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 			}
 		}
 		if(truetotalcount!=NULL&&totalcount6!=NULL&&totalcount3!=NULL&&flagzerodeterminantcount!=NULL/*&&flagtotalcount!=NULL*/){
-			q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",-max,max);
+			q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",max,max);
 			
 			//D mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
 			mp_int *flagzdc=MP_INT_POINTER(flagzerodeterminantcount)/*,*flagtc=MP_INT_POINTER(flagtotalcount)*/;
@@ -14879,6 +14880,8 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 			long long aei,afh,bfg,bdi,cdh,ceg;
 			long long min_aei,min_afh,min_bfg,min_bdi,min_cdh,min_ceg;
 			long long mult,flagdeterminant;
+			uint8_t rowequalityflags; // the number of different row orderings with the same amount of zero determinants
+			long long multroworders[4]={6,3,3,1};
 			///long long equalrowcount=0;uint8_t equalrowflags;
 			///long sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant,flagdeterminant;
 			///long checkdelta_a,checkdelta_b,checkdelta_c,checkdelta_a_error=0,checkdelta_b_error=0,checkdelta_c_error=0;
@@ -14888,16 +14891,17 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 			if(uniqueTriplets!=NULL){
 				//D output("Triplets!\n");
 				// let's write the unique triplets!!!
-				/*D
+
 				uint32_t index=3;
 				output("Unique triplets: 0:%d 1:%d 2:%d",uniqueTriplets[0],uniqueTriplets[1],uniqueTriplets[2]);
 				while(uniqueTriplets[index-3]>=0||uniqueTriplets[index-2]>=0||uniqueTriplets[index-1]>=0)
 					output(" %d:%d",index,uniqueTriplets[index++]);
 				outputChar('\n');
-				D*/
+
 				///uint32_t abctripletindex,deftripletindex,ghitripletindex;
 				signed char *abctripletptr,*deftripletptr,*ghitripletptr;
 
+				signed char *aptr,*bptr,*cptr,*dptr,*eptr,*fptr,*gptr,*hptr,*iptr; // keeping track of the pointers
 				// initialize zdc and tc to 3 times totalcount6 which are the zero determinants when each row consists of zeroes
 				mp_mul_d(MP_INT_POINTER(totalcount6),3,MP_INT_POINTER(totalcount6)); // multiply totalcount6 with 3 (for each row)
 				mp_mul_d(MP_INT_POINTER(totalcount3),3,MP_INT_POINTER(totalcount3)); // multiply totalcount3 with 3 (for each row)
@@ -14909,24 +14913,10 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 				///mp_add(flagtc,flagzdc,flagtc); // set flagtc to the same value as flagzdc
 
 				///abctripletindex=2;
-				a=uniqueTriplets[0];
-				b=uniqueTriplets[1];
-				c=uniqueTriplets[2];
-				////multabc=uniqueTriplets[3];
-				abctripletptr=&uniqueTriplets[3];
+				aptr=uniqueTriplets;bptr=aptr+1;cptr=bptr+1;abctripletptr=cptr+1;
+				a=*aptr;b=*bptr;c=*cptr;maxabc=*abctripletptr;
+				multabc=max/maxabc;
 				do{
-					// read the assumed next c
-					c=*(++abctripletptr); //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-					if(c<0){ // a c closer
-						b=*(++abctripletptr); //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-						if(b<0){ // a b closer
-							a=*(++abctripletptr); //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-							if(a<0)break;
-							b=*(++abctripletptr); //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-						}
-						c=*(++abctripletptr); //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-					}
-					multabc=*(++abctripletptr);
 					//D output(" a=%ld b=%ld c=%ld\n",a,b,c);
 					// replacing: maxabc=MAX(MAX(a,b),c); multabc=(max/maxabc);
 						///mult=multabc;
@@ -14935,44 +14925,63 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 						ae=0;ce=0;
 						af=0;bf=0;*/
 						///deftripletindex=2;
-						d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
-						deftripletptr=&uniqueTriplets[3];
+						///d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
+						// start at the same triplets as (a,b,c)
+						dptr=aptr;eptr=bptr;fptr=cptr;deftripletptr=fptr+1;
+						d=*dptr;e=*eptr;f=*fptr;maxdef=*deftripletptr;
+						multdef=max/maxdef;
+						// replacing: dptr=uniqueTriplets;eptr=dptr+1;fptr=eptr+1;
+						rowequalityflags=1; // (d,e,f) equals (a,b,c) so starts being 1
 						do{
+							/*
 							// read the assumed next f
-							f=*++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-							if(f<0){ // a c closer
-								e=*++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-								if(e<0){ // a b closer
-									d=*++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-									if(d<0)break;
-									e=*++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							if(*fptr<0){ // a c closer
+								eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+								if(*eptr<0){ // a b closer
+									dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+									if(*dptr<0)break;
+									d=*dptr;
+									eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
 								}
-								f=*++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+								e=*eptr;
+								fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
 							}
+							f=*fptr;
+							multdef=*++deftripletptr;
+							*/
 							// the six two term products we need for the six three term products
 							ae=a*e;af=a*f;
 							bd=b*d;bf=b*f;
 							cd=c*d;ce=c*e;
-							multdef=*++deftripletptr;
 							// replacing: maxdef=MAX(MAX(d,e),f);	multdef=max/maxdef;
 								///mult*=multdef;
 								///ghitripletindex=2;
-								g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
-								ghitripletptr=&uniqueTriplets[3];
+								///g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
+								gptr=dptr;hptr=eptr;iptr=fptr;ghitripletptr=iptr+1; // where maxghi is stored
+								g=*gptr;h=*hptr;i=*iptr;maxghi=*ghitripletptr;
+								multghi=max/maxghi;
+								// replacing: gptr=uniqueTriplets;hptr=gptr+1;iptr=hptr+1;
+								rowequalityflags|=2; // (g,h,i) now equal to (d,e,f)
 								do{
-									// read the assumed next f
-									i=*++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-									if(i<0){ // a c closer
-										h=*++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-										if(h<0){ // a b closer
-											g=*++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-											if(g<0)break;
-											h=*++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+									/*
+									// read the assumed next i
+									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+									if(*iptr<0){ // a i closer
+										hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+										if(*hptr<0){ // a h closer
+											gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+											if(*gptr<0)break;
+											g=*gptr;
+											hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
 										}
-										i=*++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+										h=*hptr;
+										iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
 									}
-									//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d",a,b,c,d,e,f,g,h,i);
+									i=*iptr;
 									multghi=*++ghitripletptr;
+									*/
+									//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
 									// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
 										///mult*=multghi;
 										/// obsolete: bg=b*g;cg=c*g;eg=e*g;fg=f*g;
@@ -15038,7 +15047,7 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 										// and we're only looking at 16 of them, so each of them is counted 32 times but that shouldn't 
 										// be 32 per se, so how can we compute which combinations to count twice!!
 										long long totalflagzerodeterminants=0;
-										for(int flagbit=31;flagbit>=0;flagbit--){
+										for(register int flagbit=31;flagbit>=0;flagbit--){
 											if(flags&1){ // this combination occurs 16 times
 												// let's construct the determinant
 												flagdeterminant=(flagbit&1?min_aei:aei)+
@@ -15049,10 +15058,11 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 																					ceg; ////(flagbit&32?min_ceg:ceg);
 												//D output(" det#%d=%ld",flagbit,flagdeterminant);
 												if(0==flagdeterminant)
-													totalflagzerodeterminants+=32;
+													totalflagzerodeterminants++;
 											}
 											flags>>=1; // shift out the bit we consumed
 										}
+										totalflagzerodeterminants<<=5; // multiply by 32 (otherwise we would have needed to add 32 each time)
 										// use zerodeterminantcount to determine the multiplication factor
 										long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
 										totalflagzerodeterminants>>=zeroes; // shift by the total number of zeroes
@@ -15063,7 +15073,7 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 										outputBiginteger("flag zero determinants=",incflagzdc,NULL);
 										outputBiginteger("/",incflagtc,"\n");
 										*/
-										mult=multabc*multdef*multghi;
+										mult=multroworders[rowequalityflags]*multabc*multdef*multghi;
 										/* if two rows are equal count them
 										equalrowflags=(a==d&&b==e&&c==f)+2*(a==g&&b==h&&c==i)+4*(d==g&&e==h&&f==i);
 										if(equalrowflags){
@@ -15192,6 +15202,23 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 										if(mp_add_d(flagtc,mult,flagtc)!=MP_OKAY||mp_add_d(flagzdc,mult,flagzdc)!=MP_OKAY)
 											q2outputError("Failed to increment the total and zero determinant combination counts when g, h and i are zero!");					
 									}*/
+									// read the assumed next i
+									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+									if(*iptr<0){ // a i closer
+										hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+										if(*hptr<0){ // a h closer
+											gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+											if(*gptr<0)break;
+											g=*gptr;
+											hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+										}
+										h=*hptr;
+										iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+									}
+									i=*iptr;
+									maxghi=*++ghitripletptr;
+									multghi=max/maxghi;
+									if(rowequalityflags&2)rowequalityflags-=2; // (g,h,i) now different than (d,e,f) (and possibly (a,b,c) as well)
 								}while(1);
 							/*}else{ // d=e=f=0
 								// we now we have to repeat totalcount3 by multabc
@@ -15207,6 +15234,23 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 								}else
 									q2outputError("Failed to create a big integer for computing the replication of zero determinant counts.");
 							}*/
+							// read the assumed next f
+							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							if(*fptr<0){ // a c closer
+								eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+								if(*eptr<0){ // a b closer
+									dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+									if(*dptr<0)break;
+									d=*dptr;
+									eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+								}
+								e=*eptr;
+								fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							}
+							f=*fptr;
+							maxdef=*++deftripletptr;
+							multdef=max/maxdef;
+							if(rowequalityflags&1)rowequalityflags--; // (d,e,f) will now be (considered) different from (a,b,c)
 						}while(1);
 					/*
 					}else{ // a=b=c=0
@@ -15214,6 +15258,22 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 								mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc)!=MP_OKAY)
 							q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
 					}*/
+					// read the assumed next c
+					cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+					if(*cptr<0){ // a c closer
+						bptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+						if(*bptr<0){ // a b closer
+							aptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+							if(*aptr<0)break;
+							a=*aptr;
+							bptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+						}
+						b=*bptr; // update b
+						cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];						
+					}
+					c=*cptr; // update c
+					maxabc=*(++abctripletptr);
+					multabc=max/maxabc; // update multabc
 				}while(1);
 				///output("Equal row count: %lld.\n",equalrowcount);
 				/* replacing:
