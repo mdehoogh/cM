@@ -14830,250 +14830,315 @@ static signed char* _getUniqueTriplets(long max){
 	}
 	return NULL;
 }
-/**
- * @brief 
- * 
- */
-Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* resultValue=NULL;
-	long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
-	if(max>=0&&max<128){
-		Mbiginteger *base=owned_biginteger(_getBiginteger(2*max+1),owner);
+// some module global variables to store helper data and intermediate results
+static signed char mults[128][128];
+static uint8_t initializedMults=1;
+static Mrational* integernotinvertibleprobabilities[128]={NULL,NULL};Mallocationowner owner_integernotinvertibleprobabilities=(Mallocationowner){MI_SHELL,__LINE__,1};
+static void updateMults(unsigned char max){
+	assert(max>=initializedMults&&max<128);
+	// block below
+	for(int i=initializedMults;i<=max;i++)for(int j=1;j<=max;j++)mults[i][j]=i/j;
+	// block to the right
+	for(int i=1;i<=initializedMults;i++)for(int j=initializedMults;j<max;j++)mults[i][j]=i/j;
+	// ascertain that the integer not invertible probabilities yet to be determined are zero
+	for(int j=initializedMults;j<=max;j++)integernotinvertibleprobabilities[j]=NULL;
+}
+static void updateInitializedMults(){
+	while(integernotinvertibleprobabilities[initializedMults]!=NULL)initializedMults++;
+}
+static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocationowner owner=getOwner(__LINE__);
+	assert(max>0&&max<128);
+	// if we already know it, we can return it as from the stored rationals (as a copy that is)
+	if(max<initializedMults)
+		return _getRationalCopy(integernotinvertibleprobabilities[max]);
+	// we'll be needing 3, 6 and 9 big integers
+	Mbiginteger *exponent9=owned_biginteger(_getBiginteger(9),owner),
+							*exponent6=owned_biginteger(_getBiginteger(6),owner),
+							*exponent3=owned_biginteger(_getBiginteger(3),owner);
+	if(NULL==exponent9||NULL==exponent6||NULL==exponent3){
+		FREE_BIGINTEGER(exponent9,owner);FREE_BIGINTEGER(exponent6,owner);FREE_BIGINTEGER(exponent3,owner);
+		return NULL;
+	}
+	Mrational* resultRational=NULL;
+	// we are to determine all probabilities starting at initializedMults and ending with max
+	Mbiginteger** truetotalcounts=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
+	Mbiginteger** totalcounts6=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
+	Mbiginteger** totalcounts3=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
+	Mbiginteger** flagzerodeterminantcounts=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
+	if(NULL==truetotalcounts||NULL==totalcounts6||NULL==totalcounts3||NULL==flagzerodeterminantcounts){
+		unmanaged_free(truetotalcounts,(max+1)*sizeof(Mbiginteger*));
+		unmanaged_free(totalcounts6,(max+1)*sizeof(Mbiginteger*));
+		unmanaged_free(totalcounts3,(max+1)*sizeof(Mbiginteger*));
+		unmanaged_free(flagzerodeterminantcounts,(max+1)*sizeof(Mbiginteger*));
+		return NULL;
+	}
+	// initialize the 
+	for(int i=initializedMults;i<=max;i+=1){
+		Mbiginteger *base=owned_biginteger(_getBiginteger(2*i+1),owner);
 		if(NULL==base)return NULL;
-		Mbiginteger *exponent9=owned_biginteger(_getBiginteger(9),owner),
-								*exponent6=owned_biginteger(_getBiginteger(6),owner),
-								*exponent3=owned_biginteger(_getBiginteger(3),owner);
-		Mbiginteger *truetotalcount=(exponent9!=NULL?owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent9),owner):NULL);
-		Mbiginteger	*totalcount6=(exponent6!=NULL?owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent6),owner):NULL),
-								*totalcount3=(exponent3!=NULL?owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent3),owner):NULL);
-		Mbiginteger *flagzerodeterminantcount=owned_biginteger(_getBiginteger(0),owner)/*,
-								*flagtotalcount=owned_biginteger(_getBiginteger(0),owner)*/;
-		Mbiginteger *billions=owned_biginteger(_getBiginteger(0),owner);
-		Mstring* billionsText=NULL;
-		if(billions!=NULL){
-			mp_digit d;
-			if(mp_div_d(MP_INT_POINTER(truetotalcount),1000000000,MP_INT_POINTER(billions),&d)!=MP_OKAY){
-				q2outputError("Failed to compute the number of billions of combinations to process");
-				FREE_BIGINTEGER(billions,owner);billions=NULL;
-			}else{
-				billionsText=owned_string(_getBigintegerText(billions),owner);
-				outputBiginteger("Number of billions of combinations to process: ",billions,".\n");
-			}
+		truetotalcounts[i]=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent9),owner);
+		totalcounts6[i]=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent6),owner);
+		totalcounts3[i]=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent3),owner);
+		flagzerodeterminantcounts[i]=owned_biginteger(_getBiginteger(0),owner);
+		FREE_BIGINTEGER(base,owner);
+	}
+	/* replacing:
+	Mbiginteger *truetotalcount=(exponent9!=NULL?owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent9),owner):NULL);
+	Mbiginteger *flagzerodeterminantcount=owned_biginteger(_getBiginteger(0),owner);
+	*/
+	Mbiginteger *billions=owned_biginteger(_getBiginteger(0),owner);
+	Mstring* billionsText=NULL;
+	if(billions!=NULL){
+		mp_digit d;
+		if(mp_div_d(MP_INT_POINTER(truetotalcounts[max]),1000000000,MP_INT_POINTER(billions),&d)!=MP_OKAY){
+			q2outputError("Failed to compute the number of billions of combinations to process");
+			FREE_BIGINTEGER(billions,owner);billions=NULL;
+		}else{
+			billionsText=owned_string(_getBigintegerText(billions),owner);
+			outputBiginteger("Number of billions of combinations to process: ",billions,".\n");
 		}
-		if(truetotalcount!=NULL&&totalcount6!=NULL&&totalcount3!=NULL&&flagzerodeterminantcount!=NULL/*&&flagtotalcount!=NULL*/){
-			q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",max,max);
-			
-			//D mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
-			mp_int *flagzdc=MP_INT_POINTER(flagzerodeterminantcount)/*,*flagtc=MP_INT_POINTER(flagtotalcount)*/;
-			long long a,b,c,d,e,f,g,h,i;
-			long long count,billioncount=0;
-			// the different parts may be computed as soon as they are computable
-			// let's assume using long instead of long long suffices!!!
-			long long ae,af,bd,bf,cd,ce; //// obsolete: bg,cg,ch,dh,di,eg,ei,fg,fh; // 18 all products
-			///long G,H,I,gpart,ghpart,ghipart; // these are the submatrix determinants we're going to compute 
-			long long multabc,maxabc,multdef,maxdef,multghi,maxghi;
-			///long delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i;
-			///long flag_a,flag_b,flag_c,flag_d,flag_e,flag_f,flag_g,flag_h,flag_i;
-			///long det_a,det_b,det_c,det_d,det_e,det_f,det_g,det_h;
-			///long f_a,f_b,f_c,f_d,f_e,f_f,f_g,f_h,f_i;
-			///long checkdet1,checkdet2,checkdet3;
-			long long aei,afh,bfg,bdi,cdh,ceg;
-			long long min_aei,min_afh,min_bfg,min_bdi,min_cdh,min_ceg;
-			long long mult,flagdeterminant;
-			uint8_t rowequalityflags; // the number of different row orderings with the same amount of zero determinants
-			long long multroworders[4]={6,3,3,1};
-			///long long equalrowcount=0;uint8_t equalrowflags;
-			///long sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant,flagdeterminant;
-			///long checkdelta_a,checkdelta_b,checkdelta_c,checkdelta_a_error=0,checkdelta_b_error=0,checkdelta_c_error=0;
-			///long s1,s2,s3,s4,s5,s6;
-			// only doing the non-negative parts, in which case we need to count differently
-			signed char* uniqueTriplets=_getUniqueTriplets(max);
-			if(uniqueTriplets!=NULL){
-				//D output("Triplets!\n");
-				// let's write the unique triplets!!!
+	}
+	if(truetotalcounts!=NULL&&totalcounts6!=NULL&&totalcounts3!=NULL&&flagzerodeterminantcounts!=NULL/*&&flagtotalcount!=NULL*/){
+		
+		q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",max,max);
+		
+		updateMults(max);
 
-				uint32_t index=3;
-				output("Unique triplets: 0:%d 1:%d 2:%d",uniqueTriplets[0],uniqueTriplets[1],uniqueTriplets[2]);
-				while(uniqueTriplets[index-3]>=0||uniqueTriplets[index-2]>=0||uniqueTriplets[index-1]>=0)
-					output(" %d:%d",index,uniqueTriplets[index++]);
-				outputChar('\n');
+		//D mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
+		mp_int *flagzdc; ///=MP_INT_POINTER(flagzerodeterminantcount)/*,*flagtc=MP_INT_POINTER(flagtotalcount)*/;
+		long long a,b,c,d,e,f,g,h,i;
+		long long count,billioncount=0;
+		// the different parts may be computed as soon as they are computable
+		// let's assume using long instead of long long suffices!!!
+		long long ae,af,bd,bf,cd,ce; //// obsolete: bg,cg,ch,dh,di,eg,ei,fg,fh; // 18 all products
+		///long G,H,I,gpart,ghpart,ghipart; // these are the submatrix determinants we're going to compute 
+		long long maxabc,maxdef,maxghi;
+		long long multabc,multdef,multghi;
+		long long maxtriplets; // the maximum of all the triplet elements
+		///long delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i;
+		///long flag_a,flag_b,flag_c,flag_d,flag_e,flag_f,flag_g,flag_h,flag_i;
+		///long det_a,det_b,det_c,det_d,det_e,det_f,det_g,det_h;
+		///long f_a,f_b,f_c,f_d,f_e,f_f,f_g,f_h,f_i;
+		///long checkdet1,checkdet2,checkdet3;
+		long long aei,afh,bfg,bdi,cdh,ceg;
+		long long min_aei,min_afh,min_bfg,min_bdi,min_cdh,min_ceg;
+		long long mult,flagdeterminant;
+		uint8_t rowequalityflags; // the number of different row orderings with the same amount of zero determinants
+		long long multroworders[4]={6,3,3,1};
+		///long long equalrowcount=0;uint8_t equalrowflags;
+		///long sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant,flagdeterminant;
+		///long checkdelta_a,checkdelta_b,checkdelta_c,checkdelta_a_error=0,checkdelta_b_error=0,checkdelta_c_error=0;
+		///long s1,s2,s3,s4,s5,s6;
+		// only doing the non-negative parts, in which case we need to count differently
+		signed char* uniqueTriplets=_getUniqueTriplets(max);
+		if(uniqueTriplets!=NULL){
+			//D output("Triplets!\n");
+			// let's write the unique triplets!!!
 
-				///uint32_t abctripletindex,deftripletindex,ghitripletindex;
-				signed char *abctripletptr,*deftripletptr,*ghitripletptr;
+			uint32_t index=3;
+			output("Unique triplets: 0:%d 1:%d 2:%d",uniqueTriplets[0],uniqueTriplets[1],uniqueTriplets[2]);
+			while(uniqueTriplets[index-3]>=0||uniqueTriplets[index-2]>=0||uniqueTriplets[index-1]>=0)
+				output(" %d:%d",index,uniqueTriplets[index++]);
+			outputChar('\n');
 
-				signed char *aptr,*bptr,*cptr,*dptr,*eptr,*fptr,*gptr,*hptr,*iptr; // keeping track of the pointers
+			///uint32_t abctripletindex,deftripletindex,ghitripletindex;
+			signed char *abctripletptr,*deftripletptr,*ghitripletptr;
+
+			signed char *aptr,*bptr,*cptr,*dptr,*eptr,*fptr,*gptr,*hptr,*iptr; // keeping track of the pointers
+
+			for(int i=initializedMults;i<=max;i++){
 				// initialize zdc and tc to 3 times totalcount6 which are the zero determinants when each row consists of zeroes
-				mp_mul_d(MP_INT_POINTER(totalcount6),3,MP_INT_POINTER(totalcount6)); // multiply totalcount6 with 3 (for each row)
-				mp_mul_d(MP_INT_POINTER(totalcount3),3,MP_INT_POINTER(totalcount3)); // multiply totalcount3 with 3 (for each row)
-				
+				if(totalcounts6[i]!=NULL)
+					mp_mul_d(MP_INT_POINTER(totalcounts6[i]),3,MP_INT_POINTER(totalcounts6[i])); // multiply totalcount6 with 3 (for each row)
+				else
+					q2outputMessage(M_ERROR_PREFIX,"Total counts 6 of base %d undefined!",i);
+				if(totalcounts3[i]!=NULL)
+					mp_mul_d(MP_INT_POINTER(totalcounts3[i]),3,MP_INT_POINTER(totalcounts3[i])); // multiply totalcount3 with 3 (for each row)
+				else
+					q2outputMessage(M_ERROR_PREFIX,"Total counts 3 of base %d undefined!",i);
+			
 				// initialize flagzdc to totalcount6-totalcount3+1 which are all the combinations with one of the rows zero
-				mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc);
-				mp_sub(flagzdc,MP_INT_POINTER(totalcount3),flagzdc);
-				mp_incr(flagzdc);
-				///mp_add(flagtc,flagzdc,flagtc); // set flagtc to the same value as flagzdc
+				if(flagzerodeterminantcounts[i]!=NULL){
+					flagzdc=MP_INT_POINTER(flagzerodeterminantcounts[i]);
+					mp_add(flagzdc,MP_INT_POINTER(totalcounts6[i]),flagzdc);
+					mp_sub(flagzdc,MP_INT_POINTER(totalcounts3[i]),flagzdc);
+					mp_incr(flagzdc);
+				}else
+					q2outputMessage(M_ERROR_PREFIX,"Zero determinant count of base %d undefined!",i);
+			}
+			///mp_add(flagtc,flagzdc,flagtc); // set flagtc to the same value as flagzdc
 
-				///abctripletindex=2;
-				aptr=uniqueTriplets;bptr=aptr+1;cptr=bptr+1;abctripletptr=cptr+1;
-				a=*aptr;b=*bptr;c=*cptr;maxabc=*abctripletptr;
-				multabc=max/maxabc;
-				do{
-					//D output(" a=%ld b=%ld c=%ld\n",a,b,c);
-					// replacing: maxabc=MAX(MAX(a,b),c); multabc=(max/maxabc);
-						///mult=multabc;
+			///abctripletindex=2;
+			aptr=uniqueTriplets;bptr=aptr+1;cptr=bptr+1;abctripletptr=cptr+1;
+			a=*aptr;b=*bptr;c=*cptr;maxabc=*abctripletptr;
+			///multabc=max/maxabc;
+			do{
+				//D output(" a=%ld b=%ld c=%ld\n",a,b,c);
+				// replacing: maxabc=MAX(MAX(a,b),c); multabc=(max/maxabc);
+					///mult=multabc;
+					/*
+					bd=0;cd=0; // initial value of cd=c*d
+					ae=0;ce=0;
+					af=0;bf=0;*/
+					///deftripletindex=2;
+					///d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
+					// start at the same triplets as (a,b,c)
+					dptr=aptr;eptr=bptr;fptr=cptr;deftripletptr=fptr+1;
+					d=*dptr;e=*eptr;f=*fptr;maxdef=*deftripletptr;
+					///multdef=max/maxdef;
+					// replacing: dptr=uniqueTriplets;eptr=dptr+1;fptr=eptr+1;
+					rowequalityflags=1; // (d,e,f) equals (a,b,c) so starts being 1
+					do{
 						/*
-						bd=0;cd=0; // initial value of cd=c*d
-						ae=0;ce=0;
-						af=0;bf=0;*/
-						///deftripletindex=2;
-						///d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
-						// start at the same triplets as (a,b,c)
-						dptr=aptr;eptr=bptr;fptr=cptr;deftripletptr=fptr+1;
-						d=*dptr;e=*eptr;f=*fptr;maxdef=*deftripletptr;
-						multdef=max/maxdef;
-						// replacing: dptr=uniqueTriplets;eptr=dptr+1;fptr=eptr+1;
-						rowequalityflags=1; // (d,e,f) equals (a,b,c) so starts being 1
-						do{
-							/*
-							// read the assumed next f
-							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-							if(*fptr<0){ // a c closer
+						// read the assumed next f
+						fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+						if(*fptr<0){ // a c closer
+							eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							if(*eptr<0){ // a b closer
+								dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+								if(*dptr<0)break;
+								d=*dptr;
 								eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-								if(*eptr<0){ // a b closer
-									dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-									if(*dptr<0)break;
-									d=*dptr;
-									eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-								}
-								e=*eptr;
-								fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
 							}
-							f=*fptr;
-							multdef=*++deftripletptr;
-							*/
-							// the six two term products we need for the six three term products
-							ae=a*e;af=a*f;
-							bd=b*d;bf=b*f;
-							cd=c*d;ce=c*e;
-							// replacing: maxdef=MAX(MAX(d,e),f);	multdef=max/maxdef;
-								///mult*=multdef;
-								///ghitripletindex=2;
-								///g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
-								gptr=dptr;hptr=eptr;iptr=fptr;ghitripletptr=iptr+1; // where maxghi is stored
-								g=*gptr;h=*hptr;i=*iptr;maxghi=*ghitripletptr;
-								multghi=max/maxghi;
-								// replacing: gptr=uniqueTriplets;hptr=gptr+1;iptr=hptr+1;
-								rowequalityflags|=2; // (g,h,i) now equal to (d,e,f)
-								do{
-									/*
-									// read the assumed next i
-									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-									if(*iptr<0){ // a i closer
+							e=*eptr;
+							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+						}
+						f=*fptr;
+						multdef=*++deftripletptr;
+						*/
+						// the six two term products we need for the six three term products
+						ae=a*e;af=a*f;
+						bd=b*d;bf=b*f;
+						cd=c*d;ce=c*e;
+						// replacing: maxdef=MAX(MAX(d,e),f);	multdef=max/maxdef;
+							///mult*=multdef;
+							///ghitripletindex=2;
+							///g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
+							gptr=dptr;hptr=eptr;iptr=fptr;ghitripletptr=iptr+1; // where maxghi is stored
+							g=*gptr;h=*hptr;i=*iptr;maxghi=*ghitripletptr;
+							///multghi=max/maxghi;
+							// replacing: gptr=uniqueTriplets;hptr=gptr+1;iptr=hptr+1;
+							rowequalityflags|=2; // (g,h,i) now equal to (d,e,f)
+							do{
+								/*
+								// read the assumed next i
+								iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+								if(*iptr<0){ // a i closer
+									hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+									if(*hptr<0){ // a h closer
+										gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+										if(*gptr<0)break;
+										g=*gptr;
 										hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-										if(*hptr<0){ // a h closer
-											gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-											if(*gptr<0)break;
-											g=*gptr;
-											hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-										}
-										h=*hptr;
-										iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
 									}
-									i=*iptr;
-									multghi=*++ghitripletptr;
+									h=*hptr;
+									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+								}
+								i=*iptr;
+								multghi=*++ghitripletptr;
+								*/
+								//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
+								// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
+									///mult*=multghi;
+									/// obsolete: bg=b*g;cg=c*g;eg=e*g;fg=f*g;
+									/// obsolete: ah=a*h;ch=c*h;dh=d*h;fh=f*h;
+									// compute the 6 constituent (and non-negative elements)
+									aei=ae*i;afh=af*h;
+									bdi=bd*i;bfg=bf*g;
+									cdh=cd*h;ceg=ce*g;
+									// obsolete: ai=a*i;bi=b*i;di=d*i;ei=e*i;
+									//D output("\n\taei=%3ld afh=%3ld bdi=%3ld bfg=%3ld cdh=%3ld ceg=%3ld",aei,afh,bdi,bfg,cdh,ceg);
+									/*D
+									// ghipart is the determinant for nonnegative values of a, b, c, d, e, f, g, h and i
+									delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
+									checkdelta_a=aei-afh;checkdelta_b=bfg-bdi;checkdelta_c=cdh-ceg;
+									if(checkdelta_a!=delta_a){output(" Invalid check delta a");checkdelta_a_error++;}
+									if(checkdelta_b!=delta_b){output(" Invalid check delta b");checkdelta_b_error++;}
+									if(checkdelta_c!=delta_c){output(" Invalid check delta c");checkdelta_c_error++;}
+									determinant=delta_a+delta_b+delta_c;
+									outputChar(':');
+									outputChar(determinant!=ghipart?'X':'O');
+									delta_a*=2;delta_b*=2;delta_c*=2;
+									delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
+									outputChar(determinant!=delta_d+delta_e+delta_f?'X':'O');
+									delta_d*=2;delta_e*=2;delta_f*=2;
+									delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
+									outputChar(determinant!=delta_g+delta_h+delta_i?'X':'O');
+									delta_g*=2;delta_h*=2;delta_i*=2;
+									output(" det=%ld d_a=%ld d_b=%ld d_c=%ld d_d=%ld d_e=%ld d_f=%ld d_g=%ld d_h=%ld d_i=%ld\n",
+													ghipart,delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i);
+									D*/
+									// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
+									// MISTAKE since we're starting with all negatives instead of all positives
+									//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
+									//         and do all positives first
+									// create all minus values we'll be needing
+									// NOTE these 6 three term products will all be positive!!! 
+									/*D
+									basedeterminant=aei-afh+bfg-bdi+cdh-ceg;
+									output("***basedet=%ld*** aei=%ld afh=%ld bfg=%ld bdi=%ld cdh=%ld ceg=%ld\n"
+										,basedeterminant
+										,aei,afh,bfg,bdi,cdh,ceg);
+									D*/
+									min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
+									// initial values of the signs to use
+									/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
+									// we need to toggle the signs twice
+									register uint32_t flags=0x69969669; // that's a funny number!!!
+									/* using the following bits
+										0=16  1=0  2=0  3=16  
+										4=0  5=16  6=16  7=0  
+										8=0  9=16 10=16 11=0 
+										12=16 13=0 14=0 15=16 
+										16=0 17=16 18=16 19=0 
+										20=16 21=0 22=0 23=16 
+										24=16 25=0 26=0 27=16 
+										28=0 29=16 30=16 31=0
 									*/
-									//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
-									// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
-										///mult*=multghi;
-										/// obsolete: bg=b*g;cg=c*g;eg=e*g;fg=f*g;
-										/// obsolete: ah=a*h;ch=c*h;dh=d*h;fh=f*h;
-										// compute the 6 constituent (and non-negative elements)
-										aei=ae*i;afh=af*h;
-										bdi=bd*i;bfg=bf*g;
-										cdh=cd*h;ceg=ce*g;
-										// obsolete: ai=a*i;bi=b*i;di=d*i;ei=e*i;
-										//D output("\n\taei=%3ld afh=%3ld bdi=%3ld bfg=%3ld cdh=%3ld ceg=%3ld",aei,afh,bdi,bfg,cdh,ceg);
-										/*D
-										// ghipart is the determinant for nonnegative values of a, b, c, d, e, f, g, h and i
-										delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
-										checkdelta_a=aei-afh;checkdelta_b=bfg-bdi;checkdelta_c=cdh-ceg;
-										if(checkdelta_a!=delta_a){output(" Invalid check delta a");checkdelta_a_error++;}
-										if(checkdelta_b!=delta_b){output(" Invalid check delta b");checkdelta_b_error++;}
-										if(checkdelta_c!=delta_c){output(" Invalid check delta c");checkdelta_c_error++;}
-										determinant=delta_a+delta_b+delta_c;
-										outputChar(':');
-										outputChar(determinant!=ghipart?'X':'O');
-										delta_a*=2;delta_b*=2;delta_c*=2;
-										delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
-										outputChar(determinant!=delta_d+delta_e+delta_f?'X':'O');
-										delta_d*=2;delta_e*=2;delta_f*=2;
-										delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
-										outputChar(determinant!=delta_g+delta_h+delta_i?'X':'O');
-										delta_g*=2;delta_h*=2;delta_i*=2;
-										output(" det=%ld d_a=%ld d_b=%ld d_c=%ld d_d=%ld d_e=%ld d_f=%ld d_g=%ld d_h=%ld d_i=%ld\n",
-														ghipart,delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i);
-										D*/
-										// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
-										// MISTAKE since we're starting with all negatives instead of all positives
-										//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
-										//         and do all positives first
-										// create all minus values we'll be needing
-										// NOTE these 6 three term products will all be positive!!! 
-										/*D
-										basedeterminant=aei-afh+bfg-bdi+cdh-ceg;
-										output("***basedet=%ld*** aei=%ld afh=%ld bfg=%ld bdi=%ld cdh=%ld ceg=%ld\n"
-											,basedeterminant
-											,aei,afh,bfg,bdi,cdh,ceg);
-										D*/
-										min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
-										// initial values of the signs to use
-										/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
-										// we need to toggle the signs twice
-										register uint32_t flags=0x69969669; // that's a funny number!!!
-										/* using the following bits
-											0=16  1=0  2=0  3=16  
-											4=0  5=16  6=16  7=0  
-											8=0  9=16 10=16 11=0 
-											12=16 13=0 14=0 15=16 
-											16=0 17=16 18=16 19=0 
-											20=16 21=0 22=0 23=16 
-											24=16 25=0 26=0 27=16 
-											28=0 29=16 30=16 31=0
-										*/
-										// let's iterate over all 32 bits in flags consuming flags
-										//D output("flag determinants:");
-										// the problem with the flag determinants is that the number of zeroes in the matrix determines
-										// how many combinations we actually have, if all are nonzero we have 2^9, but when we have less
-										// we should divide by any two, we have 9 variables occurring twice in 6 terms
-										// and we're only looking at 16 of them, so each of them is counted 32 times but that shouldn't 
-										// be 32 per se, so how can we compute which combinations to count twice!!
-										long long totalflagzerodeterminants=0;
-										for(register int flagbit=31;flagbit>=0;flagbit--){
-											if(flags&1){ // this combination occurs 16 times
-												// let's construct the determinant
-												flagdeterminant=(flagbit&1?min_aei:aei)+
-																					(flagbit&2?min_afh:afh)+
-																					(flagbit&4?min_bdi:bdi)+
-																					(flagbit&8?min_bfg:bfg)+
-																					(flagbit&16?min_cdh:cdh)+
-																					ceg; ////(flagbit&32?min_ceg:ceg);
-												//D output(" det#%d=%ld",flagbit,flagdeterminant);
-												if(0==flagdeterminant)
-													totalflagzerodeterminants++;
-											}
-											flags>>=1; // shift out the bit we consumed
+									// let's iterate over all 32 bits in flags consuming flags
+									//D output("flag determinants:");
+									// the problem with the flag determinants is that the number of zeroes in the matrix determines
+									// how many combinations we actually have, if all are nonzero we have 2^9, but when we have less
+									// we should divide by any two, we have 9 variables occurring twice in 6 terms
+									// and we're only looking at 16 of them, so each of them is counted 32 times but that shouldn't 
+									// be 32 per se, so how can we compute which combinations to count twice!!
+									long long totalflagzerodeterminants=0;
+									for(register int flagbit=31;flagbit>=0;flagbit--){
+										if(flags&1){ // this combination occurs 16 times
+											// let's construct the determinant
+											flagdeterminant=(flagbit&1?min_aei:aei)+
+																				(flagbit&2?min_afh:afh)+
+																				(flagbit&4?min_bdi:bdi)+
+																				(flagbit&8?min_bfg:bfg)+
+																				(flagbit&16?min_cdh:cdh)+
+																				ceg; ////(flagbit&32?min_ceg:ceg);
+											//D output(" det#%d=%ld",flagbit,flagdeterminant);
+											if(0==flagdeterminant)
+												totalflagzerodeterminants++;
 										}
-										totalflagzerodeterminants<<=5; // multiply by 32 (otherwise we would have needed to add 32 each time)
-										// use zerodeterminantcount to determine the multiplication factor
-										long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
-										totalflagzerodeterminants>>=zeroes; // shift by the total number of zeroes
-										long long totalflagdeterminants=(512>>zeroes);
-										///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
-										///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
-										/*D
-										outputBiginteger("flag zero determinants=",incflagzdc,NULL);
-										outputBiginteger("/",incflagtc,"\n");
-										*/
+										flags>>=1; // shift out the bit we consumed
+									}
+									totalflagzerodeterminants<<=5; // multiply by 32 (otherwise we would have needed to add 32 each time)
+									// use zerodeterminantcount to determine the multiplication factor
+									long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
+									totalflagzerodeterminants>>=zeroes; // shift by the total number of zeroes
+									long long totalflagdeterminants=(512>>zeroes);
+									///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
+									///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
+									/*D
+									outputBiginteger("flag zero determinants=",incflagzdc,NULL);
+									outputBiginteger("/",incflagtc,"\n");
+									*/
+									// for all the not yet determined probabilities update the flagzerodeterminantcount
+									// the maximum of all elements in the matrix determines to which level this matrix belongs to
+									maxtriplets=MAX(MAX(maxabc,maxdef),maxghi);
+									//D output("max=%lld",maxtriplets);
+									for(int i=maxtriplets;i<=max;i++){
+										multabc=mults[i][maxabc];
+										multdef=mults[i][maxdef];
+										multghi=mults[i][maxghi];
 										mult=multroworders[rowequalityflags]*multabc*multdef*multghi;
+										//D output(" mult(%d)=%lld",i,mult);
 										/* if two rows are equal count them
 										equalrowflags=(a==d&&b==e&&c==f)+2*(a==g&&b==h&&c==i)+4*(d==g&&e==h&&f==i);
 										if(equalrowflags){
@@ -15082,581 +15147,628 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
 										}
 										*/
 										//D output(" mult=%ld zdinc=%ld totalinc=%ld",mult,totalflagzerodeterminants,totalflagdeterminants);
-										if(MP_OKAY==mp_add_d(flagzdc,mult*totalflagzerodeterminants,flagzdc)/*&&
-												MP_OKAY==mp_add_d(flagtc,mult*totalflagdeterminants,flagtc)*/){
-											//D outputBiginteger(" zdc=",flagzerodeterminantcount,"/");
-											//D outputBiginteger(NULL,flagtotalcount,"\n");
+										if(flagzerodeterminantcounts[i]){
+											flagzdc=MP_INT_POINTER(flagzerodeterminantcounts[i]);
+											if(MP_OKAY!=mp_add_d(flagzdc,mult*totalflagzerodeterminants,flagzdc))
+												q2outputError("Failed to add the flag (zero) determinant count!");
 										}else
-											q2outputError("Failed to add the flag (zero) determinant count!");
-										count-=(mult*totalflagdeterminants);
-										if(count<0){
-											output("%lld",++billioncount);
-											if(billionsText!=NULL)output(" out of %s",string(billionsText));
-											output("%s"," billions of combinations processed so far.\n");
-											count+=1000000000;
-										}
-										///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
-										//D outputChar('\n');
-										/*
-										long totalzerodeterminants=0,totaldeterminants=0;
-										for(flag_a=(a?1:0),det_a=ghipart;;){
-											for(flag_b=(b?1:0),det_b=det_a;;){
-												for(flag_c=(c?1:0),det_c=det_b;;){
-													for(flag_d=(d?1:0),det_d=det_c;;){
-														for(flag_e=(e?1:0),det_e=det_d;;){
-															for(flag_f=(f?1:0),det_f=det_e;;){
-																for(flag_g=(g?1:0),det_g=det_f;;){
-																	sign_bfg=flag_b+flag_f+flag_g;
-																	sign_ceg=flag_c+flag_e+flag_g;
-																	for(flag_h=(h?1:0),det_h=det_g;;){
-																		sign_afh=flag_a+flag_f+flag_h;
-																		sign_cdh=flag_c+flag_d+flag_h;
-																		for(flag_i=(i?1:0),determinant=det_h;;){
-																			sign_aei=flag_a+flag_e+flag_i;
-																			sign_bdi=flag_b+flag_d+flag_i;
-																			signed_determinant=
-																					(sign_aei&1?min_aei:aei)+
-																					(sign_afh&1?afh:min_afh)+
-																					(sign_bfg&1?min_bfg:bfg)+
-																					(sign_bdi&1?bdi:min_bdi)+
-																					(sign_cdh&1?min_cdh:cdh)+
-																					(sign_ceg&1?ceg:min_ceg);
-																			determinant=ghipart
-																										-(flag_a?0:delta_a)
-																										-(flag_b?0:delta_b)
-																										-(flag_c?0:delta_c)
-																										-(flag_d?0:delta_d)
-																										-(flag_e?0:delta_e)
-																										-(flag_f?0:delta_f)
-																										-(flag_g?0:delta_g)
-																										-(flag_h?0:delta_h)
-																										-(flag_i?0:delta_i);
-																			totaldeterminants++;
-																			//D output(" signs=%ld%ld%ld%ld%ld%ld:%ld;",
-																			//D	sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant);
-																			f_a=(!flag_a?a:-a);f_b=(!flag_b?b:-b);f_c=(!flag_c?c:-c);
-																			f_d=(!flag_d?d:-d);f_e=(!flag_e?e:-e);f_f=(!flag_f?f:-f);
-																			f_g=(!flag_g?g:-g);f_h=(!flag_h?h:-h);f_i=(!flag_i?i:-i);
-																			// apparently checkdet1 through checkdet3 have the wrong sign!!!!!
-																			checkdet1=f_a*(f_e*f_i-f_f*f_h)+f_b*(f_f*f_g-f_d*f_i)+f_c*(f_d*f_h-f_e*f_g);
-																			checkdet2=f_d*(f_c*f_h-f_b*f_i)+f_e*(f_a*f_i-f_c*f_g)+f_f*(f_b*f_g-f_a*f_h);
-																			checkdet3=f_g*(f_b*f_f-f_c*f_e)+f_h*(f_c*f_d-f_a*f_f)+f_i*(f_a*f_e-f_b*f_d);
-																			//D output("[%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c]->%c%ld=%ld=%ld(%c)=%ld(%c)\n",
-																			//D 				f_a,(flag_a?'+':'-'),
-																			//D				f_b,(flag_b?'+':'-'),
-																			//D				f_c,(flag_c?'+':'-'),
-																			//D				f_d,(flag_d?'+':'-'),
-																			//D				f_e,(flag_e?'+':'-'),
-																			//D				f_f,(flag_f?'+':'-'),
-																			//D				f_g,(flag_g?'+':'-'),
-																			//D				f_h,(flag_h?'+':'-'),
-																			//D				f_i,(flag_i?'+':'-'),
-																			//D				(checkdet1!=determinant?'X':'O'),determinant,
-																			//D				checkdet1,
-																			//D				checkdet2,(checkdet1!=checkdet2?'X':'O'),
-																			//D				checkdet3,(checkdet2!=checkdet3?'X':'O'));
-																			if(0==checkdet1)totalzerodeterminants++;
-																			mult=multabc;
-																			while(--mult>=0){
-																				if(0==checkdet1)mp_incr(zdc);
-																				mp_incr(tc);
-																				if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
-																			}
-																			if(--flag_i<0)break;determinant-=delta_i;
+											q2outputMessage(M_ERROR_PREFIX,"Missing zero determinant count for base %d",i);
+									}
+									count-=(mult*totalflagdeterminants);
+									if(count<0){
+										output("%lld",++billioncount);
+										if(billionsText!=NULL)output(" out of %s",string(billionsText));
+										output("%s"," billions of combinations processed so far.\n");
+										count+=1000000000;
+									}
+									outputChar('\n');
+									///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
+									//D outputChar('\n');
+									/*
+									long totalzerodeterminants=0,totaldeterminants=0;
+									for(flag_a=(a?1:0),det_a=ghipart;;){
+										for(flag_b=(b?1:0),det_b=det_a;;){
+											for(flag_c=(c?1:0),det_c=det_b;;){
+												for(flag_d=(d?1:0),det_d=det_c;;){
+													for(flag_e=(e?1:0),det_e=det_d;;){
+														for(flag_f=(f?1:0),det_f=det_e;;){
+															for(flag_g=(g?1:0),det_g=det_f;;){
+																sign_bfg=flag_b+flag_f+flag_g;
+																sign_ceg=flag_c+flag_e+flag_g;
+																for(flag_h=(h?1:0),det_h=det_g;;){
+																	sign_afh=flag_a+flag_f+flag_h;
+																	sign_cdh=flag_c+flag_d+flag_h;
+																	for(flag_i=(i?1:0),determinant=det_h;;){
+																		sign_aei=flag_a+flag_e+flag_i;
+																		sign_bdi=flag_b+flag_d+flag_i;
+																		signed_determinant=
+																				(sign_aei&1?min_aei:aei)+
+																				(sign_afh&1?afh:min_afh)+
+																				(sign_bfg&1?min_bfg:bfg)+
+																				(sign_bdi&1?bdi:min_bdi)+
+																				(sign_cdh&1?min_cdh:cdh)+
+																				(sign_ceg&1?ceg:min_ceg);
+																		determinant=ghipart
+																									-(flag_a?0:delta_a)
+																									-(flag_b?0:delta_b)
+																									-(flag_c?0:delta_c)
+																									-(flag_d?0:delta_d)
+																									-(flag_e?0:delta_e)
+																									-(flag_f?0:delta_f)
+																									-(flag_g?0:delta_g)
+																									-(flag_h?0:delta_h)
+																									-(flag_i?0:delta_i);
+																		totaldeterminants++;
+																		//D output(" signs=%ld%ld%ld%ld%ld%ld:%ld;",
+																		//D	sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant);
+																		f_a=(!flag_a?a:-a);f_b=(!flag_b?b:-b);f_c=(!flag_c?c:-c);
+																		f_d=(!flag_d?d:-d);f_e=(!flag_e?e:-e);f_f=(!flag_f?f:-f);
+																		f_g=(!flag_g?g:-g);f_h=(!flag_h?h:-h);f_i=(!flag_i?i:-i);
+																		// apparently checkdet1 through checkdet3 have the wrong sign!!!!!
+																		checkdet1=f_a*(f_e*f_i-f_f*f_h)+f_b*(f_f*f_g-f_d*f_i)+f_c*(f_d*f_h-f_e*f_g);
+																		checkdet2=f_d*(f_c*f_h-f_b*f_i)+f_e*(f_a*f_i-f_c*f_g)+f_f*(f_b*f_g-f_a*f_h);
+																		checkdet3=f_g*(f_b*f_f-f_c*f_e)+f_h*(f_c*f_d-f_a*f_f)+f_i*(f_a*f_e-f_b*f_d);
+																		//D output("[%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c]->%c%ld=%ld=%ld(%c)=%ld(%c)\n",
+																		//D 				f_a,(flag_a?'+':'-'),
+																		//D				f_b,(flag_b?'+':'-'),
+																		//D				f_c,(flag_c?'+':'-'),
+																		//D				f_d,(flag_d?'+':'-'),
+																		//D				f_e,(flag_e?'+':'-'),
+																		//D				f_f,(flag_f?'+':'-'),
+																		//D				f_g,(flag_g?'+':'-'),
+																		//D				f_h,(flag_h?'+':'-'),
+																		//D				f_i,(flag_i?'+':'-'),
+																		//D				(checkdet1!=determinant?'X':'O'),determinant,
+																		//D				checkdet1,
+																		//D				checkdet2,(checkdet1!=checkdet2?'X':'O'),
+																		//D				checkdet3,(checkdet2!=checkdet3?'X':'O'));
+																		if(0==checkdet1)totalzerodeterminants++;
+																		mult=multabc;
+																		while(--mult>=0){
+																			if(0==checkdet1)mp_incr(zdc);
+																			mp_incr(tc);
+																			if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
 																		}
-																		if(--flag_h<0)break;det_h-=delta_h;
+																		if(--flag_i<0)break;determinant-=delta_i;
 																	}
-																	if(--flag_g<0)break;det_g-=delta_g;
+																	if(--flag_h<0)break;det_h-=delta_h;
 																}
-																if(--flag_f<0)break;det_f-=delta_f;
+																if(--flag_g<0)break;det_g-=delta_g;
 															}
-															if(--flag_e<0)break;det_e-=delta_e;
+															if(--flag_f<0)break;det_f-=delta_f;
 														}
-														if(--flag_d<0)break;det_d-=delta_d;
+														if(--flag_e<0)break;det_e-=delta_e;
 													}
-													if(--flag_c<0)break;det_c-=delta_c;
+													if(--flag_d<0)break;det_d-=delta_d;
 												}
-												if(--flag_b<0)break;det_b-=delta_b;
+												if(--flag_c<0)break;det_c-=delta_c;
 											}
-											if(--flag_a<0)break;det_a-=delta_a;
+											if(--flag_b<0)break;det_b-=delta_b;
 										}
-										output("totalflagzerodeterminants=%ld/%ld%stotalzerodeterminants=%ld/%ld\n",
-												totalflagzerodeterminants,totalflagdeterminants,
-												(totalflagzerodeterminants!=totalzerodeterminants?" IS NOT EQUAL TO ":" IS EQUAL TO "),
-												totalzerodeterminants,
-												totaldeterminants);
-										// let's compare flagzdc/flagtc with zdc/tc
-										outputBiginteger("flagzdc=",flagzerodeterminantcount,"/");
-										outputBiginteger(NULL,flagtotalcount,NULL);
-										if(mp_cmp(zdc,flagzdc)!=MP_EQ)
-											output(" IS NIET GELIJK AAN ");
-										else
-											output(" IS GELIJK AAN ");
-										outputBiginteger("zdc=",zerodeterminantcount,"/");
-										outputBiginteger(NULL,totalcount,"\n");
-										*/
-									/*}else{ // ghi==0
-										// how many zero determinants should we add when g=h=i=0???
-										// there's already a multabc and a multdef indicating the replication of (a,b,c) and (d,e,f)
-										//D mult=(multabc*multdef); // should I multiply by 512 or not
-										if(mp_add_d(flagtc,mult,flagtc)!=MP_OKAY||mp_add_d(flagzdc,mult,flagzdc)!=MP_OKAY)
-											q2outputError("Failed to increment the total and zero determinant combination counts when g, h and i are zero!");					
-									}*/
-									// read the assumed next i
-									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-									if(*iptr<0){ // a i closer
+										if(--flag_a<0)break;det_a-=delta_a;
+									}
+									output("totalflagzerodeterminants=%ld/%ld%stotalzerodeterminants=%ld/%ld\n",
+											totalflagzerodeterminants,totalflagdeterminants,
+											(totalflagzerodeterminants!=totalzerodeterminants?" IS NOT EQUAL TO ":" IS EQUAL TO "),
+											totalzerodeterminants,
+											totaldeterminants);
+									// let's compare flagzdc/flagtc with zdc/tc
+									outputBiginteger("flagzdc=",flagzerodeterminantcount,"/");
+									outputBiginteger(NULL,flagtotalcount,NULL);
+									if(mp_cmp(zdc,flagzdc)!=MP_EQ)
+										output(" IS NIET GELIJK AAN ");
+									else
+										output(" IS GELIJK AAN ");
+									outputBiginteger("zdc=",zerodeterminantcount,"/");
+									outputBiginteger(NULL,totalcount,"\n");
+									*/
+								/*}else{ // ghi==0
+									// how many zero determinants should we add when g=h=i=0???
+									// there's already a multabc and a multdef indicating the replication of (a,b,c) and (d,e,f)
+									//D mult=(multabc*multdef); // should I multiply by 512 or not
+									if(mp_add_d(flagtc,mult,flagtc)!=MP_OKAY||mp_add_d(flagzdc,mult,flagzdc)!=MP_OKAY)
+										q2outputError("Failed to increment the total and zero determinant combination counts when g, h and i are zero!");					
+								}*/
+								// read the assumed next i
+								iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+								if(*iptr<0){ // a i closer
+									hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+									if(*hptr<0){ // a h closer
+										gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+										if(*gptr<0)break;
+										g=*gptr;
 										hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-										if(*hptr<0){ // a h closer
-											gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-											if(*gptr<0)break;
-											g=*gptr;
-											hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-										}
-										h=*hptr;
-										iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
 									}
-									i=*iptr;
-									maxghi=*++ghitripletptr;
-									multghi=max/maxghi;
-									if(rowequalityflags&2)rowequalityflags-=2; // (g,h,i) now different than (d,e,f) (and possibly (a,b,c) as well)
-								}while(1);
-							/*}else{ // d=e=f=0
-								// we now we have to repeat totalcount3 by multabc
-								Mbiginteger* multdef=owned_biginteger(_getBigintegerCopy(totalcount3),owner);
-								if(multdef!=NULL){
-									if(mp_mul_d(MP_INT_POINTER(multdef),multabc,MP_INT_POINTER(multdef))==MP_OKAY){
-										if(mp_add(flagtc,MP_INT_POINTER(multdef),flagtc)!=MP_OKAY||
-											mp_add(flagzdc,MP_INT_POINTER(multdef),flagzdc)!=MP_OKAY)
-											q2outputError("Failed to increment the total and zero determinant combination counts when d, e and f are zero!");
-									}else
-										q2outputError("Failed to compute the number of times to replicate zero determinant counts.");
-									FREE_BIGINTEGER(multdef,owner);
+									h=*hptr;
+									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+								}
+								i=*iptr;
+								maxghi=*++ghitripletptr;
+								///multghi=max/maxghi;
+								if(rowequalityflags&2)rowequalityflags-=2; // (g,h,i) now different than (d,e,f) (and possibly (a,b,c) as well)
+							}while(1);
+						/*}else{ // d=e=f=0
+							// we now we have to repeat totalcount3 by multabc
+							Mbiginteger* multdef=owned_biginteger(_getBigintegerCopy(totalcount3),owner);
+							if(multdef!=NULL){
+								if(mp_mul_d(MP_INT_POINTER(multdef),multabc,MP_INT_POINTER(multdef))==MP_OKAY){
+									if(mp_add(flagtc,MP_INT_POINTER(multdef),flagtc)!=MP_OKAY||
+										mp_add(flagzdc,MP_INT_POINTER(multdef),flagzdc)!=MP_OKAY)
+										q2outputError("Failed to increment the total and zero determinant combination counts when d, e and f are zero!");
 								}else
-									q2outputError("Failed to create a big integer for computing the replication of zero determinant counts.");
-							}*/
-							// read the assumed next f
-							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-							if(*fptr<0){ // a c closer
+									q2outputError("Failed to compute the number of times to replicate zero determinant counts.");
+								FREE_BIGINTEGER(multdef,owner);
+							}else
+								q2outputError("Failed to create a big integer for computing the replication of zero determinant counts.");
+						}*/
+						// read the assumed next f
+						fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+						if(*fptr<0){ // a c closer
+							eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							if(*eptr<0){ // a b closer
+								dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+								if(*dptr<0)break;
+								d=*dptr;
 								eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-								if(*eptr<0){ // a b closer
-									dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-									if(*dptr<0)break;
-									d=*dptr;
-									eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-								}
-								e=*eptr;
-								fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
 							}
-							f=*fptr;
-							maxdef=*++deftripletptr;
-							multdef=max/maxdef;
-							if(rowequalityflags&1)rowequalityflags--; // (d,e,f) will now be (considered) different from (a,b,c)
-						}while(1);
-					/*
-					}else{ // a=b=c=0
-						if(mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||
-								mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc)!=MP_OKAY)
-							q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
-					}*/
-					// read the assumed next c
-					cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-					if(*cptr<0){ // a c closer
+							e=*eptr;
+							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+						}
+						f=*fptr;
+						maxdef=*++deftripletptr;
+						///multdef=max/maxdef;
+						if(rowequalityflags&1)rowequalityflags--; // (d,e,f) will now be (considered) different from (a,b,c)
+					}while(1);
+				/*
+				}else{ // a=b=c=0
+					if(mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||
+							mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc)!=MP_OKAY)
+						q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
+				}*/
+				// read the assumed next c
+				cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+				if(*cptr<0){ // a c closer
+					bptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+					if(*bptr<0){ // a b closer
+						aptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+						if(*aptr<0)break;
+						a=*aptr;
 						bptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-						if(*bptr<0){ // a b closer
-							aptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-							if(*aptr<0)break;
-							a=*aptr;
-							bptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
-						}
-						b=*bptr; // update b
-						cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];						
 					}
-					c=*cptr; // update c
-					maxabc=*(++abctripletptr);
-					multabc=max/maxabc; // update multabc
-				}while(1);
-				///output("Equal row count: %lld.\n",equalrowcount);
-				/* replacing:
-				while(1){
-					maxabc=MAX(MAX(a,b),c);
-					///mult=1;
-					//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
-					if(maxabc){
-						multabc=(maxabc?max/maxabc:1); // replacing: uniqueTriplets[ci++];
-						///mult=multabc;
-						deftripletindex=2;
-						d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
-						while(1){
-							bd=b*d;cd=c*d;
-							ae=a*e;ce=c*e;
-							af=a*f;bf=b*f;
-							maxdef=MAX(MAX(d,e),f);
-							//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
-							//if(maxdef){
-								multdef=(maxdef?max/maxdef:1); // replacing: uniqueTriplets[ci++];
-								///mult*=multdef;
-								ghitripletindex=2;
-								g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
-								while(1){
-									//D output("a=%2d b=%2d c=%2d d=%2d e=%2d f=%2d g=%2d h=%2d i=%2d",a,b,c,d,e,f,g,h,i);
-									maxghi=MAX(MAX(g,h),i);
-									//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
-									//if(maxghi){
-										multghi=(maxghi?max/maxghi:1);
-										///mult*=multghi;
-										bg=b*g;cg=c*g;eg=e*g;fg=f*g;
-										bfg=bf*g;ceg=ce*g;
-										ah=a*h;ch=c*h;dh=d*h;fh=f*h;
-										afh=af*h;cdh=cd*h;
-										ai=a*i;bi=b*i;di=d*i;ei=e*i;
-										aei=ae*i;bdi=bd*i;
-										//D output(" aei=%3ld afh=%3ld bdi=%3ld bfg=%3ld cdh=%3ld ceg=%3ld",aei,afh,bdi,bfg,cdh,ceg);
-										// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
-										// MISTAKE since we're starting with all negatives instead of all positives
-										//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
-										//         and do all positives first
-										// create all minus values we'll be needing
-										// NOTE these 6 three term products will all be positive!!! 
-										min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
-										// initial values of the signs to use
-										/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
-										// we need to toggle the signs twice
-										register uint32_t flags=0x69969669; // that's a funny number!!!
-										// let's iterate over all 32 bits in flags consuming flags
-										//D output("flag determinants:");
-										// the problem with the flag determinants is that the number of zeroes in the matrix determines
-										// how many combinations we actually have, if all are nonzero we have 2^9, but when we have less
-										// we should divide by any two, we have 9 variables occurring twice in 6 terms
-										// and we're only looking at 16 of them, so each of them is counted 32 times but that shouldn't 
-										// be 32 per se, so how can we compute which combinations to count twice!!
-										long long totalflagzerodeterminants=0;
-										for(int flagbit=31;flagbit>=0;flagbit--){
-											if(flags&1){ // this combination occurs 16 times
-												// let's construct the determinant
-												flagdeterminant=(flagbit&1?min_aei:aei)+
-																					(flagbit&2?min_afh:afh)+
-																					(flagbit&4?min_bdi:bdi)+
-																					(flagbit&8?min_bfg:bfg)+
-																					(flagbit&16?min_cdh:cdh)+
-																					(flagbit&32?min_ceg:ceg);
-												//D output(" det#%d=%ld",flagbit,flagdeterminant);
-												if(0==flagdeterminant)
-													totalflagzerodeterminants+=32;
-											}
-											flags>>=1; // shift out the bit we consumed
-										}
-										// use zerodeterminantcount to determine the multiplication factor
-										long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
-										totalflagzerodeterminants>>=zeroes; // shift by the total number of zeroes
-										long long totalflagdeterminants=(512>>zeroes);
-										///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
-										///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
-										mult=multabc*multdef*multghi;
-										//D output(" mult=%ld multabc=%ld multdef=%ld multghi=%ld\n",mult,multabc,multdef,multghi);
-										if(MP_OKAY!=mp_add_d(flagzdc,mult*totalflagzerodeterminants,flagzdc)||
-												MP_OKAY!=mp_add_d(flagtc,mult*totalflagdeterminants,flagtc))
-											q2outputError("Failed to add the flag (zero) determinant count!");
-										count-=(mult*totalflagdeterminants);
-										if(count<0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
-										///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
-										//D outputChar('\n');
-									// read the assumed next f
-									i=uniqueTriplets[++ghitripletindex];
-									if(i<0){ // a c closer
-										h=uniqueTriplets[++ghitripletindex];
-										if(h<0){ // a b closer
-											g=uniqueTriplets[++ghitripletindex];
-											if(g<0)break;
-											h=uniqueTriplets[++ghitripletindex];
-										}
-										i=uniqueTriplets[++ghitripletindex];
-									}
-								}
-							// read the assumed next f
-							f=uniqueTriplets[++deftripletindex];
-							if(f<0){ // a c closer
-								e=uniqueTriplets[++deftripletindex];
-								if(e<0){ // a b closer
-									d=uniqueTriplets[++deftripletindex];
-									if(d<0)break;
-									e=uniqueTriplets[++deftripletindex];
-								}
-								f=uniqueTriplets[++deftripletindex];
-							}
-						}
-					}else{ // a=b=c=0
-						if(mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||
-								mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc)!=MP_OKAY)
-							q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
-					}
-					// read the assumed next c
-					c=uniqueTriplets[++abctripletindex];
-					if(c<0){ // a c closer
-						b=uniqueTriplets[++abctripletindex];
-						if(b<0){ // a b closer
-							a=uniqueTriplets[++abctripletindex];
-							if(a<0)break;
-							b=uniqueTriplets[++abctripletindex];
-						}
-						c=uniqueTriplets[++abctripletindex];
-					}
+					b=*bptr; // update b
+					cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];						
 				}
-				*/
-				free(uniqueTriplets); // ESSENTIAL BRO'
-			}else{
-				long long maxab,gcdab,gcdabc,I,H,G,gpart,ghpart,ghipart;
-				long long bg,cg,eg,fg,ah,ch,dh,fh,ai,bi,di,ei;
-				for(a=0;a<=max;a++){
-					for(b=0;b<=max;b++){
-						if(a>b){
-							maxab=a;
-							gcdab=gcd(a,b);
-						}else{
-							maxab=b;
-							gcdab=(a==b?a:gcd(b,a));
+				c=*cptr; // update c
+				maxabc=*(++abctripletptr);
+				multabc=max/maxabc; // update multabc
+			}while(1);
+			///output("Equal row count: %lld.\n",equalrowcount);
+			/* replacing:
+			while(1){
+				maxabc=MAX(MAX(a,b),c);
+				///mult=1;
+				//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
+				if(maxabc){
+					multabc=(maxabc?max/maxabc:1); // replacing: uniqueTriplets[ci++];
+					///mult=multabc;
+					deftripletindex=2;
+					d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
+					while(1){
+						bd=b*d;cd=c*d;
+						ae=a*e;ce=c*e;
+						af=a*f;bf=b*f;
+						maxdef=MAX(MAX(d,e),f);
+						//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
+						//if(maxdef){
+							multdef=(maxdef?max/maxdef:1); // replacing: uniqueTriplets[ci++];
+							///mult*=multdef;
+							ghitripletindex=2;
+							g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
+							while(1){
+								//D output("a=%2d b=%2d c=%2d d=%2d e=%2d f=%2d g=%2d h=%2d i=%2d",a,b,c,d,e,f,g,h,i);
+								maxghi=MAX(MAX(g,h),i);
+								//D output("\nFirst row: a=%d b=%d c=%d maxabc=%ld\n",a,b,c,maxabc);
+								//if(maxghi){
+									multghi=(maxghi?max/maxghi:1);
+									///mult*=multghi;
+									bg=b*g;cg=c*g;eg=e*g;fg=f*g;
+									bfg=bf*g;ceg=ce*g;
+									ah=a*h;ch=c*h;dh=d*h;fh=f*h;
+									afh=af*h;cdh=cd*h;
+									ai=a*i;bi=b*i;di=d*i;ei=e*i;
+									aei=ae*i;bdi=bd*i;
+									//D output(" aei=%3ld afh=%3ld bdi=%3ld bfg=%3ld cdh=%3ld ceg=%3ld",aei,afh,bdi,bfg,cdh,ceg);
+									// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
+									// MISTAKE since we're starting with all negatives instead of all positives
+									//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
+									//         and do all positives first
+									// create all minus values we'll be needing
+									// NOTE these 6 three term products will all be positive!!! 
+									min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
+									// initial values of the signs to use
+									/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
+									// we need to toggle the signs twice
+									register uint32_t flags=0x69969669; // that's a funny number!!!
+									// let's iterate over all 32 bits in flags consuming flags
+									//D output("flag determinants:");
+									// the problem with the flag determinants is that the number of zeroes in the matrix determines
+									// how many combinations we actually have, if all are nonzero we have 2^9, but when we have less
+									// we should divide by any two, we have 9 variables occurring twice in 6 terms
+									// and we're only looking at 16 of them, so each of them is counted 32 times but that shouldn't 
+									// be 32 per se, so how can we compute which combinations to count twice!!
+									long long totalflagzerodeterminants=0;
+									for(int flagbit=31;flagbit>=0;flagbit--){
+										if(flags&1){ // this combination occurs 16 times
+											// let's construct the determinant
+											flagdeterminant=(flagbit&1?min_aei:aei)+
+																				(flagbit&2?min_afh:afh)+
+																				(flagbit&4?min_bdi:bdi)+
+																				(flagbit&8?min_bfg:bfg)+
+																				(flagbit&16?min_cdh:cdh)+
+																				(flagbit&32?min_ceg:ceg);
+											//D output(" det#%d=%ld",flagbit,flagdeterminant);
+											if(0==flagdeterminant)
+												totalflagzerodeterminants+=32;
+										}
+										flags>>=1; // shift out the bit we consumed
+									}
+									// use zerodeterminantcount to determine the multiplication factor
+									long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
+									totalflagzerodeterminants>>=zeroes; // shift by the total number of zeroes
+									long long totalflagdeterminants=(512>>zeroes);
+									///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
+									///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
+									mult=multabc*multdef*multghi;
+									//D output(" mult=%ld multabc=%ld multdef=%ld multghi=%ld\n",mult,multabc,multdef,multghi);
+									if(MP_OKAY!=mp_add_d(flagzdc,mult*totalflagzerodeterminants,flagzdc)||
+											MP_OKAY!=mp_add_d(flagtc,mult*totalflagdeterminants,flagtc))
+										q2outputError("Failed to add the flag (zero) determinant count!");
+									count-=(mult*totalflagdeterminants);
+									if(count<0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+									///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
+									//D outputChar('\n');
+								// read the assumed next f
+								i=uniqueTriplets[++ghitripletindex];
+								if(i<0){ // a c closer
+									h=uniqueTriplets[++ghitripletindex];
+									if(h<0){ // a b closer
+										g=uniqueTriplets[++ghitripletindex];
+										if(g<0)break;
+										h=uniqueTriplets[++ghitripletindex];
+									}
+									i=uniqueTriplets[++ghitripletindex];
+								}
+							}
+						// read the assumed next f
+						f=uniqueTriplets[++deftripletindex];
+						if(f<0){ // a c closer
+							e=uniqueTriplets[++deftripletindex];
+							if(e<0){ // a b closer
+								d=uniqueTriplets[++deftripletindex];
+								if(d<0)break;
+								e=uniqueTriplets[++deftripletindex];
+							}
+							f=uniqueTriplets[++deftripletindex];
 						}
-						for(c=0;c<=max;c++){
-							if(a||b||c){ // not all zero!!
-								gcdabc=(c>gcdab?gcd(c,gcdab):gcd(gcdab,c));
-								if(gcdabc!=1){outputChar('.');continue;}
-								multabc=max/MAX(c,maxab); // this should be the number of multiples of (a,b,c) we do not need to consider
-								bd=0;
-								cd=0; // initial value of cd=c*d
-								for(d=0;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
-									ae=0;
-									ce=0;
-									I=-bd; // initial value of I=a*e-b*d
-									for(e=0;e<=max;e++,ae+=a,ce+=c,I+=a){
-										H=cd; // initial value of H=c*d-a*f
-										G=-ce; // initial value of G=b*f-c*e
-										af=0;
-										bf=0;
-										for(f=0;f<=max;f++,af+=a,bf+=b,G+=b,H-=a){
-											gpart=0; // the initial value of gpart=G*g
-											bg=0;cg=0;eg=0;fg=0;
-											bfg=0;ceg=0;
-											for(g=0;g<=max;g++,bg+=b,cg+=c,eg+=e,fg+=f,bfg+=bf,ceg+=ce,gpart+=G){
-												ghpart=gpart; // the initial value of ghpart=gpart+H*h
-												ah=0;ch=0;dh=0;fh=0;
-												afh=0;cdh=0;
-												for(h=0;h<=max;h++,ah+=a,ch+=c,dh+=d,fh+=f,afh+=af,cdh+=cd,ghpart+=H){
-													ghipart=ghpart; // the initial value of ghipart=ghpart+I*i
-													ai=0;bi=0;di=0;ei=0;
-													aei=0;bdi=0;
-													for(i=0;i<=max;i++,ai+=a,bi+=b,di+=d,ei+=e,aei+=ae,bdi+=bd,ghipart+=I){
-														// ghipart is the determinant for nonnegative values of a, b, c, d, e, f, g, h and i
-														/*D
-														delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
-														checkdelta_a=aei-afh;checkdelta_b=bfg-bdi;checkdelta_c=cdh-ceg;
-														if(checkdelta_a!=delta_a){output(" Invalid check delta a");checkdelta_a_error++;}
-														if(checkdelta_b!=delta_b){output(" Invalid check delta b");checkdelta_b_error++;}
-														if(checkdelta_c!=delta_c){output(" Invalid check delta c");checkdelta_c_error++;}
-														determinant=delta_a+delta_b+delta_c;
-														outputChar(':');
-														outputChar(determinant!=ghipart?'X':'O');
-														delta_a*=2;delta_b*=2;delta_c*=2;
-														delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
-														outputChar(determinant!=delta_d+delta_e+delta_f?'X':'O');
-														delta_d*=2;delta_e*=2;delta_f*=2;
-														delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
-														outputChar(determinant!=delta_g+delta_h+delta_i?'X':'O');
-														delta_g*=2;delta_h*=2;delta_i*=2;
-														output(" det=%ld d_a=%ld d_b=%ld d_c=%ld d_d=%ld d_e=%ld d_f=%ld d_g=%ld d_h=%ld d_i=%ld\n",
-																		ghipart,delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i);
-														D*/
-														// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
-														// MISTAKE since we're starting with all negatives instead of all positives
-														//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
-														//         and do all positives first
-														// create all minus values we'll be needing
-														// NOTE these 6 three term products will all be positive!!! 
-														/*D
-														basedeterminant=aei-afh+bfg-bdi+cdh-ceg;
-														output("***basedet=%ld*** aei=%ld afh=%ld bfg=%ld bdi=%ld cdh=%ld ceg=%ld\n"
-															,basedeterminant
-															,aei,afh,bfg,bdi,cdh,ceg);
-														D*/
-														min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
-														// initial values of the signs to use
-														/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
-														// we need to toggle the signs twice
-														register uint32_t flags=0x69969669; // that's a funny number!!!
-														/* using the following bits
-															0=16  1=0  2=0  3=16  
-															4=0  5=16  6=16  7=0  
-															8=0  9=16 10=16 11=0 
-															12=16 13=0 14=0 15=16 
-															16=0 17=16 18=16 19=0 
-															20=16 21=0 22=0 23=16 
-															24=16 25=0 26=0 27=16 
-															28=0 29=16 30=16 31=0
-														*/
-														// let's iterate over all 32 bits in flags consuming flags
-														//D output("flag determinants:");
-														long long totalflagzerodeterminants=0;
-														for(int flagbit=31;flagbit>=0;flagbit--){
-															if(flags&1){ // this combination occurs 16 times
-																// let's construct the determinant
-																flagdeterminant=(flagbit&1?min_aei:aei)+
-																								(flagbit&2?min_afh:afh)+
-																								(flagbit&4?min_bdi:bdi)+
-																								(flagbit&8?min_bfg:bfg)+
-																								(flagbit&16?min_cdh:cdh)+
-																								(flagbit&32?min_ceg:ceg);
-																//D output(" det#%d=%ld",flagbit,flagdeterminant);
-																if(0==flagdeterminant)totalflagzerodeterminants+=32; // count the total number of zero flag determinants
-															}
-															flags>>=1; // shift out the bit we consumed
+					}
+				}else{ // a=b=c=0
+					if(mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||
+							mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc)!=MP_OKAY)
+						q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
+				}
+				// read the assumed next c
+				c=uniqueTriplets[++abctripletindex];
+				if(c<0){ // a c closer
+					b=uniqueTriplets[++abctripletindex];
+					if(b<0){ // a b closer
+						a=uniqueTriplets[++abctripletindex];
+						if(a<0)break;
+						b=uniqueTriplets[++abctripletindex];
+					}
+					c=uniqueTriplets[++abctripletindex];
+				}
+			}
+			*/
+			free(uniqueTriplets); // ESSENTIAL BRO'
+		}else{
+			long long maxab,gcdab,gcdabc,I,H,G,gpart,ghpart,ghipart;
+			long long bg,cg,eg,fg,ah,ch,dh,fh,ai,bi,di,ei;
+			for(a=0;a<=max;a++){
+				for(b=0;b<=max;b++){
+					if(a>b){
+						maxab=a;
+						gcdab=gcd(a,b);
+					}else{
+						maxab=b;
+						gcdab=(a==b?a:gcd(b,a));
+					}
+					for(c=0;c<=max;c++){
+						if(a||b||c){ // not all zero!!
+							gcdabc=(c>gcdab?gcd(c,gcdab):gcd(gcdab,c));
+							if(gcdabc!=1){outputChar('.');continue;}
+							multabc=max/MAX(c,maxab); // this should be the number of multiples of (a,b,c) we do not need to consider
+							bd=0;
+							cd=0; // initial value of cd=c*d
+							for(d=0;d<=max;d++,bd+=b,cd+=c){ // for every successive d value I will go down by b
+								ae=0;
+								ce=0;
+								I=-bd; // initial value of I=a*e-b*d
+								for(e=0;e<=max;e++,ae+=a,ce+=c,I+=a){
+									H=cd; // initial value of H=c*d-a*f
+									G=-ce; // initial value of G=b*f-c*e
+									af=0;
+									bf=0;
+									for(f=0;f<=max;f++,af+=a,bf+=b,G+=b,H-=a){
+										gpart=0; // the initial value of gpart=G*g
+										bg=0;cg=0;eg=0;fg=0;
+										bfg=0;ceg=0;
+										for(g=0;g<=max;g++,bg+=b,cg+=c,eg+=e,fg+=f,bfg+=bf,ceg+=ce,gpart+=G){
+											ghpart=gpart; // the initial value of ghpart=gpart+H*h
+											ah=0;ch=0;dh=0;fh=0;
+											afh=0;cdh=0;
+											for(h=0;h<=max;h++,ah+=a,ch+=c,dh+=d,fh+=f,afh+=af,cdh+=cd,ghpart+=H){
+												ghipart=ghpart; // the initial value of ghipart=ghpart+I*i
+												ai=0;bi=0;di=0;ei=0;
+												aei=0;bdi=0;
+												for(i=0;i<=max;i++,ai+=a,bi+=b,di+=d,ei+=e,aei+=ae,bdi+=bd,ghipart+=I){
+													// ghipart is the determinant for nonnegative values of a, b, c, d, e, f, g, h and i
+													/*D
+													delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
+													checkdelta_a=aei-afh;checkdelta_b=bfg-bdi;checkdelta_c=cdh-ceg;
+													if(checkdelta_a!=delta_a){output(" Invalid check delta a");checkdelta_a_error++;}
+													if(checkdelta_b!=delta_b){output(" Invalid check delta b");checkdelta_b_error++;}
+													if(checkdelta_c!=delta_c){output(" Invalid check delta c");checkdelta_c_error++;}
+													determinant=delta_a+delta_b+delta_c;
+													outputChar(':');
+													outputChar(determinant!=ghipart?'X':'O');
+													delta_a*=2;delta_b*=2;delta_c*=2;
+													delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
+													outputChar(determinant!=delta_d+delta_e+delta_f?'X':'O');
+													delta_d*=2;delta_e*=2;delta_f*=2;
+													delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
+													outputChar(determinant!=delta_g+delta_h+delta_i?'X':'O');
+													delta_g*=2;delta_h*=2;delta_i*=2;
+													output(" det=%ld d_a=%ld d_b=%ld d_c=%ld d_d=%ld d_e=%ld d_f=%ld d_g=%ld d_h=%ld d_i=%ld\n",
+																	ghipart,delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i);
+													D*/
+													// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
+													// MISTAKE since we're starting with all negatives instead of all positives
+													//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
+													//         and do all positives first
+													// create all minus values we'll be needing
+													// NOTE these 6 three term products will all be positive!!! 
+													/*D
+													basedeterminant=aei-afh+bfg-bdi+cdh-ceg;
+													output("***basedet=%ld*** aei=%ld afh=%ld bfg=%ld bdi=%ld cdh=%ld ceg=%ld\n"
+														,basedeterminant
+														,aei,afh,bfg,bdi,cdh,ceg);
+													D*/
+													min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
+													// initial values of the signs to use
+													/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
+													// we need to toggle the signs twice
+													register uint32_t flags=0x69969669; // that's a funny number!!!
+													/* using the following bits
+														0=16  1=0  2=0  3=16  
+														4=0  5=16  6=16  7=0  
+														8=0  9=16 10=16 11=0 
+														12=16 13=0 14=0 15=16 
+														16=0 17=16 18=16 19=0 
+														20=16 21=0 22=0 23=16 
+														24=16 25=0 26=0 27=16 
+														28=0 29=16 30=16 31=0
+													*/
+													// let's iterate over all 32 bits in flags consuming flags
+													//D output("flag determinants:");
+													long long totalflagzerodeterminants=0;
+													for(int flagbit=31;flagbit>=0;flagbit--){
+														if(flags&1){ // this combination occurs 16 times
+															// let's construct the determinant
+															flagdeterminant=(flagbit&1?min_aei:aei)+
+																							(flagbit&2?min_afh:afh)+
+																							(flagbit&4?min_bdi:bdi)+
+																							(flagbit&8?min_bfg:bfg)+
+																							(flagbit&16?min_cdh:cdh)+
+																							(flagbit&32?min_ceg:ceg);
+															//D output(" det#%d=%ld",flagbit,flagdeterminant);
+															if(0==flagdeterminant)totalflagzerodeterminants+=32; // count the total number of zero flag determinants
 														}
-														long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
-														if(zeroes)totalflagzerodeterminants<<=zeroes;
-														mult=multabc;
-														while(--mult>=0){
-															mp_add_d(flagzdc,totalflagzerodeterminants,flagzdc);
-															///mp_add_d(flagtc,(512>>zeroes),flagtc);
-															////if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
-														}
-														/*D
-														output(" totalflagdeterminants=%ld",totalflagzerodeterminants);
-														long totalzerodeterminants=0;
-														outputChar('\n');
-														for(flag_a=(a?1:0),det_a=ghipart;;){
-															for(flag_b=(b?1:0),det_b=det_a;;){
-																for(flag_c=(c?1:0),det_c=det_b;;){
-																	for(flag_d=(d?1:0),det_d=det_c;;){
-																		for(flag_e=(e?1:0),det_e=det_d;;){
-																			for(flag_f=(f?1:0),det_f=det_e;;){
-																				for(flag_g=(g?1:0),det_g=det_f;;){
-																					sign_bfg=flag_b+flag_f+flag_g;
-																					sign_ceg=flag_c+flag_e+flag_g;
-																					for(flag_h=(h?1:0),det_h=det_g;;){
-																						sign_afh=flag_a+flag_f+flag_h;
-																						sign_cdh=flag_c+flag_d+flag_h;
-																						for(flag_i=(i?1:0),determinant=det_h;;){
-																							sign_aei=flag_a+flag_e+flag_i;
-																							sign_bdi=flag_b+flag_d+flag_i;
-																							signed_determinant=
-																								(sign_aei&1?min_aei:aei)+
-																								(sign_afh&1?afh:min_afh)+
-																								(sign_bfg&1?min_bfg:bfg)+
-																								(sign_bdi&1?bdi:min_bdi)+
-																								(sign_cdh&1?min_cdh:cdh)+
-																								(sign_ceg&1?ceg:min_ceg);
-																							determinant=ghipart
-																													-(flag_a?0:delta_a)
-																													-(flag_b?0:delta_b)
-																													-(flag_c?0:delta_c)
-																													-(flag_d?0:delta_d)
-																													-(flag_e?0:delta_e)
-																													-(flag_f?0:delta_f)
-																													-(flag_g?0:delta_g)
-																													-(flag_h?0:delta_h)
-																													-(flag_i?0:delta_i);
-																							output(" signs=%ld%ld%ld%ld%ld%ld:%ld;",
-																								sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant);
-																							f_a=(!flag_a?a:-a);f_b=(!flag_b?b:-b);f_c=(!flag_c?c:-c);
-																							f_d=(!flag_d?d:-d);f_e=(!flag_e?e:-e);f_f=(!flag_f?f:-f);
-																							f_g=(!flag_g?g:-g);f_h=(!flag_h?h:-h);f_i=(!flag_i?i:-i);
-																							// apparently checkdet1 through checkdet3 have the wrong sign!!!!!
-																							checkdet1=f_a*(f_e*f_i-f_f*f_h)+f_b*(f_f*f_g-f_d*f_i)+f_c*(f_d*f_h-f_e*f_g);
-																							checkdet2=f_d*(f_c*f_h-f_b*f_i)+f_e*(f_a*f_i-f_c*f_g)+f_f*(f_b*f_g-f_a*f_h);
-																							checkdet3=f_g*(f_b*f_f-f_c*f_e)+f_h*(f_c*f_d-f_a*f_f)+f_i*(f_a*f_e-f_b*f_d);
-																							output("[%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c]->%c%ld=%ld=%ld(%c)=%ld(%c)\n",
-																											f_a,(flag_a?'+':'-'),
-																											f_b,(flag_b?'+':'-'),
-																											f_c,(flag_c?'+':'-'),
-																											f_d,(flag_d?'+':'-'),
-																											f_e,(flag_e?'+':'-'),
-																											f_f,(flag_f?'+':'-'),
-																											f_g,(flag_g?'+':'-'),
-																											f_h,(flag_h?'+':'-'),
-																											f_i,(flag_i?'+':'-'),
-																											(checkdet1!=determinant?'X':'O'),determinant,
-																											checkdet1,
-																											checkdet2,(checkdet1!=checkdet2?'X':'O'),
-																											checkdet3,(checkdet2!=checkdet3?'X':'O'));
-																							if(0==checkdet1)totalzerodeterminants++;
-																							output(" totalzerodeterminants=%ld",totalzerodeterminants);
-																							mult=multabc;
-																							while(--mult>=0){
-																								if(0==checkdet1)mp_incr(zdc);
-																								mp_incr(tc);
-																								if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
-																							}
-																							if(--flag_i<0)break;determinant-=delta_i;
-																						}
-																						if(--flag_h<0)break;det_h-=delta_h;
-																					}
-																					if(--flag_g<0)break;det_g-=delta_g;
-																				}
-																				if(--flag_f<0)break;det_f-=delta_f;
-																			}
-																			if(--flag_e<0)break;det_e-=delta_e;
-																		}
-																		if(--flag_d<0)break;det_d-=delta_d;
-																	}
-																	if(--flag_c<0)break;det_c-=delta_c;
-																}
-																if(--flag_b<0)break;det_b-=delta_b;
-															}
-															if(--flag_a<0)break;det_a-=delta_a;
-														}
-														output("flagzerodeterminantcount=%ld zerodeterminantcount=%ld\n"
-																	,totalflagzerodeterminants,totalzerodeterminants);
-														D*/
+														flags>>=1; // shift out the bit we consumed
 													}
+													long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
+													if(zeroes)totalflagzerodeterminants<<=zeroes;
+													mult=multabc;
+													while(--mult>=0){
+														mp_add_d(flagzdc,totalflagzerodeterminants,flagzdc);
+														///mp_add_d(flagtc,(512>>zeroes),flagtc);
+														////if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+													}
+													/*D
+													output(" totalflagdeterminants=%ld",totalflagzerodeterminants);
+													long totalzerodeterminants=0;
+													outputChar('\n');
+													for(flag_a=(a?1:0),det_a=ghipart;;){
+														for(flag_b=(b?1:0),det_b=det_a;;){
+															for(flag_c=(c?1:0),det_c=det_b;;){
+																for(flag_d=(d?1:0),det_d=det_c;;){
+																	for(flag_e=(e?1:0),det_e=det_d;;){
+																		for(flag_f=(f?1:0),det_f=det_e;;){
+																			for(flag_g=(g?1:0),det_g=det_f;;){
+																				sign_bfg=flag_b+flag_f+flag_g;
+																				sign_ceg=flag_c+flag_e+flag_g;
+																				for(flag_h=(h?1:0),det_h=det_g;;){
+																					sign_afh=flag_a+flag_f+flag_h;
+																					sign_cdh=flag_c+flag_d+flag_h;
+																					for(flag_i=(i?1:0),determinant=det_h;;){
+																						sign_aei=flag_a+flag_e+flag_i;
+																						sign_bdi=flag_b+flag_d+flag_i;
+																						signed_determinant=
+																							(sign_aei&1?min_aei:aei)+
+																							(sign_afh&1?afh:min_afh)+
+																							(sign_bfg&1?min_bfg:bfg)+
+																							(sign_bdi&1?bdi:min_bdi)+
+																							(sign_cdh&1?min_cdh:cdh)+
+																							(sign_ceg&1?ceg:min_ceg);
+																						determinant=ghipart
+																												-(flag_a?0:delta_a)
+																												-(flag_b?0:delta_b)
+																												-(flag_c?0:delta_c)
+																												-(flag_d?0:delta_d)
+																												-(flag_e?0:delta_e)
+																												-(flag_f?0:delta_f)
+																												-(flag_g?0:delta_g)
+																												-(flag_h?0:delta_h)
+																												-(flag_i?0:delta_i);
+																						output(" signs=%ld%ld%ld%ld%ld%ld:%ld;",
+																							sign_aei,sign_afh,sign_bfg,sign_bdi,sign_cdh,sign_ceg,signed_determinant);
+																						f_a=(!flag_a?a:-a);f_b=(!flag_b?b:-b);f_c=(!flag_c?c:-c);
+																						f_d=(!flag_d?d:-d);f_e=(!flag_e?e:-e);f_f=(!flag_f?f:-f);
+																						f_g=(!flag_g?g:-g);f_h=(!flag_h?h:-h);f_i=(!flag_i?i:-i);
+																						// apparently checkdet1 through checkdet3 have the wrong sign!!!!!
+																						checkdet1=f_a*(f_e*f_i-f_f*f_h)+f_b*(f_f*f_g-f_d*f_i)+f_c*(f_d*f_h-f_e*f_g);
+																						checkdet2=f_d*(f_c*f_h-f_b*f_i)+f_e*(f_a*f_i-f_c*f_g)+f_f*(f_b*f_g-f_a*f_h);
+																						checkdet3=f_g*(f_b*f_f-f_c*f_e)+f_h*(f_c*f_d-f_a*f_f)+f_i*(f_a*f_e-f_b*f_d);
+																						output("[%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c,%ld%c %ld%c %ld%c]->%c%ld=%ld=%ld(%c)=%ld(%c)\n",
+																										f_a,(flag_a?'+':'-'),
+																										f_b,(flag_b?'+':'-'),
+																										f_c,(flag_c?'+':'-'),
+																										f_d,(flag_d?'+':'-'),
+																										f_e,(flag_e?'+':'-'),
+																										f_f,(flag_f?'+':'-'),
+																										f_g,(flag_g?'+':'-'),
+																										f_h,(flag_h?'+':'-'),
+																										f_i,(flag_i?'+':'-'),
+																										(checkdet1!=determinant?'X':'O'),determinant,
+																										checkdet1,
+																										checkdet2,(checkdet1!=checkdet2?'X':'O'),
+																										checkdet3,(checkdet2!=checkdet3?'X':'O'));
+																						if(0==checkdet1)totalzerodeterminants++;
+																						output(" totalzerodeterminants=%ld",totalzerodeterminants);
+																						mult=multabc;
+																						while(--mult>=0){
+																							if(0==checkdet1)mp_incr(zdc);
+																							mp_incr(tc);
+																							if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
+																						}
+																						if(--flag_i<0)break;determinant-=delta_i;
+																					}
+																					if(--flag_h<0)break;det_h-=delta_h;
+																				}
+																				if(--flag_g<0)break;det_g-=delta_g;
+																			}
+																			if(--flag_f<0)break;det_f-=delta_f;
+																		}
+																		if(--flag_e<0)break;det_e-=delta_e;
+																	}
+																	if(--flag_d<0)break;det_d-=delta_d;
+																}
+																if(--flag_c<0)break;det_c-=delta_c;
+															}
+															if(--flag_b<0)break;det_b-=delta_b;
+														}
+														if(--flag_a<0)break;det_a-=delta_a;
+													}
+													output("flagzerodeterminantcount=%ld zerodeterminantcount=%ld\n"
+																,totalflagzerodeterminants,totalzerodeterminants);
+													D*/
 												}
 											}
 										}
 									}
 								}
-							}else{
-								//D outputBiginteger("totalcount6=",totalcount6,".\n");
-								//D outputBiginteger("tc=",totalcount,".\n");
-								//D outputBiginteger("zdc=",zerodeterminantcount,".\n");
-								// if a, b and c are zero, all determinants will be zero
-								if(/*mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||*/mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc)!=MP_OKAY)
+							}
+						}else{
+							//D outputBiginteger("totalcount6=",totalcount6,".\n");
+							//D outputBiginteger("tc=",totalcount,".\n");
+							//D outputBiginteger("zdc=",zerodeterminantcount,".\n");
+							// if a, b and c are zero, all determinants will be zero
+							for(int i=initializedMults;i<=max;i++){
+								flagzdc=MP_INT_POINTER(flagzerodeterminantcounts[i]);
+								if(/*mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||*/mp_add(flagzdc,MP_INT_POINTER(totalcounts6[i]),flagzdc)!=MP_OKAY)
 									q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
 							}
 						}
 					}
 				}
 			}
-			/*D
-			q2outputBiginteger("The computed total number of flag combinations (",flagzerodeterminantcount,")");
-			q2outputBiginteger("does not match the counted total number of flag combinations (",flagtotalcount,").\n");
-			FREE_BIGINTEGER(flagzerodeterminantcount,owner);
-			FREE_BIGINTEGER(flagtotalcount,owner);
-			FREE_BIGINTEGER(bigint32,owner);
-			FREE_BIGINTEGER(bigint16,owner);
-			D*/
-			/*D
-			output("Number of check delta errors: a=%ld b=%ld c=%ld.\n",checkdelta_a_error,checkdelta_b_error,checkdelta_c_error);
-			if(truetotalcount!=NULL){
-				if(mp_cmp(MP_INT_POINTER(truetotalcount),tc)!=MP_EQ){
-					q2outputmessageprefix(M_BUG_PREFIX);
-					q2outputBiginteger("The computed total number of combinations (",truetotalcount,")");
-					q2outputBiginteger("does not match the counted total number of combinations (",totalcount,").\n");
-				}
-			}else
-				q2outputError("Failed to compute the total number of combinations!");
-			*/
-			resultValue=_getValueOfRational(
-					_getRational(disowned_biginteger(flagzerodeterminantcount,owner),disowned_biginteger(truetotalcount,owner),M_LD_NAN,false)
-				);
-		}else{
-			FREE_BIGINTEGER(flagzerodeterminantcount,owner);
-			FREE_BIGINTEGER(truetotalcount,owner);
 		}
-		if(billions!=NULL)FREE_BIGINTEGER(billions,owner);
-		if(billionsText!=NULL)FREE_STRING(billionsText,owner);
-		///// OOPS do NOT do this again!!!!! if(base!=NULL)FREE_BIGINTEGER(base,owner);
-		if(exponent9!=NULL)FREE_BIGINTEGER(exponent9,owner);
-		if(exponent6!=NULL)FREE_BIGINTEGER(exponent6,owner);
-		if(exponent3!=NULL)FREE_BIGINTEGER(exponent3,owner);
-		/// OOPS should never do this here!!! if(truetotalcount!=NULL)FREE_BIGINTEGER(truetotalcount,owner);
-		if(totalcount6!=NULL)FREE_BIGINTEGER(totalcount6,owner);
-		if(totalcount3!=NULL)FREE_BIGINTEGER(totalcount3,owner);
+		/*D
+		q2outputBiginteger("The computed total number of flag combinations (",flagzerodeterminantcount,")");
+		q2outputBiginteger("does not match the counted total number of flag combinations (",flagtotalcount,").\n");
+		FREE_BIGINTEGER(flagzerodeterminantcount,owner);
+		FREE_BIGINTEGER(flagtotalcount,owner);
+		FREE_BIGINTEGER(bigint32,owner);
+		FREE_BIGINTEGER(bigint16,owner);
+		D*/
+		/*D
+		output("Number of check delta errors: a=%ld b=%ld c=%ld.\n",checkdelta_a_error,checkdelta_b_error,checkdelta_c_error);
+		if(truetotalcount!=NULL){
+			if(mp_cmp(MP_INT_POINTER(truetotalcount),tc)!=MP_EQ){
+				q2outputmessageprefix(M_BUG_PREFIX);
+				q2outputBiginteger("The computed total number of combinations (",truetotalcount,")");
+				q2outputBiginteger("does not match the counted total number of combinations (",totalcount,").\n");
+			}
+		}else
+			q2outputError("Failed to compute the total number of combinations!");
+		*/
+		// we have to take copies as all flagzerodeterminantcounts and truetotalcounts are going to be freed or bound
+		resultRational=owned_rational(
+				_getRational(
+					_getBigintegerCopy(flagzerodeterminantcounts[max]),
+					_getBigintegerCopy(truetotalcounts[max]),M_LD_NAN,false)
+				,owner);
+	}else{
+		/*
+		FREE_BIGINTEGER(flagzerodeterminantcounts,owner);
+		FREE_BIGINTEGER(truetotalcounts,owner);
+		*/
+	}
+	if(billions!=NULL)FREE_BIGINTEGER(billions,owner);
+	if(billionsText!=NULL)FREE_STRING(billionsText,owner);
+	///// OOPS do NOT do this again!!!!! if(base!=NULL)FREE_BIGINTEGER(base,owner);
+	if(exponent9!=NULL)FREE_BIGINTEGER(exponent9,owner);
+	if(exponent6!=NULL)FREE_BIGINTEGER(exponent6,owner);
+	if(exponent3!=NULL)FREE_BIGINTEGER(exponent3,owner);
+	/// OOPS should never do this here!!! if(truetotalcount!=NULL)FREE_BIGINTEGER(truetotalcount,owner);
+	
+	//if(totalcount6!=NULL)FREE_BIGINTEGER(totalcount6,owner);
+	//if(totalcount3!=NULL)FREE_BIGINTEGER(totalcount3,owner);
+	// store all rational probabilities determined!!!!
+	for(int i=initializedMults;i<=max;i++){
+		if(truetotalcounts[i]!=NULL&&flagzerodeterminantcounts[i]!=NULL)
+			integernotinvertibleprobabilities[i]=owned_rational(_getRational(disowned_biginteger(flagzerodeterminantcounts[i],owner),disowned_biginteger(truetotalcounts[i],owner),M_LD_NAN,false),owner_integernotinvertibleprobabilities);
+		// if not stored, free the two big integers (if any) as they not bound to the stored rational apparently
+		if(NULL==integernotinvertibleprobabilities[i]){
+			FREE_BIGINTEGER(truetotalcounts[i],owner);
+			FREE_BIGINTEGER(flagzerodeterminantcounts[i],owner);
+			q2outputMessage(M_ERROR_PREFIX,"Not invertible probability for integer matrices with elements in [-%d,%d] not stored!",i,i);
+		}else{
+			q2outputRational("Not invertible probability ",integernotinvertibleprobabilities[i],NULL);
+			q2output(" for integer matrices with elements in [-%d,%d] stored.\n",i,i);
+		}
+	}
+	updateInitializedMults();
+	// free the unmanaged big integers
+	unmanaged_free(truetotalcounts,(max+1)*sizeof(Mbiginteger*));
+	unmanaged_free(totalcounts6,(max+1)*sizeof(Mbiginteger*));
+	unmanaged_free(totalcounts3,(max+1)*sizeof(Mbiginteger*));
+	unmanaged_free(flagzerodeterminantcounts,(max+1)*sizeof(Mbiginteger*));
+
+	return disowned_rational(resultRational,owner);
+}
+/**
+ * @brief 
+ * 
+ */
+Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* resultValue=NULL;
+	long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
+	if(max>=0&&max<128){
+		if(max){
+			Mrational* resultRational=owned_rational(symmetricnotinvertibleprobability(max),owner);
+			if(resultRational!=NULL)resultValue=_getValueOfRational(resultRational);
+		}else
+			resultValue=_getValueOfBiginteger(_getBiginteger(1));
 	}
 	return resultValue;
 }
