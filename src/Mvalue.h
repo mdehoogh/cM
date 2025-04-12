@@ -661,3 +661,6 @@ Mvalue* Mmessages(Mvalue const * const messageTypeValue,Mvalue const * const ret
 Mvalue* Mremovemessages(Mvalue const * const messageTypeValue);
 Mvalue* Maddmessage(Mvalue const * const messageValue);
 Mvalue* Mmessagecounts();
+
+Mvalue* MsetNormalizeRationalsFlag(Mvalue* normalizeRationalsFlagValue);
+Mvalue* MgetNormalizeRationalsFlag();

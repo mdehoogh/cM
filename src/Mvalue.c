@@ -7894,7 +7894,7 @@ Mrational* _getValueRational(Mvalue const * const value){Mallocationowner owner=
 					if(bi_num!=NULL||bi_den!=NULL)
 						_rational=owned_rational(_getRational(bi_num,bi_den,
 						(value->value._list->numberOfElements>2?getValueLongDouble(value->value._list->_first->_next->_next->_value):M_LD_NAN),
-						true),owner);
+						getNormalizeRationalsFlag()),owner);
 					if(bi_num!=NULL&&numeratorValue!=NULL&&numeratorValue->type!=VT_BIGINTEGER)free_biginteger(bi_num);
 					if(bi_den!=NULL&&denominatorValue!=NULL&&denominatorValue->type!=VT_BIGINTEGER)free_biginteger(bi_den);
 				}
@@ -8413,4 +8413,16 @@ size_t getMvalueSize(Mvalue const * const _value){
 	}
 	*/
 	return result;
+}
+
+Mvalue* MsetNormalizeRationalsFlag(Mvalue* normalizeRationalFlagsValue){
+	long long result=M_LL_INVALID;
+	long long normalizeRationalFlagsInteger=getValueInteger(normalizeRationalFlagsValue);
+	if(normalizeRationalFlagsInteger!=M_LL_INVALID){ // a valid integer that we may use to set the normalize rationals flag with
+		result=(setNormalizeRationalsFlag(normalizeRationalFlagsInteger!=0)?M_TRUE:M_FALSE);
+	}
+	return _getIntegerValue(result);
+}
+Mvalue* MgetNormalizeRationalsFlag(){
+	return _getIntegerValue(getNormalizeRationalsFlag()?M_TRUE:M_FALSE);
 }

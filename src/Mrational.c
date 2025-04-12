@@ -9,6 +9,8 @@ extern const long double M_LD_Q_EPS; // the threshold for accepting a rational a
 
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MI_RATIONAL,id};}
 
+// whether or not to rationalize any rational is determined by the normalizeRationsFlag
+static bool normalizeRationalsFlag=1;
 // for the computation of the sum of two long doubles
 /**
  * @brief returns the sum of long doubles \p ld1 and \p ld2
@@ -266,7 +268,8 @@ mp_err _qmul(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c)){
+		// MDH@12APR2025: only normalize when normalizeRationalsFlag tells us to
+		if(normalizeRationalsFlag&&!c->normalized&&!normalizeRational(c,owner_c)){
 			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputRational("Failed to normalize rational ",c,".\n");
 		}
@@ -294,7 +297,7 @@ mp_err _qmul_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c)){
+		if(normalizeRationalsFlag&&!c->normalized&&!normalizeRational(c,owner_c)){
 			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputRational("Failed to normalize rational ",c,".\n");
 		}
@@ -324,7 +327,7 @@ mp_err _qdiv(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c)){
+		if(normalizeRationalsFlag&&!c->normalized&&!normalizeRational(c,owner_c)){
 			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputRational("Failed to normalize rational ",c,".\n");
 		}
@@ -353,7 +356,7 @@ mp_err _qdiv_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
 	}else{ // numerator and denominator computed
 		c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 		c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-		if(!c->normalized&&!normalizeRational(c,owner_c)){
+		if(normalizeRationalsFlag&&!c->normalized&&!normalizeRational(c,owner_c)){
 			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputRational("Failed to normalize rational ",c,".\n");
 		}
@@ -416,7 +419,7 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 					}
 					// if _num was not bound to c->num free _num here, otherwise leave it alone
 					if(c->num!=NULL){ // success
-						if(!c->normalized&&!normalizeRational(c,owner_c)){
+						if(normalizeRationalsFlag&&!c->normalized&&!normalizeRational(c,owner_c)){
 							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputRational("Failed to normalize rational ",c,".\n");
 						}
@@ -446,7 +449,7 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 					c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
 					c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
 					/////// not on pure rationals!!!! c->delta=_floatdifference(a->delta,b->delta);
-					if(!c->normalized&&!normalizeRational(c,owner_c)){
+					if(normalizeRationalsFlag&&!c->normalized&&!normalizeRational(c,owner_c)){
 						q2outputmessageprefix(M_ERROR_PREFIX);
 						q2outputRational("Failed to normalize rational ",c,".\n");
 					}
@@ -535,7 +538,8 @@ mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 		// normalize the rational
 		/////q2outputInfo("Normalizing the sum rational.");
 		c->normalized=false;
-		normalizeRational(c,owner_c);
+		if(normalizeRationalsFlag)
+			normalizeRational(c,owner_c);
 		// register the delta sum
 		////////c->delta=_delta;
 	}
@@ -582,7 +586,10 @@ mp_err _qcopy(Mrational * const b,Mallocationowner owner_b,Mrational const * con
  * @param b
  * @param owner_b the current owner of b
  */
-mp_err _qcopy_bi(Mrational * const b,Mallocationowner owner_b,Mbiginteger const * const a){if(!b||b->num||b->den||b->delta)return MP_ERR;Mallocationowner owner=getOwner(__LINE__);
+mp_err _qcopy_bi(Mrational * const b,Mallocationowner owner_b,Mbiginteger const * const a){
+	if(NULL==b||b->num!=NULL||b->den!=NULL||b->delta!=NULL)
+		return MP_ERR;
+	Mallocationowner owner=getOwner(__LINE__);
 	mp_err status=(a!=NULL?MP_OKAY:MP_ERR);
 	if(status==MP_OKAY){
 		// get copies of numerator, denominator and delta of the source
@@ -918,7 +925,7 @@ Mrational* _getRationalBigintegerQuotient(Mrational const * const q,Mbiginteger 
 			if(!q->den||mp_mul(MP_INT_POINTER(_newnum),MP_INT_POINTER(q->den),MP_INT_POINTER(_newnum))==MP_OKAY){
 				long double newdelta=M_LD_NAN,qdelta=getFloatLongDouble(q->delta);
 				if(qdelta!=M_LD_NAN)newdelta=qdelta/mp_get_long_double(b);
-				_rationalBigintegerQuotient=owned_rational(_getRational(q->num,_newnum,newdelta,true),owner);
+				_rationalBigintegerQuotient=owned_rational(_getRational(q->num,_newnum,newdelta,getNormalizeRationalsFlag()),owner);
 				FREE_BIGINTEGER(_newnum,owner);
 			}else
 				q2outputError("Failed to multiply two big integers");
@@ -1172,7 +1179,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){Mal
 						// check again whether we still have an exponent (when we should)
 						if(exponentText==NULL||_exponent)
 							if(!neg||mp_neg(MP_INT_POINTER(_numerator),MP_INT_POINTER(_numerator))==MP_OKAY)
-								rational=owned_rational(_getRational(_numerator,_denominator,0,true),owner); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
+								rational=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,getNormalizeRationalsFlag()),owner); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
 					}
 				}
 				FREE_BIGINTEGER(_decimalPartBiginteger,owner);
@@ -1367,6 +1374,8 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 				if(_rational!=NULL){ // if we still have one (could have failed when we had to toggle the signs)
 					// last step: normalize if so requested
 					_rational->normalized=(!_rational->den||isBigintegerOne(_rational->num)); // if either numerator or denominator is NULL assume normalized!!!
+					// MDH@12APR2025: normalize overrides normalizeRationalsFlag so if you want to honor normalizeRationalsFlag
+					//                you should use that flag in the call to _getRational()!!
 					if(normalize&&!_rational->normalized){
 						if(amVerboseDebugging())
 							q2outputRational("Rational before normalization: ",_rational,".\n");
@@ -1375,10 +1384,14 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
 							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputRational("Failed to normalize rational ",_rational,".\n");
 						} // normalize the rational if we are supposed to
-						if(_denominator&&!_rational->normalized)q2outputError("Failed to normalize a rational");else 
-						if(amVerboseDebugging())q2outputRational("Rational after normalization: ",_rational,".\n");
+						if(_denominator!=NULL&&!_rational->normalized)
+							q2outputError("Failed to normalize a rational");
+						else 
+						if(amVerboseDebugging())
+							q2outputRational("Rational after normalization: ",_rational,".\n");
 					}else
-					if(amVerboseDebugging())q2outputRational("Rational initialized: ",_rational,".\n");
+					if(amVerboseDebugging())
+						q2outputRational("Rational initialized: ",_rational,".\n");
 				}
 				///////// AS LONG AS WE FREE THE RATIONAL IN THE ELSE PART NO NEED TO DO: return _rational; // return whether normalized or not
 			}else{ // either _numerator NULL or _getBiginteger(1) NULL, in the last case nothing created that needs to be freed (except for _rational)
@@ -1408,7 +1421,7 @@ Mrational* _getInverseRational(Mrational const * const _rational){Mallocationown
 		Mbiginteger *_inverseNumerator=owned_biginteger(_rational->den?_getBigintegerCopy(_rational->den):_getBiginteger(1),owner)
 								,*_inverseDenominator=owned_biginteger(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1),owner); // free on failure
 		if(_inverseNumerator!=NULL&&_inverseDenominator!=NULL)
-			_inverseRational=owned_rational(_getRational(_inverseNumerator,_inverseDenominator,M_LD_NAN,!_rational->normalized/*,false*/),owner);
+			_inverseRational=owned_rational(_getRational(_inverseNumerator,_inverseDenominator,M_LD_NAN,getNormalizeRationalsFlag()&&!_rational->normalized/*,false*/),owner);
 		// TODO is this correct????
 		FREE_BIGINTEGER(_inverseNumerator,owner);
 		FREE_BIGINTEGER(_inverseDenominator,owner);
@@ -1631,7 +1644,7 @@ Mrational* _getLongDoubleRational(long double ld,int maxiter){Mallocationowner o
 			Mbiginteger *_numerator=owned_biginteger(_getBiginteger(p),owner),*_denominator=owned_biginteger(_getBiginteger(q),owner);
 			if(_numerator!=NULL&&_denominator!=NULL) // we've got both of them
 				if(!neg||mp_neg(MP_INT_POINTER(_numerator),MP_INT_POINTER(_numerator))==MP_OKAY)
-					_rational=owned_rational(_getRational(_numerator,_denominator,delta,true),owner); // NOTE there should always be a delta!!!!
+					_rational=owned_rational(_getRational(_numerator,_denominator,delta,getNormalizeRationalsFlag()),owner); // NOTE there should always be a delta!!!!
 			FREE_BIGINTEGER(_numerator,owner);
 			FREE_BIGINTEGER(_denominator,owner);
 		}else{ // long double is zero
@@ -1791,4 +1804,19 @@ long long isRationalOne(Mrational const * const rational){
 			q2output(": %s.\n",(result==M_LL_INVALID?"UNKNOWN":(result==M_TRUE?"YES":"NO")));
 	}
 	return result;
+}
+/**
+ * @brief sets the global normalizeRationalsFlag to \p normalizeRationals
+ * 
+ * @param normalizeRationals the value to set normalizeRationalsFlag to
+ * @return true 
+ * @return false 
+ */
+bool setNormalizeRationalsFlag(bool normalizeRationals){
+	bool oldNormalizeRationals=normalizeRationalsFlag;
+	normalizeRationalsFlag=normalizeRationals;
+	return oldNormalizeRationals;
+}
+bool getNormalizeRationalsFlag(){
+	return normalizeRationalsFlag;
 }

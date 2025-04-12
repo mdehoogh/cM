@@ -2407,7 +2407,7 @@ Mrational* _getValueRational(Mvalue* _value){Mallocationowner owner=getOwner(__L
 			case VT_LIST:
 				if(_value->value._list->numberOfElements>1)
 					_rational=owned_rational(_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),
-											(_value->value._list->numberOfElements>2?getValueLongDouble(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true),owner);
+											(_value->value._list->numberOfElements>2?getValueLongDouble(_value->value._list->_first->_next->_next->_value):M_LD_NAN),getNormalizeRationalsFlag()),owner);
 				break;
 			default:break;
 		}
@@ -2462,7 +2462,7 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		Mrational* _purifiedRational=NULL;
 		// create a copy of the numerator and denominator of the provided rational
 		Mbiginteger* _num=owned_biginteger(_getBigintegerCopy(rational->num),owner),*_den=owned_biginteger(_getBigintegerCopy(rational->den),owner);
-		Mrational* _pureRational=(_num?owned_rational(_getRational(_num,_den,M_LD_NAN,true),owner):NULL);
+		Mrational* _pureRational=(_num?owned_rational(_getRational(_num,_den,M_LD_NAN,getNormalizeRationalsFlag()),owner):NULL);
 		if(_pureRational){
 			_purifiedRational=owned_rational(_getPurifiedRational(_pureRational,rationaldelta),owner);
 			FREE_RATIONAL(_pureRational,owner);
@@ -2530,7 +2530,7 @@ Mvalue* Madd(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
     if(_value){
 		if(amVerbose())outputValue("Computing the sum of '",_value,"'.\n");
-        if(_value->type==VT_LIST){
+		if(_value->type==VT_LIST){
 			Mvalue* _sumValue=NULL;
 			// all the values in the list could be integer
 			Mlist* list=_value->value._list;
@@ -2575,11 +2575,11 @@ Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		case VT_INTEGER:
 			{
 				Mbiginteger* _denominator=owned_biginteger(_getBiginteger(value->value._integer->ll),owner); // create the big integer denominator
-				_reciprocalValue=_getValueOfRational(_getRational(NULL,_denominator,M_LD_NAN,true));
+				_reciprocalValue=_getValueOfRational(_getRational(NULL,_denominator,M_LD_NAN,getNormalizeRationalsFlag()));
 				FREE_BIGINTEGER(_denominator,owner); // free the created big integer used to create the rational
 			}
 			break;
-		case VT_BIGINTEGER:_reciprocalValue=_getValueOfRational(_getRational(NULL,value->value._biginteger,M_LD_NAN,true));break; // same as with VT_INTEGER but without freeing the to remain bound big integer
+		case VT_BIGINTEGER:_reciprocalValue=_getValueOfRational(_getRational(NULL,value->value._biginteger,M_LD_NAN,getNormalizeRationalsFlag()));break; // same as with VT_INTEGER but without freeing the to remain bound big integer
 		case VT_DECIMAL:_reciprocalValue=_getValueOfDecimal(_getInverseDecimal(value->value._decimal));break;
 		default:break;
 	}
@@ -5164,7 +5164,7 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 		Mbiginteger *baseNumerator=(neg?baseRational->den:baseRational->num),*baseDenominator=(neg?baseRational->num:baseRational->den);
 		Mbiginteger *_numerator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger),owner);
 		Mbiginteger *_denominator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger),owner);
-		_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner);
+		_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,getNormalizeRationalsFlag()),owner);
 		if(!_rationalPower||!_rationalPower->num)FREE_BIGINTEGER(_numerator,owner);
 		if(!_rationalPower||!_rationalPower->den)FREE_BIGINTEGER(_denominator,owner);
 	}
@@ -5530,7 +5530,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 									FREE_BIGINTEGER(_one,owner);
 								}
 								FREE_BIGINTEGER(_np_a,owner);
-								_rationalBigintegerRootRational=owned_rational(_getRational(_pk,_qk,M_LD_NAN,true),owner);
+								_rationalBigintegerRootRational=owned_rational(_getRational(_pk,_qk,M_LD_NAN,getNormalizeRationalsFlag()),owner);
 							}
 						}else
 							q2outputError("Failed to initialize the rational root approximation");
@@ -5997,7 +5997,7 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		// if the denominator is negative, both the numerator and denominator should be negated (should this be part of the normalization procedure?), theoretically storing the sign separate from the big integers in a rational could also be the way to go
 		// so when the sign of the two big integers is different, the rational is negative, otherwise it is positive and _getRational would store the absolute values of the big integer
 		// if _getRational would take care of negating the numerator and denominator it would have to free the passed in big integers (if so requested)
-		Mrational* _rational=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner); // free num/den when failing to bind
+		Mrational* _rational=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,getNormalizeRationalsFlag()),owner); // free num/den when failing to bind
 		FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner);
 		return _getValueOfRational(disowned_rational(_rational,owner)); // when failing to bind _rational to a value, free it as well
 	}

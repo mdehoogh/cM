@@ -688,7 +688,7 @@ Mvalue* Mdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 		// if the denominator is negative, both the numerator and denominator should be negated (should this be part of the normalization procedure?), theoretically storing the sign separate from the big integers in a rational could also be the way to go
 		// so when the sign of the two big integers is different, the rational is negative, otherwise it is positive and _getRational would store the absolute values of the big integer
 		// if _getRational would take care of negating the numerator and denominator it would have to free the passed in big integers (if so requested)
-		Mrational* _rational=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner); // free num/den when failing to bind
+		Mrational* _rational=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,getNormalizeRationalsFlag()),owner); // free num/den when failing to bind
 		FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner);
 		return _getValueOfRational(disowned_rational(_rational,owner)); // when failing to bind _rational to a value, free it as well
 	}

@@ -51,3 +51,7 @@ long long isRationalZero(Mrational const * const rational);
 long long isRationalPositive(Mrational const * const rational);
 long long isRationalNegative(Mrational const * const rational);
 long long isRationalOne(Mrational const * const rational);
+
+// whether or not to normalize rationals
+bool setNormalizeRationalsFlag(bool normalizeRationals);
+bool getNormalizeRationalsFlag();

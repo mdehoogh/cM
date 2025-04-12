@@ -526,7 +526,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 								// negate the numerator if the decimal is negative
 								if(_num!=NULL&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){FREE_BIGINTEGER(_num,owner);_num=NULL;}
 								if(_num!=NULL){
-									_rational=owned_rational(_getRational(_num,_den,M_LD_NAN,true),owner);
+									_rational=owned_rational(_getRational(_num,_den,M_LD_NAN,getNormalizeRationalsFlag()),owner);
 									FREE_BIGINTEGER(_num,owner);
 								}
 								// if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though

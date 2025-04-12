@@ -4730,7 +4730,7 @@ Mvalue* Mq(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		long double rationaldelta=getReal(rational->delta);
 		// MDH@29MAR2023: TODO since _getRational copies num and den input there's no need to create copies here!!!!!
 		//                DONE no need to create _num and _den anymore!!!!!
-		Mrational* _pureRational=owned_rational(_getRational(rational->num,rational->den,M_LD_NAN,true),owner); // MDH@29MAR2023: _num can be NULL as well
+		Mrational* _pureRational=owned_rational(_getRational(rational->num,rational->den,M_LD_NAN,getNormalizeRationalsFlag()),owner); // MDH@29MAR2023: _num can be NULL as well
 		/* replacing:
 		// create a copy of the numerator and denominator of the provided rational
 		Mbiginteger *_num=owned_biginteger(_getBigintegerCopy(rational->num),owner);
@@ -4979,13 +4979,13 @@ Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			{
 				Mbiginteger* _denominator=owned_biginteger(_getBiginteger(value->value._integer->ll),owner); // create the big integer denominator
 				if(_denominator!=NULL){
-					_reciprocalValue=_getValueOfRational(_getRational(NULL,_denominator,M_LD_NAN,true));
+					_reciprocalValue=_getValueOfRational(_getRational(NULL,_denominator,M_LD_NAN,getNormalizeRationalsFlag()));
 					FREE_BIGINTEGER(_denominator,owner); // free the created big integer used to create the rational
 				}else
 					outputMemoryError("Failed to create a big integer");
 			}
 			break;
-		case VT_BIGINTEGER:_reciprocalValue=_getValueOfRational(_getRational(NULL,value->value._biginteger,M_LD_NAN,true));break; // same as with VT_INTEGER but without freeing the to remain bound big integer
+		case VT_BIGINTEGER:_reciprocalValue=_getValueOfRational(_getRational(NULL,value->value._biginteger,M_LD_NAN,getNormalizeRationalsFlag()));break; // same as with VT_INTEGER but without freeing the to remain bound big integer
 		case VT_DECIMAL:_reciprocalValue=_getValueOfDecimal(_getInverseDecimal(value->value._decimal));break;
 		default:break;
 	}
@@ -7660,7 +7660,7 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 			Mbiginteger *_numerator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger),owner);
 			Mbiginteger *_denominator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger),owner);
 			if(neg)MP_INT_POINTER(exponentBiginteger)->sign=MP_NEG;
-			_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner);
+			_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,getNormalizeRationalsFlag()),owner);
 			if(NULL==_rationalPower||NULL==_rationalPower->num)FREE_BIGINTEGER(_numerator,owner);
 			if(NULL==_rationalPower||NULL==_rationalPower->den)FREE_BIGINTEGER(_denominator,owner);
 		}else // the exponent equals zero, so return rational 1
@@ -8108,7 +8108,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 									FREE_BIGINTEGER(_one,owner);
 								}
 								FREE_BIGINTEGER(_np_a,owner);
-								_rationalBigintegerRootRational=owned_rational(_getRational(_pk,_qk,M_LD_NAN,true),owner);
+								_rationalBigintegerRootRational=owned_rational(_getRational(_pk,_qk,M_LD_NAN,getNormalizeRationalsFlag()),owner);
 							}
 						}else
 							q2outputError("Failed to initialize the rational root approximation");
@@ -14846,30 +14846,35 @@ static void updateMults(unsigned char max){
 static void updateInitializedMults(){
 	while(integernotinvertibleprobabilities[initializedMults]!=NULL)initializedMults++;
 }
-static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocationowner owner=getOwner(__LINE__);
+static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationowner owner=getOwner(__LINE__);
 	assert(max>0&&max<128);
 	// if we already know it, we can return it as from the stored rationals (as a copy that is)
 	if(max<initializedMults)
 		return _getRationalCopy(integernotinvertibleprobabilities[max]);
 	// we'll be needing 3, 6 and 9 big integers
-	Mbiginteger *exponent9=owned_biginteger(_getBiginteger(9),owner),
+	Mbiginteger *exponent9=owned_biginteger(_getBiginteger(9),owner)/*,
 							*exponent6=owned_biginteger(_getBiginteger(6),owner),
-							*exponent3=owned_biginteger(_getBiginteger(3),owner);
-	if(NULL==exponent9||NULL==exponent6||NULL==exponent3){
-		FREE_BIGINTEGER(exponent9,owner);FREE_BIGINTEGER(exponent6,owner);FREE_BIGINTEGER(exponent3,owner);
+							*exponent3=owned_biginteger(_getBiginteger(3),owner)*/;
+	if(NULL==exponent9/*||NULL==exponent6||NULL==exponent3*/){
+		FREE_BIGINTEGER(exponent9,owner);
+		///FREE_BIGINTEGER(exponent6,owner);FREE_BIGINTEGER(exponent3,owner);
 		return NULL;
 	}
 	Mrational* resultRational=NULL;
 	// we are to determine all probabilities starting at initializedMults and ending with max
 	Mbiginteger** truetotalcounts=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
+	/*
 	Mbiginteger** totalcounts6=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
 	Mbiginteger** totalcounts3=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
-	Mbiginteger** flagzerodeterminantcounts=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
-	if(NULL==truetotalcounts||NULL==totalcounts6||NULL==totalcounts3||NULL==flagzerodeterminantcounts){
+	*/
+	Mbiginteger** flagnonzerodeterminantcounts=unmanaged_calloc(max+1,sizeof(Mbiginteger*));
+	if(NULL==truetotalcounts/*||NULL==totalcounts6||NULL==totalcounts3*/||NULL==flagnonzerodeterminantcounts){
 		unmanaged_free(truetotalcounts,(max+1)*sizeof(Mbiginteger*));
+		/*
 		unmanaged_free(totalcounts6,(max+1)*sizeof(Mbiginteger*));
 		unmanaged_free(totalcounts3,(max+1)*sizeof(Mbiginteger*));
-		unmanaged_free(flagzerodeterminantcounts,(max+1)*sizeof(Mbiginteger*));
+		*/
+		unmanaged_free(flagnonzerodeterminantcounts,(max+1)*sizeof(Mbiginteger*));
 		return NULL;
 	}
 	// initialize the 
@@ -14877,9 +14882,11 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 		Mbiginteger *base=owned_biginteger(_getBiginteger(2*i+1),owner);
 		if(NULL==base)return NULL;
 		truetotalcounts[i]=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent9),owner);
+		/*
 		totalcounts6[i]=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent6),owner);
 		totalcounts3[i]=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(base,exponent3),owner);
-		flagzerodeterminantcounts[i]=owned_biginteger(_getBiginteger(0),owner);
+		*/
+		flagnonzerodeterminantcounts[i]=owned_biginteger(_getBiginteger(0),owner);
 		FREE_BIGINTEGER(base,owner);
 	}
 	/* replacing:
@@ -14898,14 +14905,14 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 			outputBiginteger("Number of billions of combinations to process: ",billions,".\n");
 		}
 	}
-	if(truetotalcounts!=NULL&&totalcounts6!=NULL&&totalcounts3!=NULL&&flagzerodeterminantcounts!=NULL/*&&flagtotalcount!=NULL*/){
+	if(truetotalcounts!=NULL&&/*totalcounts6!=NULL&&totalcounts3!=NULL&&*/flagnonzerodeterminantcounts!=NULL/*&&flagtotalcount!=NULL*/){
 		
 		q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",max,max);
 		
 		updateMults(max);
 
 		//D mp_int *zdc=MP_INT_POINTER(zerodeterminantcount),*tc=MP_INT_POINTER(totalcount);
-		mp_int *flagzdc; ///=MP_INT_POINTER(flagzerodeterminantcount)/*,*flagtc=MP_INT_POINTER(flagtotalcount)*/;
+		mp_int *flagnzdc; ///=MP_INT_POINTER(flagzerodeterminantcount)/*,*flagtc=MP_INT_POINTER(flagtotalcount)*/;
 		long long a,b,c,d,e,f,g,h,i;
 		long long count,billioncount=0;
 		// the different parts may be computed as soon as they are computable
@@ -14914,6 +14921,7 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 		///long G,H,I,gpart,ghpart,ghipart; // these are the submatrix determinants we're going to compute 
 		long long maxabc,maxdef,maxghi;
 		long long multabc,multdef,multghi;
+		long long zeroesabc,zeroesdef,zeroesghi;
 		long long maxtriplets; // the maximum of all the triplet elements
 		///long delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i;
 		///long flag_a,flag_b,flag_c,flag_d,flag_e,flag_f,flag_g,flag_h,flag_i;
@@ -14945,7 +14953,7 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 			signed char *abctripletptr,*deftripletptr,*ghitripletptr;
 
 			signed char *aptr,*bptr,*cptr,*dptr,*eptr,*fptr,*gptr,*hptr,*iptr; // keeping track of the pointers
-
+			/*
 			for(int i=initializedMults;i<=max;i++){
 				// initialize zdc and tc to 3 times totalcount6 which are the zero determinants when each row consists of zeroes
 				if(totalcounts6[i]!=NULL)
@@ -14956,16 +14964,16 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 					mp_mul_d(MP_INT_POINTER(totalcounts3[i]),3,MP_INT_POINTER(totalcounts3[i])); // multiply totalcount3 with 3 (for each row)
 				else
 					q2outputMessage(M_ERROR_PREFIX,"Total counts 3 of base %d undefined!",i);
-			
 				// initialize flagzdc to totalcount6-totalcount3+1 which are all the combinations with one of the rows zero
-				if(flagzerodeterminantcounts[i]!=NULL){
-					flagzdc=MP_INT_POINTER(flagzerodeterminantcounts[i]);
+				if(flagnonzerodeterminantcounts[i]!=NULL){
+					flagzdc=MP_INT_POINTER(flagnonzerodeterminantcounts[i]);
 					mp_add(flagzdc,MP_INT_POINTER(totalcounts6[i]),flagzdc);
 					mp_sub(flagzdc,MP_INT_POINTER(totalcounts3[i]),flagzdc);
 					mp_incr(flagzdc);
 				}else
 					q2outputMessage(M_ERROR_PREFIX,"Zero determinant count of base %d undefined!",i);
 			}
+			*/
 			///mp_add(flagtc,flagzdc,flagtc); // set flagtc to the same value as flagzdc
 
 			///abctripletindex=2;
@@ -14973,119 +14981,108 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 			a=*aptr;b=*bptr;c=*cptr;maxabc=*abctripletptr;
 			///multabc=max/maxabc;
 			do{
+				maxtriplets=maxabc;
+				zeroesabc=(!a)+(!b)+(!c);
 				//D output(" a=%ld b=%ld c=%ld\n",a,b,c);
 				// replacing: maxabc=MAX(MAX(a,b),c); multabc=(max/maxabc);
-					///mult=multabc;
+				///mult=multabc;
+				/*
+				bd=0;cd=0; // initial value of cd=c*d
+				ae=0;ce=0;
+				af=0;bf=0;*/
+				///deftripletindex=2;
+				///d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
+				// start at the same triplets as (a,b,c)
+				dptr=aptr;eptr=bptr;fptr=cptr;deftripletptr=fptr+1;
+				d=*dptr;e=*eptr;f=*fptr;maxdef=*deftripletptr;
+				///multdef=max/maxdef;
+				// replacing: dptr=uniqueTriplets;eptr=dptr+1;fptr=eptr+1;
+				rowequalityflags=1; // (d,e,f) equals (a,b,c) so starts being 1
+				do{
+					if(maxdef>maxtriplets)maxtriplets=maxdef;
+					zeroesdef=(!d)+(!e)+(!f);
 					/*
-					bd=0;cd=0; // initial value of cd=c*d
-					ae=0;ce=0;
-					af=0;bf=0;*/
-					///deftripletindex=2;
-					///d=uniqueTriplets[0],e=uniqueTriplets[1],f=uniqueTriplets[2];
-					// start at the same triplets as (a,b,c)
-					dptr=aptr;eptr=bptr;fptr=cptr;deftripletptr=fptr+1;
-					d=*dptr;e=*eptr;f=*fptr;maxdef=*deftripletptr;
-					///multdef=max/maxdef;
-					// replacing: dptr=uniqueTriplets;eptr=dptr+1;fptr=eptr+1;
-					rowequalityflags=1; // (d,e,f) equals (a,b,c) so starts being 1
-					do{
-						/*
-						// read the assumed next f
-						fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-						if(*fptr<0){ // a c closer
+					// read the assumed next f
+					fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+					if(*fptr<0){ // a c closer
+						eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+						if(*eptr<0){ // a b closer
+							dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							if(*dptr<0)break;
+							d=*dptr;
 							eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-							if(*eptr<0){ // a b closer
-								dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-								if(*dptr<0)break;
-								d=*dptr;
-								eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-							}
-							e=*eptr;
-							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
 						}
-						f=*fptr;
-						multdef=*++deftripletptr;
-						*/
-						// the six two term products we need for the six three term products
-						ae=a*e;af=a*f;
-						bd=b*d;bf=b*f;
-						cd=c*d;ce=c*e;
-						// replacing: maxdef=MAX(MAX(d,e),f);	multdef=max/maxdef;
-							///mult*=multdef;
-							///ghitripletindex=2;
-							///g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
-							gptr=dptr;hptr=eptr;iptr=fptr;ghitripletptr=iptr+1; // where maxghi is stored
-							g=*gptr;h=*hptr;i=*iptr;maxghi=*ghitripletptr;
-							///multghi=max/maxghi;
-							// replacing: gptr=uniqueTriplets;hptr=gptr+1;iptr=hptr+1;
-							rowequalityflags|=2; // (g,h,i) now equal to (d,e,f)
-							do{
-								/*
-								// read the assumed next i
-								iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-								if(*iptr<0){ // a i closer
-									hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-									if(*hptr<0){ // a h closer
-										gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-										if(*gptr<0)break;
-										g=*gptr;
-										hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-									}
-									h=*hptr;
-									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-								}
-								i=*iptr;
-								multghi=*++ghitripletptr;
-								*/
-								//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
-								// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
-									///mult*=multghi;
-									/// obsolete: bg=b*g;cg=c*g;eg=e*g;fg=f*g;
-									/// obsolete: ah=a*h;ch=c*h;dh=d*h;fh=f*h;
-									// compute the 6 constituent (and non-negative elements)
-									aei=ae*i;afh=af*h;
-									bdi=bd*i;bfg=bf*g;
-									cdh=cd*h;ceg=ce*g;
-									// obsolete: ai=a*i;bi=b*i;di=d*i;ei=e*i;
-									//D output("\n\taei=%3ld afh=%3ld bdi=%3ld bfg=%3ld cdh=%3ld ceg=%3ld",aei,afh,bdi,bfg,cdh,ceg);
-									/*D
-									// ghipart is the determinant for nonnegative values of a, b, c, d, e, f, g, h and i
-									delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
-									checkdelta_a=aei-afh;checkdelta_b=bfg-bdi;checkdelta_c=cdh-ceg;
-									if(checkdelta_a!=delta_a){output(" Invalid check delta a");checkdelta_a_error++;}
-									if(checkdelta_b!=delta_b){output(" Invalid check delta b");checkdelta_b_error++;}
-									if(checkdelta_c!=delta_c){output(" Invalid check delta c");checkdelta_c_error++;}
-									determinant=delta_a+delta_b+delta_c;
-									outputChar(':');
-									outputChar(determinant!=ghipart?'X':'O');
-									delta_a*=2;delta_b*=2;delta_c*=2;
-									delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
-									outputChar(determinant!=delta_d+delta_e+delta_f?'X':'O');
-									delta_d*=2;delta_e*=2;delta_f*=2;
-									delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
-									outputChar(determinant!=delta_g+delta_h+delta_i?'X':'O');
-									delta_g*=2;delta_h*=2;delta_i*=2;
-									output(" det=%ld d_a=%ld d_b=%ld d_c=%ld d_d=%ld d_e=%ld d_f=%ld d_g=%ld d_h=%ld d_i=%ld\n",
-													ghipart,delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i);
-									D*/
-									// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
-									// MISTAKE since we're starting with all negatives instead of all positives
-									//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
-									//         and do all positives first
-									// create all minus values we'll be needing
-									// NOTE these 6 three term products will all be positive!!! 
-									/*D
-									basedeterminant=aei-afh+bfg-bdi+cdh-ceg;
-									output("***basedet=%ld*** aei=%ld afh=%ld bfg=%ld bdi=%ld cdh=%ld ceg=%ld\n"
-										,basedeterminant
-										,aei,afh,bfg,bdi,cdh,ceg);
-									D*/
-									min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
-									// initial values of the signs to use
-									/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
-									// we need to toggle the signs twice
-									register uint32_t flags=0x69969669; // that's a funny number!!!
-									/* using the following bits
+						e=*eptr;
+						fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+					}
+					f=*fptr;
+					multdef=*++deftripletptr;
+					*/
+					// the six two term products we need for the six three term products
+					ae=a*e;af=a*f;
+					bd=b*d;bf=b*f;
+					cd=c*d;ce=c*e;
+					// replacing: maxdef=MAX(MAX(d,e),f);	multdef=max/maxdef;
+					///mult*=multdef;
+					///ghitripletindex=2;
+					///g=uniqueTriplets[0];h=uniqueTriplets[1];i=uniqueTriplets[2];
+					gptr=dptr;hptr=eptr;iptr=fptr;ghitripletptr=iptr+1; // where maxghi is stored
+					g=*gptr;h=*hptr;i=*iptr;maxghi=*ghitripletptr;
+					///multghi=max/maxghi;
+					// replacing: gptr=uniqueTriplets;hptr=gptr+1;iptr=hptr+1;
+					rowequalityflags|=2; // (g,h,i) now equal to (d,e,f)
+					do{
+						if(maxghi>maxtriplets)maxtriplets=maxghi;
+						zeroesghi=(!g)+(!h)+(!i);
+						//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
+						// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
+						///mult*=multghi;
+						/// obsolete: bg=b*g;cg=c*g;eg=e*g;fg=f*g;
+						/// obsolete: ah=a*h;ch=c*h;dh=d*h;fh=f*h;
+						// compute the 6 constituent (and non-negative elements)
+						aei=ae*i;afh=af*h;
+						bdi=bd*i;bfg=bf*g;
+						cdh=cd*h;ceg=ce*g;
+						// obsolete: ai=a*i;bi=b*i;di=d*i;ei=e*i;
+						//D output("\n\taei=%3ld afh=%3ld bdi=%3ld bfg=%3ld cdh=%3ld ceg=%3ld",aei,afh,bdi,bfg,cdh,ceg);
+						/*D
+						// ghipart is the determinant for nonnegative values of a, b, c, d, e, f, g, h and i
+						delta_a=a*(ei-fh);delta_b=b*(fg-di);delta_c=c*(dh-eg);
+						checkdelta_a=aei-afh;checkdelta_b=bfg-bdi;checkdelta_c=cdh-ceg;
+						if(checkdelta_a!=delta_a){output(" Invalid check delta a");checkdelta_a_error++;}
+						if(checkdelta_b!=delta_b){output(" Invalid check delta b");checkdelta_b_error++;}
+						if(checkdelta_c!=delta_c){output(" Invalid check delta c");checkdelta_c_error++;}
+						determinant=delta_a+delta_b+delta_c;
+						outputChar(':');
+						outputChar(determinant!=ghipart?'X':'O');
+						delta_a*=2;delta_b*=2;delta_c*=2;
+						delta_d=d*(ch-bi);delta_e=e*(ai-cg);delta_f=f*(bg-ah);
+						outputChar(determinant!=delta_d+delta_e+delta_f?'X':'O');
+						delta_d*=2;delta_e*=2;delta_f*=2;
+						delta_g=g*(bf-ce);delta_h=h*(cd-af);delta_i=i*(ae-bd);
+						outputChar(determinant!=delta_g+delta_h+delta_i?'X':'O');
+						delta_g*=2;delta_h*=2;delta_i*=2;
+						output(" det=%ld d_a=%ld d_b=%ld d_c=%ld d_d=%ld d_e=%ld d_f=%ld d_g=%ld d_h=%ld d_i=%ld\n",
+										ghipart,delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i);
+						D*/
+						// flag_? equals 1 means the negated value, and we know what to substract from the determinant in that case to start with
+						// MISTAKE since we're starting with all negatives instead of all positives
+						//         we should not start with ghipart!!!! but with the sum of all unless we turn the lot around
+						//         and do all positives first
+						// create all minus values we'll be needing
+						// NOTE these 6 three term products will all be positive!!! 
+						/*D
+						basedeterminant=aei-afh+bfg-bdi+cdh-ceg;
+						output("***basedet=%ld*** aei=%ld afh=%ld bfg=%ld bdi=%ld cdh=%ld ceg=%ld\n"
+							,basedeterminant
+							,aei,afh,bfg,bdi,cdh,ceg);
+						D*/
+						min_aei=-aei;min_afh=-afh;min_bfg=-bfg;min_bdi=-bdi;min_cdh=-cdh;min_ceg=-ceg;
+						// initial values of the signs to use
+						/////sign_aei=0,sign_afh=1,sign_bfg=0,sign_bdi=1,sign_cdh=0,sign_ceg=1;
+						// we need to toggle the signs twice
+						register uint32_t flags=0x69969669; // that's a funny number!!!
+						/* using the following bits
 										0=16  1=0  2=0  3=16  
 										4=0  5=16  6=16  7=0  
 										8=0  9=16 10=16 11=0 
@@ -15094,77 +15091,78 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 										20=16 21=0 22=0 23=16 
 										24=16 25=0 26=0 27=16 
 										28=0 29=16 30=16 31=0
-									*/
-									// let's iterate over all 32 bits in flags consuming flags
-									//D output("flag determinants:");
-									// the problem with the flag determinants is that the number of zeroes in the matrix determines
-									// how many combinations we actually have, if all are nonzero we have 2^9, but when we have less
-									// we should divide by any two, we have 9 variables occurring twice in 6 terms
-									// and we're only looking at 16 of them, so each of them is counted 32 times but that shouldn't 
-									// be 32 per se, so how can we compute which combinations to count twice!!
-									long long totalflagzerodeterminants=0;
-									for(register int flagbit=31;flagbit>=0;flagbit--){
-										if(flags&1){ // this combination occurs 16 times
-											// let's construct the determinant
-											flagdeterminant=(flagbit&1?min_aei:aei)+
-																				(flagbit&2?min_afh:afh)+
-																				(flagbit&4?min_bdi:bdi)+
-																				(flagbit&8?min_bfg:bfg)+
-																				(flagbit&16?min_cdh:cdh)+
-																				ceg; ////(flagbit&32?min_ceg:ceg);
-											//D output(" det#%d=%ld",flagbit,flagdeterminant);
-											if(0==flagdeterminant)
-												totalflagzerodeterminants++;
-										}
-										flags>>=1; // shift out the bit we consumed
-									}
-									totalflagzerodeterminants<<=5; // multiply by 32 (otherwise we would have needed to add 32 each time)
-									// use zerodeterminantcount to determine the multiplication factor
-									long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
-									totalflagzerodeterminants>>=zeroes; // shift by the total number of zeroes
-									long long totalflagdeterminants=(512>>zeroes);
-									///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
-									///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
-									/*D
-									outputBiginteger("flag zero determinants=",incflagzdc,NULL);
-									outputBiginteger("/",incflagtc,"\n");
-									*/
-									// for all the not yet determined probabilities update the flagzerodeterminantcount
-									// the maximum of all elements in the matrix determines to which level this matrix belongs to
-									maxtriplets=MAX(MAX(maxabc,maxdef),maxghi);
-									//D output("max=%lld",maxtriplets);
-									for(int i=maxtriplets;i<=max;i++){
-										multabc=mults[i][maxabc];
-										multdef=mults[i][maxdef];
-										multghi=mults[i][maxghi];
-										mult=multroworders[rowequalityflags]*multabc*multdef*multghi;
-										//D output(" mult(%d)=%lld",i,mult);
-										/* if two rows are equal count them
+						*/
+						// let's iterate over all 32 bits in flags consuming flags
+						//D output("flag determinants:");
+						// the problem with the flag determinants is that the number of zeroes in the matrix determines
+						// how many combinations we actually have, if all are nonzero we have 2^9, but when we have less
+						// we should divide by any two, we have 9 variables occurring twice in 6 terms
+						// and we're only looking at 16 of them, so each of them is counted 32 times but that shouldn't 
+						// be 32 per se, so how can we compute which combinations to count twice!!
+						long long totalflagnonzerodeterminants=16;
+						for(register int flagbit=31;flagbit>=0;flagbit--){
+							if(flags&1){ // this combination occurs 16 times
+								// let's construct the determinant
+								flagdeterminant=(flagbit&1?min_aei:aei)+
+																(flagbit&2?min_afh:afh)+
+																(flagbit&4?min_bdi:bdi)+
+																(flagbit&8?min_bfg:bfg)+
+																(flagbit&16?min_cdh:cdh)+
+																ceg; ////(flagbit&32?min_ceg:ceg);
+								//D output(" det#%d=%ld",flagbit,flagdeterminant);
+								if(0==flagdeterminant)
+									totalflagnonzerodeterminants--;
+							}
+							flags>>=1; // shift out the bit we consumed
+						}
+						totalflagnonzerodeterminants<<=5; // multiply by 32 (otherwise we would have needed to add 32 each time)
+						// use zerodeterminantcount to determine the multiplication factor
+						long long zeroes=zeroesabc+zeroesdef+zeroesghi; // replacing: (!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
+						totalflagnonzerodeterminants>>=zeroes; // shift by the total number of zeroes
+						long long totalflagdeterminants=(512>>zeroes);
+						///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
+						///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
+						/*D
+						outputBiginteger("flag zero determinants=",incflagzdc,NULL);
+						outputBiginteger("/",incflagtc,"\n");
+						*/
+						// for all the not yet determined probabilities update the flagzerodeterminantcount
+						// the maximum of all elements in the matrix determines to which level this matrix belongs to
+						///maxtriplets=MAX(maxabc,MAX(maxdef,maxghi));
+						//D output("max=%lld",maxtriplets);
+						for(int m=maxtriplets;m<=max;m++){
+							multabc=mults[m][maxabc];
+							multdef=mults[m][maxdef];
+							multghi=mults[m][maxghi];
+							mult=multroworders[rowequalityflags]*multabc*multdef*multghi;
+							//D output(" mult(%d)=%lld",i,mult);
+							/* if two rows are equal count them
 										equalrowflags=(a==d&&b==e&&c==f)+2*(a==g&&b==h&&c==i)+4*(d==g&&e==h&&f==i);
 										if(equalrowflags){
 											equalrowcount+=(mult*totalflagzerodeterminants);
 											output("a=%2d b=%2d c=%2d d=%2d e=%2d f=%2d g=%2d h=%2d i=%2d equalrowflags=%d mult=%lld fzd=%lld equalrowcount=%lld\n",a,b,c,d,e,f,g,h,i,equalrowflags,mult,totalflagzerodeterminants,equalrowcount);
 										}
-										*/
-										//D output(" mult=%ld zdinc=%ld totalinc=%ld",mult,totalflagzerodeterminants,totalflagdeterminants);
-										if(flagzerodeterminantcounts[i]){
-											flagzdc=MP_INT_POINTER(flagzerodeterminantcounts[i]);
-											if(MP_OKAY!=mp_add_d(flagzdc,mult*totalflagzerodeterminants,flagzdc))
-												q2outputError("Failed to add the flag (zero) determinant count!");
-										}else
-											q2outputMessage(M_ERROR_PREFIX,"Missing zero determinant count for base %d",i);
-									}
-									count-=(mult*totalflagdeterminants);
-									if(count<0){
-										output("%lld",++billioncount);
-										if(billionsText!=NULL)output(" out of %s",string(billionsText));
-										output("%s"," billions of combinations processed so far.\n");
-										count+=1000000000;
-									}
-									outputChar('\n');
-									///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
-									//D outputChar('\n');
-									/*
+							*/
+							//D output(" mult=%ld zdinc=%ld totalinc=%ld",mult,totalflagzerodeterminants,totalflagdeterminants);
+							if(flagnonzerodeterminantcounts[m]!=NULL){
+								flagnzdc=MP_INT_POINTER(flagnonzerodeterminantcounts[m]);
+								if(MP_OKAY!=mp_add_d(flagnzdc,mult*totalflagnonzerodeterminants,flagnzdc))
+									q2outputError("Failed to add the determinant count!");
+							}else
+							if(NULL==integernotinvertibleprobabilities[m])
+								q2outputMessage(M_ERROR_PREFIX,"Missing zero determinant count for base %d",i);
+						}
+						count-=(mult*totalflagdeterminants);
+						if(count<0){
+							output("%lld",++billioncount);
+							if(billionsText!=NULL)output(" out of %s",string(billionsText));
+							output("%s"," billions of combinations processed so far.\n");
+							count+=1000000000;
+						}
+						//D outputChar('\n');
+						///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
+						//D outputChar('\n');
+						/*
 									long totalzerodeterminants=0,totaldeterminants=0;
 									for(flag_a=(a?1:0),det_a=ghipart;;){
 										for(flag_b=(b?1:0),det_b=det_a;;){
@@ -15261,33 +15259,33 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 										output(" IS GELIJK AAN ");
 									outputBiginteger("zdc=",zerodeterminantcount,"/");
 									outputBiginteger(NULL,totalcount,"\n");
-									*/
-								/*}else{ // ghi==0
+						*/
+						/*}else{ // ghi==0
 									// how many zero determinants should we add when g=h=i=0???
 									// there's already a multabc and a multdef indicating the replication of (a,b,c) and (d,e,f)
 									//D mult=(multabc*multdef); // should I multiply by 512 or not
 									if(mp_add_d(flagtc,mult,flagtc)!=MP_OKAY||mp_add_d(flagzdc,mult,flagzdc)!=MP_OKAY)
 										q2outputError("Failed to increment the total and zero determinant combination counts when g, h and i are zero!");					
-								}*/
-								// read the assumed next i
-								iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-								if(*iptr<0){ // a i closer
-									hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-									if(*hptr<0){ // a h closer
-										gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-										if(*gptr<0)break;
-										g=*gptr;
-										hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-									}
-									h=*hptr;
-									iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
-								}
-								i=*iptr;
-								maxghi=*++ghitripletptr;
-								///multghi=max/maxghi;
-								if(rowequalityflags&2)rowequalityflags-=2; // (g,h,i) now different than (d,e,f) (and possibly (a,b,c) as well)
-							}while(1);
-						/*}else{ // d=e=f=0
+						}*/
+						// read the assumed next i
+						iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+						if(*iptr<0){ // a i closer
+							hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+							if(*hptr<0){ // a h closer
+								gptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+								if(*gptr<0)break;
+								g=*gptr;
+								hptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+							}
+							h=*hptr;
+							iptr=++ghitripletptr; // replacing: uniqueTriplets[++ghitripletindex];
+						}
+						i=*iptr;
+						maxghi=*++ghitripletptr;
+						///multghi=max/maxghi;
+						if(rowequalityflags&2)rowequalityflags-=2; // (g,h,i) now different than (d,e,f) (and possibly (a,b,c) as well)
+					}while(1);
+					/*}else{ // d=e=f=0
 							// we now we have to repeat totalcount3 by multabc
 							Mbiginteger* multdef=owned_biginteger(_getBigintegerCopy(totalcount3),owner);
 							if(multdef!=NULL){
@@ -15300,31 +15298,33 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 								FREE_BIGINTEGER(multdef,owner);
 							}else
 								q2outputError("Failed to create a big integer for computing the replication of zero determinant counts.");
-						}*/
-						// read the assumed next f
-						fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-						if(*fptr<0){ // a c closer
+					}*/
+					// read the assumed next f
+					fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+					if(*fptr<0){ // a c closer
+						eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+						if(*eptr<0){ // a b closer
+							dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+							if(*dptr<0)break;
+							d=*dptr;
 							eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-							if(*eptr<0){ // a b closer
-								dptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-								if(*dptr<0)break;
-								d=*dptr;
-								eptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
-							}
-							e=*eptr;
-							fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
 						}
-						f=*fptr;
-						maxdef=*++deftripletptr;
-						///multdef=max/maxdef;
-						if(rowequalityflags&1)rowequalityflags--; // (d,e,f) will now be (considered) different from (a,b,c)
-					}while(1);
+						e=*eptr;
+						fptr=++deftripletptr; //replacing: uniqueTriplets[++deftripletindex];
+					}
+					f=*fptr;
+					maxdef=*++deftripletptr;
+					if(maxdef>maxtriplets)maxtriplets=maxdef;
+					///multdef=max/maxdef;
+					if(rowequalityflags&1)rowequalityflags--; // (d,e,f) will now be (considered) different from (a,b,c)
+				}while(1);
 				/*
 				}else{ // a=b=c=0
 					if(mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||
 							mp_add(flagzdc,MP_INT_POINTER(totalcount6),flagzdc)!=MP_OKAY)
 						q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
-				}*/
+				}
+				*/
 				// read the assumed next c
 				cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
 				if(*cptr<0){ // a c closer
@@ -15333,17 +15333,17 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 						aptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
 						if(*aptr<0)break;
 						a=*aptr;
-						bptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
+					bptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];
 					}
 					b=*bptr; // update b
 					cptr=++abctripletptr; //uniqueTriplets[++abctripletindex];///*(++abctripletptr); // replacing: uniqueTriplets[++abctripletindex];						
 				}
 				c=*cptr; // update c
 				maxabc=*(++abctripletptr);
-				multabc=max/maxabc; // update multabc
+			///multabc=max/maxabc; // update multabc
 			}while(1);
-			///output("Equal row count: %lld.\n",equalrowcount);
-			/* replacing:
+	///output("Equal row count: %lld.\n",equalrowcount);
+	/* replacing:
 			while(1){
 				maxabc=MAX(MAX(a,b),c);
 				///mult=1;
@@ -15468,11 +15468,11 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 					c=uniqueTriplets[++abctripletindex];
 				}
 			}
-			*/
-			free(uniqueTriplets); // ESSENTIAL BRO'
-		}else{
+	  */
+		free(uniqueTriplets); // ESSENTIAL BRO'
+	}else{
 			long long maxab,gcdab,gcdabc,I,H,G,gpart,ghpart,ghipart;
-			long long bg,cg,eg,fg,ah,ch,dh,fh,ai,bi,di,ei;
+			long long bg,cg,eg,fg,ah,ch,dh,fh,ai,bi,di,ei,totalflagdeterminants;
 			for(a=0;a<=max;a++){
 				for(b=0;b<=max;b++){
 					if(a>b){
@@ -15577,9 +15577,10 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 													}
 													long long zeroes=(!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
 													if(zeroes)totalflagzerodeterminants<<=zeroes;
+													totalflagdeterminants=(512>>zeroes);
 													mult=multabc;
 													while(--mult>=0){
-														mp_add_d(flagzdc,totalflagzerodeterminants,flagzdc);
+														mp_add_d(flagnzdc,totalflagdeterminants-totalflagzerodeterminants,flagnzdc);
 														///mp_add_d(flagtc,(512>>zeroes),flagtc);
 														////if(--count==0){output("Billion combinations processed: %lld.\n",++billioncount);count=1000000000;}
 													}
@@ -15682,11 +15683,13 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 							//D outputBiginteger("tc=",totalcount,".\n");
 							//D outputBiginteger("zdc=",zerodeterminantcount,".\n");
 							// if a, b and c are zero, all determinants will be zero
-							for(int i=initializedMults;i<=max;i++){
-								flagzdc=MP_INT_POINTER(flagzerodeterminantcounts[i]);
-								if(/*mp_add(flagtc,MP_INT_POINTER(totalcount6),flagtc)!=MP_OKAY||*/mp_add(flagzdc,MP_INT_POINTER(totalcounts6[i]),flagzdc)!=MP_OKAY)
+							/*
+							for(int m=initializedMults;m<=max;m++){
+								flagnzdc=MP_INT_POINTER(flagnonzerodeterminantcounts[m]);
+								if(mp_add(flagzdc,MP_INT_POINTER(totalcounts6[m]),flagzdc)!=MP_OKAY)
 									q2outputError("Failed to increment the total and zero determinant combination counts when a, b and c are zero!");
 							}
+							*/
 						}
 					}
 				}
@@ -15711,15 +15714,15 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 		}else
 			q2outputError("Failed to compute the total number of combinations!");
 		*/
-		// we have to take copies as all flagzerodeterminantcounts and truetotalcounts are going to be freed or bound
+		// we have to take copies as all flagnonzerodeterminantcounts and truetotalcounts are going to be freed or bound
 		resultRational=owned_rational(
 				_getRational(
-					_getBigintegerCopy(flagzerodeterminantcounts[max]),
+					_getBigintegerCopy(flagnonzerodeterminantcounts[max]),
 					_getBigintegerCopy(truetotalcounts[max]),M_LD_NAN,false)
 				,owner);
 	}else{
 		/*
-		FREE_BIGINTEGER(flagzerodeterminantcounts,owner);
+		FREE_BIGINTEGER(flagnonzerodeterminantcounts,owner);
 		FREE_BIGINTEGER(truetotalcounts,owner);
 		*/
 	}
@@ -15727,32 +15730,35 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
 	if(billionsText!=NULL)FREE_STRING(billionsText,owner);
 	///// OOPS do NOT do this again!!!!! if(base!=NULL)FREE_BIGINTEGER(base,owner);
 	if(exponent9!=NULL)FREE_BIGINTEGER(exponent9,owner);
+	/*
 	if(exponent6!=NULL)FREE_BIGINTEGER(exponent6,owner);
 	if(exponent3!=NULL)FREE_BIGINTEGER(exponent3,owner);
+	*/
 	/// OOPS should never do this here!!! if(truetotalcount!=NULL)FREE_BIGINTEGER(truetotalcount,owner);
 	
 	//if(totalcount6!=NULL)FREE_BIGINTEGER(totalcount6,owner);
 	//if(totalcount3!=NULL)FREE_BIGINTEGER(totalcount3,owner);
 	// store all rational probabilities determined!!!!
-	for(int i=initializedMults;i<=max;i++){
-		if(truetotalcounts[i]!=NULL&&flagzerodeterminantcounts[i]!=NULL)
-			integernotinvertibleprobabilities[i]=owned_rational(_getRational(disowned_biginteger(flagzerodeterminantcounts[i],owner),disowned_biginteger(truetotalcounts[i],owner),M_LD_NAN,false),owner_integernotinvertibleprobabilities);
-		// if not stored, free the two big integers (if any) as they not bound to the stored rational apparently
-		if(NULL==integernotinvertibleprobabilities[i]){
-			FREE_BIGINTEGER(truetotalcounts[i],owner);
-			FREE_BIGINTEGER(flagzerodeterminantcounts[i],owner);
-			q2outputMessage(M_ERROR_PREFIX,"Not invertible probability for integer matrices with elements in [-%d,%d] not stored!",i,i);
+	for(int m=initializedMults;m<=max;m++){
+		if(truetotalcounts[m]!=NULL&&flagnonzerodeterminantcounts[m]!=NULL){
+			integernotinvertibleprobabilities[m]=owned_rational(_getRational(disowned_biginteger(flagnonzerodeterminantcounts[m],owner),disowned_biginteger(truetotalcounts[m],owner),M_LD_NAN,false),owner_integernotinvertibleprobabilities);
+		}
+			// if not stored, free the two big integers (if any) as they not bound to the stored rational apparently
+		if(NULL==integernotinvertibleprobabilities[m]){
+			FREE_BIGINTEGER(truetotalcounts[m],owner);
+			FREE_BIGINTEGER(flagnonzerodeterminantcounts[m],owner);
+			q2outputMessage(M_ERROR_PREFIX,"Invertible probability for integer matrices with elements in [-%d,%d] not stored!",m,m);
 		}else{
-			q2outputRational("Not invertible probability ",integernotinvertibleprobabilities[i],NULL);
-			q2output(" for integer matrices with elements in [-%d,%d] stored.\n",i,i);
+			q2outputRational("Invertible probability ",integernotinvertibleprobabilities[m],NULL);
+			q2output(" for integer matrices with elements in [-%d,%d] stored.\n",m,m);
 		}
 	}
 	updateInitializedMults();
 	// free the unmanaged big integers
 	unmanaged_free(truetotalcounts,(max+1)*sizeof(Mbiginteger*));
-	unmanaged_free(totalcounts6,(max+1)*sizeof(Mbiginteger*));
-	unmanaged_free(totalcounts3,(max+1)*sizeof(Mbiginteger*));
-	unmanaged_free(flagzerodeterminantcounts,(max+1)*sizeof(Mbiginteger*));
+	/*unmanaged_free(totalcounts6,(max+1)*sizeof(Mbiginteger*));
+	unmanaged_free(totalcounts3,(max+1)*sizeof(Mbiginteger*));*/
+	unmanaged_free(flagnonzerodeterminantcounts,(max+1)*sizeof(Mbiginteger*));
 
 	return disowned_rational(resultRational,owner);
 }
@@ -15760,15 +15766,21 @@ static Mrational* symmetricnotinvertibleprobability(unsigned char max){Mallocati
  * @brief 
  * 
  */
-Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Msymmetricinvertibleprobability(Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* resultValue=NULL;
-	long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
-	if(max>=0&&max<128){
-		if(max){
-			Mrational* resultRational=owned_rational(symmetricnotinvertibleprobability(max),owner);
-			if(resultRational!=NULL)resultValue=_getValueOfRational(resultRational);
-		}else
-			resultValue=_getValueOfBiginteger(_getBiginteger(1));
+	if(maxValue!=NULL){
+		if(maxValue->type==VT_ARRAY)
+			return _functionAppliedToArray(maxValue->value._array,Msymmetricinvertibleprobability,false);
+		if(maxValue->type==VT_LIST)
+			return _functionAppliedToList(maxValue->value._list,Msymmetricinvertibleprobability,false);
+		long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
+		if(max>=0&&max<128){
+			if(max){
+				Mrational* resultRational=owned_rational(symmetricinvertibleprobability(max),owner);
+				if(resultRational!=NULL)resultValue=_getValueOfRational(resultRational);
+			}else
+				resultValue=_getValueOfBiginteger(_getBiginteger(1));
+		}
 	}
 	return resultValue;
 }
@@ -15779,14 +15791,14 @@ Mvalue* Msymmetricintegernotinvertibleprobability(Mvalue* maxValue){Mallocationo
  * @param maxValue the largest integer value
  * @return Mvalue* the probability of being invertible
  */
-Mvalue* Mintegernotinvertibleprobability(Mvalue* minValue,Mvalue* maxValue,Mvalue* methodValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Minvertibleprobability(Mvalue* minValue,Mvalue* maxValue,Mvalue* methodValue){Mallocationowner owner=getOwner(__LINE__);
 	long long min=(minValue!=NULL?getValueInteger(minValue):M_LL_INVALID);
 	long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
 	long long method=(methodValue!=NULL?getValueInteger(methodValue):M_LL_INVALID);
 	if(min!=M_LL_INVALID&&max!=M_LL_INVALID&&min<=max){
 		// use shortcut method
 		if(min+max==0&&method<0&&max<=127){
-			Mvalue* resultValue=Msymmetricintegernotinvertibleprobability(maxValue);
+			Mvalue* resultValue=Msymmetricinvertibleprobability(maxValue);
 			if(resultValue!=NULL)return resultValue;
 			q2outputError("Failed to take advantage of the symmetric integer not invertible probability computation");
 		}
@@ -16682,12 +16694,15 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
-			if(!registerFunction(_Menvironment,owner,"integernotinvertibleprobability",Mintegernotinvertibleprobability,3,(char*[]){"min integer","max integer","method integer"},NULL))
-				q2outputError("Failed to register the integerinvertibleprobability() function");
+			if(!registerFunction(_Menvironment,owner,"invertibleprobability",Minvertibleprobability,3,(char*[]){"min integer","max integer","method integer"},NULL))
+				q2outputError("Failed to register the invertibleprobability() function");
 
-			if(!registerFunction(_Menvironment,owner,"symmetricintegernotinvertibleprobability",Msymmetricintegernotinvertibleprobability,1,(char*[]){"max integer"},NULL))
-				q2outputError("Failed to register the integerinvertibleprobability() function");
+			if(!registerFunction(_Menvironment,owner,"syminvertibleprobability",Msymmetricinvertibleprobability,1,(char*[]){"max integer"},NULL))
+				q2outputError("Failed to register the syminvertibleprobability() function");
 
+			if(!registerFunction(_Menvironment,owner,"getnormalizerationals",MgetNormalizeRationalsFlag,0,NULL,NULL)||
+					!registerFunction(_Menvironment,owner,"setnormalizerationals",MsetNormalizeRationalsFlag,1,(char*[]){"flag"},NULL))
+				q2outputError("Failed to register the normalize rationals functions");
 		}
 	}
 
