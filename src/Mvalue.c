@@ -8426,3 +8426,33 @@ Mvalue* MsetNormalizeRationalsFlag(Mvalue* normalizeRationalFlagsValue){
 Mvalue* MgetNormalizeRationalsFlag(){
 	return _getIntegerValue(getNormalizeRationalsFlag()?M_TRUE:M_FALSE);
 }
+Mvalue* MnormalizeRational(Mvalue* rationalValue){
+	// we could return the number of values NOT normalized!!
+	long long result=M_LL_INVALID;
+	if(rationalValue!=NULL){
+		if(rationalValue->type==VT_ARRAY){
+			Marray* array=rationalValue->value._array;
+			Marrayelements* arrayelements=(array!=NULL?array->elements:NULL);
+			if(arrayelements!=NULL){
+				result=0;
+				long long size=arrayelements->count;
+				while(size){
+					Mvalue* resultValue=MnormalizeRational(arrayelements->values[--size]);
+					if(resultValue==NULL||resultValue->value._integer->ll)result++;
+				}
+			}
+		}else
+		if(rationalValue->type==VT_LIST){
+			result=0;
+			Mlistelement* listelement=rationalValue->value._list->_first;
+			while(listelement!=NULL){
+				Mvalue* resultValue=MnormalizeRational(listelement->_value);
+				if(resultValue==NULL||resultValue->value._integer->ll)result++;
+				listelement=listelement->_next;
+			}
+		}else
+			result=(rationalValue->type==VT_RATIONAL&&
+				(rationalValue->value._rational->normalized||normalizeRational(rationalValue->value._rational,owner_value_data))?0:1);
+	}
+	return _getIntegerValue(result);
+}

@@ -664,3 +664,4 @@ Mvalue* Mmessagecounts();
 
 Mvalue* MsetNormalizeRationalsFlag(Mvalue* normalizeRationalsFlagValue);
 Mvalue* MgetNormalizeRationalsFlag();
+Mvalue* MnormalizeRational(Mvalue* rationalValue);

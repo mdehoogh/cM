@@ -394,6 +394,7 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 			if(b->num!=NULL){c->num=owned_biginteger(_getBigintegerCopy(b->num),Msubowner(owner_c,1));if(c->num==NULL)return MP_ERR;}
 			if(b->den!=NULL){c->den=owned_biginteger(_getBigintegerCopy(b->den),Msubowner(owner_c,1));if(c->den==NULL){FREE_BIGINTEGER(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
 		}else{
+			outputRational(NULL,a,NULL);outputRational("-",b,"="); // DEBUGGING
 			// ASSERT a and b both defined
 			if(report)
 				q2outputInfo("Subtracting two pure rationals.");
@@ -423,10 +424,12 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 							q2outputmessageprefix(M_ERROR_PREFIX);
 							q2outputRational("Failed to normalize rational ",c,".\n");
 						}
+						outputRational("**",c,"**"); // DEBUGGING
 					}else{
 						FREE_BIGINTEGER(_num,owner);
 						q2outputError("Failed to compute the rational difference numerator");
 					}
+					outputChar('\n');
 				}else
 					q2outputError("Failed to subtract the rational numerators");
 			}else{
@@ -715,7 +718,8 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
 			// compute the delta
 			_rational->delta=owned_float(_floatdifference(q1->delta,q2->delta),Msubowner(owner,1));
 			// if failed to compute the delta mark error
-			if(q1->delta!=NULL&&q2->delta!=NULL)if(_rational->delta==NULL){q2outputError("Failed to compute the difference of two rational deltas");status=MP_ERR;}
+			if(q1->delta!=NULL&&q2->delta!=NULL)
+			if(_rational->delta==NULL){q2outputError("Failed to compute the difference of two rational deltas");status=MP_ERR;}
 		}else
 			q2outputError("Failed to subtract two pure rationals");
 		if(status!=MP_OKAY){FREE_RATIONAL(_rational,owner);_rational=NULL;q2outputError("Failed to compute the difference of two rationals");}

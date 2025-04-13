@@ -362,9 +362,10 @@ Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binar
 				if(maintainsValuetype)_result->valuetype=getMatchingArrayValuetype(_array->valuetype,_value->type);
 				unsigned long long arrayindex=0;
 				while(arrayindex<_array->elements->count){
-					assignValue(&_result->elements->values[arrayindex],binaryoperator(_array->elements->values[arrayindex],_value));
+					assignValue(&_result->elements->values[arrayindex],binaryoperator(_value,_array->elements->values[arrayindex]));
 					arrayindex++;
 				}
+				resultValue=_getValueOfArray(_result);
 			}
 		}else
 		if(_value->type==VT_ARRAY)
@@ -599,7 +600,7 @@ Mvalue* Msubtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		{q2outputValue("Subtracting '",_value2,"'");q2outputValue(" from '",_value1,"'.\n");}
 	if(_value1->type==VT_ARRAY)return _appliedToArray(_value1->value._array,_value2,Msubtract,true);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msubtract,true);
-	if(_value2->type==VT_ARRAY)return _appliedToArray(_value2->value._array,_value1,Msubtract,true);
+	if(_value2->type==VT_ARRAY)return _appliedToArray2(_value1,_value2->value._array,Msubtract,true);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msubtract,true);
 	// if either is zero, result is easy to determine
 	if(isValueZero(_value1)==M_TRUE)return Mneg(_value2);

@@ -14981,7 +14981,6 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 			a=*aptr;b=*bptr;c=*cptr;maxabc=*abctripletptr;
 			///multabc=max/maxabc;
 			do{
-				maxtriplets=maxabc;
 				zeroesabc=(!a)+(!b)+(!c);
 				//D output(" a=%ld b=%ld c=%ld\n",a,b,c);
 				// replacing: maxabc=MAX(MAX(a,b),c); multabc=(max/maxabc);
@@ -14999,7 +14998,6 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 				// replacing: dptr=uniqueTriplets;eptr=dptr+1;fptr=eptr+1;
 				rowequalityflags=1; // (d,e,f) equals (a,b,c) so starts being 1
 				do{
-					if(maxdef>maxtriplets)maxtriplets=maxdef;
 					zeroesdef=(!d)+(!e)+(!f);
 					/*
 					// read the assumed next f
@@ -15032,7 +15030,6 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 					// replacing: gptr=uniqueTriplets;hptr=gptr+1;iptr=hptr+1;
 					rowequalityflags|=2; // (g,h,i) now equal to (d,e,f)
 					do{
-						if(maxghi>maxtriplets)maxtriplets=maxghi;
 						zeroesghi=(!g)+(!h)+(!i);
 						//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
 						// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
@@ -15128,7 +15125,7 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 						*/
 						// for all the not yet determined probabilities update the flagzerodeterminantcount
 						// the maximum of all elements in the matrix determines to which level this matrix belongs to
-						///maxtriplets=MAX(maxabc,MAX(maxdef,maxghi));
+						maxtriplets=MAX(maxabc,MAX(maxdef,maxghi));
 						//D output("max=%lld",maxtriplets);
 						for(int m=maxtriplets;m<=max;m++){
 							multabc=mults[m][maxabc];
@@ -15314,7 +15311,6 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 					}
 					f=*fptr;
 					maxdef=*++deftripletptr;
-					if(maxdef>maxtriplets)maxtriplets=maxdef;
 					///multdef=max/maxdef;
 					if(rowequalityflags&1)rowequalityflags--; // (d,e,f) will now be (considered) different from (a,b,c)
 				}while(1);
@@ -16701,7 +16697,8 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				q2outputError("Failed to register the syminvertibleprobability() function");
 
 			if(!registerFunction(_Menvironment,owner,"getnormalizerationals",MgetNormalizeRationalsFlag,0,NULL,NULL)||
-					!registerFunction(_Menvironment,owner,"setnormalizerationals",MsetNormalizeRationalsFlag,1,(char*[]){"flag"},NULL))
+					!registerFunction(_Menvironment,owner,"setnormalizerationals",MsetNormalizeRationalsFlag,1,(char*[]){"flag"},NULL)||
+					!registerFunction(_Menvironment,owner,"normalizedrational",MnormalizeRational,1,(char*[]){"rational(s)"},NULL))
 				q2outputError("Failed to register the normalize rationals functions");
 		}
 	}
