@@ -4169,13 +4169,19 @@ Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mv
 		if(l>0){
 			Marrayelements* arrayElements=_array->elements;
 			_result=owned_array(_getArray("appliedToArray",arrayElements->count,NULL),owner);
-			if(_result==NULL)return NULL;
+			if(_result==NULL){q2outputError("Failed to create an array");return NULL;}
 			_result->valuetype=array_valuetype; // MDH@04AUG2023
 			Marrayelements* resultElements=_result->elements;
-			do{
-				l--;
-				assignValue(&resultElements->values[l],oneArgumentFunction(arrayElements->values[l]));
-			}while(l>0);
+			if(resultElements!=NULL){
+				for(unsigned long long i=0;i<l;i++){
+					output("Applying the function to '",arrayElements->values[i],"'\n"); //D
+					Mvalue* resultValue=oneArgumentFunction(arrayElements->values[i]);
+					outputValue("Assigning result value '",resultValue,"'.\n"); //D
+					assignValue(&resultElements->values[i],resultValue);
+					outputValue("Assigned value '",resultElements->values[i],"'.\n"); //D
+				}
+			}else
+				q2outputBug("No result array elements!");
 		}
 	}
 	return disowned_array(_result,owner);	
@@ -4194,18 +4200,17 @@ Marray* applyFunctionToArray(Marray const * const _array,Mfunctionunion function
 	Marray* _result=(l>0?owned_array(_getArray("applyFunctionToArray",l,NULL),owner):NULL);
 	if(NULL==_result)return NULL;
 	Marrayelements *arrayElements=_array->elements,*resultElements=_result->elements;
-	do{
-		l--;
+	for(unsigned long long i=0;i<l;i++){
 		Mvalue* functionValue=NULL;
 		switch(numberOfAdditionalArguments){
-			case 0:functionValue=functionunion.oneArgumentFunction(arrayElements->values[l]);break;
-			case 1:functionValue=functionunion.twoArgumentFunction(arrayElements->values[l],additionalArguments[0]);break;
-			case 2:functionValue=functionunion.threeArgumentFunction(arrayElements->values[l],additionalArguments[0],additionalArguments[1]);break;
-			case 3:functionValue=functionunion.fourArgumentFunction(arrayElements->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2]);break;
-			case 4:functionValue=functionunion.fiveArgumentFunction(arrayElements->values[l],additionalArguments[0],additionalArguments[1],additionalArguments[2],additionalArguments[3]);break;
+			case 0:functionValue=functionunion.oneArgumentFunction(arrayElements->values[i]);break;
+			case 1:functionValue=functionunion.twoArgumentFunction(arrayElements->values[i],additionalArguments[0]);break;
+			case 2:functionValue=functionunion.threeArgumentFunction(arrayElements->values[i],additionalArguments[0],additionalArguments[1]);break;
+			case 3:functionValue=functionunion.fourArgumentFunction(arrayElements->values[i],additionalArguments[0],additionalArguments[1],additionalArguments[2]);break;
+			case 4:functionValue=functionunion.fiveArgumentFunction(arrayElements->values[i],additionalArguments[0],additionalArguments[1],additionalArguments[2],additionalArguments[3]);break;
 		}
-		assignValue(&resultElements->values[l],functionValue);
-	}while(l>0);
+		assignValue(&resultElements->values[i],functionValue);
+	}
 	return disowned_array(_result,owner);
 }
 
@@ -4251,9 +4256,11 @@ Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction,Mvalue
 	Mlist* _result=NULL;
 	if(_list!=NULL){
 		_result=owned_list(_getListOfType(list_valuetype),owner);
-		if(NULL==_result)return NULL;
+		if(NULL==_result){q2outputError("Failed to create a list");return NULL;}
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement!=NULL&&appendedToList(_result,owner,oneArgumentFunction(_listelement->_value),_listelement->index)>0)_listelement=_listelement->_next;
+		while(_listelement!=NULL
+						&&appendedToList(_result,owner,oneArgumentFunction(_listelement->_value),_listelement->index)>0)
+			_listelement=_listelement->_next;
 	}
 	return disowned_list(_result,owner);
 }/* VALIDATED */

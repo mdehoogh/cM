@@ -2191,7 +2191,7 @@ size_t q2outputDecimal(char const * const prefix,Mdecimal const * const decimal,
 	size_t written=(prefix!=NULL?q2output("%s",prefix):0);
 	if(decimal!=NULL){
 		Mstring* _decimalText=owned_string(_getDecimalText(decimal,false),owner);
-		if(_decimalText){
+		if(_decimalText!=NULL){
 			written+=q2output("%s",string(_decimalText));
 			FREE_STRING(_decimalText,owner);
 		}else

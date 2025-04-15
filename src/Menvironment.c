@@ -2808,7 +2808,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue/*Mvalue* immutableValue*/)
 		/* replacing:
 		// MDH@10AUG2023: first time application of the new applyFunctionTo... functions defined in Mvalue.h/c which can take any system function now
 		if(value->type==VT_ARRAY)return _getValueOfArray(applyFunctionToArray(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
-		if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value._array,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
+		if(value->type==VT_LIST)return _getValueOfList(applyFunctionToList(value->value.list,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
 		if(value->type==VT_MAP)return _getValueOfMap(applyFunctionToMap(value->value._map,(Mfunctionunion)Msettype,2,(Mvalue*[]){valuetypeValue,immutableValue}));
 		*/
 		else{

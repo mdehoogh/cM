@@ -2255,7 +2255,7 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 		OUTPUT_INFO("\tAllocation #%i=%s:%u(%s%u%s%s).\n",_alloc->allocationIndex
 			,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.freed);
 		// you can only disown what you own!!
-		if(owner.disowned==0&&owner.id>0){
+		if(owner.disowned==0&&owner.id!=0){
 			// MDH@31JAN2025: I've replaced _owners by tree-like storing starting at allocationNodesRoot
 			//                so we won't be able to actually verify that the owner is correctly stored
 			//                (it would have sufficed to compare the Mallocationowner* actually)
@@ -2311,7 +2311,7 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 			);
 		*/
-		if(0==owner.disowned&&0<owner.id&&0==owner.freed){
+		if(owner.disowned==0&&owner.id!=0&&owner.freed==0){
 			// MDH@23MAR2025: if ownership changes from local to global or from global to local we need to deregister or register in allocations._owners respectively
 			if(_alloc->owner.global){ // currently global
 				if(!owner.global){ // global to local

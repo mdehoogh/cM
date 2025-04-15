@@ -348,7 +348,7 @@ Mvalue* _appliedToArray(Marray* _array,Mvalue* _value,TwoArgumentFunction binary
  * @param _value 
  * @param _array 
  * @param maintainsValuetype 
- * @return Mvalue* the wrapped 
+ * @return Mvalue* the wrapped array of applying \p binaryoperator to \p _value and each value of \p _array
  */
 Mvalue* _appliedToArray2(Mvalue* _value,Marray* _array,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list

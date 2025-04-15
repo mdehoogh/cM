@@ -181,7 +181,10 @@ Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=g
  */
 Mstring* disowned_string(Mstring* str,Mallocationowner owner_str){
 	if(NULL==str)return NULL;
-	if(str->_chars!=NULL)disowned_chars(str->_chars,owner_str);
+	if(str->_chars!=NULL){
+		disowned_chars(str->_chars,owner_str);
+		//D output("Chars disowned!\n");
+	}
 	return DISOWNED(str,owner_str);
 }
 

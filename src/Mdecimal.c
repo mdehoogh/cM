@@ -692,7 +692,8 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 							_p=NULL;
 							break;
 						}
-						if(amVerboseDebugging()){q2outputBiginteger("Dividing '",_remainder,"'");q2outputBiginteger(" by '",denominator,"'.\n");}
+						///if(amVerboseDebugging())
+						{q2outputBiginteger("Dividing '",_remainder,"'");q2outputBiginteger(" by '",denominator,"'.\n");}
 						
 						// _digit and _remainder are getting re-used here as well, which does not pose a problem (so we've created them once)
 						if(mp_div(MP_INT_POINTER(_remainder),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))!=MP_OKAY){
@@ -706,15 +707,16 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 						// append the dividend to the decimal text
 						// NOTE that _digitText is freed as soon as possible
 						_digitText=owned_string(_getBigintegerText(_digit),owner);
-						if(_digitText==NULL){
+						if(NULL==_digitText){
 							q2outputError("Failed to store the next decimal character");
 							_p=NULL;
 							break;
 						}
+						output("Digit text: '%s'.\n",string(_digitText)); //D
 						_p=string_append(_p,string(_digitText));
 						FREE_STRING(_digitText,owner); // MDH@11JUN2020: disowns it and frees it
-
-						if(amVerboseDebugging())
+						//D output("Digit text freed!\n"); //D
+						///if(amVerboseDebugging())
 							if(_p!=NULL)q2output("Decimal text so far: '%s'.\n",string(_p));
 
 						// if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
@@ -730,9 +732,11 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 			}
 			// prepend the sign if the numerator is negative TODO what if this fails?????
 			if(mp_isneg(MP_INT_POINTER(numerator))){
-				if(_decimalText!=NULL&&!string_insert_char(_decimalText,0,'-')){FREE_STRING(_decimalText,owner);_decimalText=NULL;}
+				if(_decimalText!=NULL&&NULL==string_insert_char(_decimalText,0,'-'))
+				{FREE_STRING(_decimalText,owner);_decimalText=NULL;}
 				FREE_BIGINTEGER(_nonnegativenumerator,owner);
 			}
+			output("Freeing helper big integers.\n"); //D
 			// free all locally used pointers to dynamic memory
 			FREE_BIGINTEGER(_digit,owner);FREE_BIGINTEGER(_remainder,owner);FREE_BIGINTEGER(_bi10,owner);
 		}
@@ -742,12 +746,13 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 	Mdecimal* _decimal=NULL;
 	if(_decimalText!=NULL){
 		_decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating,mpd_context),owner);
-		if(_decimal==NULL)
+		if(NULL==_decimal)
 			q2outputMessage(M_ERROR_PREFIX,"Failed to parse decimal text '%s' of the corresponding rational",string(_decimalText));
 		else 
-		if(amVerboseDebugging())
+		///if(amVerboseDebugging())
 			q2outputDecimal("Decimal of rational: '",_decimal,"'.\n");
 		FREE_STRING(_decimalText,owner);
+		//D output("Decimal text freed!\n");
 	}
 	return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
