@@ -23,7 +23,9 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_CHARS
  * @param owner_chars 
  * @return Mchars* the disowned \p _chars
  */
-Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return DISOWNED(_chars,owner_chars);}
+Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){
+	return DISOWNED(_chars,owner_chars);
+}
 /**
  * @brief makes \p _chars owned by \p owner_chars
  * 
@@ -31,7 +33,9 @@ Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars)
  * @param owner_chars 
  * @return Mchars* the owned \p _chars
  */
-Mchars* owned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return OWNED(_chars,owner_chars);}
+Mchars* owned_chars(Mchars const * const _chars,Mallocationowner owner_chars){
+	return OWNED(_chars,owner_chars);
+}
 
 // I guess it's prudent to pass in how many initial characters you want to be able to store in the result
 // NOTE this would mean that an external party should somehow keep track of the number of characters that can be stored in the character array

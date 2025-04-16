@@ -194,7 +194,7 @@ size_t outputIntegerLocale(Minteger const * const integer){
 static Mstring* _getIntegerTextLocale(char const * const integerText){Mallocationowner owner=getOwner(__LINE__);
 	struct lconv *locale_ptr=localeconv();
 	char sep=(locale_ptr!=NULL?locale_ptr->thousands_sep[0]:'\0');
-	if(!sep)return NULL; // this is easiest, so that integerText will simply be output instead
+	if(!sep){/*D output("No separator!"); D*/return NULL;} // this is easiest, so that integerText will simply be output instead
 	// initialize _integerTextString with integerText
 	Mstring* _integerTextString=owned_string(_getString(integerText),owner);
 	if(NULL==_integerTextString)return NULL;
@@ -226,10 +226,11 @@ size_t outputBigintegerLocale(Mbiginteger const * const biginteger){Mallocationo
 	size_t written=0;
 	Mstring* _bigintegerText=owned_string(_getBigintegerText(biginteger),owner);
 	if(_bigintegerText!=NULL){
+		//D output("Big integer text: '%s'.\n",string(_bigintegerText));
 		Mstring* _bigintegerTextLocale=owned_string(_getIntegerTextLocale(string(_bigintegerText)),owner);
 		if(_bigintegerTextLocale!=NULL){ // we've got it
 			written=output("%s",string(_bigintegerTextLocale));
-			//D output("Freeing big integer text locale '%s'.\n",string(_bigintegerTextLocale)); // DEBUGGING
+			output("Freeing big integer text locale '%s'.\n",string(_bigintegerTextLocale)); // DEBUGGING
 			FREE_STRING(_bigintegerTextLocale,owner);
 		}else
 			written=output("%s",string(_bigintegerText));

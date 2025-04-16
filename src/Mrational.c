@@ -1466,11 +1466,10 @@ bool isRationalOne(Mrational* _rational){
  * @return Mstring* the pointer to the M string representing the rational \p _rational
  */
 Mstring* _getRationalText(Mrational const * const _rational){Mallocationowner owner=getOwner(__LINE__);
-	Mstring* _rationalText=NULL;
 	///outputChar('a');
 	if(_rational!=NULL){
 		///outputChar('b');
-		_rationalText=owned_string(__string(),owner);
+		Mstring* _rationalText=owned_string(__string(),owner);
 		///outputChar('c');
 		if(_rationalText!=NULL){
 			///outputChar('d');
@@ -1479,32 +1478,38 @@ Mstring* _getRationalText(Mrational const * const _rational){Mallocationowner ow
 			///outputChar('e');
 			Mstring* _numeratorBigintegerText=owned_string(_getBigintegerText(_rational->num),owner);
 			///outputChar('f');
-			if(_numeratorBigintegerText){p=string_append(p,string(_numeratorBigintegerText));FREE_STRING(_numeratorBigintegerText,owner);}
+			if(_numeratorBigintegerText!=NULL){
+				p=string_append(p,string(_numeratorBigintegerText));
+				FREE_STRING(_numeratorBigintegerText,owner);
+			}
 			///outputChar('g');
-			if(_rational->den){
+			if(_rational->den!=NULL){
 				p=string_append_char(p,'/');
 				// p=string_append_char(p,'/'); // MDH@28OCT2020: inserted to indicate integer division
 				Mstring* _denominatorBigintegerText=owned_string(_getBigintegerText(_rational->den),owner);
-				if(_denominatorBigintegerText){p=string_append(p,string(_denominatorBigintegerText));FREE_STRING(_denominatorBigintegerText,owner);}
+				if(_denominatorBigintegerText!=NULL){
+					p=string_append(p,string(_denominatorBigintegerText));
+					FREE_STRING(_denominatorBigintegerText,owner);
+				}
 			}
 			///outputChar('k');
 			p=string_append_char(p,')');
 			///outputChar('l');
 			// if a delta is known, append that as well!!!
-			if(_rational->delta){
+			if(_rational->delta!=NULL){
 				// always show a sign
-				if(_rational->delta>=0)p=string_append_char(p,'+');
+				if(_rational->delta->ld>=0)p=string_append_char(p,'+');
 				p=appendld(p,_rational->delta->ld);
 			}
 			///outputChar('n');
-			if(!p){FREE_STRING(_rationalText,owner); return NULL;} // if something went wrong, return NULL and free _rationalText
+			if(NULL==p){FREE_STRING(_rationalText,owner); return NULL;} // if something went wrong, return NULL and free _rationalText
 			///outputChar('o');
+			return disowned_string(_rationalText,owner);
 		}
+		q2outputError("Failed to create the text object to store the rational representation in");
 	}else
-	if(amVerbose())
-		q2outputInfo("No rational to determine the text representation of.");
-	// outputChar('p');
-	return disowned_string(_rationalText,owner);
+		q2outputWarning("No rational to determine the text representation of");
+	return NULL;
 }/* VALIDATED */
 
 /**
@@ -1541,7 +1546,7 @@ size_t q2outputRational(const char* const prefix,const Mrational* const _rationa
 	size_t written=(prefix!=NULL?q2output("%s",prefix):0);
 	if(_rational!=NULL){
 		Mstring* _rationalText=owned_string(_getRationalText(_rational),owner);
-		if(_rationalText){
+		if(_rationalText!=NULL){
 			written+=q2output("%s",string(_rationalText));
 			FREE_STRING(_rationalText,owner);
 		}else

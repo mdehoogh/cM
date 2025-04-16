@@ -2265,13 +2265,13 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			if(_owner->id==owner.id){
 				allocations._owners[_alloc->allocationIndex]->owner.disowned=1; // replacing: _owner->disowned=1;
 			*/
+			if(_alloc->owner.id==owner.id)
 				_alloc->owner.disowned=1; // TODO we might have to comment this out in due course
-			/*}else
+			else
 				q2outputMessage(M_BUG_PREFIX,"\t%s:%u(%s%u%s%s) can't disown the allocation owned by %s:%u(%s%u%s%s)."
 					,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
-					,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
+					,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 					);
-			*/
 		}else
 			q2outputMessage(M_BUG_PREFIX,"\t%s:%u(%s%u%s%s) can't disown the allocation owned by %s:%u(%s%u%s%s): it is invalid."
 			,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
@@ -2334,6 +2334,8 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			if(_owner->disowned!=0){
 				*_owner=owner;
 			*/
+			// ownership can only be taken over when currently disowned!!!!!
+			if(_alloc->owner.disowned){
 				// printf("\tOwnership of %s:%u(%s%u%s%s)"
 				//	 ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 				// );
@@ -2343,18 +2345,16 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 				// printf(" taken by %s:%u(%s%u%s%s).\n"
 				//	 ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
 				//	 );
-			/*
 			}else
-			if(_owner->id==0)
+			if(_alloc->owner.id==0)
 				q2outputMessage(M_BUG_PREFIX,"\tOwner %s:%u(%s%u%s%s) cannot take over ownership of a memory allocation: it is not owned anymore."
 					,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
 					);
 			else
 				q2outputMessage(M_BUG_PREFIX,"\tOwner %s:%u(%s%u%s%s) cannot take over ownership: it is still owned by %s:%u(%s%u%s%s)."
 					,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
-					,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
+					,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
 					);
-			*/
 			// printf("%s","Y");
 		}else
 			q2outputMessage(M_BUG_PREFIX,"\tCan't set the ownership of the memory allocation owned by %s:%u(%s%u%s%s) to invalid owner %s:%u(%s%u%s%s)."

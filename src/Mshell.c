@@ -14859,6 +14859,8 @@ static Mrational* invertibleMatrixProbabilities[128]={NULL};Mallocationowner own
 static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationowner owner=getOwner(__LINE__);
 	assert(max>0&&max<128);
 	q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",max,max);
+	if(3+9+3*7>MP_DIGIT_BIT) // not enough bits in mp_digit
+		q2outputWarning("May have to use a big integer to add nonzero determinant counts");
 	// if we already know it, we can return it as from the stored rationals (as a copy that is)
 	// TODO we're storing unnormalized or what?????????
 	if(max<=lastInitializedInvertibleProbability&&invertibleMatrixProbabilities[max]!=NULL)
@@ -14877,7 +14879,8 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 	unsigned char maxoffset=MIN(max-1,lastInitializedInvertibleProbability);
 	while(maxoffset>0&&NULL==invertibleMatrixProbabilities[maxoffset])maxoffset--;
 	Mbiginteger* flagnonzerodeterminantcounts=NULL;
-	if(maxoffset){
+	signed char *maxoffsetmults=(maxoffset?mults[maxoffset]:NULL);
+	if(maxoffsetmults!=NULL){
 		flagnonzerodeterminantcounts=owned_biginteger(_getBigintegerCopy(invertibleMatrixProbabilities[maxoffset]->num),owner);
 		q2outputRational("Using the 3x3 matrix invertible probability ",invertibleMatrixProbabilities[maxoffset],NULL);
 		q2output(" for all integer matrices with values in [-%d,%d].\n",maxoffset,maxoffset);
@@ -14890,46 +14893,59 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 		return NULL;
 	}
 	// let's create the mults we're going to need (apart from mults[maxoffset] which should already be available!!!)
-	if(NULL==mults[max]){
-		mults[max]=unmanaged_malloc(sizeof(signed char)*(max+1)); // indices 0 through max (we know the last mult will equal 1)
-		if(NULL==mults[max]){
+	signed char* maxmults=mults[max];
+	if(NULL==maxmults){
+		maxmults=unmanaged_malloc(sizeof(signed char)*(max+1)); // indices 0 through max (we know the last mult will equal 1)
+		if(NULL==maxmults){
 			q2outputError("Failed to initialize the multiplication factors!");
 			return NULL;
 		}
 		// initialize the mults (except for mults[max][0] which we will never need!!!)
-		for(signed char multindex=max;multindex;multindex--)mults[max][multindex]=max/multindex;
+		for(signed char multindex=max;multindex;multindex--)maxmults[multindex]=max/multindex;
+		// remember maxmults
+		mults[max]=maxmults;
 	}
 
 	// count the billions processed!!!!
 	Mstring* billionsText=NULL;
-	Mbiginteger *billions=owned_biginteger(_getBiginteger(0),owner),*abillion=owned_biginteger(_getBiginteger(1000000000),owner);
+	Mbiginteger *billions=owned_biginteger(_getBiginteger(0),owner),
+							*abillion=owned_biginteger(_getBiginteger(1000000000),owner);
 	if(billions!=NULL&&abillion!=NULL){
 		Mbiginteger* totalcounts=owned_biginteger(_getBigintegerCopy(truetotalcounts),owner);
 		if(totalcounts!=NULL){
 			if(maxoffset==0||mp_sub(MP_INT_POINTER(totalcounts),MP_INT_POINTER(invertibleMatrixProbabilities[maxoffset]->den),MP_INT_POINTER(totalcounts))==MP_OKAY){
 				if(mp_div(MP_INT_POINTER(totalcounts),MP_INT_POINTER(abillion),MP_INT_POINTER(billions),NULL)==MP_OKAY){
 					billionsText=owned_string(_getBigintegerText(billions),owner);
+					if(NULL==billionsText)
+						q2outputError("Failed to store the number of billions of matrices to assess");
 					q2outputBiginteger("Number of billions of combinations to process: ",billions,".\n");
 				}else
 					q2outputWarning("Won't be able to report the number of 3x3 matrices left to process");
-			}
+			}else
+			if(maxoffset)
+				q2outputError("Failed to determine the total number of additional matrices to assess");
 			FREE_BIGINTEGER(totalcounts,owner);
-		}
-	}
+		}else
+			q2outputError("Failed to initialize the total number of matrices to assess");
+	}else
+		q2outputError("Failed to initialize the billions counter");
 	if(billions!=NULL)FREE_BIGINTEGER(billions,owner);
 	if(abillion!=NULL)FREE_BIGINTEGER(abillion,owner);
 
 	mp_int *flagnzdc=MP_INT_POINTER(flagnonzerodeterminantcounts);
+	Mbiginteger* addendum;
+	int64_t nonzerodeterminantcount;
+	mp_digit unregisterednzdcount=0; // the non zero determinant count so far not registered yet
 	long long a,b,c,d,e,f,g,h,i;
-	long long count,billioncount=0;
+	long long count=1000000000,billioncount=0;
 	// the different parts may be computed as soon as they are computable
 	// let's assume using long instead of long long suffices!!!
 	long long ae,af,bd,bf,cd,ce; //// obsolete: bg,cg,ch,dh,di,eg,ei,fg,fh; // 18 all products
 	///long G,H,I,gpart,ghpart,ghipart; // these are the submatrix determinants we're going to compute 
 	long long maxabc,maxdef,maxghi;
-	long long multabc,multdef,multghi;
+	///long long multabc,multdef,multghi;
 	long long zeroesabc,zeroesdef,zeroesghi;
-	long long maxtriplets,multmaxoffset; // the maximum of all the triplet elements
+	long long maxtriplets; // the maximum of all the triplet elements
 	///long delta_a,delta_b,delta_c,delta_d,delta_e,delta_f,delta_g,delta_h,delta_i;
 	///long flag_a,flag_b,flag_c,flag_d,flag_e,flag_f,flag_g,flag_h,flag_i;
 	///long det_a,det_b,det_c,det_d,det_e,det_f,det_g,det_h;
@@ -14949,7 +14965,7 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 	if(uniqueTriplets!=NULL){
 		//D output("Triplets!\n");
 		// let's write the unique triplets!!!
-
+		/*
 		uint32_t index=3;
 		output("Unique triplets: 0:%d 1:%d 2:%d",uniqueTriplets[0],uniqueTriplets[1],uniqueTriplets[2]);
 		while(uniqueTriplets[index-3]>=0||uniqueTriplets[index-2]>=0||uniqueTriplets[index-1]>=0){
@@ -14957,7 +14973,7 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 			index++;
 		}
 		outputChar('\n');
-
+		*/
 		///uint32_t abctripletindex,deftripletindex,ghitripletindex;
 		signed char *abctripletptr,*deftripletptr,*ghitripletptr;
 
@@ -15136,19 +15152,36 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 					// the maximum of all elements in the matrix determines to which level this matrix belongs to
 					maxtriplets=MAX(maxabc,MAX(maxdef,maxghi));
 					//D output("max=%lld",maxtriplets);
-					multmaxoffset=(maxtriplets<=maxoffset?mults[maxoffset][maxabc]*mults[maxoffset][maxdef]*mults[maxoffset][maxghi]:0);
-					multabc=mults[max][maxabc];multdef=mults[max][maxdef];multghi=mults[max][maxghi];
-					mult=multroworders[rowequalityflags]*(multabc*multdef*multghi-multmaxoffset);
-					if(MP_OKAY!=mp_add_d(flagnzdc,mult*totalflagnonzerodeterminants,flagnzdc))
-						q2outputError("Failed to add the determinant count!");
-					
+					mult=maxmults[maxabc]*maxmults[maxdef]*maxmults[maxghi];
+					if(maxtriplets<=maxoffset)
+						mult-=maxoffsetmults[maxabc]*maxoffsetmults[maxdef]*maxoffsetmults[maxghi];
+					mult*=multroworders[rowequalityflags];
+					nonzerodeterminantcount=mult*totalflagnonzerodeterminants;
+					if(nonzerodeterminantcount>MP_DIGIT_MAX){
+						addendum=owned_biginteger(_getBiginteger(nonzerodeterminantcount),owner);
+						if(NULL==addendum){
+							if(mp_add(flagnzdc,MP_INT_POINTER(addendum),flagnzdc)!=MP_OKAY)
+								q2outputMessage(M_ERROR_PREFIX,"Failed to add %lld to the total number of nonzero determinants",nonzerodeterminantcount);
+							FREE_BIGINTEGER(addendum,owner);addendum=NULL;
+						}else
+							q2outputMessage(M_ERROR_PREFIX,"Failed to add nonzero determinant count %lld.",nonzerodeterminantcount);
+					}else{ // mult itself does not exceed MP_DIGIT_MAX but the sum of nonzerodeterminantcount and unregisterednzdcount might
+						if(nonzerodeterminantcount+unregisterednzdcount>MP_DIGIT_MAX){ // overflow
+							if(mp_add_d(flagnzdc,unregisterednzdcount,flagnzdc)!=MP_OKAY)
+								q2outputError("Failed to add the determinant count!");
+							else
+								unregisterednzdcount=nonzerodeterminantcount;
+						}else
+							unregisterednzdcount+=nonzerodeterminantcount;
+					}
 					count-=(mult*totalflagdeterminants);
 					if(count<0){
 						output("%lld",++billioncount);
 						if(billionsText!=NULL)output(" out of %s",string(billionsText));
 						output("%s"," billions of combinations processed so far.\n");
 						count+=1000000000;
-					}
+					}/*D else
+						output(" %lld:%lld",billioncount,count); D*/
 					//D outputChar('\n');
 					///FREE_BIGINTEGER(incflagzdc,owner);FREE_BIGINTEGER(incflagtc,owner);
 					//D outputChar('\n');
@@ -15459,8 +15492,13 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 		}
 		*/
 		free(uniqueTriplets); // ESSENTIAL BRO'
+		if(unregisterednzdcount){ // left over to register
+			if(mp_add_d(flagnzdc,unregisterednzdcount,flagnzdc)!=MP_OKAY)
+				q2outputError("Failed to add the remaining unregistered nonzero determinant count!");
+		}
 	}else{
-		long long maxab,gcdab,gcdabc,I,H,G,gpart,ghpart,ghipart;
+		q2outputError("Failed to determine all canonical row combinations beforehand; will generate them");
+		long long maxab,gcdab,gcdabc,I,H,G,gpart,ghpart,ghipart,multabc,multdef,multghi;
 		long long bg,cg,eg,fg,ah,ch,dh,fh,ai,bi,di,ei,totalflagdeterminants;
 		for(a=0;a<=max;a++){
 			for(b=0;b<=max;b++){
@@ -15778,7 +15816,7 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 
 		mp_int *flagnzdc;
 		long long a,b,c,d,e,f,g,h,i;
-		long long count,billioncount=0;
+		long long count=1000000000,billioncount=0;
 		long long ae,af,bd,bf,cd,ce;
 		long long maxabc,maxdef,maxghi;
 		long long multabc,multdef,multghi;
