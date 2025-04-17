@@ -14856,9 +14856,10 @@ static Mrational* invertibleMatrixProbabilities[128]={NULL};Mallocationowner own
  * @param max a positive integer smaller than 128
  * @return Mrational* the probability that a 3x3 matrix with integer values between negative \p max and \p max are invertible 
  */
-static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationowner owner=getOwner(__LINE__);
+static Mrational* symmetricinvertibleprobability(unsigned char max,bool no_reuse,bool no_store,bool no_slow,bool force_slow){Mallocationowner owner=getOwner(__LINE__);
 	assert(max>0&&max<128);
 	q2output("Determining the fraction of not invertible 3x3 matrices with integers in [-%d,%ld] using symmetry properties.\n",max,max);
+	q2output("Usage flags: no reuse: %s, no store: %s, no slow: %s, force slow: %s.\n",(no_reuse?"YES":"NO"),(no_store?"YES":"NO"),(no_slow?"YES":"NO"),(force_slow?"YES":"NO"));
 	if(3+9+3*7>MP_DIGIT_BIT) // not enough bits in mp_digit
 		q2outputWarning("May have to use a big integer to add nonzero determinant counts");
 	// if we already know it, we can return it as from the stored rationals (as a copy that is)
@@ -14876,34 +14877,32 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 	// find maxoffset, the largest probability found so far!!
 	// will end up being 0 if none is available
 	// since lastInitializedInvertibleProbability-1 is the largest max for which symmetricinvertibleprobability is stored, and max could just as well be somewhere in between, and maxoffset needs to be smaller than max
-	unsigned char maxoffset=MIN(max-1,lastInitializedInvertibleProbability);
-	while(maxoffset>0&&NULL==invertibleMatrixProbabilities[maxoffset])maxoffset--;
+	signed char *maxoffsetmults=NULL;
+	unsigned char maxoffset=0; // the stored probability to reuse
+	if(!no_reuse){ // if reuse of previously computed probabilities is allowed
+		maxoffset=MIN(max-1,lastInitializedInvertibleProbability);
+		while(maxoffset>0&&NULL==invertibleMatrixProbabilities[maxoffset])maxoffset--;
+		if(maxoffset)maxoffsetmults=mults[maxoffset];
+	}
+
 	Mbiginteger* flagnonzerodeterminantcounts=NULL;
-	signed char *maxoffsetmults=(maxoffset?mults[maxoffset]:NULL);
 	if(maxoffsetmults!=NULL){
 		flagnonzerodeterminantcounts=owned_biginteger(_getBigintegerCopy(invertibleMatrixProbabilities[maxoffset]->num),owner);
 		q2outputRational("Using the 3x3 matrix invertible probability ",invertibleMatrixProbabilities[maxoffset],NULL);
 		q2output(" for all integer matrices with values in [-%d,%d].\n",maxoffset,maxoffset);
 	}else{
 		flagnonzerodeterminantcounts=owned_biginteger(_getBiginteger(0),owner);
-		q2outputMessage(M_INFO_PREFIX,"No previous invertible 3x3 matrix probability available.");
+		if(maxoffset==0||NULL==invertibleMatrixProbabilities[maxoffset]){
+			if(maxoffset==0)
+				q2outputInfo("Won't use previously stored invertible 3x3 matrix probabilities");
+			else
+				q2outputInfo("No previous invertible 3x3 matrix probability available");
+		}else
+			q2outputMessage(M_INFO_PREFIX,"Not using the stored probability for 3x3 matrices with integer elements in [-%d,%d]",maxoffset);
 	}
 	if(NULL==flagnonzerodeterminantcounts){
 		q2outputError("Failed to initialize the non zero determinant count!");
 		return NULL;
-	}
-	// let's create the mults we're going to need (apart from mults[maxoffset] which should already be available!!!)
-	signed char* maxmults=mults[max];
-	if(NULL==maxmults){
-		maxmults=unmanaged_malloc(sizeof(signed char)*(max+1)); // indices 0 through max (we know the last mult will equal 1)
-		if(NULL==maxmults){
-			q2outputError("Failed to initialize the multiplication factors!");
-			return NULL;
-		}
-		// initialize the mults (except for mults[max][0] which we will never need!!!)
-		for(signed char multindex=max;multindex;multindex--)maxmults[multindex]=max/multindex;
-		// remember maxmults
-		mults[max]=maxmults;
 	}
 
 	// count the billions processed!!!!
@@ -14961,7 +14960,12 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 	///long checkdelta_a,checkdelta_b,checkdelta_c,checkdelta_a_error=0,checkdelta_b_error=0,checkdelta_c_error=0;
 	///long s1,s2,s3,s4,s5,s6;
 	// only doing the non-negative parts, in which case we need to count differently
-	signed char* uniqueTriplets=_getUniqueTriplets(max);
+	signed char* uniqueTriplets=NULL;
+	if(!force_slow){ // if we're not force slowing, we should use the fast method using the unique triplets
+		uniqueTriplets=_getUniqueTriplets(max);
+		if(NULL==uniqueTriplets)
+			q2outputError("Failed to determine all canonical row combinations beforehand; will generate them");
+	}
 	if(uniqueTriplets!=NULL){
 		//D output("Triplets!\n");
 		// let's write the unique triplets!!!
@@ -14974,6 +14978,20 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 		}
 		outputChar('\n');
 		*/
+		// let's create the mults we're going to need (apart from mults[maxoffset] which should already be available!!!)
+		signed char* maxmults=mults[max];
+		if(NULL==maxmults){
+			maxmults=unmanaged_malloc(sizeof(signed char)*(max+1)); // indices 0 through max (we know the last mult will equal 1)
+			if(NULL==maxmults){
+				q2outputError("Failed to initialize the multiplication factors!");
+				return NULL;
+			}
+			// initialize the mults (except for mults[max][0] which we will never need!!!)
+			for(signed char multindex=max;multindex;multindex--)maxmults[multindex]=max/multindex;
+			// remember maxmults
+			mults[max]=maxmults;
+		}
+		
 		///uint32_t abctripletindex,deftripletindex,ghitripletindex;
 		signed char *abctripletptr,*deftripletptr,*ghitripletptr;
 
@@ -15496,8 +15514,8 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 			if(mp_add_d(flagnzdc,unregisterednzdcount,flagnzdc)!=MP_OKAY)
 				q2outputError("Failed to add the remaining unregistered nonzero determinant count!");
 		}
-	}else{
-		q2outputError("Failed to determine all canonical row combinations beforehand; will generate them");
+	}else // no unique triplets available!!!
+	if(!no_slow){
 		long long maxab,gcdab,gcdabc,I,H,G,gpart,ghpart,ghipart,multabc,multdef,multghi;
 		long long bg,cg,eg,fg,ah,ch,dh,fh,ai,bi,di,ei,totalflagdeterminants;
 		for(a=0;a<=max;a++){
@@ -15740,19 +15758,21 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
 		return NULL;
 	}
 	// try to store the computed probability
-	invertibleMatrixProbabilities[max]=owned_rational(_getRationalCopy(resultRational),owner_invertibleMatrixProbabilities);
-	// if not stored, free the two big integers (if any) as they not bound to the stored rational apparently
-	if(invertibleMatrixProbabilities[max]!=NULL){ // failed to store the probability
-		// update lastInitializedInvertibleProbability to max, NULLing all invertibleMatrixProbabilities in between!!!
-		while(++lastInitializedInvertibleProbability<max)invertibleMatrixProbabilities[lastInitializedInvertibleProbability]=NULL;
-		q2outputRational("Invertible probability ",invertibleMatrixProbabilities[max],NULL);
-		q2output(" for integer matrices with elements in [-%d,%d] stored.\n",max,max);
-	}else
-		q2outputMessage(M_ERROR_PREFIX,"Invertible probability for integer matrices with elements in [-%d,%d] not stored!",max,max);
+	if(!no_store){
+		invertibleMatrixProbabilities[max]=owned_rational(_getRationalCopy(resultRational),owner_invertibleMatrixProbabilities);
+		// if not stored, free the two big integers (if any) as they not bound to the stored rational apparently
+		if(invertibleMatrixProbabilities[max]!=NULL){ // failed to store the probability
+			// update lastInitializedInvertibleProbability to max, NULLing all invertibleMatrixProbabilities in between!!!
+			while(++lastInitializedInvertibleProbability<max)invertibleMatrixProbabilities[lastInitializedInvertibleProbability]=NULL;
+			q2outputRational("Invertible probability ",invertibleMatrixProbabilities[max],NULL);
+			q2output(" for integer matrices with elements in [-%d,%d] stored.\n",max,max);
+		}else
+			q2outputMessage(M_ERROR_PREFIX,"Invertible probability for integer matrices with elements in [-%d,%d] not stored!",max,max);
+	}
 
 	// normalize if we're supposed to!
 	if(getNormalizeRationalsFlag()&&!normalizeRational(resultRational,owner))
-		q2outputError("Failed to normalize the probability");
+		q2outputError("Failed to normalize the 3x3 matrix invertible probability rational");
 
 	return disowned_rational(resultRational,owner);
 }
@@ -16100,17 +16120,27 @@ static Mrational* symmetricinvertibleprobability(unsigned char max){Mallocationo
  * @brief 
  * 
  */
-Mvalue* Msymmetricinvertibleprobability(Mvalue* maxValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Msymmetricinvertibleprobability(Mvalue* maxValue,Mvalue* flagsValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* resultValue=NULL;
 	if(maxValue!=NULL){
 		if(maxValue->type==VT_ARRAY)
-			return _functionAppliedToArray(maxValue->value._array,Msymmetricinvertibleprobability,false);
+			return _getValueOfArray(applyFunctionToArray(maxValue->value._array,(Mfunctionunion)Msymmetricinvertibleprobability,1,(Mvalue*[]){flagsValue}));
 		if(maxValue->type==VT_LIST)
-			return _functionAppliedToList(maxValue->value._list,Msymmetricinvertibleprobability,false);
+			return _getValueOfList(applyFunctionToList(maxValue->value._list,(Mfunctionunion)Msymmetricinvertibleprobability,1,(Mvalue*[]){flagsValue}));
 		long long max=(maxValue!=NULL?getValueInteger(maxValue):M_LL_INVALID);
 		if(max>=0&&max<128){
 			if(max){
-				Mrational* resultRational=owned_rational(symmetricinvertibleprobability(max),owner);
+				// extract flags
+				long long flags=0;
+				if(flagsValue!=NULL){
+					//D q2outputValue("Flags: ",flagsValue,".\n"); //D
+					flags=getValueInteger(flagsValue);
+					if(flags<0)
+						q2outputMessage(M_ERROR_PREFIX,"Invalid flags integer: %lld. Will use defaults!",flags);
+					/*D else
+						q2outputMessage(M_INFO_PREFIX,"Flags: %lld.\n",flags); D*/
+				}
+				Mrational* resultRational=owned_rational(symmetricinvertibleprobability(max,(flags>=0?flags&1:0),(flags>=0?flags&2:0),(flags>=0?flags&4:0),(flags>=0?flags&8:0)),owner);
 				if(resultRational!=NULL)
 					resultValue=_getValueOfRational(disowned_rational(resultRational,owner));
 			}else
@@ -16134,7 +16164,7 @@ Mvalue* Minvertibleprobability(Mvalue* minValue,Mvalue* maxValue,Mvalue* methodV
 	if(min!=M_LL_INVALID&&max!=M_LL_INVALID&&min<=max){
 		// use shortcut method
 		if(min+max==0&&method<0&&max<=127){
-			resultValue=Msymmetricinvertibleprobability(maxValue);
+			resultValue=Msymmetricinvertibleprobability(maxValue,NULL); // use default flags!!!!
 			if(resultValue!=NULL)return resultValue;
 			q2outputError("Failed to take advantage of the symmetric integer not invertible probability computation");
 		}
@@ -17030,15 +17060,15 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 				return NULL;
 			}
 
-			if(!registerFunction(_Menvironment,owner,"invertibleprobability",Minvertibleprobability,3,(char*[]){"min integer","max integer","method integer"},NULL))
+			if(!registerFunction(_Menvironment,owner,"invertibleprobability",Minvertibleprobability,3,(char*[]){"(i)min","(i)max","(i)method"},NULL))
 				q2outputError("Failed to register the invertibleprobability() function");
 
-			if(!registerFunction(_Menvironment,owner,"syminvertibleprobability",Msymmetricinvertibleprobability,1,(char*[]){"max integer"},NULL))
+			if(!registerFunction(_Menvironment,owner,"syminvertibleprobability",Msymmetricinvertibleprobability,2,(char*[]){"(i)max","(i)flags"},NULL))
 				q2outputError("Failed to register the syminvertibleprobability() function");
 
 			if(!registerFunction(_Menvironment,owner,"getnormalizerationals",MgetNormalizeRationalsFlag,0,NULL,NULL)||
-					!registerFunction(_Menvironment,owner,"setnormalizerationals",MsetNormalizeRationalsFlag,1,(char*[]){"flag"},NULL)||
-					!registerFunction(_Menvironment,owner,"normalizedrational",MnormalizeRational,1,(char*[]){"rational(s)"},NULL))
+					!registerFunction(_Menvironment,owner,"setnormalizerationals",MsetNormalizeRationalsFlag,1,(char*[]){"(b)flag"},NULL)||
+					!registerFunction(_Menvironment,owner,"normalizedrational",MnormalizeRational,1,(char*[]){"(q)rational(s)"},NULL))
 				q2outputError("Failed to register the normalize rationals functions");
 		}
 	}
