@@ -2321,7 +2321,7 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 				}
 			}else{ // currently local
 				if(owner.global){ // local to global
-					//D q2output("Local to global transition!\n");
+					q2output("Local to global transition from owner %s:%i with id %lli to owner %s:%i!\n",MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,_alloc->allocationIndex,MODULE_NAMES[owner.module],owner.id);
 					if(!unregisterLocalAllocation(_alloc))
 						q2outputError("Failed to unregister a local allocation on transitioning from local to global.");
 				}

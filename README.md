@@ -29,3 +29,8 @@ about this problem.
 12 December 2024
 Now working on fixing the placeholder feature, which is implemented by using ? to indicate a function call argument or a list or array element, like cos(?). Somehow the expr property is not set correctly on the expression being asked by M to replace ? and therefore will not get it executed properly.
 
+11 July 2025
+The current branch is v0.1.10 and here's some of the things that need further attention, to see if they work correctly or to be improved:
+1. The complete command functionality allows using ? for arguments in a function call, and needs to be debugged.
+2. There are some issues with code autocompletion when the user uses the left arrow key and 'consumes' certain finalizers like ) ] or } but they keep being shown at the end when perhaps they shouldn't
+3. Currently the logging of locally created allocation pointers is not working correctly, because apparently they are made global somewhere but subsequently they are removed locally (where they are not found of course)

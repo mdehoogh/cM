@@ -14967,6 +14967,24 @@ static Mrational* symmetricinvertibleprobability(unsigned char max,bool no_reuse
 			q2outputError("Failed to determine all canonical row combinations beforehand; will generate them");
 	}
 	if(uniqueTriplets!=NULL){
+		// count the symcombinations
+		long long zeroes,totalflagdeterminants,symmult;
+		Mbiginteger* symcombinations[13]={
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner),
+			owned_biginteger(_getBiginteger(0),owner)
+		};
+	
 		//D output("Triplets!\n");
 		// let's write the unique triplets!!!
 		/*
@@ -15073,8 +15091,57 @@ static Mrational* symmetricinvertibleprobability(unsigned char max,bool no_reuse
 				// replacing: gptr=uniqueTriplets;hptr=gptr+1;iptr=hptr+1;
 				rowequalityflags|=2; // (g,h,i) now equal to (d,e,f)
 				do{
+					// if row 1 equals row 3 set the third flag
+					// NOTE that if 1==2==3 all three flags will be set
+					if(a==g&&b==h&&c==i)rowequalityflags|=4;
+
 					zeroesghi=(!g)+(!h)+(!i);
-					//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
+					
+					zeroes=zeroesabc+zeroesdef+zeroesghi; // replacing: (!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
+					totalflagdeterminants=(512>>zeroes);
+					
+					symmult=0; // means not to be used!!
+					// because we're processing all permutations we need to also process all these permutations
+					// but in this case we have to total of 13 possible results instead of just 3
+					if(b!=d||c!=g||f!=h){ // at least one of them differs
+						// if (b,c,d)<(d,g,h) we process it, counting it twice, otherwise we don't
+						if((b<d)||((b==d)&&((c<g)||((c==g)&&(f<h)))))symmult+=2; // count twice
+					}else
+						symmult+=1;
+					if(rowequalityflags!=7){ // not all rows are equal
+						// permutation 2
+						if((rowequalityflags&2)==0)
+						if(b!=g||c!=d||i!=e){
+							if((b<g)||((b==g)&&((c<d)||((c==d)&&(i<e)))))symmult+=2; // count twice
+						}else
+							symmult+=1;
+						// permutation 3
+						if((rowequalityflags&1)==0)
+						if(e!=a||f!=g||c!=h){
+							if((e<a)||((e==a)&&((f<g)||((f==g)&&(c<h)))))symmult+=2; // count twice
+						}else
+							symmult+=1;
+						// permutation 4
+						if((rowequalityflags&1)==0&&(rowequalityflags&4)==0)
+						if(e!=g||f!=a||i!=b){
+							if((e<g)||((e==g)&&((f<a)||((f==a)&&(i<b)))))symmult+=2; // count twice
+						}else
+							symmult+=1;
+						// permutation 5
+						if((rowequalityflags&2)==0&&(rowequalityflags&4)==0)
+						if(h!=a||i!=d||c!=e){
+							if((h<a)||((h==a)&&((i<d)||((i==d)&&(c<e)))))symmult+=2; // count twice
+						}else
+							symmult+=1;
+						// permutation 6, all flags should not be set
+						if((rowequalityflags&1)==0&&(rowequalityflags&2)==0&&(rowequalityflags&4)==0)
+						if(h!=d||i!=a||f!=b){
+							if((h<d)||((h==d)&&((i<a)||((i==a)&&(f<b)))))symmult+=2; // count twice
+						}else
+							symmult+=1;
+					}
+					if(symcombinations[symmult]!=NULL)mp_incr(MP_INT_POINTER(symcombinations[symmult]));
+				//D output("\na=%2d b=%2d c=%2d\nd=%2d e=%2d f=%2d\ng=%2d h=%2d i=%2d mult=%ld multroworder=%ld\n",a,b,c,d,e,f,g,h,i,multghi,multroworders[rowequalityflags]);
 					// replacing: maxghi=MAX(MAX(g,h),i);multghi=max/maxghi;
 					///mult*=multghi;
 					/// obsolete: bg=b*g;cg=c*g;eg=e*g;fg=f*g;
@@ -15155,42 +15222,42 @@ static Mrational* symmetricinvertibleprobability(unsigned char max,bool no_reuse
 						}
 						flags>>=1; // shift out the bit we consumed
 					}
-					totalflagnonzerodeterminants<<=5; // multiply by 32 (otherwise we would have needed to add 32 each time)
-					// use zerodeterminantcount to determine the multiplication factor
-					long long zeroes=zeroesabc+zeroesdef+zeroesghi; // replacing: (!a)+(!b)+(!c)+(!d)+(!e)+(!f)+(!g)+(!h)+(!i);
-					totalflagnonzerodeterminants>>=zeroes; // shift by the total number of zeroes
-					long long totalflagdeterminants=(512>>zeroes);
-					///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
-					///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
-					/*D
-					outputBiginteger("flag zero determinants=",incflagzdc,NULL);
-					outputBiginteger("/",incflagtc,"\n");
-					*/
-					// for all the not yet determined probabilities update the flagzerodeterminantcount
-					// the maximum of all elements in the matrix determines to which level this matrix belongs to
-					maxtriplets=MAX(maxabc,MAX(maxdef,maxghi));
-					//D output("max=%lld",maxtriplets);
-					mult=maxmults[maxabc]*maxmults[maxdef]*maxmults[maxghi];
-					if(maxtriplets<=maxoffset)
-						mult-=maxoffsetmults[maxabc]*maxoffsetmults[maxdef]*maxoffsetmults[maxghi];
-					mult*=multroworders[rowequalityflags];
-					nonzerodeterminantcount=mult*totalflagnonzerodeterminants;
-					if(nonzerodeterminantcount>MP_DIGIT_MAX){
-						addendum=owned_biginteger(_getBiginteger(nonzerodeterminantcount),owner);
-						if(NULL==addendum){
-							if(mp_add(flagnzdc,MP_INT_POINTER(addendum),flagnzdc)!=MP_OKAY)
-								q2outputMessage(M_ERROR_PREFIX,"Failed to add %lld to the total number of nonzero determinants",nonzerodeterminantcount);
-							FREE_BIGINTEGER(addendum,owner);addendum=NULL;
-						}else
-							q2outputMessage(M_ERROR_PREFIX,"Failed to add nonzero determinant count %lld.",nonzerodeterminantcount);
-					}else{ // mult itself does not exceed MP_DIGIT_MAX but the sum of nonzerodeterminantcount and unregisterednzdcount might
-						if(nonzerodeterminantcount+unregisterednzdcount>MP_DIGIT_MAX){ // overflow
-							if(mp_add_d(flagnzdc,unregisterednzdcount,flagnzdc)!=MP_OKAY)
-								q2outputError("Failed to add the determinant count!");
-							else
-								unregisterednzdcount=nonzerodeterminantcount;
-						}else
-							unregisterednzdcount+=nonzerodeterminantcount;
+					if(totalflagnonzerodeterminants){
+						totalflagnonzerodeterminants<<=5; // multiply by 32 (otherwise we would have needed to add 32 each time)
+						// use zerodeterminantcount to determine the multiplication factor
+						totalflagnonzerodeterminants>>=zeroes; // shift by the total number of zeroes
+						///Mbiginteger* incflagzdc=owned_biginteger(_getBiginteger(totalflagzerodeterminants),owner);
+						///Mbiginteger* incflagtc=owned_biginteger(_getBiginteger(totalflagdeterminants),owner);
+						/*D
+						outputBiginteger("flag zero determinants=",incflagzdc,NULL);
+						outputBiginteger("/",incflagtc,"\n");
+						*/
+						// for all the not yet determined probabilities update the flagzerodeterminantcount
+						// the maximum of all elements in the matrix determines to which level this matrix belongs to
+						maxtriplets=MAX(maxabc,MAX(maxdef,maxghi));
+						//D output("max=%lld",maxtriplets);
+						mult=maxmults[maxabc]*maxmults[maxdef]*maxmults[maxghi];
+						if(maxtriplets<=maxoffset)
+							mult-=maxoffsetmults[maxabc]*maxoffsetmults[maxdef]*maxoffsetmults[maxghi];
+						mult*=multroworders[rowequalityflags&3];
+						nonzerodeterminantcount=mult*totalflagnonzerodeterminants;
+						if(nonzerodeterminantcount>MP_DIGIT_MAX){
+							addendum=owned_biginteger(_getBiginteger(nonzerodeterminantcount),owner);
+							if(NULL==addendum){
+								if(mp_add(flagnzdc,MP_INT_POINTER(addendum),flagnzdc)!=MP_OKAY)
+									q2outputMessage(M_ERROR_PREFIX,"Failed to add %lld to the total number of nonzero determinants",nonzerodeterminantcount);
+								FREE_BIGINTEGER(addendum,owner);addendum=NULL;
+							}else
+								q2outputMessage(M_ERROR_PREFIX,"Failed to add nonzero determinant count %lld.",nonzerodeterminantcount);
+						}else{ // mult itself does not exceed MP_DIGIT_MAX but the sum of nonzerodeterminantcount and unregisterednzdcount might
+							if(nonzerodeterminantcount+unregisterednzdcount>MP_DIGIT_MAX){ // overflow
+								if(mp_add_d(flagnzdc,unregisterednzdcount,flagnzdc)!=MP_OKAY)
+									q2outputError("Failed to add the determinant count!");
+								else
+									unregisterednzdcount=nonzerodeterminantcount;
+							}else
+								unregisterednzdcount+=nonzerodeterminantcount;
+						}
 					}
 					count-=(mult*totalflagdeterminants);
 					if(count<0){
@@ -15324,6 +15391,7 @@ static Mrational* symmetricinvertibleprobability(unsigned char max,bool no_reuse
 					i=*iptr;
 					maxghi=*++ghitripletptr;
 					///multghi=max/maxghi;
+					if(rowequalityflags&4)rowequalityflags-=4;
 					if(rowequalityflags&2)rowequalityflags-=2; // (g,h,i) now different than (d,e,f) (and possibly (a,b,c) as well)
 				}while(1);
 				/*}else{ // d=e=f=0
@@ -15382,8 +15450,31 @@ static Mrational* symmetricinvertibleprobability(unsigned char max,bool no_reuse
 			maxabc=*(++abctripletptr);
 		///multabc=max/maxabc; // update multabc
 		}while(1);
-///output("Equal row count: %lld.\n",equalrowcount);
-/* replacing:
+		output("Symmetric mults: ");
+		Mbiginteger* _symmultBi=owned_biginteger(_getBiginteger(0),owner);
+		for(long long i=0;i<13;i++){
+			output(" %d:",i);
+			if(NULL==symcombinations[i])continue;
+			outputBiginteger(NULL,symcombinations[i],NULL);
+			if(i!=6){
+				if(i<6)
+					mp_add(_symmultBi->_bi,symcombinations[i]->_bi,_symmultBi->_bi);
+				else
+					mp_sub(_symmultBi->_bi,symcombinations[i]->_bi,_symmultBi->_bi);
+			}
+			FREE_BIGINTEGER(symcombinations[i],owner);
+		}
+		outputChar('\n');
+		// is this symmetrical???????
+		outputBiginteger("\tSymmetry mult symmetry: ",_symmultBi,".\n");
+		FREE_BIGINTEGER(_symmultBi,owner);
+		/*
+		outputBiginteger("Skipped: ",symcombinations[0],NULL);
+		outputBiginteger(" - symmetricals: ",symcombinations[1],NULL);
+		outputBiginteger(" - nonsymmetricals: ",symcombinations[2],".\n");
+		*/
+		///output("Equal row count: %lld.\n",equalrowcount);
+		/* replacing:
 		while(1){
 			maxabc=MAX(MAX(a,b),c);
 			///mult=1;
