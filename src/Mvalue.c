@@ -288,7 +288,7 @@ Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_ma
 	if(NULL==_mapelement)return NULL;
 	if(_mapelement->_next!=NULL)owned_mapelement(_mapelement->_next,owner_mapelement);
 	if(_mapelement->_variable!=NULL)owned_variable(_mapelement->_variable,Msubowner(owner_mapelement,1));
-	//DEBUGGINGoutput("Owning a map element!\n");
+	//D output("Owning a map element!\n");
 	return OWNED(_mapelement,owner_mapelement);
 }
 /**
@@ -300,9 +300,9 @@ Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_ma
  */
 Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
 	if(NULL==_mapelement)return NULL;
-	//DEBUGGINGoutput("Disowning a map element!\n");
+	//D output("Disowning a map element!\n");
 	if(_mapelement->_variable!=NULL){
-		//DEBUGGINGoutput("Disowning map element variable '%s'.\n",_mapelement->_variable->_name,".\n");
+		//D output("Disowning map element variable '%s'.\n",_mapelement->_variable->_name,".\n");
 		disowned_variable(_mapelement->_variable,owner_mapelement);
 	}
 	if(_mapelement->_next!=NULL)disowned_mapelement(_mapelement->_next,owner_mapelement);
@@ -378,13 +378,13 @@ Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
  */
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
 	if(NULL==_map)return NULL;
-  //DEBUGGINGoutput("Disowning map!\n");
+  //D output("Disowning map!\n");
 	if(_map->_creator!=NULL){
 		////////output("Creator: '%s'.\n",_map->_creator);
 		disowned_chars(_map->_creator,owner_map);
 	} // MDH@25JAN2023 BUG FIX: disown the creator owner as well!!!!
 	if(_map->_first!=NULL)disowned_mapelement(_map->_first,owner_map);
-	//DEBUGGINGoutput("Map disowned!\n");
+	//D output("Map disowned!\n");
 	return DISOWNED(_map,owner_map);
 }
 #endif
@@ -451,7 +451,7 @@ Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Malloc
  */
 Mvaluereference* owned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
 	if(NULL==_valuereference)return NULL;
-		////output("Owning value reference '%s'!\n",_valuereference->_name->chars);
+		//D output("Owning value reference '%s'!\n",_valuereference->_name->chars);
 	owned_chars(_valuereference->_name,owner_valuereference);
 	return OWNED(_valuereference,owner_valuereference);
 }
@@ -897,7 +897,7 @@ Mvalue* _getStringValue(Mstring const * const str){Mallocationowner owner=getOwn
 	bool disowned_string=Misdisowned(str); // determine if str is disowned, if it is we can free it when failing to wrap it!!
 	Mvalue* _stringValue=__value("string");
 	if(NULL==_stringValue){
-		if(disowned_string)free_string(str);
+		if(disowned_string)free_string(str); // or FREE_STRING()????
 		q2outputError("Failed to create a bytes value");
 		return NULL;
 	}
@@ -2964,7 +2964,7 @@ Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquote
 		}
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(NULL==p){FREE_STRING(result,owner);return NULL;}
+		if(NULL==p){q2outputError("Failed to compose map text");FREE_STRING(result,owner);return NULL;}
 	}
 	return disowned_string(result,owner);
 }/* VALIDATED */
@@ -4176,9 +4176,9 @@ Marray* appliedToArray(Marray* _array,OneArgumentFunction oneArgumentFunction,Mv
 				for(unsigned long long i=0;i<l;i++){
 					output("Applying the function to '",arrayElements->values[i],"'\n"); //D
 					Mvalue* resultValue=oneArgumentFunction(arrayElements->values[i]);
-					outputValue("Assigning result value '",resultValue,"'.\n"); //D
+					//D outputValue("Assigning result value '",resultValue,"'.\n"); //D
 					assignValue(&resultElements->values[i],resultValue);
-					outputValue("Assigned value '",resultElements->values[i],"'.\n"); //D
+					//D outputValue("Assigned value '",resultElements->values[i],"'.\n"); //D
 				}
 			}else
 				q2outputBug("No result array elements!");
@@ -4679,7 +4679,7 @@ void free_functionmapelement(Mfunctionmapelement* _functionmapelement){
 	if(!_functionmapelement)return;
 	free_functionmapelement(_functionmapelement->_next);
 	free_function(_functionmapelement->_function);
-	free_string(_functionmapelement->_name);
+	free_string(_functionmapelement->_name); // or FREE_STRING()???? no, disowned_functionmapelement took care of the disowning!!
 	FREE_1(_functionmapelement,'f');
 }// VALIDATED
 #define FREE_FUNCTIONMAPELEMENT(_functionmapelement,owner_functionmapelement) free_functionmapelement(disowned_functionmapelement(_functionmapelement,owner_functionmapelement))

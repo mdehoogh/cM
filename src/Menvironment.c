@@ -317,7 +317,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 					if(tablerowValue->type==VT_LIST){
 						Mlist* tablerowValueList=tablerowValue->value._list;
 						if(tablerowValueList!=NULL&&tablerowValueList->_first!=NULL){
-							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
+							//D if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
 							maximumNumberOfColumns=tablerowValueList->numberOfElements;
 							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
 							_columnLengths=unmanaged_calloc(maximumNumberOfColumns,sizeof(size_t));
@@ -351,7 +351,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 						Marray* tablerowValueArray=tablerowValue->value._array;
 						Marrayelements* tablerowValueArrayElements=(tablerowValueArray!=NULL?tablerowValueArray->elements:NULL);
 						if(tablerowValueArrayElements!=NULL&&tablerowValueArrayElements->count>0){
-							//////DEBUG if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
+							//D if(amVerbose())output("Number of table columns: %llu.\n",tablerowValueList->numberOfElements);
 							maximumNumberOfColumns=tablerowValueArrayElements->count;
 							///////if(amVerbose())output("Maximum number of columns: %zu.",maximumNumberOfColumns);
 							_columnLengths=unmanaged_calloc(maximumNumberOfColumns,sizeof(size_t));
@@ -477,7 +477,7 @@ Mlist* getTableLines(Mlist const * const tableList,Mlist const * const minColumn
 									}
 								}else
 								if(tablerowValue->type==VT_ARRAY){
-									////DEBUG q2output("Showing the array!\n");
+									//D q2output("Showing the array!\n");
 									Mvalue* cellValue;
 									Marray* tablerowValueArray=tablerowValue->value._array;
 									if(tablerowValueArray!=NULL){
@@ -1557,7 +1557,7 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
  */
 Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name){
 	if(NULL==_environment||NULL==name){q2outputError("No environment or name specified");return NULL;}
-	//DEBUGGINGoutput("Looking for the value of variable '%s' in environment '%s'.\n",name,string(_getEnvironmentName(_environment)));
+	//D output("Looking for the value of variable '%s' in environment '%s'.\n",name,string(_getEnvironmentName(_environment)));
 	Mvariable* variable=getVariable(_environment,name,false);
 	if(NULL==variable){q2outputMessage(M_ERROR_PREFIX,"Variable '%s' not found.",name);return NULL;}
 	return variable->_value;
@@ -2426,7 +2426,7 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		Mvariable* referencedVariable=value->value._reference->variable;
 		Mmap* _map=owned_map(_getThreeArgumentMap("references","referenced variable type","referenced value type",VT_TEXT,VT_UNDEFINED,VT_UNDEFINED),owner);
 		if(NULL==_map){q2outputError("Failed to create type result map!");return NULL;}
-		//DEBUGGINGoutputMap("Initialized result map: ",_map,".\n");
+		//D outputMap("Initialized result map: ",_map,".\n");
 		if(referencedVariable!=NULL){
 			////output("Creating map elements.\n");
 			Mmapelement* _mapelement1=_map->_first;
@@ -2442,7 +2442,7 @@ Mvalue* Mtype(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			assignValue(&_mapelement2->_variable->_value,_getTextValue(_getCharText(getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->unlockCode>0),'\'')));
 			assignValue(&_mapelement3->_variable->_value,Mtype(referencedVariable->_value));
 		}
-		//DEBUGGINGoutputMap("Result map: ",_map,".\n");
+		//D outputMap("Result map: ",_map,".\n");
 		//* replacing:
 		// Mmap* _map=owned_map(__map(src),owner);
 		// if(referencedVariable!=NULL){
@@ -3699,15 +3699,20 @@ unsigned long long getNumberOfFunctionCommands(char const * const functionName){
  * @return Mstring* the text representation of the definition of function \p function with name \p functionName
  */
 Mstring* _getFunctionText(Mfunction const * const function,char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
+	q2output("Get function text of '%s'\n",functionName); // DEBUGGING
 	Mstring* _s=owned_string(_getString(functionName),owner);
 	///printf("\n%s","name");
 	// I guess we might show the parameter map (if any)
 	Mstring* p=string_append_char(_s,'(');
 	if(function->_parameterMap!=NULL){
+		q2output("Composing parameter map text.\n");
 		Mstring* _parameterMapText=owned_string(_getMapText(function->_parameterMap,false,false,false),owner); // do NOT show curly braces, quotes or missing defaults
 		if(_parameterMapText!=NULL){
 			string_append(p,string(_parameterMapText));
+			//////xxxx
+			q2output("Freeing map text '%s'.\n",string(_parameterMapText));
 			FREE_STRING(_parameterMapText,owner);
+			q2output("Parameter map freed!\n");
 		}
 	}
 	///printf("\n%s","params");
@@ -3736,7 +3741,7 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 					_argumentMap->numberOfElements=numberOfArguments; // OOPS forgot this initially!!!
 					Mmapelement *_mapelement,*_prevmapelement=NULL;
 					for(size_t argumentIndex=0;argumentIndex<numberOfArguments;argumentIndex++){
-						/////////DEBUGGING q2outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
+						//D q2outputValue("Registering default value '",defaultValues[argumentIndex],"'");output(" of argument '%s'.\n",argumentNames[argumentIndex]);
 						_mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
 						_mapelement->_next=NULL; // TODO do we need this?????
 						if(argumentNames[argumentIndex]!=NULL){
@@ -3752,15 +3757,16 @@ bool registerFunction(Menvironment * const _environment,Mallocationowner owner_e
 						_prevmapelement=_mapelement;
 					}
 					_argumentMap->_last=_mapelement;
-					///DEBUGGING output("Argument map constructed!\n");
+					//D output("Argument map constructed!\n");
 					_function->_parameterMap=owned_map(disowned_map(_argumentMap,owner),Msubowner(owner_environment,2));
 				}
 				Mallocationowner ownerf=getOwner(__LINE__);
 				Mstring* _functionText=owned_string(_getFunctionText(_function,functionName),ownerf);
 				if(_functionText!=NULL){
-					q2outputMessage(M_INFO_PREFIX,"'%s' registered.",string(_functionText));
+					q2outputMessage(M_INFO_PREFIX,"Function '%s' registered.",string(_functionText));
 					FREE_STRING(_functionText,ownerf);
-				} ///DEBUGGING
+					//D q2outputMessage(M_INFO_PREFIX,"Function text freed!\n");
+				}
 				return true;
 			}
 			q2outputMessage(M_ERROR_PREFIX,"Failed to register internal function '%s'.",functionName);

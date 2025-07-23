@@ -4827,9 +4827,9 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	}
 
 	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
-	////////output("Owning the new user input command!\n");
+	//D output("Owning the new user input command!\n");
 	_userInputCommand=owned_command(disowned_command(_newUserInputCommand,owner),owner_userInputCommand); // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
-	/* DEBUGGING
+	/*D
 	q2output("Copied command:\n");
 	outputCommandInfo(_userInputCommand);
 	*/
@@ -5393,7 +5393,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 	if(NULL==newLastCommandToEvaluateToken)return -1; // MDH@13DEC2023: can't actually return -1 though!!!!
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
 		result|=NEW_TOKEN_CHARACTER;
-		//////outputLine("Owning the last command token!");
+		//D outputLine("Owning the last command token!");
 		_userInputCommand->_lastToken=owned_token(newLastCommandToEvaluateToken,Msubowner(owner_userInputCommand,1)); // MDH@28MAY2020: take over ownership of the new last command token
 		// MDH@08DEC2024: the right place for the semantic check on the validity of this new token 
 		//                is here JIT before switching to the new token color!!!!

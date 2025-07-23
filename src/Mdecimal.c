@@ -77,7 +77,7 @@ void free_sincoselement(Msincoselement* _sincoselement/*,Mallocationowner owner_
  * @return mpd_context_t* \p _mpd_context now owned by \p owner_mpd_context
  */
 mpd_context_t* owned_mpd_context(mpd_context_t* _mpd_context,Mallocationowner owner_mpd_context){
-	//////output("Owning a decimal context!\n");
+	//D output("Owning a decimal context!\n");
 	return OWNED(_mpd_context,owner_mpd_context);
 }
 
@@ -185,7 +185,7 @@ void free_decimalcontext(Mdecimalcontext* _decimalcontext/*,Mallocationowner own
  */
 MdecimalcontextElement* owned_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
 	if(_decimalcontextElement==NULL)return NULL;
-	////output("Owning a decimal context element!\n");
+	//D output("Owning a decimal context element!\n");
 	//// MDH@20JAN2023 leave next alone: if(_decimalcontextElement->_next)owned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
 	if(_decimalcontextElement->_decimalcontext!=NULL){
 		owned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
@@ -736,7 +736,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational,mpd_context_t co
 				{FREE_STRING(_decimalText,owner);_decimalText=NULL;}
 				FREE_BIGINTEGER(_nonnegativenumerator,owner);
 			}
-			output("Freeing helper big integers.\n"); //D
+			//D output("Freeing helper big integers.\n"); //D
 			// free all locally used pointers to dynamic memory
 			FREE_BIGINTEGER(_digit,owner);FREE_BIGINTEGER(_remainder,owner);FREE_BIGINTEGER(_bi10,owner);
 		}

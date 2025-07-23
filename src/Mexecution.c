@@ -951,7 +951,7 @@ Mtext* _getSingleQuotedText(char const * const text){Mallocationowner owner=getO
 	Mtext* _singleQuotedText=owned_text(_getText(string(_singleQuotedTextString)),owner);
 	//D q2output("\tFreeing single quoted text string..."); // DEBUGGING
 	FREE_STRING(_singleQuotedTextString,owner);
-	//D output("done.\n"); // DEBUGGING
+	//D output("done.\n");
 	return disowned_text(_singleQuotedText,owner);
 } /* VALIDATED */
 /**

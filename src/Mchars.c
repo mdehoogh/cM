@@ -24,7 +24,11 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_CHARS
  * @return Mchars* the disowned \p _chars
  */
 Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){
-	return DISOWNED(_chars,owner_chars);
+	if(NULL==_chars)return NULL;
+	//D q2output("Disowning %s chars '%s': %s:%i with level %i...",(owner_chars.global?"global":"local"),_chars->chars,getModuleName(owner_chars.module),owner_chars.id,owner_chars.level);
+	Mchars* p=DISOWNED(_chars,owner_chars);
+	//D q2output("done.\n");
+	return p;
 }
 /**
  * @brief makes \p _chars owned by \p owner_chars
@@ -34,7 +38,11 @@ Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars)
  * @return Mchars* the owned \p _chars
  */
 Mchars* owned_chars(Mchars const * const _chars,Mallocationowner owner_chars){
-	return OWNED(_chars,owner_chars);
+	if(NULL==_chars)return NULL;
+	//D q2output("Owning %s chars '%s': %s:%i with level %i.\n",(owner_chars.global?"global":"local"),_chars->chars,getModuleName(owner_chars.module),owner_chars.id,owner_chars.level);
+	Mchars* p=OWNED(_chars,owner_chars);
+	//D q2output("Owning %s chars '%s': %s:%i with level %i done.\n",(owner_chars.global?"global":"local"),_chars->chars,getModuleName(owner_chars.module),owner_chars.id,owner_chars.level);
+	return p;
 }
 
 // I guess it's prudent to pass in how many initial characters you want to be able to store in the result

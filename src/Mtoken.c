@@ -47,6 +47,7 @@ void free_token(Mtoken* _token/*,Mallocationowner owner*/){
 	if(_token->next){free_token(_token->next/*,owner*/);_token->next=NULL;}
 	if(_token->text){
 		if(amVerboseDebugging())output("Freeing token '%s'.\n",string(_token->text));
+		// TODO or FREE_STRING()??????
 		free_string(_token->text/*,owner*/);_token->text=NULL;
 	}
 	FREE_1(_token,'O'/*,owner*/);

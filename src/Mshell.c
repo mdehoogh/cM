@@ -803,7 +803,6 @@ Mvalue* Msetdp(Mvalue* value){
 	if(_newDecimalContext!=NULL){
 		M_DECIMALCONTEXT=_newDecimalContext;
 		M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
-		////DP_value->value._integer->ll=_decimalContext->prec;
 	}else
 		q2outputMessage(M_ERROR_PREFIX,"Active decimal context not replaced: failed to create a decimal context with precision %llu.\n",decimalprecision);
 	return _getIntegerValue(olddecimalprecision);
@@ -2622,6 +2621,7 @@ static Mvalue* getSubcommandValue(Mtoken const * const firstSubcommandToken,Mtok
 			}
 		}else
 			q2outputMessage(M_ERROR_PREFIX,"Failed to evaluate '%s'.\n",string(_commandText=getSubcommandText(firstSubcommandToken,lastSubcommandToken,commandText)));
+		// TODO shouldn't this be FREE_STRING instead of free_string????
 		if(NULL==commandText&&_commandText!=NULL)free_string(_commandText);
 	}else
 		logToOutputFile("%s%sUnable to evaluate a subcommand!\n",M_ERROR_PREFIX,M_MESSAGE_PREFIX);
@@ -16721,11 +16721,12 @@ bool shellInitialized(char const * const settingCharacters,char const * const lo
 			//D q2output("CWD variable added!\n"); // DEBUGGING
 			char cwd[PATH_MAX];
 			Mstring* cwd_str=owned_string(_getString("'"),owner);
-			char* _cwd=getcwd(cwd,sizeof(cwd));output("Current working directory: '%s'.\n",_cwd);
+			char* _cwd=getcwd(cwd,sizeof(cwd));
+			q2output("Current working directory: '%s'.\n",_cwd);
 			string_append(cwd_str,_cwd);
 			if(string_last_char(cwd_str)!=M_PATH_SEPARATOR)string_append_char(cwd_str,M_PATH_SEPARATOR); // ascertain that CWD ends with a path separator!!!
 			Mvalue* CWD_value=_getTextValue(string(cwd_str)); // I suppose we can directly use the result of getcwd() in _getString
-			FREE_STRING(cwd_str,owner);
+			FREE_STRING(cwd_str,owner);/////q2output("cwd_str freed.\n");
 			if(!setValue(_Menvironment,"CWD",CWD_value)){
 				//////free_value(E_value);
 				q2outputError("Failed to initialize CWD");

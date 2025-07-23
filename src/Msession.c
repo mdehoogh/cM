@@ -364,11 +364,17 @@ int getCurrentNumberOfWindowTextColumns(){windowSizeDetermined();return windowCo
  * @return true on success
  * @return false on failure
  */
-bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix){
-	_timestampedOutputFilename=owned_string(_getTimestamp(".%Y%m%d.%H%M%S"),owner_timestampedOutputFilename); // MDH@24JAN2023: replacing: getOwner(__LINE__));
-  if(_timestampedOutputFilename&&string_prepend(_timestampedOutputFilename,outputfilenamePrefix))outputFilenamePrefixLength=strlen(outputfilenamePrefix);
+bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix){Mallocationowner owner=getOwner(__LINE__);
+	// you can see the timestamp getting global here!!
+	//D q2output("Creating timestamp!\n");
+	Mstring* timestamp=owned_string(_getTimestamp(".%Y%m%d.%H%M%S"),owner);
+	//D q2output("Registering timestamp globally!\n");
+	_timestampedOutputFilename=owned_string(disowned_string(timestamp,owner),owner_timestampedOutputFilename); // MDH@24JAN2023: replacing: getOwner(__LINE__));
+  //D q2output("Timestamp registered globally!\n");
+	if(_timestampedOutputFilename&&string_prepend(_timestampedOutputFilename,outputfilenamePrefix))outputFilenamePrefixLength=strlen(outputfilenamePrefix);
 	if(_timestampedOutputFilename&&string_append(_timestampedOutputFilename,outputfilenameSuffix))outputFilenameSuffixLength=strlen(outputfilenameSuffix);
 	initDisplay();
+	//D q2output("Display initialized.\n");
 	// interfaces with initDisplay() TODO perhaps initialize settings here for a common interactive session???
 	return windowSizeDetermined();
 }

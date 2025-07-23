@@ -181,11 +181,14 @@ Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=g
  */
 Mstring* disowned_string(Mstring* str,Mallocationowner owner_str){
 	if(NULL==str)return NULL;
+	//D q2output("Disowning %s string...",(owner_str.global?"global":"local"));
 	if(str->_chars!=NULL){
 		disowned_chars(str->_chars,owner_str);
 		//D output("Chars disowned!\n");
 	}
-	return DISOWNED(str,owner_str);
+	Mstring* p=DISOWNED(str,owner_str);
+	//D q2output("done.\n");
+	return p;
 }
 
 /**
@@ -197,8 +200,11 @@ Mstring* disowned_string(Mstring* str,Mallocationowner owner_str){
  */
 Mstring* owned_string(Mstring* str,Mallocationowner owner_str){
 	if(NULL==str)return NULL;
+	//D q2output("Owning %s string.\n",owner_str.global?"global":"local");
 	if(str->_chars!=NULL)owned_chars(str->_chars,Msubowner(owner_str,1));
-	return OWNED(str,owner_str);
+	Mstring* p=OWNED(str,owner_str);
+	//D q2output("Owning %s string done.\n",owner_str.global?"global":"local");
+	return p;
 }
 
 // MDH@18MAY2020: you can see what a nuisance it is to free a string for somebody else because the caller needs to DISOWN it first, then I have to obtain ownership otherwise I can't free it
