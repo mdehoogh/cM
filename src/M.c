@@ -1785,6 +1785,7 @@ void initializeNumberOfLineCharacters(){
  * 
  */
 void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
+	//D q2output("Output total memory usage!\n");
 	resetOutputColor(); // MDH@30JUN2020: apparently sometimes required
 	if(!amVerbose()){
 		unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
@@ -1802,6 +1803,7 @@ void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
 		output("Dynamic memory allocation:\n");
 		outputAllocationTypeMarks("\t");
 	}
+	//D q2output("Total memory displayed!");
 }/* VALIDATED */
 // MDH@11MAY2020: if we want to know what changed since the previous mark as for the incremental memory usage
 //				it's easiest to ask for all and only show the changes
@@ -3454,6 +3456,8 @@ size_t getNumberOfTokenAutoCompletionTexts(){
 // MDH@16JAN2024: keep track of the source of the first character in the suggested text
 //                this way there's no need to actually construct _suggestedText
 unsigned char suggestedTextSources[]={0,0,0,0,0}; // there are 4 possible text sources but the actually sources
+// MDH@27JUL2025: let's keep track of the number of finishers in the suggested text
+size_t unsuggestedFinishers=0;
 
 // MDH@23SEP2020: perhaps more convenient to keep track of any cursor displacement
 /**
@@ -3479,6 +3483,11 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 		string_setlength(_manualFeedforwardText,_cursormovement->written); // in case not all characters were actually written
 		// MDH@16JAN2024: update the suggested text source to 1
 		suggestedTextSources[++suggestedTextSources[0]]=1;
+		// MDH@27JUL2025: every finisher that's suggested already does not need to be shown as finisher
+		char* manualFeedforwardChars=string(_manualFeedforwardText);
+		while(unsuggestedFinishers>0&&
+					strchr(manualFeedforwardChars,string_char(_finisherStack,unsuggestedFinishers-1))!=NULL)
+			unsuggestedFinishers--;
 		/* replacing:
 		if(NULL==string_append(_suggestedText,string(_manualFeedforwardText)))
 			_cursormovement->written=0;
@@ -3495,6 +3504,10 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
 	if(_cursormovement!=NULL&&_identifierContinuationCharacters!=NULL&&strlen(_identifierContinuationCharacters)){
 		outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
 		suggestedTextSources[++suggestedTextSources[0]]=2;
+		// MDH@27JUL2025: every finisher that's suggested already does not need to be shown as finisher
+		while(unsuggestedFinishers>0&&
+					strchr(_identifierContinuationCharacters,string_char(_finisherStack,unsuggestedFinishers-1))!=NULL)
+			unsuggestedFinishers--;
 	}
 	/* replacing:
 	if(_cursormovement&&_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)&&string_append(_suggestedText,_identifierContinuationCharacters))
@@ -3524,8 +3537,13 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
  */
 void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 	if(_cursormovement!=NULL&&string_length(_immediateFeedforwardText)){
-		outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+		char* immediateFeedforwardChars=string(_immediateFeedforwardText);
+		outputCommandLineText(immediateFeedforwardChars,_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
 		suggestedTextSources[++suggestedTextSources[0]]=3;
+		// MDH@27JUL2025: every finisher that's suggested already does not need to be shown as finisher
+		while(unsuggestedFinishers>0&&
+					strchr(immediateFeedforwardChars,string_char(_finisherStack,unsuggestedFinishers-1))!=NULL)
+			unsuggestedFinishers--;
 	}
 	/* replacing:
 	if(_cursormovement!=NULL&&string_length(_immediateFeedforwardText)&&string_append(_suggestedText,string(_immediateFeedforwardText))!=NULL)
@@ -3553,10 +3571,11 @@ void outputFinishers(Mcursormovement* _cursormovement){Mallocationowner owner=ge
 	if(NULL==_cursormovement)return;
 	Mchars *_chars=owned_chars(_getReversedChars(string(_finisherStack)),owner);
 	if(NULL==_chars)return;
-
+	// MDH@27JUL2025: the first finisher to display is at the index unsuggestedFinishers
+	size_t firstFinisherToDisplayIndex=string_length(_finisherStack)-unsuggestedFinishers;
 	// MDH@16JAN2024: keep track of the source of the first character in the suggested text
 	//                this way there's no need to actually construct _suggestedText
-	outputCommandLineText(_chars->chars,_cursormovement,
+	outputCommandLineText(_chars->chars+firstFinisherToDisplayIndex,_cursormovement,
 		(_cursormovement->written==0?getFinisherStackTextColor():getUnreachableFinisherStackTextColor()),-1);
 	// MDH@16JAN2024: updating suggestedTextSources
 	suggestedTextSources[++suggestedTextSources[0]]=4;
@@ -3901,6 +3920,8 @@ unsigned long long numberOfSuggestedCharactersWritten=0; // MDH@23SEP2020: basic
 void showSuggestedText(){
 	// MDH@16JAN2024: initialize suggestedTextSources[0] to 0 indicating there is NO suggested text
 	memset(suggestedTextSources,0,sizeof suggestedTextSources); // reset the suggested text sources
+	// MDH@27JUL2025: in order to know what finishers to show we need to determine the finishers already suggested!!
+	unsuggestedFinishers=(_finisherStack!=NULL?string_length(_finisherStack):0); // currently all finishers should be displayed!!
 	/* replacing:
 	// ASSERT _suggestedText should not be NULL
 	if(NULL==_suggestedText)return;
@@ -7431,7 +7452,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	//                     we decide to show both the comma and the closing parenthesis, and the comma is deletable!!!! 
 	_finisherStack=owned_string(__string(),owner_finisherStack);
 	if(NULL==_finisherStack)
-		q2outputError("Failed to feed forward closing parentheses!");
+		q2outputError("Failed to initialize finishers!");
 
 	_suggestedText=owned_string(__string(),owner_suggestedText);
 	if(NULL==_suggestedText)
@@ -7489,6 +7510,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		if(inputMode==IM_COMMAND)
 			if(blockCommandLevel==0){
 				showSeparatorLine();
+				outputLocalAllocations();
 				outputTotalMemoryUsage(); // TODO have to think about this though
 			}
 		// if we're supposed to start a new command (i.e. it's not a command continuation)

@@ -547,7 +547,7 @@ static char const * const MODULE_NAMES[]={"Moutput","Mmessage","Malloc","Mchars"
  * @return char* the name of module with id \p module
  */
 char const * const getModuleName(uint16_t module){
-	return MODULE_NAMES[module];
+	return(module>MI_MAIN?"?":MODULE_NAMES[module]);
 }
 
 /**
@@ -2727,12 +2727,12 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 				// replacing: allocations._owners[allocationIndex]=newptr;
 				// MDH@22JUL2025: BUG FIX ADDITION we must also change the registration if this is a local pointer
 				if(_alloc->local){
-					long long ownerIndex=allocations.ownercount;
+					ssize_t ownerIndex=allocations.ownercount;
 					while(--ownerIndex>=0&&allocations._owners[ownerIndex]!=_alloc);
 					if(ownerIndex>=0){ // success!!!!
 						allocations._owners[ownerIndex]=newptr;
 					}else
-						q2outputBug("Failed to relocate a pointer registered as local.");
+						q2outputMessage(M_BUG_PREFIX,"Failed to relocate local pointer of type %i owned by %s:%d.",_alloc->allocationType,getModuleName(_alloc->owner.module),_alloc->owner.id);
 				}
 				// safer to do the following immediately
 				newptr=((char*)newptr)+sizeof(Malloc);
@@ -3042,4 +3042,62 @@ bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
 	return true;
 
 	// replacing: if(!allocations._chars)OUTPUT_INFO("ERROR: Failed to initialize recording allocations.\n");else OUTPUT_INFO("Allocation recording initialized.\n");
+}
+
+static bool isTheSameOwner(Mallocationowner owner1,Mallocationowner owner2){
+	return (owner1.module==owner2.module&&owner1.id==owner2.id);
+}
+/**
+ * @brief outputs a summary of the local allocations
+ * 
+ */
+void outputLocalAllocations(){
+	// let's collect the local allocations
+	if(allocations.ownercount){
+		q2output("Overview of %zu registered local allocations.\n",allocations.ownercount);
+		Malloc* registeredLocalAllocation;
+		size_t nulledLocalAllocationCount=0;
+		ssize_t registeredLocalAllocationIndex=allocations.ownercount;
+		while(1){
+			// find 'next' non-null one
+			while(--registeredLocalAllocationIndex>=0){
+				registeredLocalAllocation=allocations._owners[registeredLocalAllocationIndex];
+				if(NULL==registeredLocalAllocation)
+					nulledLocalAllocationCount++;
+				else
+				if(registeredLocalAllocation->local)
+					break;
+			}
+			if(registeredLocalAllocationIndex<0)break;
+			Mallocationowner registeredAllocationOwner=registeredLocalAllocation->owner;
+			q2output("Number of local allocations in %s:%d: ",getModuleName(registeredAllocationOwner.module),
+				registeredAllocationOwner.id);
+			size_t ownerCount=1;
+			ssize_t ownerIndex=registeredLocalAllocationIndex;
+			while(--ownerIndex>=0){
+				registeredLocalAllocation=allocations._owners[ownerIndex];
+				if(NULL==registeredLocalAllocation)continue;
+				if(isTheSameOwner(registeredLocalAllocation->owner,registeredAllocationOwner)){
+					registeredLocalAllocation->local=0; // just to mark it for now as being processed
+					ownerCount++;
+				}
+			}
+			q2output("%zu.\n",ownerCount);
+		}
+		if(nulledLocalAllocationCount)
+			q2output("Number of removed local allocations: %zu.\n",nulledLocalAllocationCount);
+		// fix local!!
+		ssize_t localCount=0;
+		registeredLocalAllocationIndex=allocations.ownercount;
+		while(--registeredLocalAllocationIndex>=0){
+			if(NULL==allocations._owners[registeredLocalAllocationIndex])continue;
+			if(allocations._owners[registeredLocalAllocationIndex]->local)continue;
+			localCount++;
+			allocations._owners[registeredLocalAllocationIndex]->local=1;
+		}
+		if(localCount)
+			q2output("Number of detected local allocations: %zu.\n",localCount);
+	}else
+		q2outputWarning("No local allocations registered!");
+	q2newline(true);
 }
