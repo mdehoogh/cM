@@ -562,6 +562,7 @@ static long long unregisterLocalAllocation(Malloc* const alloc){
 	long long ownerIndex=-1;
 	if(alloc!=NULL){ // defined
 		if(alloc->owner.global==0){ // and considered local
+			if(alloc->allocationType==-115)q2output("Unregistering local allocation: *** %c %p.\n",(alloc->owner.disowned?'-':'+'),alloc);
 			//D 
 			if(alloc->local==0)
 				q2outputMessage(M_ERROR_PREFIX,"Local allocation pointer to unregister of type %d with id %llu not registered as local!",alloc->allocationType,alloc->allocationIndex);
@@ -589,9 +590,13 @@ static long long unregisterLocalAllocation(Malloc* const alloc){
 				}else
 				//D q2output("%s","Assumed registered local allocation not found!\n"); // DEBUGGING
 				// allocation pointer not registered!!
-				if(alloc->local)
-					q2outputMessage(M_BUG_PREFIX,"Failed to locate and unregister local allocation with index %llu of type %c(%i) owned by %s:%d starting at %zu.",alloc->allocationIndex,alloc->allocationType,alloc->allocationType,MODULE_NAMES[alloc->owner.module],alloc->owner.id,allocations.ownercount-1);
-				//D else q2outputMessage(M_INFO_PREFIX,"Of course we couldn't locate a local allocation pointer when it is not registered as local!");
+				if(alloc->local){
+					q2outputMessage(M_BUG_PREFIX,"Failed to locate and unregister local allocation %p with index %llu of type %c(%i) owned by %s:%d starting at %zu.",alloc,alloc->allocationIndex,alloc->allocationType,alloc->allocationType,MODULE_NAMES[alloc->owner.module],alloc->owner.id,allocations.ownercount-1);
+					if(alloc->allocationType==-115){
+						q2output("\tText: '%s'.\n",((char*)alloc)+sizeof(Malloc));
+					}
+				}
+					//D else q2outputMessage(M_INFO_PREFIX,"Of course we couldn't locate a local allocation pointer when it is not registered as local!");
 			//}else q2outputMessage(M_WARNING_PREFIX,"No need to unregister unregistered local allocation with index %llu owned by %s:%d",alloc->allocationIndex,MODULE_NAMES[alloc->owner.module],alloc->owner.id);
 		}else
 			q2outputBug("Allocation pointer to unregister as local allocation pointer considered global!");
@@ -1297,6 +1302,7 @@ static long long registerLocalAllocation(Malloc* const alloc){
 	if(alloc!=NULL){
 		if(alloc->owner.global==0){ // not assumed local, so should be registered as local!!
 			if(alloc->local==0){ // not registered as local yet
+				if(alloc->allocationType==-115)q2output("Registering local allocation: *** %c %p.\n",(alloc->owner.disowned?'-':'+'),alloc);
 				if(allocations.ownercount>=allocations.size){ // MDH@18JAN2023 replacing: !(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
 					OUTPUT_INFO("%s","Expanding allocations.");
 					Malloc* *newAllocationOwners=(Malloc**)(allocations.size?unmanaged_realloc(allocations._owners,allocations.size*sizeof(Malloc*),(allocations.size+16)*sizeof(Malloc*)):unmanaged_malloc(16*sizeof(Malloc*)));
@@ -2721,19 +2727,30 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 			if(newptr!=NULL){ // success (newptr will be NULL when occupied==0, but that also indicates success)
 				// MDH@18JAN2023: we have to rethink the following: registerReallocation() isn't crucial to the operation so if it fails we can still continue
 				//				it's essential to replace the registered allocation pointer (which should equal ptr with newptr)
+				Malloc* newalloc=(Malloc*)newptr;
 				// MDH@31JAN2025 REMOVING TODO should we find a way to replace the allocation history pointer??????
 				//                 because by commenting this out the pointers will be different after a realloc!!!! 
-				replaceAllocationAtIndex(_alloc,allocationIndex,newptr);
+				replaceAllocationAtIndex(_alloc,allocationIndex,newalloc);
 				// replacing: allocations._owners[allocationIndex]=newptr;
 				// MDH@22JUL2025: BUG FIX ADDITION we must also change the registration if this is a local pointer
-				if(_alloc->local){
+				//D 
+				if(newalloc->local){ // MDH@31JUL2025: BUG FIX OOPS _alloc might have changed!!! replacing: _alloc->local){
 					ssize_t ownerIndex=allocations.ownercount;
-					while(--ownerIndex>=0&&allocations._owners[ownerIndex]!=_alloc);
+					while(--ownerIndex>=0&&allocations._owners[ownerIndex]!=_alloc)
+						;
 					if(ownerIndex>=0){ // success!!!!
 						allocations._owners[ownerIndex]=newptr;
-					}else
-						q2outputMessage(M_BUG_PREFIX,"Failed to relocate local pointer of type %i owned by %s:%d.",_alloc->allocationType,getModuleName(_alloc->owner.module),_alloc->owner.id);
+						q2output("Local allocation registration %p of type %i owned by %s:%d updated to %p.\n",_alloc,newalloc->allocationType,getModuleName(newalloc->owner.module),newalloc->owner.id,newptr);
+						if(newalloc->allocationType==-115)
+							q2output("\tText: '%s'.\n",((char*)_alloc)+sizeof(Malloc));
+					}else{
+						q2outputMessage(M_BUG_PREFIX,"Failed to relocate local pointer %p of type %i owned by %s:%d.",_alloc,newalloc->allocationType,getModuleName(newalloc->owner.module),newalloc->owner.id);
+						if(newalloc->allocationType==-115)
+							q2output("\tText: '%s'.\n",((char*)_alloc)+sizeof(Malloc));
+					}
 				}
+				//D 
+				else q2outputMessage(M_WARNING_PREFIX,"No need to update the local reallocation!");
 				// safer to do the following immediately
 				newptr=((char*)newptr)+sizeof(Malloc);
 				unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false);
@@ -2765,8 +2782,10 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 #else
 				newptr=realloc(newptr,occupied); // we have to reallocate nitems each of the given size
 #endif
-			}
-		}
+			}else
+				q2outputMessage(M_ERROR_PREFIX,"Reallocation failed!");
+		}else
+			q2outputMessage(M_WARNING_PREFIX,"No change in the number of bytes to reallocate!");
 	}else
 		q2outputMessage(M_BUG_PREFIX,"%s.","Number of bytes to reallocate non-positive");
 	return newptr;
@@ -3072,17 +3091,20 @@ void outputLocalAllocations(){
 			Mallocationowner registeredAllocationOwner=registeredLocalAllocation->owner;
 			q2output("Number of local allocations in %s:%d: ",getModuleName(registeredAllocationOwner.module),
 				registeredAllocationOwner.id);
-			size_t ownerCount=1;
+			size_t localOwnerCount=1,globalOwnerCount=registeredAllocationOwner.global;
 			ssize_t ownerIndex=registeredLocalAllocationIndex;
 			while(--ownerIndex>=0){
 				registeredLocalAllocation=allocations._owners[ownerIndex];
 				if(NULL==registeredLocalAllocation)continue;
 				if(isTheSameOwner(registeredLocalAllocation->owner,registeredAllocationOwner)){
 					registeredLocalAllocation->local=0; // just to mark it for now as being processed
-					ownerCount++;
+					localOwnerCount++;
+					if(registeredLocalAllocation->owner.global)globalOwnerCount++;
 				}
 			}
-			q2output("%zu.\n",ownerCount);
+			q2output("%zu",localOwnerCount);
+			if(globalOwnerCount)q2output(" of which global %zu",globalOwnerCount);
+			q2output(".\n");
 		}
 		if(nulledLocalAllocationCount)
 			q2output("Number of removed local allocations: %zu.\n",nulledLocalAllocationCount);

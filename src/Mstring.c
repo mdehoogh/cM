@@ -539,7 +539,11 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,un
 			if(l==getNumberOfChars(str)){
 				////////printf("Realloc string_append_char()...");
 				// size_t sizeOfChars=getSizeOfChars(str);
-				if(!string_blockappended(str))return NULL;
+				if(!string_blockappended(str)){
+					q2outputError("Failed to append a block!");
+					return NULL;
+				}
+				q2output("Block %d appended!\n",str->blocks);
 				/* replacing:
 				Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
 				if(NULL==new_chars)return NULL;
@@ -801,7 +805,11 @@ Mstring* string_append_chars(Mstring* const str/*,Mallocationowner owner_str*/,c
 	if(str!=NULL&&pc!=NULL){ // something to append
 		char c;
 		size_t index=0;
-		while((c=pc[index++])){if(index>count)break;if(string_append_char(str,(unsigned char)c)==NULL)return NULL;}
+		while((c=pc[index++])){
+			if(index>count)break;
+			if(string_append_char(str,(unsigned char)c)==NULL)
+			return NULL;
+		}
 		/////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 	}
 	return str;
@@ -819,7 +827,10 @@ Mstring* string_append(Mstring * const str/*,Mallocationowner owner_str*/,char c
 	if(str!=NULL&&pc!=NULL){ // something to append (to)
 		char c;
 		size_t index=0;
-		while((c=pc[index++])){if(!string_append_char(str,(unsigned char)c))return NULL;/*output("***** %c appended! ******\n",c);*/}
+		while((c=pc[index++])){
+			if(!string_append_char(str,(unsigned char)c))
+				return NULL;/*output("***** %c appended! ******\n",c);*/
+		}
 		/////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 	}
 	return str;
@@ -836,7 +847,11 @@ Mstring* string_prepend(Mstring* const str/*,Mallocationowner owner_str*/,char c
 	if(str!=NULL&&pc!=NULL){ // something to prepend (to)
 		char c;
 		size_t index=0;
-		while((c=pc[index])){if(!string_insert_char(str,index,(unsigned char)c))return NULL;index++;} // increment index at the end is better than at the beginning TODO can we do even better?
+		while((c=pc[index])){
+			if(!string_insert_char(str,index,(unsigned char)c))
+				return NULL;
+			index++; // increment index at the end is better than at the beginning TODO can we do even better?
+		}
 		/////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 	}
 	return str;

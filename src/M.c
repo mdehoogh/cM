@@ -3148,20 +3148,21 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 	newline(); // outputValueColored() doesn't do that!!
 
 	// MDH@19AUG2024: let's now collect the same thing but without color!
-	Mstring* _commandResultText=owned_string(__string(),owner);
+	Mallocationowner owner2,owner3,owner4;
+	Mstring* _commandResultText=owned_string(__string(),owner2=getOwner(__LINE__));
 	if(_commandResultText!=NULL){
-		Mstring* _uncoloredCommandText=owned_string(_getCommandText(false),owner); // MDH@13MAR2020 TODO determine later???????
+		Mstring* _uncoloredCommandText=owned_string(_getCommandText(false),owner3=getOwner(__LINE__)); // MDH@13MAR2020 TODO determine later???????
 		if(_uncoloredCommandText!=NULL){
 			string_append(_commandResultText,string(_uncoloredCommandText));
 			// replacing: q2collect("%s",string(_uncoloredCommandText));
-			FREE_STRING(_uncoloredCommandText,owner);
+			FREE_STRING(_uncoloredCommandText,owner3);
 		}else
 			string_append_char(_commandResultText,'?'); // replacing: q2collect("%sFailed to obtain the command text",M_ERROR_PREFIX);
 		string_append(_commandResultText," = "); // replacing: q2collect("%s"," = ");
-		Mstring* _resultText=owned_string(_getValueText(isValueNull(*resultValue)?NULL_value:*resultValue,false,false),owner);
+		Mstring* _resultText=owned_string(_getValueText(isValueNull(*resultValue)?NULL_value:*resultValue,false,false),owner4=getOwner(__LINE__));
 		if(_resultText!=NULL){
 			string_append(_commandResultText,string(_resultText)); // replacing: q2collect("%s\n",string(_resultText));
-			FREE_STRING(_resultText,owner);
+			FREE_STRING(_resultText,owner4);
 		}else
 			string_append_char(_commandResultText,'?'); ///q2collect("%s\n","Failed to obtain the result text");
 		// we need to collect the result so it ends up as registered message, but not output it
@@ -3169,7 +3170,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 			q2outputError("Failed to register the result message");
 		/*else
 			output("Result text: '%s'.\n",string(_commandResultText));*/
-		FREE_STRING(_commandResultText,owner);
+		FREE_STRING(_commandResultText,owner2);
 	}else
 		q2outputError("Failed to collect the command result");
 	/*
