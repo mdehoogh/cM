@@ -543,7 +543,7 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,un
 					q2outputError("Failed to append a block!");
 					return NULL;
 				}
-				q2output("Block %d appended!\n",str->blocks);
+				//D q2output("Block %d appended!\n",str->blocks);
 				/* replacing:
 				Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
 				if(NULL==new_chars)return NULL;
@@ -825,11 +825,33 @@ Mstring* string_append_chars(Mstring* const str/*,Mallocationowner owner_str*/,c
  */
 Mstring* string_append(Mstring * const str/*,Mallocationowner owner_str*/,char const * const pc){
 	if(str!=NULL&&pc!=NULL){ // something to append (to)
-		char c;
-		size_t index=0;
-		while((c=pc[index++])){
-			if(!string_append_char(str,(unsigned char)c))
-				return NULL;/*output("***** %c appended! ******\n",c);*/
+		// MDH@31JUL2025: prudent to ascertain that str has sufficient room to store all characters to append
+		size_t pcl=strlen(pc);
+		if(pcl){ // something to append
+			// determining the total number of blocks we're going to need
+			size_t newblocks=1+((pcl+str->length)/M_BLOCK_CHARACTERS);
+			if(newblocks>str->blocks){
+				Mchars* newchars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,newblocks,'s');
+				if(NULL==newchars){
+					q2outputMessage(M_ERROR_PREFIX,"Failed to allocate sufficient memory to append to a string.");
+					return NULL;
+				}
+				str->blocks=newblocks;
+				str->_chars=newchars;
+			}
+			// TODO DONE knowing we have enough additional memory to store the characters to add we could speed up the following
+			char c;
+			size_t index=0;
+			while((c=pc[index++]))
+				str->_chars->chars[str->length++]=c;
+			/* replacing:
+			char c;
+			size_t index=0;
+			while((c=pc[index++])){
+				if(!string_append_char(str,(unsigned char)c))
+					return NULL;
+			}
+			*/
 		}
 		/////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 	}

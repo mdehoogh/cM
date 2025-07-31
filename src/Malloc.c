@@ -562,7 +562,7 @@ static long long unregisterLocalAllocation(Malloc* const alloc){
 	long long ownerIndex=-1;
 	if(alloc!=NULL){ // defined
 		if(alloc->owner.global==0){ // and considered local
-			if(alloc->allocationType==-115)q2output("Unregistering local allocation: *** %c %p.\n",(alloc->owner.disowned?'-':'+'),alloc);
+			//D if(alloc->allocationType==-115)q2output("Unregistering local allocation: *** %c %p.\n",(alloc->owner.disowned?'-':'+'),alloc);
 			//D 
 			if(alloc->local==0)
 				q2outputMessage(M_ERROR_PREFIX,"Local allocation pointer to unregister of type %d with id %llu not registered as local!",alloc->allocationType,alloc->allocationIndex);
@@ -1302,7 +1302,7 @@ static long long registerLocalAllocation(Malloc* const alloc){
 	if(alloc!=NULL){
 		if(alloc->owner.global==0){ // not assumed local, so should be registered as local!!
 			if(alloc->local==0){ // not registered as local yet
-				if(alloc->allocationType==-115)q2output("Registering local allocation: *** %c %p.\n",(alloc->owner.disowned?'-':'+'),alloc);
+				//D if(alloc->allocationType==-115)q2output("Registering local allocation: *** %c %p.\n",(alloc->owner.disowned?'-':'+'),alloc);
 				if(allocations.ownercount>=allocations.size){ // MDH@18JAN2023 replacing: !(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
 					OUTPUT_INFO("%s","Expanding allocations.");
 					Malloc* *newAllocationOwners=(Malloc**)(allocations.size?unmanaged_realloc(allocations._owners,allocations.size*sizeof(Malloc*),(allocations.size+16)*sizeof(Malloc*)):unmanaged_malloc(16*sizeof(Malloc*)));
@@ -2740,9 +2740,11 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 						;
 					if(ownerIndex>=0){ // success!!!!
 						allocations._owners[ownerIndex]=newptr;
+						/*D
 						q2output("Local allocation registration %p of type %i owned by %s:%d updated to %p.\n",_alloc,newalloc->allocationType,getModuleName(newalloc->owner.module),newalloc->owner.id,newptr);
 						if(newalloc->allocationType==-115)
 							q2output("\tText: '%s'.\n",((char*)_alloc)+sizeof(Malloc));
+							*/
 					}else{
 						q2outputMessage(M_BUG_PREFIX,"Failed to relocate local pointer %p of type %i owned by %s:%d.",_alloc,newalloc->allocationType,getModuleName(newalloc->owner.module),newalloc->owner.id);
 						if(newalloc->allocationType==-115)
