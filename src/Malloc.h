@@ -121,6 +121,7 @@ unsigned long long obtainAllocationStats(unsigned long long occupations[257],uns
 
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
 bool Misowned(void* ptr);
+bool Misownedby(void* ptr,Mallocationowner owner);
 bool Misdisowned(void* ptr);
 void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner);

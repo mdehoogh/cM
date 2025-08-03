@@ -4749,6 +4749,8 @@ bool createUserInputCommand(){
  * @return false on failure
  */
 bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
+// TODO somehow copyUserInputCommand does NOT disown properly part of what is owns
+//      possibly part of the copied tokens? because each time 12 elements are not properly unregistered as local allocations
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	//		it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
 	Mcommand* _newUserInputCommand=owned_command(_getNewCommand(false,NULL),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
@@ -4810,6 +4812,12 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 		// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
 		
 		setTokenSignificantCharacterCount(_newLastToken,getTokenSignificantCharacterCount(_tokenToCopy));
+		// MDH@03AUG2025 BUG FIX: here's the bug: _newLastToken->text is already set, so when it is replaced
+		//                        the original text is no longer accessible!!!!
+		if(_newLastToken->text!=NULL){
+			FREE_STRING(_newLastToken->text,owner);
+			_newLastToken->text=NULL;
+		}
 		// if failing to copy the text over get rid of the command constructed so far, and break
 		_newLastToken->text=owned_string(_stringCopy(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over
 		if(NULL==_newLastToken->text){
@@ -4851,6 +4859,7 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
 	//D output("Owning the new user input command!\n");
 	_userInputCommand=owned_command(disowned_command(_newUserInputCommand,owner),owner_userInputCommand); // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
+	//D output("Not owned in the copied command: %zu.",checkCommand(_userInputCommand,owner_userInputCommand));
 	/*D
 	q2output("Copied command:\n");
 	outputCommandInfo(_userInputCommand);

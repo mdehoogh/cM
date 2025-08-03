@@ -150,7 +150,8 @@ Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=g
 	// MDH@17APR2020: replacing src->chars by src->_chars->chars
 	src->_chars->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
 	Mstring* _result=owned_string(_getString(src->_chars->chars),owner);
-	if(length>0)if(_result)string_setlength(_result,length);
+	if(NULL==_result)return NULL;
+	if(length>0)string_setlength(_result,length);
 	return disowned_string(_result,owner);
 	/* replacing:
 	Mstring* dst=__string();

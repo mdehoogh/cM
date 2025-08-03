@@ -33,6 +33,21 @@ void free_token(Mtoken* _token/*,Mallocationowner owner*/){
 	}
 	FREE_1(_token,'O'/*,owner*/);
 }
+/**
+ * @brief returns two bitsflags set when the token and the token text in \p token are not owned by \p owner_token
+ * @details bit 0 is set when the token itself is not owned by \p owner_token, bit 1 when the token text is not owned by \p owner_token
+ * @param _token 
+ * @param owner_token 
+ * @return size_t 0=neither token nor token text not owned 1=only token not owned 2=only token text not owned, 3=both token and token text not owned
+ */
+size_t checkToken(Mtoken const * const _token,Mallocationowner owner_token){
+	size_t notowned=0;
+	if(token!=NULL){
+		if(!Misowned(token,owner_token))notowned=1;
+		if(token->text!=NULL&&!Misownedby(token->text,owner_token))notowned+=2;
+	}
+	return notowned;
+}
 
 Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
 	return disowned_token(CALLOC_1(sizeof(Mtoken),'O',owner),owner);

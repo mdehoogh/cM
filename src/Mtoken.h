@@ -166,8 +166,9 @@ typedef struct Mtoken{
 }Mtoken;
 
 Mtoken* __token();
-Mtoken* owned_token(Mtoken* _token,Mallocationowner owner_token);
-Mtoken* disowned_token(Mtoken* _token,Mallocationowner owner_token);
+Mtoken* owned_token(Mtoken const * const _token,Mallocationowner owner_token);
+Mtoken* disowned_token(Mtoken const * const _token,Mallocationowner owner_token);
+size_t checkToken(Mtoken const * const _token,Mallocationowner owner_token);
 void free_token(Mtoken* _token);
 #define FREE_TOKEN(_token,owner_token) free_token(disowned_token(_token,owner_token))
 

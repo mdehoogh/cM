@@ -2253,7 +2253,19 @@ bool Misowned(void* ptr){
 	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));
 	return(!_alloc->owner.freed&&!_alloc->owner.disowned);
 }
-
+/**
+ * @brief returns true if ptr is owned by owner, false otherwise
+ * 
+ * @param ptr 
+ * @param owner
+ * @return true 
+ * @return false 
+ */
+bool Misownedby(void* ptr,Mallocationowner owner){
+	if(NULL==ptr)return false;
+	Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));
+	return(_alloc->owner.module==owner.module&&_alloc->owner.id==owner.id);
+}
 /**
  * @brief determines whether allocation element pointed to by \p ptr is currently disowned
  * 
@@ -3079,6 +3091,7 @@ void outputLocalAllocations(){
 		Malloc* registeredLocalAllocation;
 		size_t nulledLocalAllocationCount=0;
 		ssize_t registeredLocalAllocationIndex=allocations.ownercount;
+		size_t localAllocationTypeCounts[256];
 		while(1){
 			// find 'next' non-null one
 			while(--registeredLocalAllocationIndex>=0){
@@ -3090,8 +3103,12 @@ void outputLocalAllocations(){
 					break;
 			}
 			if(registeredLocalAllocationIndex<0)break;
+			memset(localAllocationTypeCounts,0,sizeof(size_t)*256); // zero local allocation type counts
+			localAllocationTypeCounts[128+registeredLocalAllocation->allocationType]=1;
+			if(registeredLocalAllocation->allocationType==-115)
+				q2output("\tText: '%s'.\n",((char*)registeredLocalAllocation)+sizeof(Malloc));	
 			Mallocationowner registeredAllocationOwner=registeredLocalAllocation->owner;
-			q2output("Number of local allocations in %s:%d: ",getModuleName(registeredAllocationOwner.module),
+			q2output("Local allocation type counts owned by %s:%d: ",getModuleName(registeredAllocationOwner.module),
 				registeredAllocationOwner.id);
 			size_t localOwnerCount=1,globalOwnerCount=registeredAllocationOwner.global;
 			ssize_t ownerIndex=registeredLocalAllocationIndex;
@@ -3101,10 +3118,17 @@ void outputLocalAllocations(){
 				if(isTheSameOwner(registeredLocalAllocation->owner,registeredAllocationOwner)){
 					registeredLocalAllocation->local=0; // just to mark it for now as being processed
 					localOwnerCount++;
+					if(registeredLocalAllocation->allocationType==-115)
+						q2output("\tText: '%s'.\n",((char*)registeredLocalAllocation)+sizeof(Malloc));	
+					localAllocationTypeCounts[128+registeredLocalAllocation->allocationType]++;
 					if(registeredLocalAllocation->owner.global)globalOwnerCount++;
 				}
 			}
-			q2output("%zu",localOwnerCount);
+			for(int i=CHAR_MIN;i<=CHAR_MAX;i++){
+				if(localAllocationTypeCounts[i+128])
+					q2output(" %i:%zu",i,localAllocationTypeCounts[i+128]);
+			}
+			q2output(" =%zu",localOwnerCount);
 			if(globalOwnerCount)q2output(" of which global %zu",globalOwnerCount);
 			q2output(".\n");
 		}

@@ -17,7 +17,7 @@ extern char const * const M_BUG_PREFIX;
  * @param owner_token the new owner of the M token
  * @return Mtoken* the owned M token pointer \p _token
  */
-Mtoken* owned_token(Mtoken* _token,Mallocationowner owner_token){
+Mtoken* owned_token(Mtoken const * const _token,Mallocationowner owner_token){
 	if(!_token)return NULL;
 	owned_token(_token->next,owner_token);
 	owned_string(_token->text,Msubowner(owner_token,1));
@@ -30,12 +30,28 @@ Mtoken* owned_token(Mtoken* _token,Mallocationowner owner_token){
  * @param owner_token the current M token owner
  * @return Mtoken* the pointer to the disowned M token
  */
-Mtoken* disowned_token(Mtoken* _token,Mallocationowner owner_token){
-	if(!_token)return NULL;
+Mtoken* disowned_token(Mtoken const * const _token,Mallocationowner owner_token){
+	if(NULL==_token)return NULL;
 	disowned_token(_token->next,owner_token);
 	disowned_string(_token->text,Msubowner(owner_token,1));
 	return DISOWNED(_token,owner_token);
 }
+/**
+ * @brief returns the number of fields in \p token not owned by \p owner_token
+ * 
+ * @param _token 
+ * @param owner_token 
+ * @return size_t the number of fields in \p token not owned by \p owner_token
+ */
+size_t checkToken(Mtoken const * const token,Mallocationowner owner_token){
+	size_t notowned=0;
+	if(token!=NULL){
+		if(!Misownedby(token,owner_token))notowned=1;
+		if(token->text!=NULL&&!Misownedby(token->text,owner_token))notowned+=2;
+	}
+	return notowned;
+}
+
 /**
  * @brief frees the M token pointed to by \p _token
  * 

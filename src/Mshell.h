@@ -34,6 +34,7 @@ typedef struct{
 
 Mcommand* owned_command(Mcommand* _command,Mallocationowner owner_command);
 Mcommand* disowned_command(Mcommand* _command,Mallocationowner owner_command);
+size_t checkCommand(Mcommand const * const command,Mallocationowner owner_command);
 void free_command(Mcommand* _command/*,Mallocationowner owner*/);
 #define FREE_COMMAND(_command,owner_command) free_command(disowned_command(_command,owner_command))
 

@@ -2792,6 +2792,32 @@ Mcommand* disowned_command(Mcommand* _command,Mallocationowner owner_command){
 	return DISOWNED(_command,owner_command);
 }
 /**
+ * @brief returns the number of fields in \p command that are not owned by \p owner_command
+ * 
+ * @param command 
+ * @param owner_command 
+ * @return size_t 
+ */
+size_t checkCommand(Mcommand const * const command,Mallocationowner owner_command){
+	size_t notowned=0;
+	if(command!=NULL){
+		if(!Misownedby(command,owner_command))notowned=1;
+		Mtoken* token=command->_firstToken;
+		size_t notownedtoken;
+		while(token!=NULL){
+			notownedtoken=checkToken(token,owner_command);
+			if(notownedtoken){
+				if(notownedtoken&1)
+					q2output("Token '%s' not owned!",(token->text!=NULL?string(token->text):'?'));
+				notowned+=2;
+			}
+			token=token->next;
+		}
+	}
+	return notowned;
+}
+
+/**
  * @brief frees M command \p _command
  * 
  * @param _command 
@@ -7675,8 +7701,12 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 			Mbiginteger *_denominator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger),owner);
 			if(neg)MP_INT_POINTER(exponentBiginteger)->sign=MP_NEG;
 			_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,getNormalizeRationalsFlag()),owner);
-			if(NULL==_rationalPower||NULL==_rationalPower->num)FREE_BIGINTEGER(_numerator,owner);
-			if(NULL==_rationalPower||NULL==_rationalPower->den)FREE_BIGINTEGER(_denominator,owner);
+			// MDH@01AUG2025: because _getRational() copies _numerator and _denominator
+			//                I have to release _numerator and _denominator here ALWAYS
+			// removed: if(NULL==_rationalPower||NULL==_rationalPower->num)
+				FREE_BIGINTEGER(_numerator,owner);
+			// removed: if(NULL==_rationalPower||NULL==_rationalPower->den)
+				FREE_BIGINTEGER(_denominator,owner);
 		}else // the exponent equals zero, so return rational 1
 			_rationalPower=owned_rational(__rational(),owner);
 	}

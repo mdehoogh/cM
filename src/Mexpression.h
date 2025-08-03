@@ -165,8 +165,8 @@ Mtoken* __token();
 Mtoken* owned_token(Mtoken* _token,Mallocationowner owner_token);
 Mtoken* disowned_token(Mtoken* _token,Mallocationowner owner_token);
 void free_token(Mtoken* _token);
+size_t checkToken(Mtoken const * const _token,Mallocationowner owner_token);
 #define FREE_TOKEN(_token,owner_token) free_token(disowned_token(_token,owner_token))
-
 /* a list of Mexpressions holds the body of an M function
 typedef struct Mexpression{
     // a tokenized list of tokens, which means we have to move the definition of an Mtoken out of M.c to e.g. Mcommand or Mexpression even!!!
