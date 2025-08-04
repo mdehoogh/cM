@@ -83,8 +83,10 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -103,8 +105,10 @@ static Mmatrix getMatrix(Mvalue* matrixValue){
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return result;
 	}
 	return M_LL_INVALID;

@@ -6433,7 +6433,7 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
 		Mrational* _shiftleftRational=NULL;
 		Mrational* _rational1=owned_rational(_getValueRational(_value1),owner);
-		if(_rational1){
+		if(_rational1!=NULL){
 			// shifting to the right means dividing the rational by 2 the given number of times but this means doubling the denominator
 			// i.e. we should never divide because we could end up with zero (and loose the precision of exact computations)
 			_shiftleftRational=owned_rational(_getRationalCopy(_rational1),owner);
@@ -6462,7 +6462,8 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 				}
 			}else 
 				q2outputError("Failed to copy a rational");
-			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+			// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+			FREE_RATIONAL(_rational1,owner);
 		}else 
 			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftleftRational,owner));
@@ -6523,7 +6524,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
 		Mrational* _shiftrightRational=NULL;
 		Mrational* _rational1=owned_rational(_getValueRational(_value1),owner);
-		if(_rational1){
+		if(_rational1!=NULL){
 			// shifting to the right means dividing the rational by 2 the given number of times but this means doubling the denominator
 			// i.e. we should never divide because we could end up with zero (and loose the precision of exact computations)
 			_shiftrightRational=owned_rational(_getRationalCopy(_rational1),owner);
@@ -6552,7 +6553,8 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				}
 			}else 
 				q2outputError("Failed to copy a rational");
-			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+			// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+			FREE_RATIONAL(_rational1,owner);
 		}else 
 			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftrightRational,owner));
@@ -6592,7 +6594,7 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
 		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
@@ -6602,7 +6604,10 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -6610,7 +6615,7 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
 		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())
@@ -6621,8 +6626,10 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6646,7 +6653,7 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
 		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is larger than another rational: '",_rationalDifference,"'.\n");
@@ -6656,7 +6663,10 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -6698,7 +6708,7 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
 		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is larger than or equal to another rational: '",_rationalDifference,"'.\n");
@@ -6708,8 +6718,10 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -6727,8 +6739,10 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6807,9 +6821,9 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
 		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
-			if(_rationalDifference){
+			if(_rationalDifference!=NULL){
 				if(amVerbose())outputRational("Difference in determining whether a rational is equal to another rational: '",_rationalDifference,"'.\n");
 				result=isRationalZero(_rationalDifference);
 				FREE_RATIONAL(_rationalDifference,owner);
@@ -6817,8 +6831,10 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -6836,8 +6852,10 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6853,7 +6871,8 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+		FREE_BIGINTEGER(_biginteger1,owner);
+		FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getIntegerValue(llsmallerthanorequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
@@ -6861,7 +6880,7 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 		long long result=M_LL_INVALID;
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
 		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
-		if(_rational1&&_rational2){
+		if(_rational1!=NULL&&_rational2!=NULL){
 			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than or equal to another rational: '",_rationalDifference,"'.\n");
@@ -6871,8 +6890,10 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -6880,7 +6901,7 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 		long long result=M_LL_INVALID;
 		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
 		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
-		if(_decimal1&&_decimal2){
+		if(_decimal1!=NULL&&_decimal2!=NULL){
 			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is smaller than or equal to another decimal: '",_decimalDifference,"'.\n");
@@ -6890,8 +6911,10 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
