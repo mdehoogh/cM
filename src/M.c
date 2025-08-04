@@ -4214,7 +4214,7 @@ bool updateNumberOfLineCharacters(){
 
 	}else
 	if(inputMode==IM_SHELL){
-		if(!_shellCommand||string_length(_shellCommand)==0)return true;
+		if(NULL==_shellCommand||string_length(_shellCommand)==0)return true;
 		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
 		// TODO output the shell command wrapped
 		outputShellCommand();
@@ -6155,8 +6155,8 @@ Mvalue* Mpython(Mvalue const * const pythonCommandValue,Mvalue const * const sys
  * 
  */
 void clear_shellCommand(){
-	string_setlength(_suggestedText,0/*,owner_suggestedText*/);
-	string_setlength(_shellCommand,0/*,owner_shellCommand*/);
+	if(_suggestedText!=NULL)string_setlength(_suggestedText,0/*,owner_suggestedText*/);
+	if(_shellCommand!=NULL)string_setlength(_shellCommand,0/*,owner_shellCommand*/);
 	// MDH@24APR2019 obsolete: getUserInputLength()=0;
 }
 
@@ -6167,7 +6167,8 @@ void clear_shellCommand(){
 void executeShellCommand(){
 	output(""); // get a new line before we see the result of executing this command!!
 	int result=execute_shellCommandText(string(_shellCommand));
-	if(result)output("Shell command return code: %d.\n",result);else output("\n"); // non-zero result
+	if(result)output("Shell command return code: %d.",result); // non-zero result
+	outputChar('\n');
 	clear_shellCommand(); // ready for the next execution
 }
 

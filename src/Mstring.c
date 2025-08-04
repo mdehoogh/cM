@@ -37,6 +37,7 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
 		ans->_chars=owned_chars(__chars(M_BLOCK_SIZE,1,'s'),Msubowner(owner,1));
 		if(NULL==ans->_chars){FREE_DISOWNED_1(ans,'S',owner);return NULL;}
 		//OWNED(ans->_chars,owner);SUBOWNED(ans->_chars,1);
+		ans->length=0; // MDH@03AUG2025 addition: this should help: see _getString() for what should happen!!
 		ans->blocks=1;
 		// printf("String contents allocated...\n");
 		/* replacing:

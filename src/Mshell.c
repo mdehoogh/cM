@@ -8347,7 +8347,8 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 				}
 			}else
 				q2outputError("Failed to create a decimal context for computing a decimal root");
-			if(rootArgumentValue->type!=VT_DECIMAL)FREE_DECIMAL(_rootArgumentDecimal,owner);
+			// BUG FIX removed: if(rootArgumentValue->type!=VT_DECIMAL)
+			FREE_DECIMAL(_rootArgumentDecimal,owner);
 		}else{
 			q2outputmessageprefix(M_ERROR_PREFIX);
 			q2outputValue("Failed to convert root argument '",rootArgumentValue,"' to a decimal.\n");
@@ -9258,7 +9259,8 @@ Mvalue* Mshiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				}
 			}else 
 				q2outputError("Failed to copy a rational");
-			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+			// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+			FREE_RATIONAL(_rational1,owner);
 		}else 
 			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftleftRational,owner));
@@ -9444,7 +9446,8 @@ Mvalue* Mshiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 				}
 			}else 
 				q2outputError("Failed to copy a rational");
-			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+			// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+			FREE_RATIONAL(_rational1,owner);
 		}else 
 			q2outputError("Failed to convert a decimal to a rational");
 		return _getValueOfRational(disowned_rational(_shiftrightRational,owner));
@@ -9527,8 +9530,10 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -9547,8 +9552,10 @@ static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return result;
 	}
 	return M_LL_INVALID;
@@ -9611,8 +9618,10 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -9631,8 +9640,10 @@ long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner 
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return result;
 	}
 	return M_LL_INVALID;
@@ -9698,8 +9709,10 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -9718,8 +9731,10 @@ static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner own
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return result;
 	}
 	return M_LL_INVALID;
@@ -9784,8 +9799,10 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -9804,8 +9821,10 @@ static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return result;
 	}
 	/* see above
@@ -9871,6 +9890,7 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
+		// NOTE _getValueRational ALWAYS returns a NEW rational (even if _value1/2 themselves wrap rationals!!)
 		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner),
 				 			*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1!=NULL&&_rational2!=NULL){
@@ -9884,8 +9904,10 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 				q2outputError("Failed to compute the difference of two rationals");
 		}else
 			q2outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_RATIONAL)
+		FREE_RATIONAL(_rational2,owner);
 		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -9904,8 +9926,10 @@ static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocati
 				q2outputError("Failed to compute the difference of two decimals");
 		}else
 			q2outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
+		// BUG FIX removed: if(_value1->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal1,owner);
+		// BUG FIX removed: if(_value2->type!=VT_DECIMAL)
+		FREE_DECIMAL(_decimal2,owner);
 		return result;
 	}
 	return M_LL_INVALID;

@@ -2361,7 +2361,8 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 			// MDH@23MAR2025: if ownership changes from local to global or from global to local we need to deregister or register in allocations._owners respectively
 			if(_alloc->owner.global){ // currently global
 				if(owner.global==0){ // global to local
-					//D q2output("Global to local transition from owner %s:%i with id %lli to owner %s:%i!\n",MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,_alloc->allocationIndex,MODULE_NAMES[owner.module],owner.id);
+					//D 
+					q2output("Global to local transition from owner %s:%i with id %lli to owner %s:%i!\n",MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,_alloc->allocationIndex,MODULE_NAMES[owner.module],owner.id);
 					if(registerLocalAllocation(_alloc)<0)
 						q2outputError("Failed to register a local allocation on transitioning from global to local.");
 				}
@@ -3087,11 +3088,11 @@ static bool isTheSameOwner(Mallocationowner owner1,Mallocationowner owner2){
 void outputLocalAllocations(){
 	// let's collect the local allocations
 	if(allocations.ownercount){
-		q2output("Overview of %zu registered local allocations.\n",allocations.ownercount);
 		Malloc* registeredLocalAllocation;
 		size_t nulledLocalAllocationCount=0;
 		ssize_t registeredLocalAllocationIndex=allocations.ownercount;
 		size_t localAllocationTypeCounts[256];
+		bool first=true;
 		while(1){
 			// find 'next' non-null one
 			while(--registeredLocalAllocationIndex>=0){
@@ -3103,6 +3104,10 @@ void outputLocalAllocations(){
 					break;
 			}
 			if(registeredLocalAllocationIndex<0)break;
+			if(first){
+				first=false;
+				q2output("Overview of %zu registered local allocations.\n",allocations.ownercount);
+			}
 			memset(localAllocationTypeCounts,0,sizeof(size_t)*256); // zero local allocation type counts
 			localAllocationTypeCounts[128+registeredLocalAllocation->allocationType]=1;
 			if(registeredLocalAllocation->allocationType==-115)
@@ -3128,10 +3133,11 @@ void outputLocalAllocations(){
 				if(localAllocationTypeCounts[i+128])
 					q2output(" %i:%zu",i,localAllocationTypeCounts[i+128]);
 			}
-			q2output(" =%zu",localOwnerCount);
+			q2output(" total: %zu",localOwnerCount);
 			if(globalOwnerCount)q2output(" of which global %zu",globalOwnerCount);
 			q2output(".\n");
 		}
+		if(first)return;
 		if(nulledLocalAllocationCount)
 			q2output("Number of removed local allocations: %zu.\n",nulledLocalAllocationCount);
 		// fix local!!
