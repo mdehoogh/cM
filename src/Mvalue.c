@@ -3343,16 +3343,15 @@ long double getValueLongDouble(const Mvalue* const _value){
 }/* VALIDATED */
 
 /**
- * @brief returns the big integer stored in M value \p _value
- * @details returns NULL if \p _value cannot be converted as a big integer
+ * @brief returns a new big integer of the (numeric) value wrapped in \p _value
+ * @details handles all numeric value types as well as VT_TEXT and VT_TOKEN, returns NULL for all other types
  * @param _value 
- * @return Mbiginteger* the big integer stored in M value \p _value
+ * @return Mbiginteger* a new big integer of the value wrapped in \p _value
  */
 Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
-	if(NULL==_value)return NULL;
-	if(_value!=NULL&&_value->type==VT_BIGINTEGER)return _value->value._biginteger;
 	Mbiginteger* _resultBiginteger=NULL;
 	switch(_value->type){
+		case VT_BIGINTEGER:_resultBiginteger=owned_biginteger(_getBigintegerCopy(_value->value._biginteger),owner);break;
 		case VT_INTEGER:_resultBiginteger=owned_biginteger(_getBiginteger(_value->value._integer->ll),owner);break;
 		case VT_RATIONAL:_resultBiginteger=owned_biginteger(_rational2biginteger(_value->value._rational),owner);break; // TODO how can we be certain that the returned big integer is actually used? well, it should as this is _getValueBiginteger meaning you have to free it if you don't use it!!!
 		case VT_FLOAT:
@@ -3384,6 +3383,18 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
 		default:break;
 	}
 	return disowned_biginteger(_resultBiginteger,owner);
+}/* VALIDATED */
+
+/**
+ * @brief returns the big integer stored in M value \p _value
+ * @details returns NULL if \p _value cannot be converted to a big integer
+ * @param _value 
+ * @return Mbiginteger* the big integer equivalent of the value wrapped in M value \p _value
+ */
+Mbiginteger* getValueBiginteger(Mvalue const * const _value){
+	if(NULL==_value)return NULL;
+	if(_value->type==VT_BIGINTEGER)return _value->value._biginteger; // NOT returning a copy as _getValueBiginteger() would!
+	return _getValueBiginteger(_value);
 }/* VALIDATED */
 
 // (map) list conversions

@@ -87,3 +87,6 @@ size_t outputMemoryError(char const * const memoryerror);
 size_t q2outputBug(char const * const bug);
 
 int kbhit();
+
+// MDH@14AUG2025: moved over from output.c/h so I can use q2output in it!
+bool setOutputFilename(char const * const outputFilename);

@@ -1,5 +1,5 @@
 #include <string.h>
-
+#include <errno.h>
 #include <unistd.h>
 #include <termios.h>
 
@@ -1340,3 +1340,27 @@ bool messageStreamsInitialized(char const * const source){
 	return(_messageStreamStack!=NULL||pushMessageStream(stdout,(source!=NULL?source:""),NULL)); // stdout is the principal output message stream
 }
 */
+
+/**
+ * @brief changes the name of the file to which console output is echoed to \p outputFilename
+ * @details pass in NULL to discard the output file without opening a new one!!!
+ * @param outputFilename the name of the output file
+ * @return true when \p outputFilename was successfully opened (echo_to_output_file will be set to true)
+ * @return false when \p outputFilename was not successfully opened (echo_to_output_file will be set to false)
+ */
+bool setOutputFilename(char const * const outputFilename){
+	// discard any current output file reporting when closing the current output file fails
+	// NOTE that discardOutputFile will always turn echo_to_output_file off
+	if(!discardOutputFile())
+		q2outputError("Failed to close the current output file");
+	if(outputFilename!=NULL&&strlen(outputFilename)>0){ // an output file name to use was given
+		// if we fail to set it to be the open file, we failed!!
+		if(!setOutputFile(fopen(outputFilename,"a+t"))){
+			q2outputMessage(M_ERROR_PREFIX,"No output will be written to file, due to failing to open output file '%s' (error code: %d).",outputFilename,errno);
+			return false;
+		}
+		// successfully opened the proposed output file
+		q2outputMessage(M_INFO_PREFIX,"Output will also be written to '%s'.\n",outputFilename);
+	}
+	return true;
+}

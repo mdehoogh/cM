@@ -2764,8 +2764,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
 							q2output("\tText: '%s'.\n",((char*)_alloc)+sizeof(Malloc));
 					}
 				}
-				//D 
-				else q2outputMessage(M_WARNING_PREFIX,"No need to update the local reallocation!");
+				//D problematic when a command is being entered: else q2outputMessage(M_WARNING_PREFIX,"No need to update the local reallocation!");
 				// safer to do the following immediately
 				newptr=((char*)newptr)+sizeof(Malloc);
 				unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false);

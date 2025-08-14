@@ -322,7 +322,8 @@ long long prependedToMap(Mmap * const _map,Mallocationowner owner_map,char const
 long long removedFromMap(Mmap * const _map,Mallocationowner owner_map,char const * const attributeName);
 
 long double getValueLongDouble(Mvalue const * const _value);
-Mbiginteger* _getValueBiginteger(Mvalue const * const _value); // converts a value to a big integer (if possible)
+Mbiginteger* getValueBiginteger(Mvalue const * const _value); // converts a value to a big integer (if possible)
+Mbiginteger* _getValueBiginteger(Mvalue const * const _value);
 
 long long getValueSign(Mvalue const * const value); // return -1 for negative values, 1 for positive values, 0 for zero values, and M_LL_INVALID for non-scalar values obviously
 

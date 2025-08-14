@@ -61,25 +61,6 @@ size_t output(const char *fmt,...){
     return(result<0?0:result);
 } // NOTE use vprintf here, NOT printf!!!!
 
-/**
- * @brief changes the name of the file to which console output is echoed to \p outputFilename
- * 
- * @param outputFilename the name of the output file
- * @return true when \p outputFilename was successfully opened (echo_to_output_file will be set to true)
- * @return false when \p outputFilename was not successfully opened (echo_to_output_file will be set to false)
- */
-bool setOutputFilename(char const * const outputFilename){
-	// close any current output file
-	// NOTE apparently fclose() already takes care of free'ing the file handle, so calling free(outputFile) would result in a runtime error!!!
-	if(outputFile){int closeResult=fclose(outputFile);if(closeResult!=0)fprintf(stderr,"Failed to close the output file (reason: %d).\n",closeResult);/*free(outputFile);*/outputFile=NULL;}
-	echo_to_output_file=false;
-	if(outputFilename&&strlen(outputFilename)>0){
-		outputFile=fopen(outputFilename,"a+t");
-		// NOTE: we can use output here because the echo to output file flag is still false!!!
-		if(outputFile){output("Output will also be written to '%s'.\n",outputFilename);echo_to_output_file=true;}
-	}
-	return echo_to_output_file;
-}
 // MDH@25OCT2021: now delegating to logToOutputFile which accepts a format specification and variable number of arguments
 /**
  * @brief writes \p prefix, \p str, and \p suffix to the output file
@@ -128,9 +109,41 @@ size_t outputControlText(char* s){return output(ES"%s",s);}
  * @return true when echo_to_output_file is (set to) true
  * @return false when echo_to_output_file is false
  */
-bool echoToOutputFile(){if(outputFile)echo_to_output_file=true;return echo_to_output_file;}
+bool echoToOutputFile(){
+	if(outputFile!=NULL)echo_to_output_file=true;return echo_to_output_file;
+}
 /**
- * @brief sets echo_to_output_file to false
+ * @brief sets echo_to_output_file to false, and returns the previous one
  * 
  */
-void dontEchoToOutputFile(){echo_to_output_file=false;}
+bool dontEchoToOutputFile(){
+	bool current_echo_to_output_file=echo_to_output_file;
+	echo_to_output_file=false;
+	return current_echo_to_output_file;
+}
+/**
+ * @brief registers \p newOutputFile as the output file 
+ * 
+ * @param newOutputFile 
+ * @return echo_to_output_file which will be true if the output file is not NULL, false otherwise
+ */
+bool setOutputFile(FILE const * newOutputFile){
+	outputFile=newOutputFile;
+	// sync echo to output file so it's false when there's no output file and true otherwise!!!
+	echo_to_output_file=(outputFile!=NULL);
+	return echo_to_output_file;
+}
+
+/**
+ * @brief discards the current output file
+ * @details returns false when failing to close the current output file, true otherwise
+ * 
+ * @return true when there is no current output file or when the current output file was closed successfully
+ * @return false when the current output file was not closed successfully
+ */
+bool discardOutputFile(){
+	if(NULL==outputFile)return true;
+	bool closed=fclose(outputFile);
+	setOutputFile(NULL); // get rid of the output file!!
+	return closed;
+}

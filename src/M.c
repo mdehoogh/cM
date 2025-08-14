@@ -756,7 +756,7 @@ char* _identifierContinuationCharacters=NULL; // the single text that we can con
  * @return char 
  */
 char getFirstIdentifierContinuationCharacter(){
-	inputInfo("%s","Determining the first identifier continuation character!");
+	//D inputInfo("%s","Determining the first identifier continuation character!");
 	return(_identifierContinuationCharacters!=NULL?_identifierContinuationCharacters[0]:'\0');
 }
 
@@ -969,12 +969,14 @@ static void updateTheFirstCommandClosingCharacter(){
 	Mtoken* lastCommandToken=(_userInputCommand!=NULL?_userInputCommand->_lastToken:NULL);
 	if(lastCommandToken!=NULL&&isTokenFinished(lastCommandToken)){ // the last command token is finished
 		firstCommandClosingCharacter=getTokenTypeFeedforwardCharacter(lastCommandToken->type);
+		/*D
 		// even if there's a first command closing character, it might not be allowed if the current token
 		if(firstCommandClosingCharacter){
 			inputInfo("First command closing character: '%c'.",firstCommandClosingCharacter);
 		}else{
 			inputInfo("No first command closing character!");
 		}
+		*/
 	}
 }
 
