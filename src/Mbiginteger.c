@@ -12,7 +12,7 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MI_BIGIN
  * @return Mbiginteger* the pointer to the new M big integer
  */
 Mbiginteger* _getNegatedBiginteger(Mbiginteger const * const biginteger){Mallocationowner owner=getOwner(__LINE__);
-	if(biginteger==NULL)return NULL;
+	if(NULL==biginteger)return NULL;
 	Mbiginteger* _bineg=OWNED(__biginteger(),owner);
 	if(_bineg!=NULL&&mp_neg(MP_INT_POINTER(biginteger),MP_INT_POINTER(_bineg))!=MP_OKAY)
 	{FREE_BIGINTEGER(_bineg,owner);q2outputError("Failed to negate a big integer");return NULL;}
@@ -25,7 +25,7 @@ Mbiginteger* _getNegatedBiginteger(Mbiginteger const * const biginteger){Malloca
  * @return long long either M_POSITIVE, M_NEGATIVE, M_ZERO or M_LL_INVALID
  */
 long long getBigintegerSign(Mbiginteger const * const biginteger){
-	if(!biginteger)return M_LL_INVALID;
+	if(NULL==biginteger)return M_LL_INVALID;
 	long long result=(mp_iszero(MP_INT_POINTER(biginteger))==MP_YES?M_ZERO:(mp_isneg(MP_INT_POINTER(biginteger))==MP_YES?M_NEGATIVE:M_POSITIVE)); // OOPS, comparing with MP_YES essential!!!
 	if(amVerboseDebugging()){
 		q2outputBiginteger("Sign of big integer '",biginteger,"':");
@@ -62,4 +62,18 @@ long long isBigintegerPositive(Mbiginteger const * const biginteger){
 long long isBigintegerNegative(Mbiginteger const * const biginteger){
 	long long bigintegerSign=getBigintegerSign(biginteger);
 	return(bigintegerSign==M_LL_INVALID?M_LL_INVALID:(bigintegerSign==M_NEGATIVE?M_TRUE:M_FALSE));
+}
+
+// MDH@14OCT2025
+long long isBigintegerOdd(Mbiginteger const * const biginteger){
+	long long result=M_LL_INVALID;
+	if(biginteger!=NULL){
+		mp_int mpAnd1;
+		if(mp_init(&mpAnd1)==MP_OKAY){
+			if(mp_and(biginteger->_bi,MP_INT_POINTER(getBigintegerOne()),&mpAnd1)==MP_OKAY)
+				result=(mp_iszero(&mpAnd1)?M_FALSE:M_TRUE);
+			mp_clear(&mpAnd1);
+		}
+	}
+	return result;
 }

@@ -4010,6 +4010,6 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 
 	if(!registerFunction(_environment,owner_environment,"brgb",Mbrgb,3,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
 	if(!registerFunction(_environment,owner_environment,"trgb",Mtrgb,1,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
-	if(!registerFunction(_environment,owner_environment,"collatz",Mcollatz,1,(char*[]){"odd integer"},(Mvalue*[]){NULL}))return false;
+	if(!registerFunction(_environment,owner_environment,"collatz",Mcollatz,2,(char*[]){"odd integer","odds only flag"},(Mvalue*[]){NULL,NULL}))return false;
 	return true;
 }/* VALIDATED */

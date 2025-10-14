@@ -1562,47 +1562,68 @@ Mvalue* Msrand(Mvalue* _seedValue){
 }
 
 // MDH@14OCT2025: some Collatz Conjecture functions
-Mvalue* Mcollatz(Mvalue* oddValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mcollatz(Mvalue* oddValue,Mvalue* oddsOnlyValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* resultValue=NULL;
 	if(oddValue!=NULL){
+		long long oddsOnly=getValueInteger(oddsOnlyValue);
 		Mbiginteger* biOdd=getValueBiginteger(oddValue);
-		if(biOdd!=NULL){
-			Mbiginteger* biOne=getBigintegerOne();
+		if(biOdd!=NULL&&isBigintegerPositive(biOdd)){
+			Mbiginteger* const biOne=getBigintegerOne();
 			mp_err opErrorCode=MP_OKAY;
-			mp_int mpZero;
-			opErrorCode=mp_init(&mpZero);
-			Mlist* resultList=NULL;
+			Mlist* _resultList=NULL;
 			mp_int* mpOdd=biOdd->_bi;
 			if(opErrorCode==MP_OKAY&&mpOdd!=NULL){
-				resultList=owned_list(__list("Mcollatz"),owner);
-				if(resultList!=NULL){
-					mp_int mpAnd1,mpOddTimes2;
-					opErrorCode=mp_init(&mpAnd1);
-					if(opErrorCode==MP_OKAY)opErrorCode=mp_init(&mpOddTimes2);
-					while(opErrorCode==MP_OKAY){
-						// let's divide by 2 until odd
-						do{
-							opErrorCode=mp_and(mpOdd,MP_INT_POINTER(biOne),&mpAnd1);
+				_resultList=owned_list(__list("collatz()"),owner);
+				if(_resultList!=NULL){
+					// only when not only odds or it is odd append to result list
+					if((oddsOnly!=M_TRUE||isBigintegerOdd(biOdd)==M_TRUE)&&
+						appendedToList(_resultList,owner,_getValueOfBiginteger(_getBigintegerCopy(biOdd)),M_LL_INVALID)>=0){
+						mp_int mpOddTimes2;
+						opErrorCode=mp_init(&mpOddTimes2);
+						while(opErrorCode==MP_OKAY){
+							// let's divide by 2 until odd
+							long long biOddIsOdd=isBigintegerOdd(biOdd);
+							while(biOddIsOdd!=M_TRUE){ // while even
+								opErrorCode=mp_div_2(mpOdd,mpOdd); // half
+								if(opErrorCode!=MP_OKAY)break;
+								biOddIsOdd=isBigintegerOdd(biOdd);
+								if(biOddIsOdd==M_TRUE||oddsOnly!=M_TRUE)
+								if(appendedToList(_resultList,owner,_getValueOfBiginteger(_getBigintegerCopy(biOdd)),M_LL_INVALID)<0){
+									opErrorCode=MP_ERR;
+									break;
+								}
+							}
 							if(opErrorCode!=MP_OKAY)break;
-							if(mp_cmp(&mpAnd1,MP_INT_POINTER(biOne))==MP_EQ)break; // when odd break
-							opErrorCode=mp_div_2(mpOdd,mpOdd);
-						}while(opErrorCode==MP_OKAY);
-						if(opErrorCode!=MP_OKAY)break;
-						// mpOdd is now odd
-						if(appendedToList(resultList,owner,_getValueOfBiginteger(_getBigintegerCopy(biOdd)),M_LL_INVALID)<0){opErrorCode=MP_ERR;break;}
-						if(mp_cmp(mpOdd,MP_INT_POINTER(biOne))==MP_EQ)break; // when 1 break
-						q2outputBiginteger("Odd: ",biOdd,".\n"); // DEBUG
-						mp_mul_2(mpOdd,&mpOddTimes2);
-						mp_add(mpOdd,&mpOddTimes2,mpOdd);
-						mp_incr(mpOdd);
-					}
-					mp_clear(&mpAnd1);mp_clear(&mpOddTimes2);
+							// mpOdd is now odd
+							///q2outputBiginteger("Odd: ",biOdd,".\n"); // DEBUG
+							if(mp_cmp_mag(mpOdd,MP_INT_POINTER(biOne))==MP_EQ)break; // when 1 break
+							opErrorCode=mp_mul_2(mpOdd,&mpOddTimes2);
+							if(opErrorCode!=MP_OKAY)break;
+							opErrorCode=mp_add(mpOdd,&mpOddTimes2,mpOdd);
+							if(opErrorCode!=MP_OKAY)break;
+							opErrorCode=mp_incr(mpOdd);
+							if(opErrorCode!=MP_OKAY)break;
+							if(oddsOnly!=M_TRUE) // evens should be returned to
+							if(appendedToList(_resultList,owner,_getValueOfBiginteger(_getBigintegerCopy(biOdd)),M_LL_INVALID)<0)
+								opErrorCode=MP_ERR;
+						}
+						///q2output("Clearing...");
+						mp_clear(&mpOddTimes2);
+						///q2output("done.\n");
+					}else
+						q2outputError("Failed to initialize the list of intermediate collatz odds");
 				}
 			}
-			mp_clear(&mpZero);
-			if(opErrorCode!=MP_OKAY){FREE_LIST(resultList,owner);resultList=NULL;}
-			if(oddValue->type!=VT_BIGINTEGER)free_biginteger(biOdd);
-			return(resultList!=NULL?_getValueOfList(disowned_list(resultList,owner)):NULL);
-		}
+			if(opErrorCode!=MP_OKAY){
+				q2outputError("Some error occurred!");
+				FREE_LIST(_resultList,owner);_resultList=NULL;
+			}
+			resultValue=(_resultList!=NULL?_getValueOfList(disowned_list(_resultList,owner)):NULL);
+		}else
+		if(biOdd!=NULL)
+			q2outputError("Input to the collatz() function not a positive integer");
+		// release the created big integers
+		if(biOdd!=NULL&&oddValue->type!=VT_BIGINTEGER)free_biginteger(biOdd);
 	}
-	return NULL;
+	return resultValue;
 }

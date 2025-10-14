@@ -71,4 +71,5 @@ Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue);
 
 Mvalue* Msrand(Mvalue* _seedValue);
 
-Mvalue* Mcollatz(Mvalue* oddValue);
+// MDH@14OCT2025
+Mvalue* Mcollatz(Mvalue* oddValue,Mvalue* oddsOnlyValue);
