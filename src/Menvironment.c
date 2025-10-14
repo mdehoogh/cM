@@ -3699,20 +3699,19 @@ unsigned long long getNumberOfFunctionCommands(char const * const functionName){
  * @return Mstring* the text representation of the definition of function \p function with name \p functionName
  */
 Mstring* _getFunctionText(Mfunction const * const function,char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
-	q2output("Get function text of '%s'\n",functionName); // DEBUGGING
+	//D q2output("Get function text of '%s'\n",functionName); // DEBUGGING
 	Mstring* _s=owned_string(_getString(functionName),owner);
 	///printf("\n%s","name");
 	// I guess we might show the parameter map (if any)
 	Mstring* p=string_append_char(_s,'(');
 	if(function->_parameterMap!=NULL){
-		q2output("Composing parameter map text.\n");
+		//D q2output("Composing parameter map text.\n");
 		Mstring* _parameterMapText=owned_string(_getMapText(function->_parameterMap,false,false,false),owner); // do NOT show curly braces, quotes or missing defaults
 		if(_parameterMapText!=NULL){
 			string_append(p,string(_parameterMapText));
-			//////xxxx
-			q2output("Freeing map text '%s'.\n",string(_parameterMapText));
+			//D q2output("Freeing map text '%s'.\n",string(_parameterMapText));
 			FREE_STRING(_parameterMapText,owner);
-			q2output("Parameter map freed!\n");
+			//D q2output("Parameter map freed!\n");
 		}
 	}
 	///printf("\n%s","params");
@@ -4011,5 +4010,6 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
 
 	if(!registerFunction(_environment,owner_environment,"brgb",Mbrgb,3,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
 	if(!registerFunction(_environment,owner_environment,"trgb",Mtrgb,1,(char*[]){"red","green","blue"},(Mvalue*[]){getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER),getValueZeroOfType(VT_INTEGER)}))return false;
+	if(!registerFunction(_environment,owner_environment,"collatz",Mcollatz,1,(char*[]){"odd integer"},(Mvalue*[]){NULL}))return false;
 	return true;
 }/* VALIDATED */

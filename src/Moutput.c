@@ -143,7 +143,7 @@ bool setOutputFile(FILE const * newOutputFile){
  */
 bool discardOutputFile(){
 	if(NULL==outputFile)return true;
-	bool closed=fclose(outputFile);
+	bool closed=(fclose(outputFile)==0);
 	setOutputFile(NULL); // get rid of the output file!!
 	return closed;
 }

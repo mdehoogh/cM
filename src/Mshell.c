@@ -17451,7 +17451,7 @@ bool addBlockCommand(Mcommand const * const command){
 			while(token!=NULL){
 				if(!tokenPropertiesPropagated(token,false,true)){
 					q2outputError("Not all token properties propagated adding a block command!");
-					break;
+					//break;
 				}
 				if(amVerboseDebugging())
 					q2output("Properties of token '%s' propagated",string(token->text));

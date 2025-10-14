@@ -1782,9 +1782,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 				}else
 					q2outputError("Failed to make preparations for storing predefined sine/cosines in the decimal context!");
 			}
-
 			q2outputMessage(M_INFO_PREFIX,"It took %lld ms to compute the sine and cosine of 256 predefined angles.\n",(clock()-then)/M_CLOCKS_PER_MS);
-
 		}
 	}
 	return disowned_decimal(_decimal,owner); // freeonfailure=true means if we do not manage to wrap _pi in a decimal free it

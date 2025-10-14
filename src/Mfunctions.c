@@ -1560,3 +1560,49 @@ Mvalue* Msrand(Mvalue* _seedValue){
 		result=M_FALSE;
 	return _getIntegerValue(result);
 }
+
+// MDH@14OCT2025: some Collatz Conjecture functions
+Mvalue* Mcollatz(Mvalue* oddValue){Mallocationowner owner=getOwner(__LINE__);
+	if(oddValue!=NULL){
+		Mbiginteger* biOdd=getValueBiginteger(oddValue);
+		if(biOdd!=NULL){
+			Mbiginteger* biOne=getBigintegerOne();
+			mp_err opErrorCode=MP_OKAY;
+			mp_int mpZero;
+			opErrorCode=mp_init(&mpZero);
+			Mlist* resultList=NULL;
+			mp_int* mpOdd=biOdd->_bi;
+			if(opErrorCode==MP_OKAY&&mpOdd!=NULL){
+				resultList=owned_list(__list("Mcollatz"),owner);
+				if(resultList!=NULL){
+					mp_int mpAnd1,mpOddTimes2;
+					opErrorCode=mp_init(&mpAnd1);
+					if(opErrorCode==MP_OKAY)opErrorCode=mp_init(&mpOddTimes2);
+					while(opErrorCode==MP_OKAY){
+						// let's divide by 2 until odd
+						do{
+							opErrorCode=mp_and(mpOdd,MP_INT_POINTER(biOne),&mpAnd1);
+							if(opErrorCode!=MP_OKAY)break;
+							if(mp_cmp(&mpAnd1,MP_INT_POINTER(biOne))==MP_EQ)break; // when odd break
+							opErrorCode=mp_div_2(mpOdd,mpOdd);
+						}while(opErrorCode==MP_OKAY);
+						if(opErrorCode!=MP_OKAY)break;
+						// mpOdd is now odd
+						if(appendedToList(resultList,owner,_getValueOfBiginteger(_getBigintegerCopy(biOdd)),M_LL_INVALID)<0){opErrorCode=MP_ERR;break;}
+						if(mp_cmp(mpOdd,MP_INT_POINTER(biOne))==MP_EQ)break; // when 1 break
+						q2outputBiginteger("Odd: ",biOdd,".\n"); // DEBUG
+						mp_mul_2(mpOdd,&mpOddTimes2);
+						mp_add(mpOdd,&mpOddTimes2,mpOdd);
+						mp_incr(mpOdd);
+					}
+					mp_clear(&mpAnd1);mp_clear(&mpOddTimes2);
+				}
+			}
+			mp_clear(&mpZero);
+			if(opErrorCode!=MP_OKAY){FREE_LIST(resultList,owner);resultList=NULL;}
+			if(oddValue->type!=VT_BIGINTEGER)free_biginteger(biOdd);
+			return(resultList!=NULL?_getValueOfList(disowned_list(resultList,owner)):NULL);
+		}
+	}
+	return NULL;
+}

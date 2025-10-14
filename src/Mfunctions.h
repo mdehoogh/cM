@@ -70,3 +70,5 @@ Mvalue* Mrands(Mvalue* _countValue); // returns a list of _countValue random num
 Mvalue* Mirands(Mvalue* _countValue,Mvalue* _upperValue);
 
 Mvalue* Msrand(Mvalue* _seedValue);
+
+Mvalue* Mcollatz(Mvalue* oddValue);
