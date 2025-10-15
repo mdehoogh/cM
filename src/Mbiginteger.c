@@ -65,15 +65,16 @@ long long isBigintegerNegative(Mbiginteger const * const biginteger){
 }
 
 // MDH@14OCT2025
-long long isBigintegerOdd(Mbiginteger const * const biginteger){
+long long isMpintOdd(mp_int const * const mpint){
 	long long result=M_LL_INVALID;
-	if(biginteger!=NULL){
-		mp_int mpAnd1;
-		if(mp_init(&mpAnd1)==MP_OKAY){
-			if(mp_and(biginteger->_bi,MP_INT_POINTER(getBigintegerOne()),&mpAnd1)==MP_OKAY)
-				result=(mp_iszero(&mpAnd1)?M_FALSE:M_TRUE);
-			mp_clear(&mpAnd1);
-		}
+	mp_int mpAnd1;
+	if(mp_init(&mpAnd1)==MP_OKAY){
+		if(mp_and(mpint,MP_INT_POINTER(getBigintegerOne()),&mpAnd1)==MP_OKAY)
+			result=(mp_iszero(&mpAnd1)?M_FALSE:M_TRUE);
+		mp_clear(&mpAnd1);
 	}
 	return result;
+}
+long long isBigintegerOdd(Mbiginteger const * const biginteger){
+	return (biginteger!=NULL?isMpintOdd(biginteger->_bi):M_LL_INVALID);
 }

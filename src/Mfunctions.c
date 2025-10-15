@@ -1627,3 +1627,69 @@ Mvalue* Mcollatz(Mvalue* oddValue,Mvalue* oddsOnlyValue){Mallocationowner owner=
 	}
 	return resultValue;
 }
+
+Mvalue* Mccworstodds(Mvalue* maxstepsValue,Mvalue* minstepsValue){Mallocationowner owner=getOwner(__LINE__);
+	Mlist* _resultList=NULL;
+	if(maxstepsValue!=NULL){
+		long long minsteps=getValueInteger(minstepsValue);
+		long long maxsteps=getValueInteger(maxstepsValue);
+		if(minsteps<=0)minsteps=1;
+		if(maxsteps<minsteps)maxsteps=minsteps;
+		Mlist* _resultList=owned_list(__list("ccworstodds()"),owner);
+		Mbiginteger* _biOdd=owned_biginteger(_getBiginteger(3),owner); // initialize the first odd to investigate to 3
+		if(_resultList!=NULL&&_biOdd!=NULL){
+			mp_err opErrorCode=MP_OKAY;
+			long long maxstepssofar=minsteps-1;
+			const Mbiginteger* biOne=getBigintegerOne();
+			mp_int*_mpOdd=calloc(1,sizeof(mp_int));
+			if(_mpOdd!=NULL){
+				mp_int* mpOdd=_biOdd->_bi;
+				mp_int mpOddTimes2;
+				opErrorCode=mp_init(&mpOddTimes2);
+				if(opErrorCode!=MP_OKAY)q2outputError("Failed to initialize a big integer helper");
+				while(opErrorCode==MP_OKAY){
+					// let's iterate over the Collatz odds
+					long long steps=0;
+					opErrorCode=mp_init_copy(_mpOdd,mpOdd);
+					if(opErrorCode==MP_OKAY)
+					do{
+						steps+=1;
+						opErrorCode=mp_mul_2(_mpOdd,&mpOddTimes2);
+						if(opErrorCode==MP_OKAY)opErrorCode=mp_add(_mpOdd,&mpOddTimes2,_mpOdd);
+						if(opErrorCode==MP_OKAY)opErrorCode=mp_incr(_mpOdd);
+						// half until odd again
+						do{
+							opErrorCode=mp_div_2(_mpOdd,_mpOdd);
+							if(opErrorCode!=MP_OKAY)break;
+						}while(isMpintOdd(_mpOdd)!=M_TRUE);
+						if(opErrorCode!=MP_OKAY){q2outputError("Failed to iterate");break;}
+					}while(mp_cmp_mag(_mpOdd,MP_INT_POINTER(biOne))!=MP_EQ);
+					if(opErrorCode==MP_OKAY&&steps>maxstepssofar){
+						maxstepssofar=steps;
+						// wrap in another big integer
+						Mbiginteger* biOdd=owned_biginteger(_getBigintegerCopy(_biOdd),owner);
+						if(biOdd==NULL){opErrorCode=MP_ERR;break;}
+						if(appendedToList(_resultList,owner,_getValueOfBiginteger(disowned_biginteger(biOdd,owner)),M_LL_INVALID)<0){
+							free_biginteger(biOdd);
+							opErrorCode=MP_ERR;
+							q2outputError("Failed to return an odd");
+							break;
+						}
+						q2outputBiginteger("Appended: ",biOdd,".\n");
+						if(maxstepssofar>maxsteps)break;
+					}
+					// increment odd by 2
+					if(opErrorCode==MP_OKAY)opErrorCode=mp_add_d(mpOdd,2,mpOdd);
+				}
+				free(_mpOdd);
+			}else
+				opErrorCode=MP_ERR;
+			if(opErrorCode!=MP_OKAY){
+				FREE_LIST(_resultList,owner);_resultList=NULL;
+				q2outputError("Some error occurred in ccworstodds().");
+			}
+		}
+		if(_biOdd!=NULL)FREE_BIGINTEGER(_biOdd,owner);
+	}
+	return(_resultList!=NULL?_getValueOfList(disowned_list(_resultList,owner)):NULL);
+}

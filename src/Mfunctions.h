@@ -73,3 +73,4 @@ Mvalue* Msrand(Mvalue* _seedValue);
 
 // MDH@14OCT2025
 Mvalue* Mcollatz(Mvalue* oddValue,Mvalue* oddsOnlyValue);
+Mvalue* Mccworstodds(Mvalue* maxstepsValue,Mvalue* minstepsValue);
