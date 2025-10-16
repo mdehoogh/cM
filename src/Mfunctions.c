@@ -1635,7 +1635,7 @@ Mvalue* Mccworstodds(Mvalue* maxstepsValue,Mvalue* minstepsValue){Mallocationown
 		long long maxsteps=getValueInteger(maxstepsValue);
 		if(minsteps<=0)minsteps=1;
 		if(maxsteps<minsteps)maxsteps=minsteps;
-		Mlist* _resultList=owned_list(__list("ccworstodds()"),owner);
+		_resultList=owned_list(__list("ccworstodds()"),owner);
 		Mbiginteger* _biOdd=owned_biginteger(_getBiginteger(3),owner); // initialize the first odd to investigate to 3
 		if(_resultList!=NULL&&_biOdd!=NULL){
 			mp_err opErrorCode=MP_OKAY;
@@ -1669,13 +1669,25 @@ Mvalue* Mccworstodds(Mvalue* maxstepsValue,Mvalue* minstepsValue){Mallocationown
 						// wrap in another big integer
 						Mbiginteger* biOdd=owned_biginteger(_getBigintegerCopy(_biOdd),owner);
 						if(biOdd==NULL){opErrorCode=MP_ERR;break;}
-						if(appendedToList(_resultList,owner,_getValueOfBiginteger(disowned_biginteger(biOdd,owner)),M_LL_INVALID)<0){
-							free_biginteger(biOdd);
+						// let's return the odd and the number of steps in an array
+						Marray* _array=owned_array(_getArray("marray",2,NULL),owner);
+						if(_array!=NULL){
+							assignValue(_array->elements->values,_getValueOfBiginteger(disowned_biginteger(biOdd,owner)));
+							assignValue(_array->elements->values+1,_getIntegerValue(maxstepssofar));
+							if(appendedToList(_resultList,owner,_getValueOfArray(disowned_array(_array,owner)),M_LL_INVALID)<0){
+								free_array(_array);
+								opErrorCode=MP_ERR;
+								q2outputError("Failed to return an odd");
+								break;
+							}
+							q2outputBiginteger(NULL,biOdd," appended of ");
+							q2output("%lld (odd) steps.\n",maxstepssofar);
+						}else{
+							FREE_BIGINTEGER(biOdd,owner); // have to free biOdd as it is not bound in a value returned
 							opErrorCode=MP_ERR;
-							q2outputError("Failed to return an odd");
+							q2outputError("Failed to create an array to store an odd and the number of steps it takes to iterate to 1 in");
 							break;
 						}
-						q2outputBiginteger("Appended: ",biOdd,".\n");
 						if(maxstepssofar>maxsteps)break;
 					}
 					// increment odd by 2
@@ -1686,7 +1698,7 @@ Mvalue* Mccworstodds(Mvalue* maxstepsValue,Mvalue* minstepsValue){Mallocationown
 				opErrorCode=MP_ERR;
 			if(opErrorCode!=MP_OKAY){
 				FREE_LIST(_resultList,owner);_resultList=NULL;
-				q2outputError("Some error occurred in ccworstodds().");
+				q2outputError("Some error occurred in ccworstodds()");
 			}
 		}
 		if(_biOdd!=NULL)FREE_BIGINTEGER(_biOdd,owner);
