@@ -2875,6 +2875,7 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 			output("\tProperty expr of previous token not set!\n");
 		*/
 		newTokenType=_token->type;
+		///q2output("New token type: %s.\n",TOKENTYPE_STRING[newTokenType]); // DEBUGGING
 		//////outputChar('B');
 		// now we have the block of code copied from _getToken
 		/////if(amDebugging())inputInfo("E2");
@@ -3228,7 +3229,11 @@ static bool tokenPropertiesPropagated(Mtoken const * const prevToken,bool onInpu
 		}
 		//////outputChar('S');
 
-	}
+	}else
+	if(prevToken!=NULL)
+		q2outputMessage(M_ERROR_PREFIX,"No successor of token '%s' to propagate properties to.\n",string(prevToken->text));
+	else
+		q2outputError("No next token trying to propagate token properties!");
 	//////outputChar('T');
 	// only when newTokenType does not equal TT_ERROR there's success
 	return(newTokenType!=TT_ERROR);
@@ -3319,6 +3324,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool on
 	//				but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
 	bool newTokenError; // MDH@08DEC2024: set to true when propagaging the errors fail
+	// MDH@27OCT2025 NOTE this is the only place where _getNewToken() is being called
 	Mtoken* _newCommandToken=owned_token(_getNewToken(lastCommandToken,tokenType,onInput,&newTokenError),owner);
 	// MDH@10APR2024 TODO: the following is weird because _getToken could change the type of _newCommandToken to TT_ERROR which would be overwritten again by the following 
 	if(_newCommandToken!=NULL){
@@ -17344,7 +17350,7 @@ Mstring* _getBlockName(){Mallocationowner owner=getOwner(__LINE__);
  * @return false on failure
  */
 static bool pushBlock(Mblock * const block){
-	if(block==NULL||_lastBlock==NULL)return false;
+	if(NULL==block||NULL==_lastBlock)return false;
 	if(Misowned(block))q2outputError("Block is still owned!");
 	_lastBlock->next=owned_block(block,owner_blocks);
 	block->prev=_lastBlock;
@@ -17401,10 +17407,10 @@ bool addBlockCommand(Mcommand const * const command){
 		if(block!=NULL){
 			// MDH@12APR2024: since environment->insertToken now points to command->_firstToken as it must be
 			//                we do not need offsetToken anymore and can use the continuationToken in the parent env.
-			Mblock* hostBlock=block->prev;
-			if(NULL==hostBlock){q2outputBug("No host command environment");return false;}
+			Mblock* parentBlock=block->prev;
+			if(NULL==parentBlock){q2outputBug("No parent command environment");return false;}
 			///output("Embedding environment available.\n");
-			Mtoken* nextInsertToken=hostBlock->continuationToken;
+			Mtoken* nextInsertToken=parentBlock->continuationToken;
 			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
 			if(amVerboseDebugging())
 				q2output("Next insert token: '%s'.\n",string(nextInsertToken->text)); // DEBUGGING
@@ -17447,8 +17453,10 @@ bool addBlockCommand(Mcommand const * const command){
 			// propagate the offset token properties until bumping into a placeholder token (if any)
 			if(amVerboseDebugging())
 				q2output("Propagating token properties.\n");
-			Mtoken *token=command->_lastToken; // command->_lastToken is the last token to have the right properties
+			Mtoken *token=command->_lastToken,*nextToken; // command->_lastToken is the last token to have the right properties
 			while(token!=NULL){
+				// MDH@27OCT2025: we do not want to call tokenPropertiesPropagated when token does not have a successor
+				nextToken=token->next; if(NULL==nextToken)break;
 				if(!tokenPropertiesPropagated(token,false,true)){
 					q2outputError("Not all token properties propagated adding a block command!");
 					//break;
@@ -17456,7 +17464,8 @@ bool addBlockCommand(Mcommand const * const command){
 				if(amVerboseDebugging())
 					q2output("Properties of token '%s' propagated",string(token->text));
 				///q2outputToken(token);output("' propagated!\n");
-				token=token->next;
+				token=nextToken;
+				/* MDH@27OCT2025: don't need this anymore
 				if(NULL==token){
 					q2output(".\n");
 					q2output("No further tokens to propagate properties from.\n");
@@ -17464,6 +17473,7 @@ bool addBlockCommand(Mcommand const * const command){
 				}
 				if(amVerboseDebugging())
 					q2output("to '%s'.\n",string(token->text));
+				*/
 				///output("Next token to propagate properties of: '");outputToken(token);output("'.\n");
 				if(token->type==TT_PLACEHOLDER){
 					///q2output("Bumped into a placeholder token.\n");
@@ -17507,8 +17517,9 @@ bool addBlockCommand(Mcommand const * const command){
  */
 bool startBlock(Mcommand const * const command,Mtoken const * const placeholderToken,Mallocationowner ownerToken){Mallocationowner owner=getOwner(__LINE__);
 	// command is allowed to be NULL which means do not replace the incompleteCommand!!
+	if(NULL==_lastBlock)return false; // MDH@27OCT2025: more convenient to immediately return false if _lastBlock is not set
 	// we have to add a new execution environment
-	if(_lastBlock!=NULL&&placeholderToken!=NULL){
+	if(placeholderToken!=NULL){
 		if(amVerboseDebugging())
 			q2output("Placeholder token: '%s'.\n",string(placeholderToken->text));
 		Mblock* _block=owned_block(_getNewBlock(),owner);
@@ -17572,12 +17583,12 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			//// NOT HERE!!!! _blockEnvironment->continuationToken=placeholderToken->next;
 			////////if(blockKeywordId<0)return true;
 			///output("Pushing the subcommand block on the block stack.\n");
-			Mtoken *prevPlaceholderToken=placeholderToken->prev,*nextPlaceholderToken=placeholderToken->next;
 			// disconnect the placeholder token
 			if(pushBlock(disowned_block(_block,owner))){
-				Mblock* hostBlock=_block->prev;
-				if(hostBlock!=NULL){
-					if(command!=NULL)hostBlock->incompleteCommand=command; // remember the command that has to be completed NOTE when receiving NULL environment->incompleteCommand has be be left alone!!!!!
+				Mblock* parentBlock=_block->prev;
+				if(parentBlock!=NULL){
+					Mtoken *prevPlaceholderToken=placeholderToken->prev,*nextPlaceholderToken=placeholderToken->next;
+					if(command!=NULL)parentBlock->incompleteCommand=command; // remember the command that has to be completed NOTE when receiving NULL environment->incompleteCommand has be be left alone!!!!!
 					/* MDH@18APR2024: it's easier to let the user determine what to enclose the placeholder inside instead of using indicators in the placeholder text itself
 					// MDH@15APR2024: the default (with no characters behind ?) is to let the next token decide whether multiple commands are allowed
 					if(string_length(placeholderToken->text)>1){
@@ -17628,7 +17639,7 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 					if(prevPlaceholderToken!=NULL)prevPlaceholderToken->next=nextPlaceholderToken;
 					if(nextPlaceholderToken!=NULL)nextPlaceholderToken->prev=prevPlaceholderToken;
 					// register the continuation token and the insert token
-					hostBlock->continuationToken=nextPlaceholderToken; // remember where to continue looking for placeholder tokens
+					parentBlock->continuationToken=nextPlaceholderToken; // remember where to continue looking for placeholder tokens
 					_block->insertToken=prevPlaceholderToken;
 					// replacing:	_blockEnvironment->multipleCommandsAllowed=(nextPlaceholderToken!=NULL&&nextPlaceholderToken->type!=TT_LISTELEMENT);
 					///////environment->blockKeywordId=blockKeywordId; // MDH@06APR2024: store the current keyword id so we can find the next one
@@ -17661,11 +17672,12 @@ bool startBlock(Mcommand const * const command,Mtoken const * const placeholderT
 			FREE_BLOCK(_block,owner);
 		}else
 			q2outputError("Failed to create a subcommand block");
-	}else
+	}
+	/*else
 	if(NULL==_lastBlock)
-		q2outputError("No initial subcommand block!");
+		q2outputError("No initial subcommand block!");*/
 	else
-		q2outputError("Invalid input to start a subcommand block");
+		q2outputError("No placeholder token to start the subcommand block");
 	return false;
 }
 /**

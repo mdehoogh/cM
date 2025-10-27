@@ -1539,14 +1539,14 @@ void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
  * @brief the subcommand block level
  * 
  */
-size_t blockCommandLevel=0;
+size_t incompleteCommandDepth=0;
 /**
  * @brief increments the command count as being shown in the prompt
  * 
  */
 void incrementPromptCommandCount(){
 	// if inside a function declaration no need to increment anything
-	if(blockCommandLevel>0)
+	if(incompleteCommandDepth>0)
 		getCurrentBlock()->insertedBlockCommands++;
 	else
 	if(getCurrentFunctionBodyInput()==NULL)
@@ -1622,7 +1622,7 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				//                argument info as name NOTE that a question mark behind it would truely indicate this
 				size_t newPromptCommandIndex=0;
 				// MDH@03JAN2025: it's preferred to only change the prompt in here, and not in getNewPromptIndex
-				if(blockCommandLevel>0){
+				if(incompleteCommandDepth>0){
 					Mblock* currentBlock=getCurrentBlock();
 					Mstring* _blockName=owned_string(_getBlockName(),owner);
 					if(_blockName!=NULL){
@@ -1657,7 +1657,7 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 				promptLength=output("%s",setMessageId(string(prompt))); 
 				/* replacing (so we won't need str anymore)
 				// when inside a block of commands show the block name
-				if(blockCommandLevel>0){
+				if(incompleteCommandDepth>0){
 					Mstring* _blockName=owned_string(_getBlockName(),owner);
 					if(_blockName!=NULL){
 						promptLength+=output(string(_blockName));
@@ -1894,7 +1894,7 @@ void promptForUserInput(){
 	enableRawmode(0);
 	resetOutputColor();
 	newline();
-	if(inputMode!=IM_COMMAND||blockCommandLevel==0)
+	if(inputMode!=IM_COMMAND||incompleteCommandDepth==0)
 		outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	initializeNumberOfLineCharacters(); // MDH@24JUN2020: determine the number of line characters available!!!
@@ -5177,7 +5177,10 @@ char removedTokenCharacter(bool endOfInput){
 				//                TODO alternatively we could check against _userInputCommand->_firstToken
 				if(lastToken==_userInputCommand->_firstToken)break; // if lastToken is already _userInputCommand->_firstToken (because it's offset is zero) we should not allow lastToken to become 'less'
 				lastToken=lastToken->prev;
-				if(NULL==lastToken)break; // never allow _userInputCommand->_lastToken to become NULL!!!!
+				if(NULL==lastToken){
+					q2output("No previous token!");
+					break; // never allow _userInputCommand->_lastToken to become NULL!!!!
+				}
 				_userInputCommand->_lastToken=lastToken;
 			}
 		}else
@@ -6636,6 +6639,7 @@ bool preparedForUserInput(){
 
 bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 	assert(_userInputCommand!=NULL);
+	outputCommandInfo(_userInputCommand); // DEBUGGING
 	incrementPromptCommandCount(); // replacing: getExecutionEnvironment()->commandCount++; // increment command count BEFORE evaluating as evaluating might create a new environment!!!!!
 	Mvalue* userInputCommandResultValue=NULL;
 	bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
@@ -6711,7 +6715,7 @@ bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 	_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
 
 	// MDH@18MAR2024: only garbage collect when not inside a block collecting block commands
-	if(blockCommandLevel==0){
+	if(incompleteCommandDepth==0){
 		// garbage collection: remove any values not used anymore...
 		// if(amVerboseDebugging())
 		if(amVerbose/*Debugging*/())
@@ -6743,8 +6747,8 @@ bool userInputCommandEvaluated(){Mallocationowner owner=getOwner(__LINE__);
 			while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
 		}
 	}/*else // a little trick to return to entering immediately executing commands
-	if(blockCommandLevel<0)
-		blockCommandLevel=0;*/
+	if(incompleteCommandDepth<0)
+		incompleteCommandDepth=0;*/
 	return true;
 }
 
@@ -6760,7 +6764,7 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 	Mblock* endedBlock=endBlock();
 	if(endedBlock!=NULL){
 		////output("Block ended!\n");
-		blockCommandLevel--;
+		incompleteCommandDepth--;
 		// once a block ended successfully we're back in the environment containing the perhaps now
 		// completed command
 		// if the command is complete, it should be offered for execution or added
@@ -6776,7 +6780,7 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 				///output("Removing subcommand separator token '%s' of type '%s'.\n",string(separatorToken->text),TOKENTYPE_STRING[separatorToken->type]);
 				// MDH@01JAN2025: TODO preferably shouldn't need to correct any separator token marked as an error token!!!
 				if(separatorToken->type==TT_ERROR&&string_char(separatorToken->text,0)==',')
-					separatorToken->type==TT_LISTELEMENT;
+					separatorToken->type=TT_LISTELEMENT;
 				if(separatorToken->type==TT_LISTELEMENT){
 					// MDH@01JAN2025: not forgetting to update the insertToken!!!
 					endedBlock->insertToken=separatorToken->prev;
@@ -6813,13 +6817,13 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 				nextPlaceholderToken->next=NULL;
 				FREE_TOKEN(nextPlaceholderToken,owner_userInputCommand);
 				////////////_userInputCommand=NULL;
-				blockCommandLevel++;
+				incompleteCommandDepth++;
 			}else{
 				result=false;
 				q2outputError("Failed to start requesting the next subcommand block");
 			}
 		}else
-		if(blockCommandLevel>0){ // the top-level incomplete command is now complete and therefore executable
+		if(incompleteCommandDepth>0){ // the top-level incomplete command is now complete and therefore executable
 			// the incomplete command is now finished and completed but not at the top-level
 			// and therefore is ready to be added as block command
 			Mcommand* completedBlockCommand=getCurrentBlock()->incompleteCommand;
@@ -6836,6 +6840,7 @@ bool endSubcommandBlock(bool removeSubcommandSeparator){
 		}else{
 			// we have to set _userInputCommand to that completed command
 			_userInputCommand=getCurrentBlock()->incompleteCommand;
+			outputCommandInfo(_userInputCommand); // DEBUGGING
 			if(_userInputCommand!=NULL){
 				getCurrentBlock()->incompleteCommand=NULL;
 				/////output("Completed command to execute: '");outputCommand(_userInputCommand);output("'.\n");resetOutputColor();
@@ -6874,14 +6879,14 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 	// MDH@31MAR2020: with lowercase 'x' let's ask for confirmation
 	if(sessionSettingCharacter=='x'){
 		if(!getCurrentFunctionBodyInput()){
-			if(!blockCommandLevel){
+			if(incompleteCommandDepth==0){
 				output("Do you really want to exit M? ");
 				char c;
 				while(!inputCharRead(&c))
 				;
 				outputChar(c);newline();
 				if(c=='Y'||c=='y')result='x';
-			}else{
+			}else{ // ends a sub command
 				if(!endSubcommandBlock(true))
 					q2outputError("Failed to end the subcommand block");
 				result='n';
@@ -7521,7 +7526,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 	while(1){ // command loop
 
 		if(inputMode==IM_COMMAND)
-			if(blockCommandLevel==0){
+			if(incompleteCommandDepth==0){
 				showSeparatorLine();
 				outputLocalAllocations();
 				outputTotalMemoryUsage(); // TODO have to think about this though
@@ -8205,7 +8210,10 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										}else{ // regular token character removal
 											// TODO apparently _userInputCommand->_firstToken will still be NULL when we're scrolling through the list of previous commands...
 											// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyUserInputCommand() itself does not seem to do that!!!)
-											if(commandIndex){commandIndex=0;copyUserInputCommand();} // will also set getCommandLength()!!!
+											if(commandIndex){
+												commandIndex=0;
+												copyUserInputCommand();
+											} // will also set getCommandLength()!!!
 											// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into feedforwardText
 											// MDH@20SEP2019: we do NOT want the character removed to disappear when the token it came from disappears, therefore the addition to the feed forward text should be anonymous
 											// MDH@25SEP2019: because we're going to prepend c to the feed forward text, we have to determine the associated token i.e. the token that generated c
@@ -8515,7 +8523,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					q2outputError("Failed to end the function body");
 				switchToCommandMode(); // NOTE as apparently we're in control mode!!
 			}else
-			if(blockCommandLevel>0){ // user decides to end a block
+			if(incompleteCommandDepth>0){ // user decides to end a block
 				if(!endSubcommandBlock(true))
 					q2outputError("Failed to end a subcommand block");
 				switchToCommandMode();
@@ -8564,16 +8572,16 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						outputCommandInfo(_userInputCommand); // now defined in Mshell.c/h
 
 					// MDH@18MAR2024: if this user input command is a block command we should collect it in the current environment, and NOT execute it
-					//                we can determine if a user input command is a block command by keeping a global variable called blockCommandLevel that keeps track of the number of active blocks
+					//                we can determine if a user input command is a block command by keeping a global variable called incompleteCommandDepth that keeps track of the number of active blocks
 					//                however, if a block command represents the declaration of local variables it should be executed in the block design environment
 					//                NOTE that any user input command should be allowed to start/end a new environment whether or not already collectingBlockCommands
 					//                for a user input command to start/end a block it's first token should be a block keyword but with the right number of arguments???
 
 					// MDH@26MAR2024: we should find the successive placeholder tokens, if any, NOTE there could be multiple
 					// MDH@06APR2024: determine if this is an incomplete (and therefore to be completed) command
-					Mtoken* firstPlaceholderToken=_userInputCommand->_firstToken;
-					while(firstPlaceholderToken!=NULL&&firstPlaceholderToken->type!=TT_PLACEHOLDER)
-						firstPlaceholderToken=firstPlaceholderToken->next;
+					Mtoken* firstSubcommandPlaceholderToken=_userInputCommand->_firstToken;
+					while(firstSubcommandPlaceholderToken!=NULL&&firstSubcommandPlaceholderToken->type!=TT_PLACEHOLDER)
+						firstSubcommandPlaceholderToken=firstSubcommandPlaceholderToken->next;
 					/* replacing:
 					// that there could be multiple placeholders might be problematic
 					Mtoken* token=getExecutionEnvironment()->continuationToken; // the continuation token is the token to search for the next placeholder token from
@@ -8589,19 +8597,19 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						token=token->next;
 					}
 					*/
-					if(firstPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
-						// MDH@08APR2024 moved over to startBlock: int8_t firstBlockKeywordId=getPlaceholderBlockKeywordId(firstPlaceholderToken);
+					if(firstSubcommandPlaceholderToken!=NULL){ // any placeholder starts a new environment in which commands are to be entered
+						// MDH@08APR2024 moved over to startBlock: int8_t firstBlockKeywordId=getPlaceholderBlockKeywordId(firstSubcommandPlaceholderToken);
 						/*
 						getExecutionEnvironment()->placeholderToken=token;
 						getExecutionEnvironment()->continuationToken=token->next; // NOTE will NOT be NULL as a command cannot end with a placeholder token!!!!
 						getExecutionEnvironment()->insertToken=token->prev; // this is the token where to connect the block command to
 						*/
 						// can we find the block keyword id?????? don't think we actually need it, hmmm although we need to know if it's a function that will create an environment!!!!!
-						if(startBlock(_userInputCommand,firstPlaceholderToken,Msubowner(owner_userInputCommand,1))){
+						if(startBlock(_userInputCommand,firstSubcommandPlaceholderToken,Msubowner(owner_userInputCommand,1))){
 							if(amVerboseDebugging())
 								q2output("Subcommand block activated!\n"); ///DEBUGGING
 							// get rid of the placeholder token
-							firstPlaceholderToken->next=NULL;FREE_TOKEN(firstPlaceholderToken,owner_userInputCommand);
+							firstSubcommandPlaceholderToken->next=NULL;FREE_TOKEN(firstSubcommandPlaceholderToken,owner_userInputCommand);
 							/*
 							// determine how many commands can be embedded: if the placeholder token is followed by a comma (,) only a single command is allowed (and no end() to end the block is required)
 							getExecutionEnvironment()->multipleCommandsAllowed=(token->next!=NULL&&token->next->type!=TT_LISTELEMENT);
@@ -8609,7 +8617,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 							getExecutionEnvironment()->_parent->value._environment->firstIncompleteCommandToken=_userInputCommand->_firstToken; // remember the start of the command we need to exeute
 							*/
 							_userInputCommand=NULL; // MDH@06APR2024: _userInputCommand was embedded in the parent environment as incompleteCommand
-							blockCommandLevel++;
+							incompleteCommandDepth++;
 						}else // this is a serious problem so let's switch to control mode (TODO allow garbage collection in control mode or some memory allocation test to check wether out of memory)
 							switchToControlMode("Failed to start requesting subcommands");
 					}
@@ -8627,13 +8635,13 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 								// a block is always ended before a new block is started
 								if(BLOCK_FLAGS[blockKeywordId]&4){ // end all blocks
 									// end all blocks (the M environment does not have a parent so it's endBlock will return false)
-									while(blockCommandLevel){
+									while(incompleteCommandDepth){
 										blockEnvironment=endBlock();
 										if(NULL==blockEnvironment)break;
 										completedBlockCommandToken=blockEnvironment->blockCommandList->_first->_value->value._token;
 										blockEnvironment->blockCommandList=NULL; 
 										FREE_ENVIRONMENT(blockEnvironment,getValueDataOwner());
-										blockCommandLevel--;
+										incompleteCommandDepth--;
 									}
 								}else
 								if(BLOCK_FLAGS[blockKeywordId]&2){ // ends a block
@@ -8642,7 +8650,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 										completedBlockCommandToken=blockEnvironment->blockCommandList->_first->_value->value._token;
 										blockEnvironment->blockCommandList=NULL; 
 										FREE_ENVIRONMENT(blockEnvironment,getValueDataOwner());
-										blockCommandLevel--;
+										incompleteCommandDepth--;
 										output("Block of commands ended!\n");
 									}else
 										q2outputError("Failed to end the block of commands");
@@ -8657,30 +8665,30 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									}
 									if(insertToken!=NULL){
 										if(startBlock(blockKeywordId,_userInputCommand,insertToken,Msubowner(owner_userInputCommand,1))){
-											blockCommandLevel++;
+											incompleteCommandDepth++;
 											output("Block of commands started.\n");
 										}else
 											q2outputError("Failed to start a new block of commands!");
 									}
 								}else{ 
 									// as soon as we're done with all the blocks, we should execute all block commands
-									if(blockCommandLevel==0){
+									if(incompleteCommandDepth==0){
 										// NOTE: _userInputCommand should NOW be completed, and ready to be executed, so no need to extract it now!!!!
 										//       unless we know that the completed block command field has actually been NULLed in the finished environment
 										_userInputCommand->_firstToken->next=completedBlockCommandToken;
 										///replacing:
 										///if(!executeBlockCommands()){
 									 	///		q2outputError("Failed to execute the block commands.");
-										///	blockCommandLevel=-2;
+										///	incompleteCommandDepth=-2;
 										///}else
-										///	blockCommandLevel=-1;
+										///	incompleteCommandDepth=-1;
 									}
 								}
 							}
 						}
 					}*/
 					else // the user input command is NOT incomplete
-					if(blockCommandLevel>0){ // (still) inside a block
+					if(incompleteCommandDepth>0){ // (still) inside a block
 						///output("Embedding the subcommand.\n");
 						// does this user input command designate an end of block?????
 						// MDH@08APR2024: if we always also add the end() command to the current block we can still use it by executing end() [and know it was a placeholder command!!!!!!]
@@ -8698,7 +8706,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 									if(endFunctionToken->type==TT_FUNCTION){
 										char* _functionName=_getSignificantTokenCharacters(endFunctionToken);
 										if(!strcmp(_functionName,"endall")){
-											numberOfBlocksToEnd=blockCommandLevel;
+											numberOfBlocksToEnd=incompleteCommandDepth;
 										}else
 										if(!strcmp(_functionName,"end"))
 											numberOfBlocksToEnd=1;
@@ -8765,7 +8773,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						*/
 					}//else
 
-					// TODO now checking for _userInputCommand being NULL but used to be blockCommandLevel==0
+					// TODO now checking for _userInputCommand being NULL but used to be incompleteCommandDepth==0
 					if(inputMode==IM_COMMAND&&_userInputCommand!=NULL){ // a directly executable user input command
 						// MDH@15APR2024: code to evaluate _userInputCommand moved over to evaluateUserInputCommand()
 						////DEBUGGING output("Command to evaluate: ");outputToken(_userInputCommand->_firstToken,NULL);outputLine(".");
@@ -8787,7 +8795,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				switchToCommandMode();
 		}
 		/*
-		if(inputMode!=IM_COMMAND||blockCommandLevel==0)
+		if(inputMode!=IM_COMMAND||incompleteCommandDepth==0)
 			showSeparatorLine();
 		*/
 		if(!allocationMarkAdded())
