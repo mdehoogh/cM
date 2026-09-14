@@ -439,7 +439,7 @@ Mvalue* Mparsetime(Mvalue* _timetextValue,Mvalue* _tznValue){Mallocationowner ow
 				// expecting the format y m d h m s timezone where y m d h m s are digits so essentially we skip whatever there's in between
 				// essentially y m d are to be separated by non digits, as goes for h m s but the hyphen cannot be used in h m s because that would indicate the start of the timezone
 				// y m d is obligatory in that order, h m s are all optional but we allow h, h m, h m s
-				Mstring *_iso8601=owned_string(__string("Mparsetime"),owner);
+				Mstring *_iso8601=owned_string(_getString("Mparsetime"),owner);
 				if(_iso8601!=NULL){
 					bool complete=false;
 					// how about extracting the actual constituent parts

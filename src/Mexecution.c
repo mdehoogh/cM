@@ -925,7 +925,7 @@ Mtext* _getCharText(char c,char quote){Mallocationowner owner=getOwner(__LINE__)
  */
 Mstring* _getQuotedTextString(char const * const text,char quote){Mallocationowner owner=getOwner(__LINE__);
 	if(text!=NULL){
-			Mstring* _quotedTextString=owned_string(__string("_getQuotedTextString()"),owner);
+			Mstring* _quotedTextString=owned_string(_getString("_getQuotedTextString()"),owner);
 			if(_quotedTextString!=NULL){
 				if((!quote||string_append_char(_quotedTextString,quote))&&string_append(_quotedTextString,text))
 					return disowned_string(_quotedTextString,owner);
@@ -962,7 +962,7 @@ Mtext* _getSingleQuotedText(char const * const text){Mallocationowner owner=getO
  * @return Mstring* the quoted M string pointer
  */
 Mstring* _getQuotedTextCharString(char _char,char quote){Mallocationowner owner=getOwner(__LINE__);
-	Mstring* _quotedTextCharString=owned_string(__string("_getQuotedTextCharString()"),owner);
+	Mstring* _quotedTextCharString=owned_string(_getString("_getQuotedTextCharString()"),owner);
 	if(_quotedTextCharString){
 		if((!quote||string_append_char(_quotedTextCharString,quote))&&(!_char||string_append_char(_quotedTextCharString,_char)))
 			return disowned_string(_quotedTextCharString,owner);
@@ -1241,11 +1241,11 @@ static int getMpintSize(mp_int const * const _mpint){
  * 
  * @param a
  * @param str where to place the decimal digits into
- * @param _size the final length of str on return
+ * @param size the final length of str on return
  * @return int MP_OKAY on sucess
  */
 static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
-	if(size<2)return MP_VAL;
+	if(*size<2)return MP_VAL;
 	// now let's compute an approximation of how many decimal digits we're going to need to allocated
 	// how about allocating this amount
 	// start of mp_to_radix function adapted to speed it up
@@ -1269,7 +1269,7 @@ static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
 		/* if it is negative output we have one less position for decimal digits */
 		if(negative){*size--;t.sign=MP_ZPOS;} // size is the number of digits we 
 		digs=*size; // the number of decimal digit positions available for the magnitude
-		mp_word remainder; // called w in the original code
+		mp_word remainder; // called w in the original code // MDH@14SEP2026: type changed from mp_word to mp_digit which should suffice being uint64_t but a point of concern
 		mp_digit digit;
 		// NOTE why divide the entire number a by 10 until it ends up equal to zero when we can
 		//      simply divide each term until it is zero before we divide the next term
@@ -2327,7 +2327,7 @@ void fUpdateStats(Mfile * const file,bool report){Mallocationowner owner=getOwne
 	if(file!=NULL&&file->_name!=NULL){
 		int stat_errno=file->staterrno; // the current status of the stats info
 		// MDH@08MAY2024: use fstat() instead of stat() on an opened file!!
-		file->staterrno=((file->_f!=NULL?fstat(file->_f,&file->stat):stat(string(file->_name),&file->stat))!=0?errno:0); // failure, some error occurred
+		file->staterrno=((file->_f!=NULL?fstat(fileno(file->_f),&file->stat):stat(string(file->_name),&file->stat))!=0?errno:0); // failure, some error occurred
 		if(file->staterrno==0){
 			///if(report){
 				/*

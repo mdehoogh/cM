@@ -1,0 +1,176 @@
+[
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/M.c.o -c /Users/marcdehoogh/cM/src/M.c",
+  "file": "/Users/marcdehoogh/cM/src/M.c",
+  "output": "CMakeFiles/M.dir/src/M.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Msession.c.o -c /Users/marcdehoogh/cM/src/Msession.c",
+  "file": "/Users/marcdehoogh/cM/src/Msession.c",
+  "output": "CMakeFiles/M.dir/src/Msession.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mcolors.c.o -c /Users/marcdehoogh/cM/src/Mcolors.c",
+  "file": "/Users/marcdehoogh/cM/src/Mcolors.c",
+  "output": "CMakeFiles/M.dir/src/Mcolors.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mshell.c.o -c /Users/marcdehoogh/cM/src/Mshell.c",
+  "file": "/Users/marcdehoogh/cM/src/Mshell.c",
+  "output": "CMakeFiles/M.dir/src/Mshell.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Menvironment.c.o -c /Users/marcdehoogh/cM/src/Menvironment.c",
+  "file": "/Users/marcdehoogh/cM/src/Menvironment.c",
+  "output": "CMakeFiles/M.dir/src/Menvironment.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mfunctions.c.o -c /Users/marcdehoogh/cM/src/Mfunctions.c",
+  "file": "/Users/marcdehoogh/cM/src/Mfunctions.c",
+  "output": "CMakeFiles/M.dir/src/Mfunctions.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mlocale.c.o -c /Users/marcdehoogh/cM/src/Mlocale.c",
+  "file": "/Users/marcdehoogh/cM/src/Mlocale.c",
+  "output": "CMakeFiles/M.dir/src/Mlocale.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mmatrix.c.o -c /Users/marcdehoogh/cM/src/Mmatrix.c",
+  "file": "/Users/marcdehoogh/cM/src/Mmatrix.c",
+  "output": "CMakeFiles/M.dir/src/Mmatrix.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Moperations.c.o -c /Users/marcdehoogh/cM/src/Moperations.c",
+  "file": "/Users/marcdehoogh/cM/src/Moperations.c",
+  "output": "CMakeFiles/M.dir/src/Moperations.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mlist.c.o -c /Users/marcdehoogh/cM/src/Mlist.c",
+  "file": "/Users/marcdehoogh/cM/src/Mlist.c",
+  "output": "CMakeFiles/M.dir/src/Mlist.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Marray.c.o -c /Users/marcdehoogh/cM/src/Marray.c",
+  "file": "/Users/marcdehoogh/cM/src/Marray.c",
+  "output": "CMakeFiles/M.dir/src/Marray.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Miterator.c.o -c /Users/marcdehoogh/cM/src/Miterator.c",
+  "file": "/Users/marcdehoogh/cM/src/Miterator.c",
+  "output": "CMakeFiles/M.dir/src/Miterator.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mtime.c.o -c /Users/marcdehoogh/cM/src/Mtime.c",
+  "file": "/Users/marcdehoogh/cM/src/Mtime.c",
+  "output": "CMakeFiles/M.dir/src/Mtime.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Msystem.c.o -c /Users/marcdehoogh/cM/src/Msystem.c",
+  "file": "/Users/marcdehoogh/cM/src/Msystem.c",
+  "output": "CMakeFiles/M.dir/src/Msystem.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mvalue.c.o -c /Users/marcdehoogh/cM/src/Mvalue.c",
+  "file": "/Users/marcdehoogh/cM/src/Mvalue.c",
+  "output": "CMakeFiles/M.dir/src/Mvalue.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mdecimal.c.o -c /Users/marcdehoogh/cM/src/Mdecimal.c",
+  "file": "/Users/marcdehoogh/cM/src/Mdecimal.c",
+  "output": "CMakeFiles/M.dir/src/Mdecimal.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mrational.c.o -c /Users/marcdehoogh/cM/src/Mrational.c",
+  "file": "/Users/marcdehoogh/cM/src/Mrational.c",
+  "output": "CMakeFiles/M.dir/src/Mrational.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mbiginteger.c.o -c /Users/marcdehoogh/cM/src/Mbiginteger.c",
+  "file": "/Users/marcdehoogh/cM/src/Mbiginteger.c",
+  "output": "CMakeFiles/M.dir/src/Mbiginteger.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mexecution.c.o -c /Users/marcdehoogh/cM/src/Mexecution.c",
+  "file": "/Users/marcdehoogh/cM/src/Mexecution.c",
+  "output": "CMakeFiles/M.dir/src/Mexecution.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mmemory.c.o -c /Users/marcdehoogh/cM/src/Mmemory.c",
+  "file": "/Users/marcdehoogh/cM/src/Mmemory.c",
+  "output": "CMakeFiles/M.dir/src/Mmemory.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mtoken.c.o -c /Users/marcdehoogh/cM/src/Mtoken.c",
+  "file": "/Users/marcdehoogh/cM/src/Mtoken.c",
+  "output": "CMakeFiles/M.dir/src/Mtoken.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Msettings.c.o -c /Users/marcdehoogh/cM/src/Msettings.c",
+  "file": "/Users/marcdehoogh/cM/src/Msettings.c",
+  "output": "CMakeFiles/M.dir/src/Msettings.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mjson.c.o -c /Users/marcdehoogh/cM/src/Mjson.c",
+  "file": "/Users/marcdehoogh/cM/src/Mjson.c",
+  "output": "CMakeFiles/M.dir/src/Mjson.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mstring.c.o -c /Users/marcdehoogh/cM/src/Mstring.c",
+  "file": "/Users/marcdehoogh/cM/src/Mstring.c",
+  "output": "CMakeFiles/M.dir/src/Mstring.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mchars.c.o -c /Users/marcdehoogh/cM/src/Mchars.c",
+  "file": "/Users/marcdehoogh/cM/src/Mchars.c",
+  "output": "CMakeFiles/M.dir/src/Mchars.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Malloc.c.o -c /Users/marcdehoogh/cM/src/Malloc.c",
+  "file": "/Users/marcdehoogh/cM/src/Malloc.c",
+  "output": "CMakeFiles/M.dir/src/Malloc.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mmessage.c.o -c /Users/marcdehoogh/cM/src/Mmessage.c",
+  "file": "/Users/marcdehoogh/cM/src/Mmessage.c",
+  "output": "CMakeFiles/M.dir/src/Mmessage.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Moutput.c.o -c /Users/marcdehoogh/cM/src/Moutput.c",
+  "file": "/Users/marcdehoogh/cM/src/Moutput.c",
+  "output": "CMakeFiles/M.dir/src/Moutput.c.o"
+},
+{
+  "directory": "/Users/marcdehoogh/cM/build",
+  "command": "/usr/bin/clang   -g -arch arm64 -o CMakeFiles/M.dir/src/Mmodule.c.o -c /Users/marcdehoogh/cM/src/Mmodule.c",
+  "file": "/Users/marcdehoogh/cM/src/Mmodule.c",
+  "output": "CMakeFiles/M.dir/src/Mmodule.c.o"
+}
+]

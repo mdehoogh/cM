@@ -26,7 +26,17 @@
 
 // MDH@31MAY2019: big integer support switched from libzahl to libtommatch
 // MDH@13MAR2020: switched to using Mtommath.h instead of tommath.h itself because sometimes we want to use a different tommath.h (like Mtommath-develop.h)
-#include "M.tommath.h"
+// MDH@14SEP2026: M.tommath.h changed to tommath.h (so it's the same naming as we use for mpdecimal.h)
+#include "tommath.h"
+// MDH@14SEP2026: additional defines that somehow where removed from tommath 1.1.0 that I was using in M 0.1.x
+// type mp_word now missing in tommath.h so we define it here as mp_digit which is uint64_t (see src/tommath.h) 
+#define mp_word mp_digit
+#define mp_n_root(a,b,c) (MP_DEPRECATED_PRAGMA("mp_n_root has been deprecated, use mp_n_root_n instead") mp_root_n(a,b,c))
+typedef enum {
+   MP_NO = 0,
+   MP_YES = 1
+} mp_bool;
+// MDH@14SEP2026 END
 
 // MDH@10JUN2019: decimal support by libmpdec
 #include "mpdecimal.h"

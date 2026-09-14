@@ -6421,7 +6421,7 @@ long long fSetPosition(Mfile const * const file,long long newposition){
 				newposition+=position;
 		}
 	}else
-		q2outputMessage("Failed to obtain the current file position in setting the file position to '%lld'.",newposition);
+		q2outputMessage(M_ERROR_PREFIX,"Failed to obtain the current file position in setting the file position to '%lld'.",newposition);
 	// when newposition is valid, and we succeed in setting the file position to newposition, position should be set to that newposition
 	if(newposition>=0){
 		if(fseeko(file->_f,(off_t)newposition,SEEK_SET)==0)position=newposition;

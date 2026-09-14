@@ -31,7 +31,8 @@ Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/); // changed fr
 #define FREE_STRING(str,owner_str) free_string(disowned_string(str,owner_str))
 
 // functions that create new string instances (and therefore start with _)
-Mstring* _getString(char const * const s); // convenient constructor
+Mstring* _getStringOfChar(unsigned char ch); // MDH@09SEP2026
+Mstring* _getString(unsigned char const * const s); // convenient constructor
 Mstring* _getStringOfLength(size_t length); // MDH@13JUN2024: returns a new Mstring* of the requested length 
 
 // copying

@@ -173,6 +173,6 @@ typedef struct{
 // for requesting some or all allocation type sizes
 long long * _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes,long long *_numberOfAllocationMarks);
 
-void outputAllocationTypeMarks();
+void outputAllocationTypeMarks(char* linePrefix);
 
 void outputLocalAllocations();

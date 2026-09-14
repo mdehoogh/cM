@@ -48,7 +48,7 @@ void outputLine(char* s); // for writing a single line of output text in the inf
 
 void initDisplay();
 
-bool sessionInitialized();
+bool sessionInitialized(char *outputfilenamePrefix,char *outputfilenameSuffix);
 
 // moved over from Mfunctions.h/c because only available in interactive sessions
 Mvalue* Mbc(Mvalue* _value);

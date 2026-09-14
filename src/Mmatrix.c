@@ -539,7 +539,7 @@ Mvalue* Mmultiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value2->type==VT_TEXT){
 		long long multiplier=getValueInteger(_value1);
 		if(multiplier<0)return NULL;
-		Mstring* resultString=owned_string(_getString(_value2->value._text->presuffix),owner);
+		Mstring* resultString=owned_string(_getStringOfChar(_value2->value._text->presuffix),owner);
 		Mvalue* resultValue=NULL;
 		if(resultString!=NULL){
 			if(string_append_char(resultString,_value2->value._text->presuffix)!=NULL){

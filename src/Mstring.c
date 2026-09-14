@@ -85,12 +85,26 @@ Mstring* _getStringOfLength(size_t length){Mallocationowner owner=getOwner(__LIN
 }
 
 /**
+ * @brief creates and returns an Mstring* initialized using C single character \p ch
+ * 
+ * @param ch the character to initialize the Mstring with
+ * @return Mstring* pointer to the created and initialed Mstring
+ */
+Mstring* _getStringOfChar(unsigned char ch){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _str=owned_string(_getStringWithBlocks(1),owner);
+	if(NULL==_str)return NULL;
+	_str->_chars->chars[0]=ch;
+	_str->_chars->chars[1]='\0';
+	_str->length=1;
+	return disowned_string(_str,owner);
+}
+/**
  * @brief creates and returns an Mstring* initialized using C string \p s
  * 
  * @param s the C string to initialize the Mstring with
  * @return Mstring* pointer to the created and initialed Mstring
  */
-Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getString(unsigned char const * const s){Mallocationowner owner=getOwner(__LINE__);
 	if(NULL==s)return NULL;
 	Mstring* ans=(Mstring*)CALLOC_1(sizeof(Mstring),'S',owner);
 	if(ans!=NULL){
