@@ -1245,7 +1245,7 @@ static int getMpintSize(mp_int const * const _mpint){
  * @return int MP_OKAY on sucess
  */
 static mp_err _getMpintDecimalText(mp_int const * const a,char * str,int* size){
-	if(size<2)return MP_VAL;
+	if(*size<2)return MP_VAL;
 	// now let's compute an approximation of how many decimal digits we're going to need to allocated
 	// how about allocating this amount
 	// start of mp_to_radix function adapted to speed it up

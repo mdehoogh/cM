@@ -14,6 +14,8 @@
 #include <time.h>
 #include <limits.h>
 #include <locale.h>
+// MDH@29AUG2026: catching Ctrl+C by means of a signal
+#include <signal.h>
 
 // MDH@27FEB2020: on top of environment management we have the 'shell' for setting up the root M environment
 #include "M.h"
@@ -3487,6 +3489,8 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 		// MDH@16JAN2024: update the suggested text source to 1
 		suggestedTextSources[++suggestedTextSources[0]]=1;
 		// MDH@27JUL2025: every finisher that's suggested already does not need to be shown as finisher
+		// MDH@27MAY2026: we can make it a little more precise by demanding the same sequence in manualFeedforwardChars, which
+		//                              means that the length of what is returned needs to go up
 		char* manualFeedforwardChars=string(_manualFeedforwardText);
 		while(unsuggestedFinishers>0&&
 					strchr(manualFeedforwardChars,string_char(_finisherStack,unsuggestedFinishers-1))!=NULL)
@@ -7293,6 +7297,41 @@ size_t getValueSize(int8_t type,void* value,bool showValue){
  return result;
 }
 
+// MDH@28AUG2026: handling Ctrl-C and Ctrl-Z by means of signal handlers!!
+void cancelInputting(){
+	// replacing: if(_userInputCommand->_firstToken!=NULL){clearCommand();break;}beep();
+	if(NULL==_userInputCommand){
+		inputInfo("Nothing to clear. (Use Ctrl-H for some help.)");
+		beep();
+	}else
+	if(_userInputCommand->_firstToken){
+		/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
+		// MDH@03SEP2019: what to do when Ctrl-C is called on a previous command????? i.e. when _userInputCommand->_firstToken points to a previous command, I'd say that we should return to the current command
+		if(commandIndex==0){
+			// MDH@20OCT2021 moved over to cancelCommand() as we probably need to do that every cancelCommand(): deleteUserInputCommand();
+			cancelCommand();
+		}else
+			setCommandIndex(0);
+	} else
+		beep();
+}
+bool continue_inputting=false,continue_executing=false;
+void handle_sigint(int sig){
+	q2output("Processing Ctrl-C"); // DEBUGGING
+	if(continue_inputting){
+		cancelInputting();
+		//////continue_inputting=false; // not here, only set to false after actually finishing inputting characters
+	}
+	if(continue_executing){
+		q2output("\nExecution interrupted...\n");
+		continue_executing=false;
+	}
+}
+void handle_sigtstp(int sig){
+	q2output("Processing Ctrl-Z"); // DEBUGGING
+	//exit_handler(); // is not going to be easy....
+}
+
 /**
  * @brief main entry point of M
  * 
@@ -7423,6 +7462,27 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 		exit(3);
 	}
 
+	// MDH@29AUG2026: install Ctrl-C handler
+	// signal(SIGINT,handle_sigint);
+	struct sigaction sa;
+	sa.sa_handler=&handle_sigint;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags=SA_RESTART;
+	if(sigaction(SIGINT,&sa,NULL)==-1){
+		q2outputError("Failed to install the Ctrl-C signal handler!");
+		exit(4);
+	}
+	output("Ctrl-C signal handler installed!\n");
+	struct sigaction sa_ignore;
+	sa_ignore.sa_handler=SIG_IGN;
+	sigemptyset(&sa_ignore.sa_mask);
+	sa_ignore.sa_flags=0;
+	if(sigaction(SIGTSTP,&sa_ignore,NULL)==-1){
+		q2outputError("Failed to suppress the Ctrl-Z signal!");
+		exit(5);
+	}
+	output("Ctrl-Z handler suppressed!");
+
 	resetOutputColor(); // just in case
 	///////q2output("%s\n","Welcome to M.");
 	output("Welcome to M.");
@@ -7533,6 +7593,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			}
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
 		promptForUserInput();
+
+		continue_inputting=true; // MDH@28AUG2026: mark input
 
 		/* MDH@16MAR2019: we're behind the prompt now and should start out without a current command (in pCommnad)
 		//				if _userInputCommand->_firstToken is NOT null, we have to make it NULL
@@ -7884,21 +7946,7 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 						inputInfo("Use Ctrl-Z to exit M immediately, press the Enter key to switch to Control mode.");
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-C)
-					// replacing: if(_userInputCommand->_firstToken!=NULL){clearCommand();break;}beep(); 
-					if(NULL==_userInputCommand){
-						inputInfo("Nothing to clear. (Use Ctrl-H for some help.)");
-						beep();
-					}else
-					if(_userInputCommand->_firstToken){
-						/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
-						// MDH@03SEP2019: what to do when Ctrl-C is called on a previous command????? i.e. when _userInputCommand->_firstToken points to a previous command, I'd say that we should return to the current command
-						if(commandIndex==0){
-							// MDH@20OCT2021 moved over to cancelCommand() as we probably need to do that every cancelCommand(): deleteUserInputCommand();
-							cancelCommand();
-						}else
-							setCommandIndex(0);
-					} else
-						beep();
+					cancelInputting();
 				}else
 				if(inputCharType=='t'){ // Tab character
 					// MDH@03SEP2019: here commandCharacterAccepted() will take care of copying the command if commandIndex is not (yet) zero
@@ -8505,6 +8553,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 			if(inputCharType=='o'||inputCharType=='s')break;
 		} // end of character input 
 
+		continue_inputting=false; // MDH@28AUG2026: input can no longer be interrupted!!!
+
 		// MDH@07OCT2019: there are several places where we might get rid of any manual feed forward text still pending
 		//				but this seems to be a very good place for it
 		//				_manualFeedforwardText is only used in command and shell mode, not in control mode
@@ -8546,6 +8596,8 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore
 			}
 			outputChar('\n');
+
+			continue_executing=true; // MDH@28AUG2026: allow interrupting execution
 
 			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
 				string_setlength(_finisherStack,0); // MDH@13DEC2023: is there a better place to do this?????
@@ -8793,6 +8845,9 @@ int main(int argc, char **argv,char* envp[]){Mallocationowner owner=getOwner(__L
 					switchToCommandMode();
 			}else // Return key in control mode, always to return to command input!!
 				switchToCommandMode();
+
+			continue_executing=false; // MDH@28AUG2026: stop allowing interrupting execution
+
 		}
 		/*
 		if(inputMode!=IM_COMMAND||incompleteCommandDepth==0)

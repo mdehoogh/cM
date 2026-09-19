@@ -118,8 +118,18 @@ void enableRawmode(uint8_t timeout){
 	struct termios raw=orig_termios; // making a copy
 	raw.c_cc[VMIN]=0; // NOT doing this caused positive timeout values to fail timing out!!!!! (all of a sudden so unclear how come though)
 	raw.c_cc[VTIME]=rawmode;
+
 	// ISIG turns off Ctrl-C and Ctrl-Z
-	raw.c_lflag&=~(ECHO|ICANON|ISIG); // we kill echoing so we can first look at what we received!!
+	// Ctrl-C we want to do by means of a signal
+	raw.c_lflag&=~ICANON;
+	raw.c_lflag&=~ECHO;
+	raw.c_lflag&=~IEXTEN; // get Ctrl-Z ignored (in combination with calling sigaction appropriately
+	raw.c_lflag|=ISIG;
+	// replacing: raw.c_lflag&=~(ECHO|ICANON|ISIG); // we kill echoing so we can first look at what we received!!
+
+	// Shut off treating Ctrl-Z as a signal so we will still receive it as a key combination
+	raw.c_cc[VSUSP]=_POSIX_VDISABLE;
+
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&raw);
 }
 

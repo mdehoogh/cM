@@ -17414,6 +17414,12 @@ bool addBlockCommand(Mcommand const * const command){
 			if(NULL==nextInsertToken){q2outputBug("No continuation token");return false;}
 			if(amVerboseDebugging())
 				q2output("Next insert token: '%s'.\n",string(nextInsertToken->text)); // DEBUGGING
+
+			// MDH@28OCT2025: in order to update all next token offsets as they should, I moved linking to subsequent tokens from below to here!!	
+			// connect end of command to where the super command continues
+			command->_lastToken->next=nextInsertToken; // links the command's last token to the continuation token
+			nextInsertToken->prev=command->_lastToken; // and back
+
 			///q2outputMessage(M_INFO_PREFIX,"Continuation token of embedded command available.");
 			/*
 			Mtoken* offsetToken=environment->insertToken;
@@ -17441,13 +17447,21 @@ bool addBlockCommand(Mcommand const * const command){
 				if(block->insertToken!=NULL){
 					block->insertToken->next=firstSignificantCommandToken; // TODO insert first token as well????
 					firstSignificantCommandToken->prev=block->insertToken;
+					// MDH@28OCT2025: here would be the right place to update the token offsets of the command being linked in
+					Mtoken *offsetToken=firstSignificantCommandToken,*prevOffsetToken=block->insertToken;
+					do{
+						offsetToken->offset=prevOffsetToken->offset+string_length(prevOffsetToken->text);
+						// assuming this is an argument token inserted, we have to replicate the argument value
+						// until we bump into
+						//// offsetToken->argument=prevOffsetToken->argument;
+						prevOffsetToken=offsetToken;
+						offsetToken=offsetToken->next;
+					}while(offsetToken!=NULL);
 				}else
 					q2outputError("Insert token vanished");
 			}else
 				q2outputWarning("No significant first subcommand token");
-			// connect end of command to where the super command continues
-			command->_lastToken->next=nextInsertToken; // links the command's last token to the continuation token
-			nextInsertToken->prev=command->_lastToken; // and back
+			
 			///output("Command fully embedded.\n");
 			// the last inserted token becomes the new insert token
 			// propagate the offset token properties until bumping into a placeholder token (if any)
